@@ -68,12 +68,16 @@ export async function GET() {
       sumGrossDollars(weekRestaurantOrders, grossAmountCents) +
       sumGrossDollars(weekPlatterOrders, grossAmountCents);
 
-    // ── Avg Spend Per Table (restaurant 매장 기준) ────────────
+    // ── Avg Spend Per Table (COMPLETED gross ÷ COMPLETED 주문 수) ─
+    // 1주문 = 1테이블 기준 평균 객단가 (Square 대시보드 표준).
+    // 분할결제(payments 건수)는 Transactions 카드와 별개로 둠.
     const completedToday = todayOrders.filter((o) => o.state === "COMPLETED");
+    const restaurantCompletedGross = sumGrossDollars(completedToday, grossAmountCents);
     const avgSpend =
       completedToday.length > 0
-        ? Math.round((restaurantSales / completedToday.length) * 100) / 100
+        ? Math.round((restaurantCompletedGross / completedToday.length) * 100) / 100
         : 0;
+    // yesterdayOrders는 fetchOrders에서 ["COMPLETED"]로 받았으므로 그대로 분모로 사용
     const yestSales = sumGrossDollars(yesterdayOrders, grossAmountCents);
     const yestAvgSpend =
       yesterdayOrders.length > 0
