@@ -46,7 +46,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           aria-hidden="true"
         />
       )}
-      <Sidebar open={sidebarOpen} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className={styles.main}>{children}</main>
     </div>
   );

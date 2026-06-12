@@ -57,9 +57,9 @@ const NAV: NavGroup[] = [
   },
 ];
 
-type Props = { open: boolean };
+type Props = { open: boolean; onClose?: () => void };
 
-export default function Sidebar({ open }: Props) {
+export default function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
 
@@ -82,6 +82,7 @@ export default function Sidebar({ open }: Props) {
                 <Link
                   href={group.href}
                   className={`${styles.groupHeader} ${pathname === group.href ? styles.active : ""}`}
+                  onClick={onClose}
                 >
                   <span className={styles.icon}>{group.icon}</span>
                   <span>{group.label}</span>
@@ -107,6 +108,7 @@ export default function Sidebar({ open }: Props) {
                         <Link
                           href={item.href}
                           className={`${styles.childLink} ${pathname === item.href ? styles.active : ""}`}
+                          onClick={onClose}
                         >
                           {item.label}
                         </Link>
