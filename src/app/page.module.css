@@ -1,0 +1,276 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-7);
+  max-width: 640px;
+}
+
+/* ── 공통 카드 ── */
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cardTopRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cardLabel {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  letter-spacing: 0.08em;
+  margin: 0;
+  flex: 1;
+}
+
+.lastUpdated {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-subtle);
+  margin: 0;
+}
+
+.errorBadge {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-negative);
+  background: rgba(220, 38, 38, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  margin: 0;
+}
+
+.salesLoading {
+  opacity: 0.35;
+}
+
+/* ── TODAY SALES ── */
+.salesAmount {
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-fg);
+  line-height: 1;
+  margin: var(--space-1) 0 0;
+}
+
+.targetLabel {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  margin: 0;
+}
+
+/* ── 프로그레스 바 ── */
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.progressTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--color-surface-hover);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-warm);
+  border-radius: 99px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progressPct {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-warm);
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ── LUNCH / DINNER ── */
+.splitRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.splitCard {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.splitLabel {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.splitPax {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-fg);
+  margin: var(--space-2) 0 var(--space-1);
+  line-height: 1;
+}
+
+.splitUnit {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  letter-spacing: 0.06em;
+}
+
+.splitStaff {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  margin: 0;
+}
+
+/* ── WEEKLY PROGRESS ── */
+.weeklyAmount {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-fg);
+  margin: var(--space-1) 0 0;
+  line-height: 1;
+}
+
+.weeklyTarget {
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  color: var(--color-fg-muted);
+}
+
+/* ── STATS 3열 ── */
+.statsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.statCard {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.statValue {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+  margin: var(--space-2) 0 var(--space-1);
+}
+
+.statValueWarm {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-warm);
+  letter-spacing: -0.01em;
+  margin: var(--space-2) 0 var(--space-1);
+}
+
+.statSub {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-subtle);
+  margin: 0;
+}
+
+.statSubValue {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  margin: 0;
+}
+
+.statSubPos {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-positive);
+  margin: 0;
+}
+
+.statSubNeg {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-negative);
+  margin: 0;
+}
+
+/* ── BEST SELLERS ── */
+.sellerList {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sellerItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sellerRank {
+  width: 24px;
+  height: 24px;
+  border-radius: 99px;
+  background: var(--color-warm);
+  color: #ffffff;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sellerName {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg);
+}
+
+.sellerSales {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-fg);
+}

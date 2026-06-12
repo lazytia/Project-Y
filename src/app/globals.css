@@ -20,6 +20,14 @@
   --color-accent: #111113;
   --color-accent-fg: #ffffff;
 
+  /* Color — warm (대시보드 강조) */
+  --color-warm: #E8440A;
+  --color-warm-bg: rgba(232, 68, 10, 0.08);
+
+  /* Color — positive / negative delta */
+  --color-positive: #16A34A;
+  --color-negative: #DC2626;
+
   /* Spacing scale */
   --space-1: 4px;
   --space-2: 8px;
@@ -36,11 +44,13 @@
 
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-size-xs: 11px;
   --font-size-sm: 13px;
   --font-size-md: 14px;
   --font-size-lg: 16px;
   --font-size-xl: 20px;
   --font-size-2xl: 28px;
+  --font-size-3xl: 42px;
 
   /* Layout */
   --sidebar-width: 260px;
