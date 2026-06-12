@@ -61,6 +61,7 @@ export async function GET() {
     }
     const peakEntry = Object.entries(hourCounts).sort((a, b) => Number(b[1]) - Number(a[1]))[0];
     const peakHour = peakEntry ? formatHour(Number(peakEntry[0])) : null;
+    const peakHourOrders = peakEntry ? Number(peakEntry[1]) : 0;
 
     // ── Best Sellers ──────────────────────────────────────────
     const itemMap: Record<string, { sales: number; quantity: number }> = {};
@@ -87,6 +88,7 @@ export async function GET() {
       avgSpendPerTable: avgSpend,
       avgSpendChange: Math.round((avgSpend - yestAvgSpend) * 100) / 100,
       peakHour,
+      peakHourOrders,
       bestSellers,
     });
   } catch (err) {

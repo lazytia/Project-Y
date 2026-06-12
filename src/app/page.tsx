@@ -68,6 +68,7 @@ export default function DashboardPage() {
     avgSpendPerTable: number;
     avgSpendChange: number;
     peakHour: string | null;
+    peakHourOrders: number;
     bestSellers: { name: string; sales: number; quantity: number }[];
   } | null>(null);
   const [statsError, setStatsError] = useState(false);
@@ -101,6 +102,7 @@ export default function DashboardPage() {
   const avgSpendPerTable   = stats?.avgSpendPerTable ?? null;
   const avgSpendChange     = stats?.avgSpendChange ?? null;
   const peakHour           = stats?.peakHour ?? null;
+  const peakHourOrders     = stats?.peakHourOrders ?? null;
   const bestSellers        = stats?.bestSellers ?? [];
   const projectedTables    = mock.projectedTables;
 
@@ -171,6 +173,9 @@ export default function DashboardPage() {
           <p className={`${styles.statValueWarm} ${peakHour === null ? styles.salesLoading : ""}`}>
             {peakHour ?? "—"}
           </p>
+          {peakHourOrders !== null && peakHourOrders > 0 && (
+            <p className={styles.statSubValue}>{peakHourOrders} orders</p>
+          )}
         </div>
         <div className={styles.statCard}>
           <p className={styles.statLabel}>AVG SPEND PER TABLE</p>
