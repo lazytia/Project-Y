@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
-import { getAuth as fbGetAuth, type Auth } from "firebase/auth";
+import { initializeAuth, getAuth as fbGetAuth, browserLocalPersistence, type Auth } from "firebase/auth";
 import { getFirestore as fbGetFirestore, type Firestore } from "firebase/firestore";
 import { getStorage as fbGetStorage, type FirebaseStorage } from "firebase/storage";
 
@@ -30,7 +30,15 @@ function app(): FirebaseApp {
 }
 
 export function getAuth(): Auth {
-  if (!_auth) _auth = fbGetAuth(app());
+  if (!_auth) {
+    try {
+      // browserLocalPersistence: 로그아웃 전까지 영구 로그인 유지
+      _auth = initializeAuth(app(), { persistence: browserLocalPersistence });
+    } catch {
+      // App Hosting 등에서 이미 초기화된 경우 기존 인스턴스 반환
+      _auth = fbGetAuth(app());
+    }
+  }
   return _auth;
 }
 
