@@ -6,10 +6,10 @@
 
 :root {
   /* Color — surface */
-  --color-bg: #ffffff;
-  --color-surface: #f7f7f8;
-  --color-surface-hover: #ececee;
-  --color-border: #e2e2e6;
+  --color-bg: #FFFFFF;
+  --color-surface: #F7F7F8;
+  --color-surface-hover: #ECECEC;
+  --color-border: #ECECEC;
 
   /* Color — text */
   --color-fg: #111111;
