@@ -1,0 +1,72 @@
+/*
+ * Project Y — global theme tokens.
+ * Change values here to reskin the entire app.
+ * Component styles live in *.module.css and consume these variables.
+ */
+
+:root {
+  /* Color — surface */
+  --color-bg: #0b0d10;
+  --color-surface: #14171c;
+  --color-surface-hover: #1c2027;
+  --color-border: #262b33;
+
+  /* Color — text */
+  --color-fg: #e6e8eb;
+  --color-fg-muted: #8a91a0;
+  --color-fg-subtle: #5a6273;
+
+  /* Color — accent */
+  --color-accent: #4f8cff;
+  --color-accent-fg: #ffffff;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 28px;
+
+  /* Layout */
+  --sidebar-width: 260px;
+  --header-height: 56px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
