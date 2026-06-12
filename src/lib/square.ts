@@ -110,6 +110,9 @@ export async function countPayments(
     endTime,
     locationId,
     limit: 100,
+    // sortField is required by the API even when defaulted in docs; without it
+    // the SDK sends an empty string which Square rejects as INVALID_ENUM_VALUE.
+    sortField: "CREATED_AT",
   });
   for await (const _ of iter) count++;
   return count;
