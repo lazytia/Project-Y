@@ -1,12 +1,138 @@
+/* ── 사이드바 컨테이너 ── */
 .sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   padding: var(--space-5) var(--space-3);
+  padding-top: calc(var(--space-5) + 48px);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  overflow-y: auto;
+  z-index: 100;
+  transform: translateX(0);
+  transition: transform 0.25s ease;
 }
 
+.sidebarClosed {
+  transform: translateX(-100%);
+}
+
+/* ── 브랜드 ── */
+.brand {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  padding: 0 var(--space-3);
+  letter-spacing: 0.02em;
+}
+
+/* ── 네비게이션 ── */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 그룹 헤더 (Link 또는 button 공통) ── */
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg);
+  font-weight: 600;
+  font-size: var(--font-size-md);
+  /* button reset */
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.groupHeader:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-fg);
+}
+
+.icon {
+  font-size: 16px;
+  width: 20px;
+  display: inline-flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.groupLabel {
+  flex: 1;
+}
+
+/* ── 아코디언 쉐브론 ── */
+.chevron {
+  font-size: 18px;
+  color: var(--color-fg-subtle);
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+  line-height: 1;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+/* ── 자식 메뉴 (아코디언) ── */
+.children {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+}
+
+.childrenOpen {
+  max-height: 400px;
+  opacity: 1;
+}
+
+.childrenClosed {
+  max-height: 0;
+  opacity: 0;
+}
+
+.childLink {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.childLink:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-fg);
+}
+
+.active {
+  background: var(--color-surface-hover);
+  color: var(--color-accent);
+}
+
+/* ── 하단 사용자 영역 ── */
 .footer {
   margin-top: auto;
   padding: var(--space-3);
@@ -32,73 +158,9 @@
   padding: var(--space-2);
   font-size: var(--font-size-sm);
   cursor: pointer;
+  font-family: inherit;
 }
 
 .signOut:hover {
   background: var(--color-surface-hover);
-}
-
-.brand {
-  font-size: var(--font-size-xl);
-  font-weight: 700;
-  padding: 0 var(--space-3);
-  letter-spacing: 0.02em;
-}
-
-.nav {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.groupHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  color: var(--color-fg);
-  font-weight: 600;
-  font-size: var(--font-size-md);
-}
-
-.icon {
-  font-size: 16px;
-  width: 20px;
-  display: inline-flex;
-  justify-content: center;
-}
-
-.children {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 var(--space-6);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.childLink {
-  display: block;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  color: var(--color-fg-muted);
-  font-size: var(--font-size-sm);
-}
-
-.childLink:hover,
-.groupHeader:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-fg);
-}
-
-.active {
-  background: var(--color-surface-hover);
-  color: var(--color-accent);
 }

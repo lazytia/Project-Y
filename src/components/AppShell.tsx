@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import { useAuth } from "./AuthProvider";
@@ -10,6 +11,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   if (loading) {
     return <div className={styles.loading}>Loading…</div>;
@@ -25,8 +27,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={styles.shell}>
-      <Sidebar />
-      <main className={styles.main}>{children}</main>
+      <button
+        className={styles.hamburger}
+        onClick={() => setSidebarOpen((o) => !o)}
+        aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+      >
+        <span className={styles.bar} />
+        <span className={styles.bar} />
+        <span className={styles.bar} />
+      </button>
+      <Sidebar open={sidebarOpen} />
+      <main className={`${styles.main} ${sidebarOpen ? styles.mainShifted : ""}`}>
+        {children}
+      </main>
     </div>
   );
 }

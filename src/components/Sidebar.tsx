@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
@@ -56,46 +57,71 @@ const NAV: NavGroup[] = [
   },
 ];
 
-export default function Sidebar() {
+type Props = { open: boolean };
+
+export default function Sidebar({ open }: Props) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
 
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(NAV.filter((g) => g.children).map((g) => g.label)),
+  );
+
+  const toggleGroup = (label: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
+
   return (
-    <aside className={styles.sidebar}>
+    <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
       <div className={styles.brand}>Project Y</div>
       <nav className={styles.nav}>
-        {NAV.map((group) => (
-          <div key={group.label} className={styles.group}>
-            {group.href ? (
-              <Link
-                href={group.href}
-                className={`${styles.groupHeader} ${pathname === group.href ? styles.active : ""}`}
-              >
-                <span className={styles.icon}>{group.icon}</span>
-                <span>{group.label}</span>
-              </Link>
-            ) : (
-              <div className={styles.groupHeader}>
-                <span className={styles.icon}>{group.icon}</span>
-                <span>{group.label}</span>
-              </div>
-            )}
-            {group.children && (
-              <ul className={styles.children}>
-                {group.children.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={`${styles.childLink} ${pathname === item.href ? styles.active : ""}`}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
+        {NAV.map((group) => {
+          const isExpanded = !group.children || expandedGroups.has(group.label);
+          return (
+            <div key={group.label} className={styles.group}>
+              {group.href ? (
+                <Link
+                  href={group.href}
+                  className={`${styles.groupHeader} ${pathname === group.href ? styles.active : ""}`}
+                >
+                  <span className={styles.icon}>{group.icon}</span>
+                  <span>{group.label}</span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.groupHeader}
+                  onClick={() => toggleGroup(group.label)}
+                >
+                  <span className={styles.icon}>{group.icon}</span>
+                  <span className={styles.groupLabel}>{group.label}</span>
+                  <span className={`${styles.chevron} ${isExpanded ? styles.chevronOpen : ""}`}>
+                    ›
+                  </span>
+                </button>
+              )}
+              {group.children && (
+                <ul className={`${styles.children} ${isExpanded ? styles.childrenOpen : styles.childrenClosed}`}>
+                  {group.children.map((item) => (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={`${styles.childLink} ${pathname === item.href ? styles.active : ""}`}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </nav>
       <div className={styles.footer}>
         <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
