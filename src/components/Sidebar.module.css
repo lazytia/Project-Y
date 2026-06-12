@@ -28,11 +28,12 @@
 /* 모바일/태블릿: 햄버거 아래 플로팅 패널 */
 @media (max-width: 1024px) {
   .sidebar {
-    top: 56px;          /* 햄버거(36px) + 여백 아래 */
-    bottom: auto;       /* 콘텐츠 높이만큼만 */
+    /* 모바일 헤더(52px) + 상태바 safe area 아래에서 시작 */
+    top: calc(56px + env(safe-area-inset-top, 0px));
+    bottom: auto;
     left: var(--space-3);
     width: calc(var(--sidebar-width) - var(--space-3));
-    max-height: calc(100vh - 72px);
+    max-height: calc(100vh - 72px - env(safe-area-inset-top, 0px));
     overflow-y: auto;
     padding: var(--space-4) var(--space-3);
     border-right: none;
