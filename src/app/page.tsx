@@ -122,7 +122,7 @@ export default function DashboardPage() {
               {lastUpdated.toLocaleTimeString("en-US", {
                 hour: "2-digit",
                 minute: "2-digit",
-              })} 업데이트
+              })} updated
             </p>
           )}
           {statsError && (
