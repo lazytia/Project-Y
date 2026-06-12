@@ -4,3 +4,13 @@ runConfig:
   concurrency: 80
   cpu: 1
   memoryMiB: 512
+
+env:
+  - variable: SQUARE_ACCESS_TOKEN
+    secret: SQUARE_ACCESS_TOKEN
+  - variable: SQUARE_LOCATION_ID
+    secret: SQUARE_LOCATION_ID
+  - variable: SQUARE_TIMEZONE
+    secret: SQUARE_TIMEZONE
+  - variable: SQUARE_ENV
+    secret: SQUARE_ENV
