@@ -37,17 +37,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPublic = PUBLIC_ROUTES.has(pathname);
     if (!user && !isPublic) {
       router.replace(ROUTES.login);
-      router.refresh();
     } else if (user && isPublic) {
       router.replace(ROUTES.home);
-      router.refresh();
     }
   }, [user, loading, pathname, router]);
 
   const signOut = async () => {
     await fbSignOut(getAuth());
     router.replace(ROUTES.login);
-    router.refresh();
   };
 
   return (

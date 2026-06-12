@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
 import { usernameToEmail } from "@/lib/username";
+import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +25,8 @@ export default function LoginPage() {
         usernameToEmail(username),
         password,
       );
-      // AuthProvider's redirect effect takes over once auth state propagates.
+      // 인증 성공 즉시 이동 — AuthProvider의 effect 체인을 기다리지 않음
+      router.push(ROUTES.home);
     } catch {
       setError("Invalid username or password");
       setBusy(false);
