@@ -1,10 +1,33 @@
-.claude/
+# Dependencies
 node_modules/
+
+# Build output
 .next/
 out/
 build/
-.env*.local
-.DS_Store
 *.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Editor / tooling local state
+.claude/
+.cursor/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js auto-generated
 next-env.d.ts
+
+# Misc
 .vercel
