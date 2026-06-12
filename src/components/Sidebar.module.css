@@ -5,32 +5,37 @@
   top: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  background: var(--color-surface);
+  background: var(--color-bg);
   border-right: 1px solid var(--color-border);
   padding: var(--space-5) var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-3);
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: 200;
   transform: translateX(0);
-  transition: transform 0.25s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 데스크탑에서는 항상 표시 */
+/* 데스크탑: 항상 표시 */
 @media (min-width: 1025px) {
   .sidebar {
     transform: translateX(0) !important;
   }
 }
 
-/* 모바일/태블릿에서 닫힘 처리 */
+/* 모바일/태블릿: 아이폰 드로어 스타일 */
 @media (max-width: 1024px) {
   .sidebar {
-    padding-top: calc(var(--space-5) + 48px);
+    padding-top: calc(var(--space-5) + 52px);
+    border-right: none;
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.12), 1px 0 0 rgba(0, 0, 0, 0.06);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   }
+
   .sidebarClosed {
-    transform: translateX(-100%);
+    transform: translateX(-110%);
   }
 }
 
@@ -38,15 +43,18 @@
 .brand {
   font-size: var(--font-size-xl);
   font-weight: 700;
-  padding: 0 var(--space-3);
-  letter-spacing: 0.02em;
+  padding: var(--space-2) var(--space-3) var(--space-4);
+  letter-spacing: -0.01em;
+  color: var(--color-fg);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-1);
 }
 
 /* ── 네비게이션 ── */
 .nav {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .group {
@@ -54,33 +62,37 @@
   flex-direction: column;
 }
 
-/* ── 그룹 헤더 (Link 또는 button 공통) ── */
+/* ── 그룹 헤더 ── */
 .groupHeader {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--color-fg);
   font-weight: 600;
   font-size: var(--font-size-md);
-  /* button reset */
   width: 100%;
   background: transparent;
   border: none;
   text-align: left;
   cursor: pointer;
   font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .groupHeader:hover {
+  background: var(--color-surface);
+}
+
+.groupHeader:active {
   background: var(--color-surface-hover);
-  color: var(--color-fg);
 }
 
 .icon {
   font-size: 16px;
-  width: 20px;
+  width: 22px;
   display: inline-flex;
   justify-content: center;
   flex-shrink: 0;
@@ -90,58 +102,72 @@
   flex: 1;
 }
 
-/* ── 아코디언 쉐브론 ── */
+/* ── 쉐브론 ── */
 .chevron {
-  font-size: 18px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-fg-subtle);
-  display: inline-block;
-  transform: rotate(0deg);
-  transition: transform 0.2s ease;
+  font-size: 16px;
+  font-style: normal;
   line-height: 1;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: rotate(0deg);
+  flex-shrink: 0;
 }
 
 .chevronOpen {
   transform: rotate(90deg);
 }
 
-/* ── 자식 메뉴 (아코디언) ── */
+/* ── 아코디언: CSS grid 트릭으로 진짜 부드러운 높이 전환 ── */
+.collapseWrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.collapseOpen {
+  grid-template-rows: 1fr;
+}
+
+/* ── 자식 메뉴 ── */
 .children {
   list-style: none;
   margin: 0;
-  padding: 0 0 0 var(--space-6);
+  padding: var(--space-1) 0 var(--space-1) calc(var(--space-2) + 22px);
   display: flex;
   flex-direction: column;
   gap: 2px;
   overflow: hidden;
-  transition: max-height 0.25s ease, opacity 0.2s ease;
-}
-
-.childrenOpen {
-  max-height: 400px;
-  opacity: 1;
-}
-
-.childrenClosed {
-  max-height: 0;
-  opacity: 0;
+  min-height: 0;
 }
 
 .childLink {
   display: block;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--color-fg-muted);
   font-size: var(--font-size-sm);
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .childLink:hover {
-  background: var(--color-surface-hover);
+  background: var(--color-surface);
   color: var(--color-fg);
+}
+
+.childLink:active {
+  background: var(--color-surface-hover);
 }
 
 .active {
   background: var(--color-surface-hover);
   color: var(--color-accent);
+  font-weight: 500;
 }
 
 /* ── 하단 사용자 영역 ── */
@@ -165,14 +191,18 @@
 .signOut {
   background: transparent;
   border: 1px solid var(--color-border);
-  color: var(--color-fg);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2);
+  color: var(--color-fg-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
   font-size: var(--font-size-sm);
   cursor: pointer;
   font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  text-align: left;
 }
 
 .signOut:hover {
-  background: var(--color-surface-hover);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  border-color: var(--color-fg-subtle);
 }

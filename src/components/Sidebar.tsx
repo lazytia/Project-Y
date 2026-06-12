@@ -100,18 +100,20 @@ export default function Sidebar({ open }: Props) {
                 </button>
               )}
               {group.children && (
-                <ul className={`${styles.children} ${isExpanded ? styles.childrenOpen : styles.childrenClosed}`}>
-                  {group.children.map((item) => (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        className={`${styles.childLink} ${pathname === item.href ? styles.active : ""}`}
-                      >
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <div className={`${styles.collapseWrap} ${isExpanded ? styles.collapseOpen : ""}`}>
+                  <ul className={styles.children}>
+                    {group.children.map((item) => (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          className={`${styles.childLink} ${pathname === item.href ? styles.active : ""}`}
+                        >
+                          {item.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           );
