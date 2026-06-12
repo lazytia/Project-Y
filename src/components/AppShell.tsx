@@ -11,7 +11,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // 모바일: 기본 닫힘 / 데스크탑: CSS에서 항상 강제 표시
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) {
     return <div className={styles.loading}>Loading…</div>;
