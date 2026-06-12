@@ -193,43 +193,51 @@ export default function DashboardPage() {
         <Progress value={weeklyProgress} max={WEEKLY_TARGET} />
       </section>
 
-      {/* STATS */}
-      <div className={styles.statsRow}>
-        <div className={styles.statCard}>
+      {/* STATS — 하나의 카드, 세로 구분선 */}
+      <section className={styles.statsCard}>
+        <div className={styles.statCol}>
           <p className={styles.statLabel}>PEAK HOUR TODAY</p>
           <p className={`${styles.statValueWarm} ${peakHour === null ? styles.salesLoading : ""}`}>
             {peakHour ?? "—"}
           </p>
           <div className={styles.statDivider} />
-          {peakHourOrders !== null && peakHourOrders > 0 && (
-            <p className={styles.statSubValue}>{peakHourOrders} orders</p>
-          )}
+          <p className={styles.statSubValue}>
+            {peakHourOrders !== null && peakHourOrders > 0 ? `${peakHourOrders} orders` : "—"}
+          </p>
         </div>
-        <div className={styles.statCard}>
+
+        <div className={styles.statColDivider} />
+
+        <div className={styles.statCol}>
           <p className={styles.statLabel}>AVG SPEND PER TABLE</p>
           <p className={`${styles.statValue} ${avgSpendPerTable === null ? styles.salesLoading : ""}`}>
             {avgSpendPerTable === null ? "—" : fmt(avgSpendPerTable)}
           </p>
+          <div className={styles.statDivider} />
           <p className={styles.statSub}>vs yesterday</p>
           {avgSpendChange !== null && (
             <p className={avgSpendChange >= 0 ? styles.statSubPos : styles.statSubNeg}>
-              {avgSpendChange >= 0 ? "+" : ""}{fmt(avgSpendChange)} {avgSpendChange >= 0 ? "↗" : "↘"}
+              {avgSpendChange >= 0 ? "+" : ""}{fmt(avgSpendChange)}&nbsp;{avgSpendChange >= 0 ? "↗" : "↘"}
             </p>
           )}
         </div>
-        <div className={styles.statCard}>
+
+        <div className={styles.statColDivider} />
+
+        <div className={styles.statCol}>
           <p className={styles.statLabel}>TRANSACTIONS</p>
           <p className={`${styles.statValue} ${transactions === null ? styles.salesLoading : ""}`}>
             {transactions ?? "—"}
           </p>
+          <div className={styles.statDivider} />
           <p className={styles.statSub}>vs yesterday</p>
           {transactionsChange !== null && (
             <p className={transactionsChange >= 0 ? styles.statSubPos : styles.statSubNeg}>
-              {transactionsChange >= 0 ? "+" : ""}{transactionsChange} {transactionsChange >= 0 ? "↗" : "↘"}
+              {transactionsChange >= 0 ? "+" : ""}{transactionsChange}&nbsp;{transactionsChange >= 0 ? "↗" : "↘"}
             </p>
           )}
         </div>
-      </div>
+      </section>
 
       {/* BEST SELLERS */}
       <section className={styles.card}>
