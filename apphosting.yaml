@@ -14,3 +14,5 @@ env:
     secret: SQUARE_TIMEZONE
   - variable: SQUARE_ENV
     secret: SQUARE_ENV
+  - variable: SQUARE_PLATTER_LOCATION_ID
+    secret: SQUARE_PLATTER_LOCATION_ID

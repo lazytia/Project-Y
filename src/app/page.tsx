@@ -67,6 +67,8 @@ export default function DashboardPage() {
     transactionsChange: number;
     avgSpendPerTable: number;
     avgSpendChange: number;
+    restaurantSales: number;
+    platterSales: number;
     peakHour: string | null;
     peakHourOrders: number;
     bestSellers: { name: string; sales: number; quantity: number }[];
@@ -101,6 +103,8 @@ export default function DashboardPage() {
   const transactionsChange = stats?.transactionsChange ?? null;
   const avgSpendPerTable   = stats?.avgSpendPerTable ?? null;
   const avgSpendChange     = stats?.avgSpendChange ?? null;
+  const restaurantSales    = stats?.restaurantSales ?? null;
+  const platterSales       = stats?.platterSales ?? null;
   const peakHour           = stats?.peakHour ?? null;
   const peakHourOrders     = stats?.peakHourOrders ?? null;
   const bestSellers        = stats?.bestSellers ?? [];
@@ -109,7 +113,7 @@ export default function DashboardPage() {
   return (
     <div className={styles.page}>
 
-      {/* TODAY SALES */}
+      {/* TODAY SALES — RESTAURANT / PLATTER 포함 */}
       <section className={styles.card}>
         <div className={styles.cardTopRow}>
           <p className={styles.cardLabel}>TODAY SALES</p>
@@ -132,6 +136,29 @@ export default function DashboardPage() {
           Target&nbsp;&nbsp;<strong>{fmt(dailyTarget)}</strong>
         </p>
         <Progress value={todaySales ?? 0} max={dailyTarget} />
+
+        {/* 카드 내부 구분선 + 레스토랑/플래터 분리 */}
+        <div className={styles.salesBreakRow}>
+          <div className={styles.salesBreakItem}>
+            <p className={styles.cardLabel}>RESTAURANT SALES</p>
+            <div className={styles.salesBreakItemBottom}>
+              <p className={`${styles.salesBreakAmount} ${restaurantSales === null ? styles.salesLoading : ""}`}>
+                {restaurantSales === null ? "—" : fmt(restaurantSales)}
+              </p>
+              <div className={styles.salesBreakIcon}>🍴</div>
+            </div>
+          </div>
+          <div className={styles.salesBreakDivider} />
+          <div className={styles.salesBreakItem}>
+            <p className={styles.cardLabel}>PLATTER SALES</p>
+            <div className={styles.salesBreakItemBottom}>
+              <p className={`${styles.salesBreakAmount} ${platterSales === null ? styles.salesLoading : ""}`}>
+                {platterSales === null ? "—" : fmt(platterSales)}
+              </p>
+              <div className={styles.salesBreakIcon}>🍽</div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* LUNCH / DINNER */}
@@ -173,6 +200,7 @@ export default function DashboardPage() {
           <p className={`${styles.statValueWarm} ${peakHour === null ? styles.salesLoading : ""}`}>
             {peakHour ?? "—"}
           </p>
+          <div className={styles.statDivider} />
           {peakHourOrders !== null && peakHourOrders > 0 && (
             <p className={styles.statSubValue}>{peakHourOrders} orders</p>
           )}
