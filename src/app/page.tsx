@@ -171,8 +171,6 @@ export default function DashboardPage() {
           <p className={`${styles.statValueWarm} ${peakHour === null ? styles.salesLoading : ""}`}>
             {peakHour ?? "—"}
           </p>
-          <p className={styles.statSub}>Projected</p>
-          <p className={styles.statSubValue}>{projectedTables} TABLES</p>
         </div>
         <div className={styles.statCard}>
           <p className={styles.statLabel}>AVG SPEND PER TABLE</p>
