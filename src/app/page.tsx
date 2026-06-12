@@ -23,10 +23,6 @@ const DAILY_TARGETS: Record<number, number> = {
 const POLL_INTERVAL_MS = 30_000;
 
 const mock = {
-  lunchPax: 42,
-  lunchStaff: 5,
-  dinnerPax: 58,
-  dinnerStaff: 6,
   projectedTables: 18,
 };
 
@@ -63,6 +59,12 @@ export default function DashboardPage() {
     peakHourOrders: number;
     bestSellers: { name: string; sales: number; quantity: number }[];
   } | null>(null);
+  const [counts, setCounts] = useState<{
+    lunchPax: number;
+    dinnerPax: number;
+    lunchStaff: number;
+    dinnerStaff: number;
+  } | null>(null);
   const [statsError, setStatsError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -80,13 +82,31 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/system-yurica/today-counts");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setCounts(await res.json());
+    } catch (err) {
+      console.error("[system_yurica] fetch error:", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
-    const id = setInterval(fetchStats, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [fetchStats]);
+    fetchCounts();
+    const id1 = setInterval(fetchStats, POLL_INTERVAL_MS);
+    const id2 = setInterval(fetchCounts, POLL_INTERVAL_MS);
+    return () => {
+      clearInterval(id1);
+      clearInterval(id2);
+    };
+  }, [fetchStats, fetchCounts]);
 
-  const { lunchPax, lunchStaff, dinnerPax, dinnerStaff } = mock;
+  const lunchPax    = counts?.lunchPax ?? null;
+  const dinnerPax   = counts?.dinnerPax ?? null;
+  const lunchStaff  = counts?.lunchStaff ?? null;
+  const dinnerStaff = counts?.dinnerStaff ?? null;
 
   const todaySales     = stats?.todaySales ?? null;
   const weeklyProgress = stats?.weeklyProgress ?? null;
@@ -156,20 +176,20 @@ export default function DashboardPage() {
       <div className={styles.splitRow}>
         <section className={styles.splitCard}>
           <p className={styles.splitLabel}>☀ LUNCH</p>
-          <p className={styles.splitPax}>
-            {lunchPax} <span className={styles.splitUnit}>PAX</span>
+          <p className={`${styles.splitPax} ${lunchPax === null ? styles.salesLoading : ""}`}>
+            {lunchPax ?? "—"} <span className={styles.splitUnit}>PAX</span>
           </p>
           <p className={styles.splitStaff}>
-            👥 {lunchStaff} <span className={styles.splitUnit}>STAFF</span>
+            👥 {lunchStaff ?? "—"} <span className={styles.splitUnit}>STAFF</span>
           </p>
         </section>
         <section className={styles.splitCard}>
           <p className={styles.splitLabel}>🌙 DINNER</p>
-          <p className={styles.splitPax}>
-            {dinnerPax} <span className={styles.splitUnit}>PAX</span>
+          <p className={`${styles.splitPax} ${dinnerPax === null ? styles.salesLoading : ""}`}>
+            {dinnerPax ?? "—"} <span className={styles.splitUnit}>PAX</span>
           </p>
           <p className={styles.splitStaff}>
-            👥 {dinnerStaff} <span className={styles.splitUnit}>STAFF</span>
+            👥 {dinnerStaff ?? "—"} <span className={styles.splitUnit}>STAFF</span>
           </p>
         </section>
       </div>

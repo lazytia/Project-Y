@@ -1,0 +1,31 @@
+/**
+ * Client for the system_yurica integration endpoint that exposes today's
+ * booking PAX and roster staff counts to this dashboard.
+ */
+
+const UPSTREAM_BASE =
+  process.env.SYSTEM_YURICA_BASE?.trim() || "https://project-y.yurica.com.au";
+
+export type TodayCounts = {
+  date: string;
+  lunchPax: number;
+  dinnerPax: number;
+  lunchStaff: number;
+  dinnerStaff: number;
+};
+
+export async function fetchSystemYuricaTodayCounts(): Promise<TodayCounts> {
+  const token = process.env.SYSTEM_YURICA_TOKEN?.trim();
+  if (!token) {
+    throw new Error("SYSTEM_YURICA_TOKEN not configured");
+  }
+  const res = await fetch(`${UPSTREAM_BASE}/api/integrations/project-y/today`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Upstream ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return (await res.json()) as TodayCounts;
+}

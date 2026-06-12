@@ -16,3 +16,6 @@ env:
     secret: SQUARE_ENV
   - variable: SQUARE_PLATTER_LOCATION_ID
     secret: SQUARE_PLATTER_LOCATION_ID
+  # Bearer token for system_yurica integration endpoint (PAX + roster staff).
+  - variable: SYSTEM_YURICA_TOKEN
+    secret: SYSTEM_YURICA_TOKEN
