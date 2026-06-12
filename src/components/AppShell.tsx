@@ -27,15 +27,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={styles.shell}>
-      <button
-        className={styles.hamburger}
-        onClick={() => setSidebarOpen((o) => !o)}
-        aria-label={sidebarOpen ? "Close menu" : "Open menu"}
-      >
-        <span className={styles.bar} />
-        <span className={styles.bar} />
-        <span className={styles.bar} />
-      </button>
+      <div className={styles.mobileHeader}>
+        <button
+          className={styles.hamburger}
+          onClick={() => setSidebarOpen((o) => !o)}
+          aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+        >
+          <span className={styles.bar} />
+          <span className={styles.bar} />
+          <span className={styles.bar} />
+        </button>
+        <span className={styles.mobileBrand}>Project Y</span>
+      </div>
       {sidebarOpen && (
         <div
           className={styles.backdrop}

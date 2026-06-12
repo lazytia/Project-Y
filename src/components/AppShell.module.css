@@ -10,9 +10,38 @@
   min-height: 100vh;
 }
 
-/* ── 햄버거: 데스크탑에서는 숨김 ── */
-.hamburger {
+/* ── 모바일 헤더: 데스크탑에서는 숨김 ── */
+.mobileHeader {
   display: none;
+}
+
+.mobileBrand {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+/* ── 햄버거 버튼 기본 스타일 ── */
+.hamburger {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.hamburger:hover {
+  background: var(--color-surface-hover);
 }
 
 /* ── 모바일 배경 오버레이 ── */
@@ -45,28 +74,19 @@
     padding-top: calc(var(--space-4) + 52px);
   }
 
-  .hamburger {
+  .mobileHeader {
     display: flex;
     position: fixed;
-    top: var(--space-3);
-    left: var(--space-3);
-    z-index: 300;
-    width: 36px;
-    height: 36px;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
     background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    flex-direction: column;
+    border-bottom: 1px solid var(--color-border);
     align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 0;
-    transition: background 0.15s;
-  }
-
-  .hamburger:hover {
-    background: var(--color-surface-hover);
+    padding: 0 var(--space-3);
+    gap: var(--space-3);
+    z-index: 300;
   }
 
   .bar {

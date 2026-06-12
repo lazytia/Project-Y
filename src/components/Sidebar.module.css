@@ -37,6 +37,10 @@
   .sidebarClosed {
     transform: translateX(-110%);
   }
+
+  .brand {
+    display: none;
+  }
 }
 
 /* ── 브랜드 ── */
