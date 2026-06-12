@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
+import Splash from "./Splash";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
 import styles from "./AppShell.module.css";
@@ -15,7 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) {
-    return <div className={styles.loading}>Loading…</div>;
+    return <Splash />;
   }
 
   if (isPublic) {
@@ -23,7 +24,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <div className={styles.loading}>Redirecting…</div>;
+    return <Splash label="Redirecting…" />;
   }
 
   return (
