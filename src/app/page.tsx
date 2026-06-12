@@ -1,7 +1,30 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import styles from "./page.module.css";
+
+const SYDNEY_TZ = "Australia/Sydney";
+
+function sydneyTodayKey(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
+}
+
+function dowOfDateKey(dateKey: string): number {
+  // Anchor at noon avoids DST edge cases.
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+}
+
+function formatDateLabel(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
 
 const WEEKLY_TARGET = 30_000;
 
@@ -43,8 +66,10 @@ function Progress({ value, max }: { value: number; max: number }) {
 }
 
 export default function DashboardPage() {
-  const todayDow = new Date().getDay();
-  const dailyTarget = DAILY_TARGETS[todayDow];
+  const todayKey = useMemo(sydneyTodayKey, []);
+  const [selectedDate, setSelectedDate] = useState<string>(todayKey);
+  const isToday = selectedDate === todayKey;
+  const dailyTarget = DAILY_TARGETS[dowOfDateKey(selectedDate)];
 
   const [stats, setStats] = useState<{
     todaySales: number;
@@ -68,9 +93,10 @@ export default function DashboardPage() {
   const [statsError, setStatsError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (dateKey: string) => {
     try {
-      const res = await fetch("/api/square/today-stats");
+      const url = `/api/square/today-stats?date=${encodeURIComponent(dateKey)}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setStats(data);
@@ -82,9 +108,10 @@ export default function DashboardPage() {
     }
   }, []);
 
-  const fetchCounts = useCallback(async () => {
+  const fetchCounts = useCallback(async (dateKey: string) => {
     try {
-      const res = await fetch("/api/system-yurica/today-counts");
+      const url = `/api/system-yurica/today-counts?date=${encodeURIComponent(dateKey)}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setCounts(await res.json());
     } catch (err) {
@@ -92,16 +119,22 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Reset displayed values on date change so we don't briefly show stale numbers.
   useEffect(() => {
-    fetchStats();
-    fetchCounts();
-    const id1 = setInterval(fetchStats, POLL_INTERVAL_MS);
-    const id2 = setInterval(fetchCounts, POLL_INTERVAL_MS);
+    setStats(null);
+    setCounts(null);
+    setLastUpdated(null);
+    fetchStats(selectedDate);
+    fetchCounts(selectedDate);
+    // Live poll only when viewing today — historical days don't change.
+    if (!isToday) return;
+    const id1 = setInterval(() => fetchStats(selectedDate), POLL_INTERVAL_MS);
+    const id2 = setInterval(() => fetchCounts(selectedDate), POLL_INTERVAL_MS);
     return () => {
       clearInterval(id1);
       clearInterval(id2);
     };
-  }, [fetchStats, fetchCounts]);
+  }, [selectedDate, isToday, fetchStats, fetchCounts]);
 
   const lunchPax    = counts?.lunchPax ?? null;
   const dinnerPax   = counts?.dinnerPax ?? null;
@@ -121,8 +154,64 @@ export default function DashboardPage() {
   const bestSellers        = stats?.bestSellers ?? [];
   const projectedTables    = mock.projectedTables;
 
+  const goToToday = () => setSelectedDate(todayKey);
+  const goPrev = () => {
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() - 1);
+    setSelectedDate(dt.toISOString().slice(0, 10));
+  };
+  const goNext = () => {
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() + 1);
+    const next = dt.toISOString().slice(0, 10);
+    if (next > todayKey) return; // never look beyond today
+    setSelectedDate(next);
+  };
+
   return (
     <div className={styles.page}>
+
+      {/* DATE PICKER */}
+      <section className={styles.datePickerBar}>
+        <button
+          type="button"
+          className={styles.dateNavBtn}
+          onClick={goPrev}
+          aria-label="Previous day"
+        >‹</button>
+        <div className={styles.dateCenter}>
+          <input
+            type="date"
+            value={selectedDate}
+            max={todayKey}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v && v <= todayKey) setSelectedDate(v);
+            }}
+            className={styles.dateInput}
+            aria-label="Select date"
+          />
+          <span className={styles.dateLabel}>{formatDateLabel(selectedDate)}</span>
+          {!isToday && (
+            <button
+              type="button"
+              onClick={goToToday}
+              className={styles.todayBtn}
+            >
+              Today
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          className={styles.dateNavBtn}
+          onClick={goNext}
+          disabled={isToday}
+          aria-label="Next day"
+        >›</button>
+      </section>
 
       {/* TODAY SALES — RESTAURANT / PLATTER 포함 */}
       <section className={styles.card}>

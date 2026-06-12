@@ -40,19 +40,37 @@ function zonedToUTC(localStr: string, timezone: string): Date {
   return new Date(approx.getTime() + (approx.getTime() - new Date(tzLocal + "Z").getTime()));
 }
 
+/** Calendar date key (YYYY-MM-DD) for the current moment in the given TZ. */
+export function todayDateKey(timezone = "UTC"): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
+}
+
 /**
- * dayOffset: 0 = 오늘, -1 = 어제
+ * UTC range covering one full calendar day in the given timezone.
+ * If `dateKey` is omitted, defaults to today + dayOffset days.
  */
 export function getDateRange(
   timezone = "UTC",
   dayOffset = 0,
-): { startAt: string; endAt: string } {
-  const target = new Date(Date.now() + dayOffset * 86_400_000);
-  const dateStr = target.toLocaleDateString("en-CA", { timeZone: timezone }); // YYYY-MM-DD
+  dateKey?: string,
+): { startAt: string; endAt: string; dateKey: string } {
+  let dk = dateKey;
+  if (!dk) {
+    const target = new Date(Date.now() + dayOffset * 86_400_000);
+    dk = target.toLocaleDateString("en-CA", { timeZone: timezone });
+  }
   return {
-    startAt: zonedToUTC(`${dateStr}T00:00:00`, timezone).toISOString(),
-    endAt: zonedToUTC(`${dateStr}T23:59:59.999`, timezone).toISOString(),
+    dateKey: dk,
+    startAt: zonedToUTC(`${dk}T00:00:00`, timezone).toISOString(),
+    endAt: zonedToUTC(`${dk}T23:59:59.999`, timezone).toISOString(),
   };
+}
+
+/** Calendar date key shifted by N days in the given timezone. */
+export function shiftDateKey(dateKey: string, dayOffset: number, timezone = "UTC"): string {
+  const noon = zonedToUTC(`${dateKey}T12:00:00`, timezone);
+  const shifted = new Date(noon.getTime() + dayOffset * 86_400_000);
+  return shifted.toLocaleDateString("en-CA", { timeZone: timezone });
 }
 
 type SquareOrder = NonNullable<
@@ -77,24 +95,34 @@ export function grossAmountCents(order: SquareOrder): number {
 }
 
 /**
- * Monday 00:00 (local) → now (UTC ISO). Used for week-to-date metrics.
+ * Monday 00:00 (local) of the week containing `dateKey` through 23:59:59 of
+ * `dateKey` — inclusive week-to-date through the selected day.
+ * If `dateKey` is omitted, uses today (Sydney → now wall clock).
  */
-export function getWeekToDateRange(timezone = "UTC"): {
-  startAt: string;
-  endAt: string;
-} {
-  const nowLocal = new Date(
-    new Date().toLocaleString("en-US", { timeZone: timezone }),
+export function getWeekToDateRange(
+  timezone = "UTC",
+  dateKey?: string,
+): { startAt: string; endAt: string } {
+  const refDateKey = dateKey ?? todayDateKey(timezone);
+  // dow at noon avoids DST edge cases
+  const noonLocal = new Date(
+    zonedToUTC(`${refDateKey}T12:00:00`, timezone),
   );
-  const dow = nowLocal.getDay(); // 0=Sun..6=Sat
+  const dow = new Date(
+    noonLocal.toLocaleString("en-US", { timeZone: timezone }),
+  ).getDay();
   const daysSinceMon = (dow + 6) % 7; // Mon=0, Sun=6
-  const mon = new Date(nowLocal);
-  mon.setDate(mon.getDate() - daysSinceMon);
-  const dateStr = mon.toLocaleDateString("en-CA", { timeZone: timezone });
+  const monKey = shiftDateKey(refDateKey, -daysSinceMon, timezone);
+
+  // For today: end-at-now (in-progress week). For past dates: end of that day.
+  const isToday = refDateKey === todayDateKey(timezone);
+  const endAt = isToday
+    ? new Date().toISOString()
+    : zonedToUTC(`${refDateKey}T23:59:59.999`, timezone).toISOString();
 
   return {
-    startAt: zonedToUTC(`${dateStr}T00:00:00`, timezone).toISOString(),
-    endAt: new Date().toISOString(),
+    startAt: zonedToUTC(`${monKey}T00:00:00`, timezone).toISOString(),
+    endAt,
   };
 }
 

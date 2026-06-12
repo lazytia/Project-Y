@@ -14,12 +14,16 @@ export type TodayCounts = {
   dinnerStaff: number;
 };
 
-export async function fetchSystemYuricaTodayCounts(): Promise<TodayCounts> {
+export async function fetchSystemYuricaTodayCounts(
+  dateKey?: string,
+): Promise<TodayCounts> {
   const token = process.env.SYSTEM_YURICA_TOKEN?.trim();
   if (!token) {
     throw new Error("SYSTEM_YURICA_TOKEN not configured");
   }
-  const res = await fetch(`${UPSTREAM_BASE}/api/integrations/project-y/today`, {
+  const url = new URL(`${UPSTREAM_BASE}/api/integrations/project-y/today`);
+  if (dateKey) url.searchParams.set("date", dateKey);
+  const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
