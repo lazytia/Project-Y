@@ -25,21 +25,23 @@
   }
 }
 
-/* 모바일/태블릿: 아이폰 드로어 스타일 */
+/* 모바일/태블릿: 햄버거 아래 플로팅 패널 */
 @media (max-width: 1024px) {
   .sidebar {
-    padding-top: calc(var(--space-5) + 52px);
+    top: 56px;          /* 햄버거(36px) + 여백 아래 */
+    bottom: auto;       /* 콘텐츠 높이만큼만 */
+    left: var(--space-3);
+    width: calc(var(--sidebar-width) - var(--space-3));
+    max-height: calc(100vh - 72px);
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-3);
     border-right: none;
-    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.12), 1px 0 0 rgba(0, 0, 0, 0.06);
-    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.13), 0 2px 8px rgba(0, 0, 0, 0.07);
   }
 
   .sidebarClosed {
-    transform: translateX(-110%);
-  }
-
-  .brand {
-    display: none;
+    transform: translateX(-120%);
   }
 }
 
@@ -52,6 +54,12 @@
   color: var(--color-fg);
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-1);
+}
+
+@media (max-width: 1024px) {
+  .brand {
+    display: none;
+  }
 }
 
 /* ── 네비게이션 ── */
@@ -115,7 +123,6 @@
   justify-content: center;
   color: var(--color-fg-subtle);
   font-size: 16px;
-  font-style: normal;
   line-height: 1;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   transform: rotate(0deg);
@@ -126,10 +133,11 @@
   transform: rotate(90deg);
 }
 
-/* ── 아코디언: CSS grid 트릭으로 진짜 부드러운 높이 전환 ── */
+/* ── 아코디언: CSS grid 트릭 ── */
 .collapseWrap {
   display: grid;
   grid-template-rows: 0fr;
+  overflow: hidden;               /* 닫혔을 때 padding 누수 방지 */
   transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -141,12 +149,18 @@
 .children {
   list-style: none;
   margin: 0;
-  padding: var(--space-1) 0 var(--space-1) calc(var(--space-2) + 22px);
+  padding: 0 0 0 calc(var(--space-2) + 22px);  /* 세로 padding 제거 */
   display: flex;
   flex-direction: column;
   gap: 2px;
   overflow: hidden;
   min-height: 0;
+}
+
+/* 열렸을 때만 위아래 여백 */
+.collapseOpen > .children {
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
 }
 
 .childLink {
@@ -174,14 +188,21 @@
   font-weight: 500;
 }
 
-/* ── 하단 사용자 영역 ── */
+/* ── 사용자 영역: 인벤토리 바로 아래 붙음 ── */
 .footer {
-  margin-top: auto;
+  margin-top: var(--space-3);    /* auto 제거 → nav 바로 아래 */
   padding: var(--space-3);
   border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* 데스크탑: 하단 고정 유지 */
+@media (min-width: 1025px) {
+  .footer {
+    margin-top: auto;
+  }
 }
 
 .userEmail {
