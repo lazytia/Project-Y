@@ -82,7 +82,7 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  color: var(--color-fg);
+  color: #6E6E73;
   font-weight: 600;
   font-size: var(--font-size-md);
   width: 100%;
@@ -164,7 +164,7 @@
   display: block;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  color: var(--color-fg-muted);
+  color: #6E6E73;
   font-size: var(--font-size-sm);
   transition: background 0.15s ease, color 0.15s ease;
   -webkit-tap-highlight-color: transparent;
@@ -180,9 +180,9 @@
 }
 
 .active {
-  background: var(--color-surface-hover);
-  color: var(--color-accent);
-  font-weight: 500;
+  background: var(--color-warm-bg);
+  color: #FF6A13;
+  font-weight: 600;
 }
 
 /* ── 사용자 영역: 인벤토리 바로 아래 붙음 ── */

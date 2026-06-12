@@ -12,17 +12,17 @@
   --color-border: #e2e2e6;
 
   /* Color — text */
-  --color-fg: #111113;
-  --color-fg-muted: #5e6470;
+  --color-fg: #111111;
+  --color-fg-muted: #6E6E73;
   --color-fg-subtle: #9499a3;
 
   /* Color — accent */
-  --color-accent: #111113;
+  --color-accent: #111111;
   --color-accent-fg: #ffffff;
 
-  /* Color — warm (대시보드 강조) */
-  --color-warm: #E8440A;
-  --color-warm-bg: rgba(232, 68, 10, 0.08);
+  /* Color — warm / Primary Orange (Hermès) */
+  --color-warm: #FF6A13;
+  --color-warm-bg: rgba(255, 106, 19, 0.08);
 
   /* Color — positive / negative delta */
   --color-positive: #16A34A;
@@ -43,14 +43,15 @@
   --radius-lg: 14px;
 
   /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-size-xs: 11px;
   --font-size-sm: 13px;
   --font-size-md: 14px;
   --font-size-lg: 16px;
   --font-size-xl: 20px;
   --font-size-2xl: 28px;
-  --font-size-3xl: 42px;
+  --font-size-3xl: 48px;
 
   /* Layout */
   --sidebar-width: 260px;

@@ -22,15 +22,23 @@ export async function GET() {
     const today = getDateRange(timezone, 0);
     const yesterday = getDateRange(timezone, -1);
 
-    // 오늘(OPEN+COMPLETED)과 어제(COMPLETED)를 병렬로 조회
-    const [todayOrders, yesterdayOrders] = await Promise.all([
+    const platterLocationId = process.env.SQUARE_PLATTER_LOCATION_ID;
+
+    // 오늘(OPEN+COMPLETED), 어제(COMPLETED), 플래터 병렬 조회
+    const [todayOrders, yesterdayOrders, platterOrders] = await Promise.all([
       fetchOrders(locationId, today.startAt, today.endAt, ["OPEN", "COMPLETED"]),
       fetchOrders(locationId, yesterday.startAt, yesterday.endAt, ["COMPLETED"]),
+      platterLocationId
+        ? fetchOrders(platterLocationId, today.startAt, today.endAt, ["OPEN", "COMPLETED"])
+        : Promise.resolve([]),
     ]);
 
-    // ── Today Sales ──────────────────────────────────────────
-    const todaySales =
+    // ── Sales 집계 ────────────────────────────────────────────
+    const restaurantSales =
       todayOrders.reduce((s, o) => s + Number(o.totalMoney?.amount ?? 0n), 0) / 100;
+    const platterSales =
+      platterOrders.reduce((s, o) => s + Number(o.totalMoney?.amount ?? 0n), 0) / 100;
+    const todaySales = restaurantSales + platterSales;
 
     // ── Transactions (완료된 건수) ────────────────────────────
     const transactions = todayOrders.filter((o) => o.state === "COMPLETED").length;
@@ -83,6 +91,8 @@ export async function GET() {
 
     return NextResponse.json({
       todaySales,
+      restaurantSales,
+      platterSales,
       transactions,
       transactionsChange: transactions - yestTransactions,
       avgSpendPerTable: avgSpend,

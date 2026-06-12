@@ -24,10 +24,12 @@
 }
 
 .cardLabel {
-  font-size: var(--font-size-xs);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-fg-muted);
   letter-spacing: 0.08em;
+  text-transform: uppercase;
   margin: 0;
   flex: 1;
 }
@@ -54,16 +56,20 @@
 
 /* ── TODAY SALES ── */
 .salesAmount {
-  font-size: var(--font-size-3xl);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 600;
   letter-spacing: -0.03em;
-  color: var(--color-fg);
-  line-height: 1;
+  color: #111111;
+  line-height: 56px;
   margin: var(--space-1) 0 0;
 }
 
+/* Supporting Text */
 .targetLabel {
-  font-size: var(--font-size-sm);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-fg-muted);
   margin: 0;
 }
@@ -130,11 +136,13 @@
   justify-content: space-between;
 }
 
+/* Secondary KPI */
 .salesBreakAmount {
-  font-size: var(--font-size-xl);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--color-fg);
+  color: #111111;
   margin: 0;
   line-height: 1;
 }
@@ -168,49 +176,62 @@
   gap: var(--space-1);
 }
 
+/* Card Title */
 .splitLabel {
-  font-size: var(--font-size-xs);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-fg-muted);
   letter-spacing: 0.08em;
+  text-transform: uppercase;
   margin: 0;
 }
 
+/* Secondary KPI (orange highlight) */
 .splitPax {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--color-warm);
   margin: var(--space-2) 0 var(--space-1);
   line-height: 1;
 }
 
+/* Supporting Text */
 .splitUnit {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-fg-muted);
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .splitStaff {
-  font-size: var(--font-size-sm);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-fg-muted);
   margin: 0;
 }
 
 /* ── WEEKLY PROGRESS ── */
+/* Main KPI */
 .weeklyAmount {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #111111;
   margin: var(--space-1) 0 0;
-  line-height: 1;
+  line-height: 56px;
 }
 
+/* Supporting Text */
 .weeklyTarget {
-  font-size: var(--font-size-lg);
-  font-weight: 400;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-fg-muted);
 }
 
@@ -240,27 +261,34 @@
   background: var(--color-border);
 }
 
+/* Card Title */
 .statLabel {
-  font-size: 9px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-fg-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   line-height: 1.4;
   margin: 0 0 var(--space-2);
 }
 
+/* Secondary KPI */
 .statValue {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
-  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  color: #111111;
   letter-spacing: -0.02em;
   margin: 0;
   line-height: 1;
 }
 
+/* Secondary KPI (orange) */
 .statValueWarm {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
   color: var(--color-warm);
   letter-spacing: -0.01em;
   margin: 0;
@@ -274,28 +302,34 @@
   margin: var(--space-2) auto;
 }
 
+/* Supporting Text */
 .statSub {
-  font-size: var(--font-size-xs);
-  color: var(--color-fg-subtle);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
   margin: 0 0 2px;
 }
 
 .statSubValue {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-fg-muted);
   margin: 0;
 }
 
 .statSubPos {
-  font-size: var(--font-size-xs);
+  font-family: var(--font-display);
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-positive);
   margin: 0;
 }
 
 .statSubNeg {
-  font-size: var(--font-size-xs);
+  font-family: var(--font-display);
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-negative);
   margin: 0;
@@ -333,13 +367,15 @@
 
 .sellerName {
   flex: 1;
-  font-size: var(--font-size-sm);
+  font-family: var(--font-display);
+  font-size: 14px;
   font-weight: 500;
-  color: var(--color-fg);
+  color: #111111;
 }
 
 .sellerSales {
-  font-size: var(--font-size-sm);
+  font-family: var(--font-display);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--color-fg);
+  color: #111111;
 }
