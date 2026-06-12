@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
+import { getAuth as fbGetAuth, type Auth } from "firebase/auth";
+import { getFirestore as fbGetFirestore, type Firestore } from "firebase/firestore";
+import { getStorage as fbGetStorage, type FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,29 +17,23 @@ let _auth: Auth | null = null;
 let _db: Firestore | null = null;
 let _storage: FirebaseStorage | null = null;
 
-function getFirebaseApp(): FirebaseApp {
+function app(): FirebaseApp {
   if (_app) return _app;
   _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   return _app;
 }
 
-export const auth: Auth = new Proxy({} as Auth, {
-  get(_t, prop) {
-    if (!_auth) _auth = getAuth(getFirebaseApp());
-    return Reflect.get(_auth as object, prop);
-  },
-});
+export function getAuth(): Auth {
+  if (!_auth) _auth = fbGetAuth(app());
+  return _auth;
+}
 
-export const db: Firestore = new Proxy({} as Firestore, {
-  get(_t, prop) {
-    if (!_db) _db = getFirestore(getFirebaseApp());
-    return Reflect.get(_db as object, prop);
-  },
-});
+export function getDb(): Firestore {
+  if (!_db) _db = fbGetFirestore(app());
+  return _db;
+}
 
-export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
-  get(_t, prop) {
-    if (!_storage) _storage = getStorage(getFirebaseApp());
-    return Reflect.get(_storage as object, prop);
-  },
-});
+export function getStorage(): FirebaseStorage {
+  if (!_storage) _storage = fbGetStorage(app());
+  return _storage;
+}

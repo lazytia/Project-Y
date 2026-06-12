@@ -6,18 +6,18 @@
 
 :root {
   /* Color — surface */
-  --color-bg: #0b0d10;
-  --color-surface: #14171c;
-  --color-surface-hover: #1c2027;
-  --color-border: #262b33;
+  --color-bg: #ffffff;
+  --color-surface: #f7f7f8;
+  --color-surface-hover: #ececee;
+  --color-border: #e2e2e6;
 
   /* Color — text */
-  --color-fg: #e6e8eb;
-  --color-fg-muted: #8a91a0;
-  --color-fg-subtle: #5a6273;
+  --color-fg: #111113;
+  --color-fg-muted: #5e6470;
+  --color-fg-subtle: #9499a3;
 
   /* Color — accent */
-  --color-accent: #4f8cff;
+  --color-accent: #111113;
   --color-accent-fg: #ffffff;
 
   /* Spacing scale */

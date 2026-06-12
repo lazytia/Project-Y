@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
+import { emailToUsername } from "@/lib/username";
 import styles from "./Sidebar.module.css";
 
 type NavItem = { label: string; href: string };
@@ -97,7 +98,7 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className={styles.footer}>
-        <div className={styles.userEmail}>{user?.email}</div>
+        <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
         <button type="button" onClick={signOut} className={styles.signOut}>
           Sign out
         </button>

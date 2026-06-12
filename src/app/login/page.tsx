@@ -1,17 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-} from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { getAuth } from "@/lib/firebase";
+import { usernameToEmail } from "@/lib/username";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -20,14 +17,14 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      if (mode === "signin") {
-        await signInWithEmailAndPassword(auth, email, password);
-      } else {
-        await createUserWithEmailAndPassword(auth, email, password);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed");
-    } finally {
+      await signInWithEmailAndPassword(
+        getAuth(),
+        usernameToEmail(username),
+        password,
+      );
+      // AuthProvider's redirect effect takes over once auth state propagates.
+    } catch {
+      setError("Invalid username or password");
       setBusy(false);
     }
   };
@@ -35,19 +32,19 @@ export default function LoginPage() {
   return (
     <div className={styles.card}>
       <h1 className={styles.title}>Project Y</h1>
-      <p className={styles.subtitle}>
-        {mode === "signin" ? "Sign in to continue" : "Create your account"}
-      </p>
+      <p className={styles.subtitle}>Sign in to continue</p>
 
       <form className={styles.form} onSubmit={handleSubmit}>
         <label className={styles.field}>
-          <span>Email</span>
+          <span>Username</span>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
-            autoComplete="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
           />
         </label>
         <label className={styles.field}>
@@ -57,30 +54,16 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={6}
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            autoComplete="current-password"
           />
         </label>
 
         {error && <div className={styles.error}>{error}</div>}
 
         <button type="submit" className={styles.submit} disabled={busy}>
-          {busy ? "…" : mode === "signin" ? "Sign in" : "Create account"}
+          {busy ? "…" : "Sign in"}
         </button>
       </form>
-
-      <button
-        type="button"
-        className={styles.toggle}
-        onClick={() => {
-          setMode(mode === "signin" ? "signup" : "signin");
-          setError(null);
-        }}
-      >
-        {mode === "signin"
-          ? "Need an account? Sign up"
-          : "Already have an account? Sign in"}
-      </button>
     </div>
   );
 }

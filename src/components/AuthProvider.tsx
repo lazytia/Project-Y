@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
-import { auth } from "@/lib/firebase";
+import { getAuth } from "@/lib/firebase";
+import { PUBLIC_ROUTES, ROUTES } from "@/lib/routes";
 
 type AuthContextValue = {
   user: User | null;
@@ -17,8 +18,6 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
 });
 
-const PUBLIC_PATHS = new Set<string>(["/login"]);
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(getAuth(), (u) => {
       setUser(u);
       setLoading(false);
     });
@@ -35,16 +34,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    const isPublic = PUBLIC_PATHS.has(pathname);
+    const isPublic = PUBLIC_ROUTES.has(pathname);
     if (!user && !isPublic) {
-      router.replace("/login");
+      router.replace(ROUTES.login);
+      router.refresh();
     } else if (user && isPublic) {
-      router.replace("/");
+      router.replace(ROUTES.home);
+      router.refresh();
     }
   }, [user, loading, pathname, router]);
 
   const signOut = async () => {
-    await fbSignOut(auth);
+    await fbSignOut(getAuth());
+    router.replace(ROUTES.login);
+    router.refresh();
   };
 
   return (
