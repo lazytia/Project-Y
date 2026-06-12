@@ -55,6 +55,27 @@ export function getDateRange(
   };
 }
 
+type SquareOrder = NonNullable<
+  Awaited<ReturnType<typeof squareClient.orders.search>>["orders"]
+>[number];
+
+/**
+ * Gross sales amount in cents — matches Square dashboard "Gross Sales":
+ * line item base price × quantity, before discounts, taxes, tips, service charges.
+ *
+ * Derived per-order: total_money + discount - tax - tip - service_charge.
+ * (total_money = items - discount + tax + tip + svc, so adding discount back
+ * and stripping the add-ons returns to the pre-discount item subtotal.)
+ */
+export function grossAmountCents(order: SquareOrder): number {
+  const total = Number(order.totalMoney?.amount ?? 0n);
+  const discount = Number(order.totalDiscountMoney?.amount ?? 0n);
+  const tax = Number(order.totalTaxMoney?.amount ?? 0n);
+  const tip = Number(order.totalTipMoney?.amount ?? 0n);
+  const svc = Number(order.totalServiceChargeMoney?.amount ?? 0n);
+  return total + discount - tax - tip - svc;
+}
+
 /** 페이지네이션 처리된 Orders 전체 조회 */
 export async function fetchOrders(
   locationId: string,

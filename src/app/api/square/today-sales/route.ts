@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { squareClient, getDateRange, squareEnv } from "@/lib/square";
+import { squareClient, getDateRange, squareEnv, grossAmountCents } from "@/lib/square";
 
 export const dynamic = "force-dynamic";
 
@@ -22,41 +22,31 @@ export async function GET() {
 
   try {
     const { startAt, endAt } = getDateRange(timezone, 0);
-    let total = 0n; // Square 금액은 BigInt (cents 단위)
+    let totalCents = 0;
     let cursor: string | undefined = undefined;
 
-    // 페이지네이션으로 오늘의 모든 오더 합산
+    // Restaurant 매장 실시간 매출: OPEN(진행 중 테이블) + COMPLETED 모두 합산, 세전·할인 전
     do {
       const response = await squareClient.orders.search({
         locationIds: [locationId],
         query: {
           filter: {
-            dateTimeFilter: {
-              createdAt: { startAt, endAt },
-            },
-            stateFilter: {
-              // OPEN: 계산 전 오픈 티켓, COMPLETED: 계산 완료
-              states: ["OPEN", "COMPLETED"],
-            },
+            dateTimeFilter: { createdAt: { startAt, endAt } },
+            stateFilter: { states: ["OPEN", "COMPLETED"] },
           },
         },
         cursor,
         limit: 500,
       });
 
-      const orders = response.orders ?? [];
-      for (const order of orders) {
-        // totalMoney: 세금·할인 포함 총액 (cents)
-        total += order.totalMoney?.amount ?? 0n;
+      for (const order of response.orders ?? []) {
+        totalCents += grossAmountCents(order);
       }
 
       cursor = response.cursor;
     } while (cursor);
 
-    return NextResponse.json({
-      // cents → dollars
-      total: Number(total) / 100,
-    });
+    return NextResponse.json({ total: totalCents / 100 });
   } catch (err) {
     console.error("[Square] today-sales error:", err);
     return NextResponse.json(
