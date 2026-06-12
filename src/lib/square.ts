@@ -1,15 +1,34 @@
 import { SquareClient, SquareEnvironment } from "square";
 
-if (!process.env.SQUARE_ACCESS_TOKEN) {
+/**
+ * Read an env var with surrounding whitespace (including stray CR/LF that
+ * sometimes get baked into Secret Manager values) stripped. Empty strings
+ * become undefined so `??` fallbacks work as expected.
+ */
+function env(name: string): string | undefined {
+  const v = process.env[name];
+  if (!v) return undefined;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export const squareEnv = {
+  accessToken: env("SQUARE_ACCESS_TOKEN"),
+  locationId: env("SQUARE_LOCATION_ID"),
+  platterLocationId: env("SQUARE_PLATTER_LOCATION_ID"),
+  timezone: env("SQUARE_TIMEZONE") ?? "UTC",
+  isProd: env("SQUARE_ENV") === "production",
+};
+
+if (!squareEnv.accessToken) {
   console.warn("[Square] SQUARE_ACCESS_TOKEN is not set");
 }
 
 export const squareClient = new SquareClient({
-  token: process.env.SQUARE_ACCESS_TOKEN ?? "",
-  environment:
-    process.env.SQUARE_ENV === "production"
-      ? SquareEnvironment.Production
-      : SquareEnvironment.Sandbox,
+  token: squareEnv.accessToken ?? "",
+  environment: squareEnv.isProd
+    ? SquareEnvironment.Production
+    : SquareEnvironment.Sandbox,
 });
 
 /**

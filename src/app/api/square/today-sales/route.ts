@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { squareClient, getDateRange } from "@/lib/square";
+import { squareClient, getDateRange, squareEnv } from "@/lib/square";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const locationId = process.env.SQUARE_LOCATION_ID;
-  const timezone = process.env.SQUARE_TIMEZONE ?? "UTC";
+  const { locationId, timezone, accessToken } = squareEnv;
 
   if (!locationId) {
     return NextResponse.json(
@@ -14,7 +13,7 @@ export async function GET() {
     );
   }
 
-  if (!process.env.SQUARE_ACCESS_TOKEN) {
+  if (!accessToken) {
     return NextResponse.json(
       { error: "SQUARE_ACCESS_TOKEN is not configured" },
       { status: 500 },

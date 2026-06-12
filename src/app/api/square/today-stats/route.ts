@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { squareClient, getDateRange, fetchOrders } from "@/lib/square";
+import { getDateRange, fetchOrders, squareEnv } from "@/lib/square";
 
 export const dynamic = "force-dynamic";
 
@@ -11,18 +11,15 @@ function formatHour(h: number): string {
 }
 
 export async function GET() {
-  const locationId = process.env.SQUARE_LOCATION_ID;
-  const timezone = process.env.SQUARE_TIMEZONE ?? "UTC";
+  const { locationId, platterLocationId, timezone, accessToken } = squareEnv;
 
-  if (!locationId || !process.env.SQUARE_ACCESS_TOKEN) {
+  if (!locationId || !accessToken) {
     return NextResponse.json({ error: "Square not configured" }, { status: 500 });
   }
 
   try {
     const today = getDateRange(timezone, 0);
     const yesterday = getDateRange(timezone, -1);
-
-    const platterLocationId = process.env.SQUARE_PLATTER_LOCATION_ID;
 
     // 오늘(OPEN+COMPLETED), 어제(COMPLETED), 플래터 병렬 조회
     const [todayOrders, yesterdayOrders, platterOrders] = await Promise.all([
