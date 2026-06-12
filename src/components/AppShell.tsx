@@ -36,10 +36,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <span className={styles.bar} />
         <span className={styles.bar} />
       </button>
+      {sidebarOpen && (
+        <div
+          className={styles.backdrop}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <Sidebar open={sidebarOpen} />
-      <main className={`${styles.main} ${sidebarOpen ? styles.mainShifted : ""}`}>
-        {children}
-      </main>
+      <main className={styles.main}>{children}</main>
     </div>
   );
 }

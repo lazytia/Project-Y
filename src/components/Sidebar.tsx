@@ -63,17 +63,11 @@ export default function Sidebar({ open }: Props) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
 
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    () => new Set(NAV.filter((g) => g.children).map((g) => g.label)),
-  );
+  // 기본값: 모두 닫힘. 한 번에 하나만 열림.
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   const toggleGroup = (label: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
-      return next;
-    });
+    setOpenGroup((prev) => (prev === label ? null : label));
   };
 
   return (
@@ -81,7 +75,7 @@ export default function Sidebar({ open }: Props) {
       <div className={styles.brand}>Project Y</div>
       <nav className={styles.nav}>
         {NAV.map((group) => {
-          const isExpanded = !group.children || expandedGroups.has(group.label);
+          const isExpanded = !group.children || openGroup === group.label;
           return (
             <div key={group.label} className={styles.group}>
               {group.href ? (

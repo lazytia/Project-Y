@@ -8,18 +8,30 @@
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   padding: var(--space-5) var(--space-3);
-  padding-top: calc(var(--space-5) + 48px);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   overflow-y: auto;
-  z-index: 100;
+  z-index: 200;
   transform: translateX(0);
   transition: transform 0.25s ease;
 }
 
-.sidebarClosed {
-  transform: translateX(-100%);
+/* 데스크탑에서는 항상 표시 */
+@media (min-width: 1025px) {
+  .sidebar {
+    transform: translateX(0) !important;
+  }
+}
+
+/* 모바일/태블릿에서 닫힘 처리 */
+@media (max-width: 1024px) {
+  .sidebar {
+    padding-top: calc(var(--space-5) + 48px);
+  }
+  .sidebarClosed {
+    transform: translateX(-100%);
+  }
 }
 
 /* ── 브랜드 ── */

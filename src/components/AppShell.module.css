@@ -3,49 +3,21 @@
   position: relative;
 }
 
-/* ── 햄버거 버튼 ── */
-.hamburger {
-  position: fixed;
-  top: var(--space-3);
-  left: var(--space-3);
-  z-index: 200;
-  width: 36px;
-  height: 36px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0;
-  transition: background 0.15s;
-}
-
-.hamburger:hover {
-  background: var(--color-surface-hover);
-}
-
-.bar {
-  display: block;
-  width: 18px;
-  height: 2px;
-  background: var(--color-fg);
-  border-radius: 2px;
-}
-
-/* ── 메인 콘텐츠 ── */
+/* ── 메인 콘텐츠: 데스크탑은 항상 사이드바만큼 밀림 ── */
 .main {
+  margin-left: var(--sidebar-width);
   padding: var(--space-6);
-  padding-top: calc(var(--space-6) + 48px);
   min-height: 100vh;
-  transition: margin-left 0.25s ease;
 }
 
-.mainShifted {
-  margin-left: var(--sidebar-width);
+/* ── 햄버거: 데스크탑에서는 숨김 ── */
+.hamburger {
+  display: none;
+}
+
+/* ── 모바일 배경 오버레이 ── */
+.backdrop {
+  display: none;
 }
 
 /* ── 퍼블릭 / 로딩 ── */
@@ -65,12 +37,51 @@
   color: var(--color-fg-muted);
 }
 
-@media (max-width: 768px) {
-  .mainShifted {
-    margin-left: 0;
-  }
+/* ── 모바일 / 태블릿 (≤1024px) ── */
+@media (max-width: 1024px) {
   .main {
+    margin-left: 0;
     padding: var(--space-4);
-    padding-top: calc(var(--space-4) + 48px);
+    padding-top: calc(var(--space-4) + 52px);
+  }
+
+  .hamburger {
+    display: flex;
+    position: fixed;
+    top: var(--space-3);
+    left: var(--space-3);
+    z-index: 300;
+    width: 36px;
+    height: 36px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0;
+    transition: background 0.15s;
+  }
+
+  .hamburger:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .bar {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--color-fg);
+    border-radius: 2px;
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.25);
+    z-index: 150;
   }
 }
