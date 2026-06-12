@@ -27,18 +27,7 @@ const mock = {
   lunchStaff: 5,
   dinnerPax: 58,
   dinnerStaff: 6,
-  weeklyProgress: 17_850,
-  peakHour: "12:30 PM",
   projectedTables: 18,
-  avgSpendPerTable: 68,
-  avgSpendChange: 4,
-  transactions: 128,
-  transactionsChange: 12,
-  bestSellers: [
-    { name: "Chicken Katsu Bento", sales: 1_350 },
-    { name: "Wagyu Don", sales: 1_180 },
-    { name: "Salmon Aburi Roll", sales: 980 },
-  ],
 };
 
 function fmt(n: number) {
@@ -69,6 +58,7 @@ export default function DashboardPage() {
     avgSpendChange: number;
     restaurantSales: number;
     platterSales: number;
+    weeklyProgress: number;
     peakHour: string | null;
     peakHourOrders: number;
     bestSellers: { name: string; sales: number; quantity: number }[];
@@ -96,9 +86,10 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, [fetchStats]);
 
-  const { lunchPax, lunchStaff, dinnerPax, dinnerStaff, weeklyProgress } = mock;
+  const { lunchPax, lunchStaff, dinnerPax, dinnerStaff } = mock;
 
   const todaySales     = stats?.todaySales ?? null;
+  const weeklyProgress = stats?.weeklyProgress ?? null;
   const transactions   = stats?.transactions ?? null;
   const transactionsChange = stats?.transactionsChange ?? null;
   const avgSpendPerTable   = stats?.avgSpendPerTable ?? null;
@@ -186,11 +177,11 @@ export default function DashboardPage() {
       {/* WEEKLY PROGRESS */}
       <section className={styles.card}>
         <p className={styles.cardLabel}>WEEKLY PROGRESS</p>
-        <p className={styles.weeklyAmount}>
-          {fmt(weeklyProgress)}&nbsp;
+        <p className={`${styles.weeklyAmount} ${weeklyProgress === null ? styles.salesLoading : ""}`}>
+          {weeklyProgress === null ? "—" : fmt(weeklyProgress)}&nbsp;
           <span className={styles.weeklyTarget}>/ {fmt(WEEKLY_TARGET)}</span>
         </p>
-        <Progress value={weeklyProgress} max={WEEKLY_TARGET} />
+        <Progress value={weeklyProgress ?? 0} max={WEEKLY_TARGET} />
       </section>
 
       {/* STATS — 하나의 카드, 세로 구분선 */}

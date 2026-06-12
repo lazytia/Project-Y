@@ -76,6 +76,45 @@ export function grossAmountCents(order: SquareOrder): number {
   return total + discount - tax - tip - svc;
 }
 
+/**
+ * Monday 00:00 (local) → now (UTC ISO). Used for week-to-date metrics.
+ */
+export function getWeekToDateRange(timezone = "UTC"): {
+  startAt: string;
+  endAt: string;
+} {
+  const nowLocal = new Date(
+    new Date().toLocaleString("en-US", { timeZone: timezone }),
+  );
+  const dow = nowLocal.getDay(); // 0=Sun..6=Sat
+  const daysSinceMon = (dow + 6) % 7; // Mon=0, Sun=6
+  const mon = new Date(nowLocal);
+  mon.setDate(mon.getDate() - daysSinceMon);
+  const dateStr = mon.toLocaleDateString("en-CA", { timeZone: timezone });
+
+  return {
+    startAt: zonedToUTC(`${dateStr}T00:00:00`, timezone).toISOString(),
+    endAt: new Date().toISOString(),
+  };
+}
+
+/** Count payments at a location within a time range (auto-paginated). */
+export async function countPayments(
+  locationId: string,
+  beginTime: string,
+  endTime: string,
+): Promise<number> {
+  let count = 0;
+  const iter = await squareClient.payments.list({
+    beginTime,
+    endTime,
+    locationId,
+    limit: 100,
+  });
+  for await (const _ of iter) count++;
+  return count;
+}
+
 /** 페이지네이션 처리된 Orders 전체 조회 */
 export async function fetchOrders(
   locationId: string,

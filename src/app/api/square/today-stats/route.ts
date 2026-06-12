@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { getDateRange, fetchOrders, squareEnv, grossAmountCents } from "@/lib/square";
+import {
+  getDateRange,
+  getWeekToDateRange,
+  fetchOrders,
+  countPayments,
+  squareEnv,
+  grossAmountCents,
+} from "@/lib/square";
 
 export const dynamic = "force-dynamic";
 
@@ -24,34 +31,48 @@ export async function GET() {
   try {
     const today = getDateRange(timezone, 0);
     const yesterday = getDateRange(timezone, -1);
+    const week = getWeekToDateRange(timezone);
 
-    // 오늘은 OPEN+COMPLETED 다 가져오되 sales 합산은 COMPLETED만 사용
-    // (peak hour / best sellers 등 활동 지표는 OPEN도 포함하는 게 자연스러움)
-    const [todayOrders, yesterdayOrders, platterOrders] = await Promise.all([
+    const [
+      todayOrders,
+      yesterdayOrders,
+      platterOrders,
+      weekRestaurantOrders,
+      weekPlatterOrders,
+      transactions,
+      yestTransactions,
+    ] = await Promise.all([
       fetchOrders(locationId, today.startAt, today.endAt, ["OPEN", "COMPLETED"]),
       fetchOrders(locationId, yesterday.startAt, yesterday.endAt, ["COMPLETED"]),
       platterLocationId
         ? fetchOrders(platterLocationId, today.startAt, today.endAt, ["OPEN", "COMPLETED"])
         : Promise.resolve([]),
+      fetchOrders(locationId, week.startAt, week.endAt, ["COMPLETED"]),
+      platterLocationId
+        ? fetchOrders(platterLocationId, week.startAt, week.endAt, ["COMPLETED"])
+        : Promise.resolve([]),
+      countPayments(locationId, today.startAt, today.endAt),
+      countPayments(locationId, yesterday.startAt, yesterday.endAt),
     ]);
 
-    // ── Sales 집계 (세전·할인 전 = Gross Sales) ────────────────
-    // Restaurant: 실시간 매출이므로 OPEN(진행 중 테이블) + COMPLETED 모두 포함
-    // Platter: 결제 완료 건만 — OPEN은 미래 날짜 케이터링 예약이라 오늘 매출 아님
+    // ── Sales 집계 (gross — 세전·할인 적용 전) ────────────────
+    // Restaurant: OPEN+COMPLETED (실시간 매장 활동)
+    // Platter:   COMPLETED만 (OPEN은 미래 케이터링 예약)
     const restaurantSales = sumGrossDollars(todayOrders, grossAmountCents);
     const completedPlatter = platterOrders.filter((o) => o.state === "COMPLETED");
     const platterSales = sumGrossDollars(completedPlatter, grossAmountCents);
     const todaySales = restaurantSales + platterSales;
 
-    // ── Transactions (완료된 건수) ────────────────────────────
-    const completedToday = todayOrders.filter((o) => o.state === "COMPLETED");
-    const transactions = completedToday.length;
-    const yestTransactions = yesterdayOrders.length;
+    // ── Weekly Progress (Mon-now, COMPLETED 양쪽 location 합산, gross) ─
+    const weeklyProgress =
+      sumGrossDollars(weekRestaurantOrders, grossAmountCents) +
+      sumGrossDollars(weekPlatterOrders, grossAmountCents);
 
-    // ── Avg Spend Per Table (restaurant 매장 손님 기준) ────────
+    // ── Avg Spend Per Table (restaurant 매장 기준) ────────────
+    const completedToday = todayOrders.filter((o) => o.state === "COMPLETED");
     const avgSpend =
-      transactions > 0
-        ? Math.round((restaurantSales / transactions) * 100) / 100
+      completedToday.length > 0
+        ? Math.round((restaurantSales / completedToday.length) * 100) / 100
         : 0;
     const yestSales = sumGrossDollars(yesterdayOrders, grossAmountCents);
     const yestAvgSpend =
@@ -59,7 +80,7 @@ export async function GET() {
         ? Math.round((yestSales / yesterdayOrders.length) * 100) / 100
         : 0;
 
-    // ── Peak Hour (생성 시각 기준 — OPEN 포함, 활동량 지표) ──
+    // ── Peak Hour (활동량 지표, OPEN 포함) ───────────────────
     const hourCounts: Record<number, number> = {};
     for (const order of todayOrders) {
       if (order.createdAt) {
@@ -74,13 +95,13 @@ export async function GET() {
     const peakHour = peakEntry ? formatHour(Number(peakEntry[0])) : null;
     const peakHourOrders = peakEntry ? Number(peakEntry[1]) : 0;
 
-    // ── Best Sellers (COMPLETED 주문만 기준) ───────────────────
+    // ── Best Sellers (COMPLETED 주문, restaurant 매장) ────────
     const itemMap: Record<string, { sales: number; quantity: number }> = {};
     for (const order of completedToday) {
       for (const item of order.lineItems ?? []) {
         if (!item.name) continue;
         const sales = Number(item.totalMoney?.amount ?? 0n) / 100;
-        if (sales <= 0) continue; // 할인/마이너스 항목 제외
+        if (sales <= 0) continue;
         const qty = parseFloat(item.quantity ?? "1");
         if (!itemMap[item.name]) itemMap[item.name] = { sales: 0, quantity: 0 };
         itemMap[item.name].sales += sales;
@@ -96,6 +117,7 @@ export async function GET() {
       todaySales,
       restaurantSales,
       platterSales,
+      weeklyProgress,
       transactions,
       transactionsChange: transactions - yestTransactions,
       avgSpendPerTable: avgSpend,
