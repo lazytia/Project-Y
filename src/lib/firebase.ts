@@ -29,6 +29,15 @@ function app(): FirebaseApp {
   return _app;
 }
 
+/**
+ * The primary Firebase app instance. Exposed so admin flows (e.g. creating
+ * a new user from the owner's session) can spin up a secondary named app
+ * with the same config and keep the owner signed in.
+ */
+export function getFirebaseApp(): FirebaseApp {
+  return app();
+}
+
 export function getAuth(): Auth {
   if (!_auth) {
     try {
