@@ -1,7 +1,7 @@
 rules_version = '2';
 
 service cloud.firestore {
-  match /databases/project-y/documents {
+  match /databases/{database}/documents {
 
     // Staff onboarding:
     //  - Any signed-in user can read (manager view at /people/onboarding lists
