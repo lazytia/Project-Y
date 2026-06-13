@@ -48,12 +48,16 @@ function fmtDate(d: Date | null | undefined): string {
   });
 }
 
-/** Documents must be ready N days before start. */
-const DUE_OFFSET_DAYS = 3;
+/**
+ * Onboarding due date = Wednesday of the calendar week AFTER the start date.
+ * Matches the payroll cut-off logic used on the staff /onboarding overview.
+ */
 function calcDueDate(startDate: Date | null | undefined): Date | null {
   if (!startDate) return null;
   const d = new Date(startDate);
-  d.setDate(d.getDate() - DUE_OFFSET_DAYS);
+  const dow = d.getDay(); // 0=Sun … 6=Sat
+  const daysToNextMonday = dow === 0 ? 1 : 8 - dow;
+  d.setDate(d.getDate() + daysToNextMonday + 2); // Mon + 2 = Wed
   return d;
 }
 
