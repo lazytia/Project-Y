@@ -72,7 +72,7 @@ export default function TfnDeclarationPage() {
   const todayKey = new Date().toLocaleDateString("en-CA");
   const declarationDate = getTodayDisplay();
 
-  async function saveToFirestore() {
+  async function saveToFirestore(markComplete = false) {
     if (!user) {
       setError("Could not find your login info. Please sign in again.");
       return false;
@@ -81,31 +81,29 @@ export default function TfnDeclarationPage() {
     setError(null);
     try {
       const db = getDb();
-      await setDoc(
-        doc(db, "staff_onboarding", user.uid),
-        {
-          uid: user.uid,
-          tfn: {
-            fullLegalName,
-            dateOfBirth,
-            homeAddress,
-            suburb,
-            state: auState,
-            postcode,
-            taxFileNumber,
-            taxResident,
-            taxFreeThreshold,
-            helpDebt,
-            otherGovDebt,
-            declarationName,
-            declarationAgreed: true,
-          },
-          step: 2,
-          status: "in_progress",
-          updatedAt: serverTimestamp(),
+      const payload: Record<string, unknown> = {
+        uid: user.uid,
+        tfn: {
+          fullLegalName,
+          dateOfBirth,
+          homeAddress,
+          suburb,
+          state: auState,
+          postcode,
+          taxFileNumber,
+          taxResident,
+          taxFreeThreshold,
+          helpDebt,
+          otherGovDebt,
+          declarationName,
+          declarationAgreed: true,
         },
-        { merge: true }
-      );
+        step: CURRENT_STEP,
+        status: markComplete ? "step_complete" : "in_progress",
+        updatedAt: serverTimestamp(),
+      };
+      if (markComplete) payload.completedStep = CURRENT_STEP;
+      await setDoc(doc(db, "staff_onboarding", user.uid), payload, { merge: true });
       return true;
     } catch (err) {
       const msg =
@@ -138,7 +136,7 @@ export default function TfnDeclarationPage() {
       return;
     }
 
-    const ok = await saveToFirestore();
+    const ok = await saveToFirestore(true);
     if (ok) {
       setShowToast(true);
       setTimeout(() => router.push("/onboarding/bank-super-details"), 1800);
@@ -146,7 +144,7 @@ export default function TfnDeclarationPage() {
   }
 
   async function handleSaveAndExit() {
-    const ok = await saveToFirestore();
+    const ok = await saveToFirestore(false);
     if (ok) router.push("/onboarding");
   }
 
