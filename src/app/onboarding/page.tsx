@@ -108,6 +108,19 @@ export default function OnboardingPage() {
 
   const payrollCutoff = getPayrollCutoff(startDate);
 
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.greeting}>
+          <h1 className={styles.greetingTitle}>Welcome, {displayName} 👋</h1>
+          <p className={styles.greetingSubtitle}>Let&apos;s get you all set up.</p>
+        </div>
+        <div className={styles.skeletonCard} />
+        <div className={styles.skeletonCardSm} />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
       {/* Greeting */}
