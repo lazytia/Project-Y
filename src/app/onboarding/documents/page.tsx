@@ -23,10 +23,47 @@ const CURRENT_STEP = 4;
 const TOTAL_STEPS = 7;
 const PERCENT = Math.round((4 / 7) * 100);
 
+/** Max edge length and JPEG quality for client-side resize before upload. */
+const COMPRESS_MAX_EDGE = 1600;
+const COMPRESS_QUALITY = 0.82;
+
+/**
+ * Downscale + re-encode an image File to a JPEG Blob that's well under 1 MB.
+ * Phone photos are typically 3–10 MB, so this cuts upload size 10–20×.
+ * PDFs / non-images pass through unchanged.
+ */
+async function compressImage(file: File): Promise<Blob> {
+  if (!file.type.startsWith("image/")) return file;
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return file;
+
+  const { width, height } = bitmap;
+  const scale = Math.min(1, COMPRESS_MAX_EDGE / Math.max(width, height));
+  const w = Math.round(width * scale);
+  const h = Math.round(height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+
+  const blob: Blob | null = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", COMPRESS_QUALITY),
+  );
+  return blob ?? file;
+}
+
 async function uploadFile(file: File, path: string): Promise<string> {
   const storage = getStorage();
   const fileRef = ref(storage, path);
-  await uploadBytes(fileRef, file);
+  const data = await compressImage(file);
+  await uploadBytes(fileRef, data, {
+    contentType: data.type || "image/jpeg",
+    cacheControl: "public, max-age=31536000, immutable",
+  });
   return getDownloadURL(fileRef);
 }
 
@@ -88,15 +125,13 @@ export default function DocumentsPage() {
     setSaving(true);
     setError(null);
     try {
-      const passportUrl = passportFile
-        ? await uploadFile(passportFile, `staff_onboarding/${user.uid}/passport`)
-        : null;
-      const visaUrl = visaFile
-        ? await uploadFile(visaFile, `staff_onboarding/${user.uid}/visa`)
-        : null;
-      const rsaUrl = rsaFile
-        ? await uploadFile(rsaFile, `staff_onboarding/${user.uid}/rsa`)
-        : null;
+      // Compress + upload all three documents in parallel.
+      const base = `staff_onboarding/${user.uid}`;
+      const [passportUrl, visaUrl, rsaUrl] = await Promise.all([
+        passportFile ? uploadFile(passportFile, `${base}/passport`) : Promise.resolve(null),
+        visaFile     ? uploadFile(visaFile,     `${base}/visa`)     : Promise.resolve(null),
+        rsaFile      ? uploadFile(rsaFile,      `${base}/rsa`)      : Promise.resolve(null),
+      ]);
 
       const db = getDb();
       const payload: Record<string, unknown> = {
