@@ -96,11 +96,43 @@ export default function OnboardingPage() {
       } finally {
         setLoading(false);
       }
-      // Best-effort: register the device for push notifications so the owner's
-      // Remind button reaches this phone. Fails silently if permission denied.
-      registerFcmToken(user.uid).catch(() => {});
     })();
   }, [user]);
+
+  // Notification permission state — iOS only fires the system prompt when
+  // requestPermission() is called inside a user-gesture handler, so we expose
+  // an explicit "Enable Notifications" button below.
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | "unsupported">(
+    "default",
+  );
+  const [registeringNotif, setRegisteringNotif] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) {
+      setNotifPerm("unsupported");
+    } else {
+      setNotifPerm(Notification.permission);
+    }
+  }, []);
+
+  async function handleEnableNotifications() {
+    if (!user) return;
+    setRegisteringNotif(true);
+    try {
+      const token = await registerFcmToken(user.uid);
+      // Re-read permission state so the UI updates whether the user allowed or denied.
+      if (typeof window !== "undefined" && "Notification" in window) {
+        setNotifPerm(Notification.permission);
+      }
+      if (!token) {
+        console.warn("[onboarding] FCM token not obtained");
+      }
+    } catch (err) {
+      console.error("[onboarding] registerFcmToken failed", err);
+    } finally {
+      setRegisteringNotif(false);
+    }
+  }
 
   const percent = Math.round((completedStep / TOTAL_STEPS) * 100);
   const offset = CIRC * (1 - percent / 100);
@@ -124,6 +156,37 @@ export default function OnboardingPage() {
         <h1 className={styles.greetingTitle}>Welcome, {displayName} 👋</h1>
         <p className={styles.greetingSubtitle}>Let&apos;s get you all set up.</p>
       </div>
+
+      {/* Notification permission prompt — iOS only shows the system dialog
+          from a user-gesture handler, so we expose it as an explicit button. */}
+      {notifPerm === "default" && (
+        <section className={styles.notifCard}>
+          <div className={styles.notifBody}>
+            <p className={styles.notifTitle}>🔔 Enable Notifications</p>
+            <p className={styles.notifSub}>
+              Allow notifications so your manager can remind you about pending
+              onboarding tasks.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={styles.notifBtn}
+            onClick={handleEnableNotifications}
+            disabled={registeringNotif}
+          >
+            {registeringNotif ? "…" : "Enable"}
+          </button>
+        </section>
+      )}
+      {notifPerm === "denied" && (
+        <section className={styles.notifCardWarn}>
+          <p className={styles.notifTitle}>🔕 Notifications blocked</p>
+          <p className={styles.notifSub}>
+            Open iPhone Settings → Notifications → Project Y and turn on
+            &quot;Allow Notifications&quot; to receive reminders.
+          </p>
+        </section>
+      )}
 
       {/* Onboarding Overview */}
       <section className={styles.card}>

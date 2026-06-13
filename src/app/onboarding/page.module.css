@@ -324,3 +324,62 @@
 .skeletonCardSm {
   height: 80px;
 }
+
+/* ── Notification permission prompt ── */
+.notifCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-warm-bg);
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-lg);
+}
+
+.notifCardWarn {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.notifBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notifTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.notifSub {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  line-height: 1.4;
+}
+
+.notifBtn {
+  background: var(--color-warm);
+  color: var(--color-bg);
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.notifBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

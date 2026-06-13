@@ -11,38 +11,51 @@ importScripts(
 const APP_ORIGIN = self.location.origin;
 const DEFAULT_LANDING = "/onboarding";
 
-// Resolve Firebase config from a same-origin endpoint so we don't have to
-// hardcode credentials. The SW is registered on every load so this is cheap.
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener("activate", (event) =>
+  event.waitUntil(self.clients.claim()),
+);
 
-const initPromise = fetch("/api/firebase-config")
-  .then((r) => r.json())
-  .then((config) => {
-    firebase.initializeApp(config);
+// The main thread posts the public Firebase config once the SW is ready
+// (NEXT_PUBLIC_* env vars are baked into the client bundle but not exposed
+// to the server runtime, so a static JSON endpoint isn't reliable here).
+let initResolve;
+const initPromise = new Promise((resolve) => {
+  initResolve = resolve;
+});
+
+function initFirebase(config) {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(config);
     const messaging = firebase.messaging();
-
+    // FCM compat SDK auto-shows the notification when `notification` is present
+    // in the payload, so onBackgroundMessage is a no-op fallback for data-only
+    // messages.
     messaging.onBackgroundMessage((payload) => {
       const notification = payload.notification ?? {};
       const data = payload.data ?? {};
       const title = notification.title ?? "Project Y";
-      const options = {
+      self.registration.showNotification(title, {
         body: notification.body ?? "",
         icon: "/icon-192.png",
         badge: "/icon-192.png",
-        data: {
-          url: data.url || DEFAULT_LANDING,
-        },
+        data: { url: data.url || DEFAULT_LANDING },
         tag: data.tag || "project-y",
         renotify: true,
-      };
-      self.registration.showNotification(title, options);
+      });
     });
-  })
-  .catch((err) => {
+    initResolve(messaging);
+  } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[firebase-sw] init failed", err);
-  });
+  }
+}
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "FIREBASE_CONFIG" && event.data.config) {
+    initFirebase(event.data.config);
+  }
+});
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
