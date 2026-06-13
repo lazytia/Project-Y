@@ -8,7 +8,7 @@
   gap: var(--space-5);
 }
 
-/* â”€â”€ Header â”€â”€ */
+/* ?€?€ Header ?€?€ */
 .header {
   display: flex;
   flex-direction: column;
@@ -49,7 +49,7 @@
   line-height: 1.2;
 }
 
-/* â”€â”€ Step Indicators â”€â”€ */
+/* ?€?€ Step Indicators ?€?€ */
 .stepsContainer {
   display: flex;
   align-items: flex-start;
@@ -72,7 +72,7 @@
   flex: 1;
   height: 1px;
   background: var(--color-border);
-  margin-top: 16px;
+  margin-top: 12px;
   min-width: 8px;
 }
 
@@ -85,8 +85,8 @@
 }
 
 .stepCircle {
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: 1.5px solid var(--color-border);
   display: flex;
@@ -113,15 +113,15 @@
 }
 
 .stepItemLabel {
-  font-size: 9px;
+  font-size: 8px;
   color: var(--color-fg-muted);
   text-align: center;
   line-height: 1.3;
   white-space: pre-line;
-  max-width: 52px;
+  max-width: 40px;
 }
 
-/* â”€â”€ Progress Bar â”€â”€ */
+/* ?€?€ Progress Bar ?€?€ */
 .progressSection {
   display: flex;
   align-items: center;
@@ -150,7 +150,7 @@
   white-space: nowrap;
 }
 
-/* â”€â”€ Form Card â”€â”€ */
+/* ?€?€ Form Card ?€?€ */
 .formCard {
   background: var(--color-bg);
   border-radius: var(--radius-lg);
@@ -174,14 +174,14 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Form â”€â”€ */
+/* ?€?€ Form ?€?€ */
 .form {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
 
-/* â”€â”€ Form Section â”€â”€ */
+/* ?€?€ Form Section ?€?€ */
 .formSection {
   display: flex;
   flex-direction: column;
@@ -211,7 +211,7 @@
   color: var(--color-warm);
 }
 
-/* â”€â”€ Input â”€â”€ */
+/* ?€?€ Input ?€?€ */
 .inputWrapper {
   position: relative;
   display: flex;
@@ -254,7 +254,7 @@
   padding-left: var(--space-3);
 }
 
-/* â”€â”€ Info Box â”€â”€ */
+/* ?€?€ Info Box ?€?€ */
 .infoBox {
   background: var(--color-surface);
   border-radius: var(--radius-md);
@@ -292,7 +292,7 @@
   margin: 0;
 }
 
-/* â”€â”€ Buttons â”€â”€ */
+/* ?€?€ Buttons ?€?€ */
 .buttonRow {
   display: flex;
   gap: var(--space-3);
@@ -350,7 +350,7 @@
   cursor: not-allowed;
 }
 
-/* â”€â”€ Error Modal â”€â”€ */
+/* ?€?€ Error Modal ?€?€ */
 .modalBackdrop {
   position: fixed;
   inset: 0;
