@@ -55,11 +55,12 @@ function fmt(n: number) {
 }
 
 function Progress({ value, max }: { value: number; max: number }) {
-  const pct = Math.min(Math.round((value / max) * 100), 100);
+  const pct = Math.round((value / max) * 100);
+  const fillPct = Math.min(pct, 100);
   return (
     <div className={styles.progressRow}>
       <div className={styles.progressTrack}>
-        <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+        <div className={styles.progressFill} style={{ width: `${fillPct}%` }} />
       </div>
       <span className={styles.progressPct}>{pct}%</span>
     </div>
