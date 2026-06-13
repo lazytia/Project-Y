@@ -16,7 +16,7 @@ const ONBOARDING_ITEMS = [
 ];
 
 const TOTAL = ONBOARDING_ITEMS.length;
-const COMPLETED = 2;
+const COMPLETED = 0;
 const PERCENT = Math.round((COMPLETED / TOTAL) * 100);
 
 // Circular progress SVG constants
