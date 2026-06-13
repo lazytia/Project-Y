@@ -4,7 +4,8 @@ import {
   getWeekToDateRange,
   fetchOrders,
   squareEnv,
-  grossAmountCents,
+  netAmountCents,
+  totalCollectedCents,
   todayDateKey,
 } from "@/lib/square";
 
@@ -19,8 +20,8 @@ function formatHour(h: number): string {
   return `${h - 12}:00 PM`;
 }
 
-function sumGrossDollars<T>(orders: T[], grossFn: (o: T) => number): number {
-  return orders.reduce((s, o) => s + grossFn(o), 0) / 100;
+function sumDollars<T>(orders: T[], cents: (o: T) => number): number {
+  return orders.reduce((s, o) => s + cents(o), 0) / 100;
 }
 
 function shiftKey(dateKey: string, dayOffset: number): string {
@@ -82,25 +83,26 @@ export async function GET(req: NextRequest) {
     const transactions = todayOrders.length;
     const yestTransactions = yesterdayOrders.length;
 
-    // ── Sales (gross — 세전·할인 전) ───────────────────────────
-    const restaurantSales = sumGrossDollars(todayOrders, grossAmountCents);
-    const platterSales = sumGrossDollars(platterOrders, grossAmountCents);
+    // ── Sales (Total Collected = 세금/팁/서비스차지 포함, Square 앱과 일치) ──
+    const restaurantSales = sumDollars(todayOrders, totalCollectedCents);
+    const platterSales = sumDollars(platterOrders, totalCollectedCents);
     const todaySales = restaurantSales + platterSales;
 
-    // ── Weekly Progress (Mon~선택일) — restaurant OPEN+COMPLETED, platter COMPLETED ─
+    // ── Weekly Progress ────────────────────────────────────────
     const weeklyProgress =
-      sumGrossDollars(weekRestaurantOrders, grossAmountCents) +
-      sumGrossDollars(weekPlatterOrders, grossAmountCents);
+      sumDollars(weekRestaurantOrders, totalCollectedCents) +
+      sumDollars(weekPlatterOrders, totalCollectedCents);
 
-    // ── Avg Spend Per Table (restaurant gross ÷ restaurant order count) ──
+    // ── Avg Net Sale (Net Sales ÷ 주문 수, Square 대시보드와 일치) ───
+    const restaurantNet = sumDollars(todayOrders, netAmountCents);
     const avgSpend =
       transactions > 0
-        ? Math.round((restaurantSales / transactions) * 100) / 100
+        ? Math.round((restaurantNet / transactions) * 100) / 100
         : 0;
-    const yestSales = sumGrossDollars(yesterdayOrders, grossAmountCents);
+    const yestNet = sumDollars(yesterdayOrders, netAmountCents);
     const yestAvgSpend =
       yestTransactions > 0
-        ? Math.round((yestSales / yestTransactions) * 100) / 100
+        ? Math.round((yestNet / yestTransactions) * 100) / 100
         : 0;
 
     // Best sellers still drawn from COMPLETED only (OPEN tickets might have
