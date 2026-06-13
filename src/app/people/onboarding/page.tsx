@@ -147,9 +147,29 @@ export default function ManagerOnboardingPage() {
   );
   const activeCount = useMemo(() => rows?.length ?? 0, [rows]);
 
-  function handleRemind(row: StaffOnboarding) {
-    // Placeholder until messaging plumbing exists.
-    console.info("[onboarding] remind", row.uid);
+  async function handleRemind(row: StaffOnboarding) {
+    try {
+      const res = await fetch("/api/staff/remind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: row.uid }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(`Reminder failed: ${data.error ?? res.status}`);
+        return;
+      }
+      if (data.delivered > 0) {
+        alert(`Reminder sent (${data.delivered} device${data.delivered === 1 ? "" : "s"}).`);
+      } else {
+        alert(
+          data.reason ??
+            "No device registered yet. The staff member needs to open the app and allow notifications first.",
+        );
+      }
+    } catch (err) {
+      alert(`Reminder failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   if (authLoading || !allowed) {

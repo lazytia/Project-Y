@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { registerFcmToken } from "@/lib/fcm";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -95,6 +96,9 @@ export default function OnboardingPage() {
       } finally {
         setLoading(false);
       }
+      // Best-effort: register the device for push notifications so the owner's
+      // Remind button reaches this phone. Fails silently if permission denied.
+      registerFcmToken(user.uid).catch(() => {});
     })();
   }, [user]);
 

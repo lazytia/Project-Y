@@ -19,3 +19,9 @@ env:
   # Bearer token for system_yurica integration endpoint (PAX + roster staff).
   - variable: SYSTEM_YURICA_TOKEN
     secret: SYSTEM_YURICA_TOKEN
+  # Web Push (VAPID) public key — used by the client to subscribe to FCM.
+  - variable: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+    secret: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+    availability:
+      - BUILD
+      - RUNTIME
