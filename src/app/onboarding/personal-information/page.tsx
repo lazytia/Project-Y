@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import CalendarPicker from "@/components/CalendarPicker";
@@ -44,6 +44,30 @@ export default function PersonalInformationPage() {
   const [showToast, setShowToast] = useState(false);
 
   const todayKey = new Date().toLocaleDateString("en-CA");
+
+  // Load any previously saved values so navigating back to this step doesn't
+  // erase the user's input.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        if (cancelled || !snap.exists()) return;
+        const data = snap.data() as Record<string, unknown>;
+        if (typeof data.firstName === "string") setFirstName(data.firstName);
+        if (typeof data.lastName === "string") setLastName(data.lastName);
+        if (typeof data.preferredName === "string") setPreferredName(data.preferredName);
+        if (typeof data.dateOfBirth === "string") setDateOfBirth(data.dateOfBirth);
+        if (typeof data.gender === "string") setGender(data.gender);
+        if (typeof data.mobileNumber === "string") setMobileNumber(data.mobileNumber);
+        if (typeof data.email === "string") setEmail(data.email);
+      } catch {
+        // Silent — user can still fill the form from scratch.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   function formatDobDisplay(raw: string): string {
     if (!raw) return "";

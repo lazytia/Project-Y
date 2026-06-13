@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import CalendarPicker from "@/components/CalendarPicker";
@@ -73,6 +73,35 @@ export default function TfnDeclarationPage() {
 
   const todayKey = new Date().toLocaleDateString("en-CA");
   const declarationDate = getTodayDisplay();
+
+  // Restore previously saved values when revisiting this step.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        if (cancelled || !snap.exists()) return;
+        const d = snap.data() as Record<string, unknown>;
+        if (typeof d.fullLegalName === "string") setFullLegalName(d.fullLegalName);
+        if (typeof d.dateOfBirth === "string") setDateOfBirth(d.dateOfBirth);
+        if (typeof d.homeAddress === "string") setHomeAddress(d.homeAddress);
+        if (typeof d.suburb === "string") setSuburb(d.suburb);
+        if (typeof d.auState === "string") setAuState(d.auState);
+        if (typeof d.postcode === "string") setPostcode(d.postcode);
+        if (typeof d.taxFileNumber === "string") setTaxFileNumber(d.taxFileNumber);
+        if (typeof d.taxResident === "string") setTaxResident(d.taxResident);
+        if (typeof d.taxFreeThreshold === "string") setTaxFreeThreshold(d.taxFreeThreshold);
+        if (typeof d.helpDebt === "string") setHelpDebt(d.helpDebt);
+        if (typeof d.otherGovDebt === "string") setOtherGovDebt(d.otherGovDebt);
+        if (typeof d.declarationAgreed === "boolean") setDeclarationAgreed(d.declarationAgreed);
+        if (typeof d.signatureDataUrl === "string") setSignatureDataUrl(d.signatureDataUrl);
+      } catch {
+        // Silent — fall back to defaults so the form stays usable.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   async function saveToFirestore(markComplete = false) {
     if (!user) {
@@ -488,8 +517,8 @@ export default function TfnDeclarationPage() {
               </div>
               <div className={styles.radioGroup}>
                 {[
-                  { value: "no", label: "No" },
                   { value: "yes", label: "Yes" },
+                  { value: "no", label: "No" },
                 ].map((opt) => (
                   <label key={opt.value} className={styles.radioItem}>
                     <input
@@ -518,8 +547,8 @@ export default function TfnDeclarationPage() {
               </div>
               <div className={styles.radioGroup}>
                 {[
-                  { value: "no", label: "No" },
                   { value: "yes", label: "Yes" },
+                  { value: "no", label: "No" },
                 ].map((opt) => (
                   <label key={opt.value} className={styles.radioItem}>
                     <input

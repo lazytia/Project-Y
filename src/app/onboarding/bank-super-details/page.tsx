@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import Toast from "@/components/Toast";
@@ -38,6 +38,29 @@ export default function BankSuperDetailsPage() {
   const [errorTitle, setErrorTitle] = useState("Required Fields Missing");
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
+
+  // Restore previously saved values when revisiting this step.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        if (cancelled || !snap.exists()) return;
+        const b = (snap.data() as { bankSuper?: Record<string, unknown> }).bankSuper;
+        if (!b) return;
+        if (typeof b.bsb === "string") setBsb(b.bsb);
+        if (typeof b.accountNumber === "string") setAccountNumber(b.accountNumber);
+        if (typeof b.accountName === "string") setAccountName(b.accountName);
+        if (typeof b.superFundName === "string") setSuperFundName(b.superFundName);
+        if (typeof b.usi === "string") setUsi(b.usi);
+        if (typeof b.memberNumber === "string") setMemberNumber(b.memberNumber);
+      } catch {
+        // Silent.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   async function saveToFirestore(markComplete = false) {
     if (!user) {
