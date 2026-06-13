@@ -209,19 +209,26 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;     /* allow grid column to shrink — prevents icon overflow */
 }
 
 .salesBreakItemBottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 /* Secondary KPI */
 .salesBreakAmount {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   letter-spacing: -0.02em;
   color: #111111;
   margin: 0;
