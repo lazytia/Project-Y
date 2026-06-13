@@ -17,7 +17,7 @@ const NAV: NavGroup[] = [
     icon: "👥",
     label: "People",
     children: [
-      { label: "+ Staff", href: "/people/add-staff", ownerOnly: true },
+      { label: "Staff +", href: "/people/add-staff", ownerOnly: true },
       { label: "Onboarding", href: "/people/onboarding", ownerOnly: true },
       { label: "Active Staff", href: "/people/active-staff" },
       { label: "HR Notes", href: "/people/hr-notes" },
