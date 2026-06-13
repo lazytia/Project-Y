@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import styles from "./page.module.css";
+import CalendarPicker from "@/components/CalendarPicker";
 
 const SYDNEY_TZ = "Australia/Sydney";
 
@@ -68,6 +69,7 @@ function Progress({ value, max }: { value: number; max: number }) {
 export default function DashboardPage() {
   const todayKey = useMemo(sydneyTodayKey, []);
   const [selectedDate, setSelectedDate] = useState<string>(todayKey);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const isToday = selectedDate === todayKey;
   const dailyTarget = DAILY_TARGETS[dowOfDateKey(selectedDate)];
 
@@ -181,29 +183,18 @@ export default function DashboardPage() {
           onClick={goPrev}
           aria-label="Previous day"
         >‹</button>
-        <div className={styles.dateCenter}>
-          <input
-            type="date"
-            value={selectedDate}
-            max={todayKey}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v && v <= todayKey) setSelectedDate(v);
-            }}
-            className={styles.dateInput}
-            aria-label="Select date"
-          />
+        <button
+          type="button"
+          className={styles.dateCenter}
+          onClick={() => setCalendarOpen(true)}
+          aria-label="Open calendar"
+        >
           <span className={styles.dateLabel}>{formatDateLabel(selectedDate)}</span>
+          <span className={styles.calendarIcon}>📅</span>
           {!isToday && (
-            <button
-              type="button"
-              onClick={goToToday}
-              className={styles.todayBtn}
-            >
-              Today
-            </button>
+            <span className={styles.todayBadge}>not today</span>
           )}
-        </div>
+        </button>
         <button
           type="button"
           className={styles.dateNavBtn}
@@ -212,6 +203,15 @@ export default function DashboardPage() {
           aria-label="Next day"
         >›</button>
       </section>
+
+      {calendarOpen && (
+        <CalendarPicker
+          value={selectedDate}
+          maxDate={todayKey}
+          onChange={(d) => setSelectedDate(d)}
+          onClose={() => setCalendarOpen(false)}
+        />
+      )}
 
       {/* TODAY SALES — RESTAURANT / PLATTER 포함 */}
       <section className={styles.card}>

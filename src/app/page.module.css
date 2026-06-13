@@ -17,25 +17,25 @@
   padding: var(--space-2) var(--space-3);
 }
 
+/* 날짜 텍스트 버튼 — 클릭하면 캘린더 오픈 */
 .dateCenter {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
-  position: relative;
+  gap: var(--space-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
 }
 
-.dateInput {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  border: 0;
-  padding: 0;
-  font: inherit;
+.dateCenter:hover {
+  background: var(--color-surface);
 }
 
 .dateLabel {
@@ -43,23 +43,23 @@
   font-size: var(--font-size-md);
   font-weight: 600;
   color: var(--color-fg);
-  pointer-events: none;
   letter-spacing: 0.01em;
 }
 
-.todayBtn {
-  position: relative;
-  z-index: 1;
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
-  border: 0;
-  border-radius: var(--radius-sm);
-  padding: 4px 10px;
+.calendarIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.todayBadge {
+  font-family: var(--font-display);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
+  color: var(--color-warm);
+  background: var(--color-warm-bg);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  letter-spacing: 0.03em;
 }
 
 .dateNavBtn {
@@ -76,6 +76,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dateNavBtn:hover:not(:disabled) {

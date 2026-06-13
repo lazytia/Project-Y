@@ -1,0 +1,177 @@
+/* ── Backdrop ── */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Bottom Sheet ── */
+.sheet {
+  width: 100%;
+  background: var(--color-bg);
+  border-radius: 20px 20px 0 0;
+  padding: var(--space-3) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  animation: slideUp 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* ── Handle bar ── */
+.handle {
+  width: 36px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 99px;
+  margin: 0 auto var(--space-1);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-1);
+}
+
+.monthTitle {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+}
+
+.navBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 99px;
+  background: var(--color-surface);
+  border: none;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--color-warm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navBtn:disabled {
+  color: var(--color-fg-subtle);
+  cursor: default;
+}
+
+.navBtn:not(:disabled):hover {
+  background: var(--color-surface-hover);
+}
+
+/* ── Day-of-week row ── */
+.weekRow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  padding: 0 var(--space-1);
+}
+
+.weekLabel {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  letter-spacing: 0.04em;
+  padding: var(--space-1) 0;
+}
+
+/* ── Day grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  padding: 0 var(--space-1);
+}
+
+.day {
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-fg);
+  border-radius: 99px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  width: 100%;
+}
+
+.day:hover:not(:disabled) {
+  background: var(--color-surface);
+}
+
+/* Today — orange outline */
+.dayToday {
+  color: var(--color-warm);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1.5px var(--color-warm);
+}
+
+/* Selected — filled orange */
+.daySelected {
+  background: var(--color-warm) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+/* Future / disabled */
+.dayDisabled {
+  color: var(--color-border);
+  cursor: default;
+}
+
+/* ── Today shortcut button ── */
+.todayShortcut {
+  margin-top: var(--space-1);
+  padding: var(--space-3) 0;
+  background: var(--color-surface);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-warm);
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.todayShortcut:hover {
+  background: var(--color-surface-hover);
+}
