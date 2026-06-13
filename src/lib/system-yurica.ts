@@ -4,7 +4,7 @@
  */
 
 const UPSTREAM_BASE =
-  process.env.SYSTEM_YURICA_BASE?.trim() || "https://project.yurica.com.au";
+  process.env.SYSTEM_YURICA_BASE?.trim() || "https://system-yurica--system-yurica-erp.asia-southeast1.hosted.app";
 
 export type TodayCounts = {
   date: string;
