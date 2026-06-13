@@ -1,0 +1,310 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.stepLabel {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-warm);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-fg);
+  line-height: 1.2;
+}
+
+/* ── Step Indicators ── */
+.stepsContainer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+}
+
+.stepItem {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  position: relative;
+}
+
+.stepItem:first-child {
+  flex: 0 0 auto;
+}
+
+.connector {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+  margin-top: 16px;
+  min-width: 8px;
+}
+
+.stepCircleWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.stepCircle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  background: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.stepCircleActive {
+  background: var(--color-warm);
+  border-color: var(--color-warm);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.stepItemLabel {
+  font-size: 9px;
+  color: var(--color-fg-muted);
+  text-align: center;
+  line-height: 1.3;
+  white-space: pre-line;
+  max-width: 52px;
+}
+
+/* ── Progress Bar ── */
+.progressSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.progressBarTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--color-surface);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  background: var(--color-warm);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.progressText {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-warm);
+  white-space: nowrap;
+}
+
+/* ── Form Card ── */
+.formCard {
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.formTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.formSubtitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+/* ── Form ── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg);
+}
+
+.required {
+  color: var(--color-warm);
+}
+
+/* Input */
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: var(--space-3);
+  display: flex;
+  align-items: center;
+  color: var(--color-fg-muted);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.inputIconRight {
+  position: absolute;
+  right: var(--space-3);
+  display: flex;
+  align-items: center;
+  color: var(--color-fg-muted);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.input {
+  width: 100%;
+  height: 48px;
+  padding: 0 var(--space-3) 0 40px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-fg);
+  background: var(--color-bg);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input::placeholder {
+  color: var(--color-fg-subtle);
+}
+
+.input:focus {
+  border-color: var(--color-warm);
+}
+
+/* Select */
+.selectWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.select {
+  width: 100%;
+  height: 48px;
+  padding: 0 40px 0 var(--space-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+  background: var(--color-bg);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.select:focus {
+  border-color: var(--color-warm);
+}
+
+.selectIcon {
+  position: absolute;
+  right: var(--space-3);
+  display: flex;
+  align-items: center;
+  color: var(--color-fg-muted);
+  pointer-events: none;
+}
+
+/* ── Buttons ── */
+.buttonRow {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.btnSecondary {
+  flex: 1;
+  height: 48px;
+  border: 1.5px solid var(--color-fg);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btnSecondary:hover {
+  background: var(--color-surface);
+}
+
+.btnPrimary {
+  flex: 1;
+  height: 48px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-warm);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  transition: opacity 0.15s;
+}
+
+.btnPrimary:hover {
+  opacity: 0.9;
+}
+
+.btnArrow {
+  font-size: 18px;
+  line-height: 1;
+}

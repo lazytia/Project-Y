@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import styles from "./page.module.css";
@@ -25,6 +26,7 @@ const CIRC = 2 * Math.PI * R;
 const OFFSET = CIRC * (1 - PERCENT / 100);
 
 export default function OnboardingPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const name = emailToUsername(user?.email ?? "");
   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
@@ -93,7 +95,10 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        <button className={styles.continueBtn}>
+        <button
+          className={styles.continueBtn}
+          onClick={() => router.push("/onboarding/personal-information")}
+        >
           Continue Onboarding <span className={styles.continueBtnArrow}>›</span>
         </button>
       </section>
