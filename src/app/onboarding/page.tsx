@@ -2,11 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import styles from "./page.module.css";
+
+/** Returns the Wednesday of the calendar week AFTER the given date. */
+function getPayrollCutoff(startDate: Date): Date {
+  const d = new Date(startDate);
+  const dow = d.getDay(); // 0=Sun … 6=Sat
+  // Days from d until the next Monday
+  const daysToNextMonday = dow === 0 ? 1 : 8 - dow;
+  // Wednesday of that next week = next Monday + 2 days
+  d.setDate(d.getDate() + daysToNextMonday + 2);
+  return d;
+}
+
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 const TOTAL_STEPS = 7;
 
@@ -34,22 +54,43 @@ export default function OnboardingPage() {
   // inProgressStep: step they were last WORKING on (including partial Save & Exit)
   const [inProgressStep, setInProgressStep] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState<Date>(new Date());
 
   useEffect(() => {
     if (!user) return;
     (async () => {
       try {
         const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        const today = new Date();
         if (snap.exists()) {
           const data = snap.data();
           const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
           const inProgress = typeof data.step === "number" ? data.step : 0;
           setCompletedStep(completed);
-          // Continue Onboarding lands on the further of the two
           setInProgressStep(Math.max(completed, inProgress - 1));
+          // Use saved startDate or fall back to today
+          if (data.startDate?.toDate) {
+            setStartDate(data.startDate.toDate());
+          } else {
+            // First visit — persist today as the start date
+            setStartDate(today);
+            await setDoc(
+              doc(getDb(), "staff_onboarding", user.uid),
+              { startDate: serverTimestamp() },
+              { merge: true }
+            );
+          }
+        } else {
+          // No document yet — persist today as the start date
+          setStartDate(today);
+          await setDoc(
+            doc(getDb(), "staff_onboarding", user.uid),
+            { uid: user.uid, startDate: serverTimestamp() },
+            { merge: true }
+          );
         }
       } catch {
-        // silently ignore — default to 0
+        // silently ignore — default to today
       } finally {
         setLoading(false);
       }
@@ -64,6 +105,8 @@ export default function OnboardingPage() {
   // "Continue Onboarding" resumes from where they last saved data
   const continueStep = ALL_STEPS[inProgressStep] ?? nextStep;
   const remainingSteps = ALL_STEPS.slice(nextStepIndex + 1);
+
+  const payrollCutoff = getPayrollCutoff(startDate);
 
   return (
     <div className={styles.page}>
@@ -83,14 +126,14 @@ export default function OnboardingPage() {
               <span className={styles.dateIcon}>📅</span>
               <div>
                 <p className={styles.dateLabel}>Start Date</p>
-                <p className={styles.dateValue}>Mon, 15 Jun 2026</p>
+                <p className={styles.dateValue}>{fmtDate(startDate)}</p>
               </div>
             </div>
             <div className={styles.dateRow}>
               <span className={styles.dateIcon}>🕐</span>
               <div>
                 <p className={styles.dateLabel}>Payroll Cut-off</p>
-                <p className={styles.dateValue}>Wed, 17 Jun 2026</p>
+                <p className={styles.dateValue}>{fmtDate(payrollCutoff)}</p>
                 <p className={styles.dateSub}>
                   Submit by this date to be paid in the following week.
                 </p>
