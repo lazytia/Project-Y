@@ -43,7 +43,7 @@ export function getAuth(): Auth {
 }
 
 export function getDb(): Firestore {
-  if (!_db) _db = fbGetFirestore(app());
+  if (!_db) _db = fbGetFirestore(app(), "project-y");
   return _db;
 }
 

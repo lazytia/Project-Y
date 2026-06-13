@@ -6,6 +6,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import CalendarPicker from "@/components/CalendarPicker";
+import Toast from "@/components/Toast";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -38,7 +39,9 @@ export default function PersonalInformationPage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState("Required Fields Missing");
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   const todayKey = new Date().toLocaleDateString("en-CA");
 
@@ -48,7 +51,7 @@ export default function PersonalInformationPage() {
     return `${d} / ${m} / ${y}`;
   }
 
-  async function saveToFirestore() {
+  async function saveToFirestore(markComplete = false) {
     if (!user) {
       setError("Could not find your login info. Please sign in again.");
       return false;
@@ -65,17 +68,19 @@ export default function PersonalInformationPage() {
         gender,
         mobileNumber,
         email,
-        step: 1,
-        status: "in_progress",
+        step: CURRENT_STEP,
+        status: markComplete ? "step_complete" : "in_progress",
         updatedAt: serverTimestamp(),
       };
-      if (preferredName.trim()) {
-        payload.preferredName = preferredName.trim();
-      }
+      if (preferredName.trim()) payload.preferredName = preferredName.trim();
+      if (markComplete) payload.completedStep = CURRENT_STEP;
       await setDoc(doc(db, "staff_onboarding", user.uid), payload, { merge: true });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save. Please try again.");
+      const msg = err instanceof Error ? err.message : "Failed to save. Please try again.";
+      setError(msg);
+      setErrorTitle("Save Failed");
+      setShowErrorModal(true);
       return false;
     } finally {
       setSaving(false);
@@ -92,16 +97,20 @@ export default function PersonalInformationPage() {
     if (!mobileNumber.trim()) missing.push("Mobile Number");
     if (!email.trim()) missing.push("Email Address");
     if (missing.length > 0) {
+      setErrorTitle("Required Fields Missing");
       setError(`Please fill in the required fields:\n${missing.join("\n")}`);
       setShowErrorModal(true);
       return;
     }
-    const ok = await saveToFirestore();
-    if (ok) router.push("/onboarding/tfn-declaration");
+    const ok = await saveToFirestore(true);
+    if (ok) {
+      setShowToast(true);
+      setTimeout(() => router.push("/onboarding/tfn-declaration"), 1800);
+    }
   }
 
   async function handleSaveAndExit() {
-    const ok = await saveToFirestore();
+    const ok = await saveToFirestore(false);
     if (ok) router.push("/onboarding");
   }
 
@@ -109,6 +118,16 @@ export default function PersonalInformationPage() {
     <div className={styles.page}>
       {/* Header */}
       <div className={styles.header}>
+        <button
+          type="button"
+          className={styles.backBtn}
+          onClick={() => router.push("/onboarding")}
+          aria-label="Back to onboarding"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
         <p className={styles.stepLabel}>Step {CURRENT_STEP} of {TOTAL_STEPS}</p>
         <h1 className={styles.title}>Personal Information</h1>
       </div>
@@ -332,12 +351,21 @@ export default function PersonalInformationPage() {
         </form>
       </div>
 
+      {/* Toast */}
+      {showToast && (
+        <Toast
+          title="Personal Information completed"
+          message="Great! Your details have been saved."
+          onClose={() => setShowToast(false)}
+        />
+      )}
+
       {/* Error Modal */}
       {showErrorModal && (
         <div className={styles.modalBackdrop} onClick={() => setShowErrorModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalIcon}>⚠️</div>
-            <h3 className={styles.modalTitle}>Required Fields Missing</h3>
+            <h3 className={styles.modalTitle}>{errorTitle}</h3>
             <ul className={styles.modalList}>
               {error?.split("\n").slice(1).map((item) => (
                 <li key={item}>{item}</li>

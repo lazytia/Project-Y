@@ -1,35 +1,60 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import styles from "./page.module.css";
 
-const ONBOARDING_ITEMS = [
-  { icon: "📄", label: "TFN Declaration" },
-  { icon: "🏦", label: "Bank & Super Details" },
-  { icon: "🪪", label: "Passport / Photo ID" },
-  { icon: "🌐", label: "Visa" },
-  { icon: "🛡", label: "RSA Certificate" },
-  { icon: "📖", label: "Staff Handbook" },
-  { icon: "🔒", label: "Privacy Policy" },
-  { icon: "📄", label: "Employee Agreement" },
-];
+const TOTAL_STEPS = 7;
 
-const TOTAL = ONBOARDING_ITEMS.length;
-const COMPLETED = 0;
-const PERCENT = Math.round((COMPLETED / TOTAL) * 100);
+const ALL_STEPS = [
+  { num: 1, label: "Personal Information",  path: "/onboarding/personal-information", icon: "👤", desc: "Add your personal details",         time: "Est. 2 mins" },
+  { num: 2, label: "TFN Declaration",        path: "/onboarding/tfn-declaration",       icon: "📄", desc: "Submit your tax file number",        time: "Est. 3 mins" },
+  { num: 3, label: "Bank & Super Details",   path: "/onboarding/bank-super-details",    icon: "🏦", desc: "Add your bank and super details",    time: "Est. 2 mins" },
+  { num: 4, label: "Documents",              path: "/onboarding/documents",             icon: "🪪", desc: "Upload required documents",          time: "Est. 5 mins" },
+  { num: 5, label: "Policies",               path: "/onboarding/policies",              icon: "📖", desc: "Read and acknowledge policies",       time: "Est. 3 mins" },
+  { num: 6, label: "Review & Sign",          path: "/onboarding/review-sign",           icon: "✍️", desc: "Review and sign your documents",     time: "Est. 2 mins" },
+  { num: 7, label: "Complete",               path: "/onboarding/complete",              icon: "🎉", desc: "You are all set!",                   time: "" },
+];
 
 // Circular progress SVG constants
 const R = 44;
 const CIRC = 2 * Math.PI * R;
-const OFFSET = CIRC * (1 - PERCENT / 100);
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useAuth();
   const name = emailToUsername(user?.email ?? "");
   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+
+  const [completedStep, setCompletedStep] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          setCompletedStep(typeof data.completedStep === "number" ? data.completedStep : 0);
+        }
+      } catch {
+        // silently ignore — default to 0
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user]);
+
+  const percent = Math.round((completedStep / TOTAL_STEPS) * 100);
+  const offset = CIRC * (1 - percent / 100);
+  const nextStepIndex = completedStep; // 0-based index into ALL_STEPS
+  const nextStep = ALL_STEPS[nextStepIndex] ?? ALL_STEPS[TOTAL_STEPS - 1];
+  const remainingSteps = ALL_STEPS.slice(nextStepIndex + 1);
 
   return (
     <div className={styles.page}>
@@ -67,30 +92,25 @@ export default function OnboardingPage() {
           <div className={styles.progressWrap}>
             <div className={styles.progressRingWrap}>
               <svg className={styles.progressRing} viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-surface)" strokeWidth="8" />
                 <circle
                   cx="50" cy="50" r={R}
                   fill="none"
-                  stroke="var(--color-surface)"
-                  strokeWidth="8"
-                />
-                <circle
-                  cx="50" cy="50" r={R}
-                  fill="none"
-                  stroke="var(--color-warm)"
+                  stroke={loading ? "var(--color-surface)" : "var(--color-warm)"}
                   strokeWidth="8"
                   strokeLinecap="round"
                   strokeDasharray={CIRC}
-                  strokeDashoffset={OFFSET}
+                  strokeDashoffset={offset}
                   transform="rotate(-90 50 50)"
                 />
               </svg>
               <div className={styles.progressInner}>
-                <span className={styles.progressPct}>{PERCENT}%</span>
+                <span className={styles.progressPct}>{loading ? "—" : `${percent}%`}</span>
               </div>
             </div>
             <div className={styles.progressMeta}>
               <span className={styles.progressCount}>
-                <span className={styles.progressCountOrange}>{COMPLETED} of {TOTAL}</span>
+                <span className={styles.progressCountOrange}>{loading ? "—" : completedStep} of {TOTAL_STEPS}</span>
               </span>
               <span className={styles.progressCompleted}>Completed</span>
             </div>
@@ -99,7 +119,8 @@ export default function OnboardingPage() {
 
         <button
           className={styles.continueBtn}
-          onClick={() => router.push("/onboarding/personal-information")}
+          onClick={() => router.push(nextStep.path)}
+          disabled={loading}
         >
           Continue Onboarding <span className={styles.continueBtnArrow}>›</span>
         </button>
@@ -110,31 +131,44 @@ export default function OnboardingPage() {
         <p className={styles.sectionLabel}>YOUR NEXT STEP</p>
         <div className={styles.nextStepRow}>
           <div className={styles.nextStepIcon}>
-            <span>👤</span>
+            <span>{nextStep.icon}</span>
           </div>
           <div className={styles.nextStepInfo}>
-            <p className={styles.nextStepTitle}>Personal Information</p>
-            <p className={styles.nextStepDesc}>Add your personal details</p>
-            <p className={styles.nextStepTime}>🕐 Est. 2 mins</p>
+            <p className={styles.nextStepTitle}>{nextStep.label}</p>
+            <p className={styles.nextStepDesc}>{nextStep.desc}</p>
+            {nextStep.time && <p className={styles.nextStepTime}>🕐 {nextStep.time}</p>}
           </div>
-          <button className={styles.startBtn}>Start</button>
+          <button className={styles.startBtn} onClick={() => router.push(nextStep.path)}>
+            {completedStep > 0 ? "Continue" : "Start"}
+          </button>
         </div>
       </section>
 
       {/* Remaining Items */}
-      <section className={styles.card}>
-        <p className={styles.sectionLabel}>REMAINING ITEMS</p>
-        <ul className={styles.itemList}>
-          {ONBOARDING_ITEMS.map((item) => (
-            <li key={item.label} className={styles.item}>
-              <span className={styles.itemIcon}>{item.icon}</span>
-              <span className={styles.itemLabel}>{item.label}</span>
-              <span className={styles.itemStatus}>Pending</span>
-              <span className={styles.itemChevron}>›</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {remainingSteps.length > 0 && (
+        <section className={styles.card}>
+          <p className={styles.sectionLabel}>REMAINING ITEMS</p>
+          <ul className={styles.itemList}>
+            {remainingSteps.map((step) => (
+              <li key={step.label} className={styles.item}>
+                <span className={styles.itemIcon}>{step.icon}</span>
+                <span className={styles.itemLabel}>{step.label}</span>
+                <span className={styles.itemStatus}>Pending</span>
+                <span className={styles.itemChevron}>›</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {completedStep >= TOTAL_STEPS && (
+        <section className={styles.card}>
+          <p className={styles.sectionLabel}>ALL DONE 🎉</p>
+          <p className={styles.allDoneNote}>
+            You have completed all onboarding steps. Welcome to the team!
+          </p>
+        </section>
+      )}
     </div>
   );
 }

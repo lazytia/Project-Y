@@ -1,7 +1,7 @@
 .page {
   font-family: var(--font-sans);
   max-width: 480px;
-  margin: 0 auto;
+  margin: 0;
   padding: var(--space-5);
   display: flex;
   flex-direction: column;
@@ -13,6 +13,25 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full, 50%);
+  border: none;
+  background: var(--color-bg-alt);
+  color: var(--color-fg);
+  cursor: pointer;
+  margin-bottom: var(--space-2);
+  transition: background 0.15s;
+}
+
+.backBtn:hover {
+  background: var(--color-border);
 }
 
 .stepLabel {
