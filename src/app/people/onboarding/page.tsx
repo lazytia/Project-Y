@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { collection, getDocs, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
+import { isOwner } from "@/lib/permissions";
+import { ROUTES } from "@/lib/routes";
+import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 type StaffOnboarding = {
@@ -82,10 +87,21 @@ function isPendingApproval(row: StaffOnboarding): boolean {
 }
 
 export default function ManagerOnboardingPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const allowed = isOwner(user);
+
   const [rows, setRows] = useState<StaffOnboarding[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Owner-only page: redirect anyone else back to the dashboard.
   useEffect(() => {
+    if (authLoading) return;
+    if (!allowed) router.replace(ROUTES.home);
+  }, [allowed, authLoading, router]);
+
+  useEffect(() => {
+    if (!allowed) return;
     let cancelled = false;
     (async () => {
       try {
@@ -119,7 +135,7 @@ export default function ManagerOnboardingPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [allowed]);
 
   const pendingApprovalCount = useMemo(
     () => rows?.filter(isPendingApproval).length ?? 0,
@@ -130,6 +146,10 @@ export default function ManagerOnboardingPage() {
   function handleRemind(row: StaffOnboarding) {
     // Placeholder until messaging plumbing exists.
     console.info("[onboarding] remind", row.uid);
+  }
+
+  if (authLoading || !allowed) {
+    return <Splash />;
   }
 
   return (

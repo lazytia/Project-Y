@@ -5,9 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { emailToUsername } from "@/lib/username";
+import { isOwner } from "@/lib/permissions";
 import styles from "./Sidebar.module.css";
 
-type NavItem = { label: string; href: string };
+type NavItem = { label: string; href: string; ownerOnly?: boolean };
 type NavGroup = { icon: string; label: string; href?: string; children?: NavItem[] };
 
 const NAV: NavGroup[] = [
@@ -16,7 +17,7 @@ const NAV: NavGroup[] = [
     icon: "👥",
     label: "People",
     children: [
-      { label: "Onboarding", href: "/people/onboarding" },
+      { label: "Onboarding", href: "/people/onboarding", ownerOnly: true },
       { label: "Active Staff", href: "/people/active-staff" },
       { label: "HR Notes", href: "/people/hr-notes" },
     ],
@@ -63,6 +64,7 @@ type Props = { open: boolean; onClose?: () => void };
 export default function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const userIsOwner = isOwner(user);
 
   // 기본값: 모두 닫힘. 한 번에 하나만 열림.
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -71,11 +73,18 @@ export default function Sidebar({ open, onClose }: Props) {
     setOpenGroup((prev) => (prev === label ? null : label));
   };
 
+  const visibleNav = NAV.map((group) => ({
+    ...group,
+    children: group.children?.filter((c) => !c.ownerOnly || userIsOwner),
+  })).filter(
+    (group) => group.href || (group.children && group.children.length > 0),
+  );
+
   return (
     <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
       <div className={styles.brand}>Project Y</div>
       <nav className={styles.nav}>
-        {NAV.map((group) => {
+        {visibleNav.map((group) => {
           const isExpanded = !group.children || openGroup === group.label;
           return (
             <div key={group.label} className={styles.group}>
