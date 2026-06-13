@@ -49,7 +49,7 @@ export default function PersonalInformationPage() {
 
   async function saveToFirestore() {
     if (!user) {
-      setError("로그인 정보를 찾을 수 없습니다. 다시 로그인해 주세요.");
+      setError("Could not find your login info. Please sign in again.");
       return false;
     }
     setSaving(true);
@@ -74,7 +74,7 @@ export default function PersonalInformationPage() {
       await setDoc(doc(db, "staff_onboarding", user.uid), payload, { merge: true });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      setError(err instanceof Error ? err.message : "Failed to save. Please try again.");
       return false;
     } finally {
       setSaving(false);
@@ -82,6 +82,18 @@ export default function PersonalInformationPage() {
   }
 
   async function handleSaveAndContinue() {
+    // Required field validation
+    const missing: string[] = [];
+    if (!firstName.trim()) missing.push("Legal First Name");
+    if (!lastName.trim()) missing.push("Legal Last Name");
+    if (!dateOfBirth) missing.push("Date of Birth");
+    if (!gender) missing.push("Gender");
+    if (!mobileNumber.trim()) missing.push("Mobile Number");
+    if (!email.trim()) missing.push("Email Address");
+    if (missing.length > 0) {
+      setError(`Please fill in the required fields: ${missing.join(", ")}`);
+      return;
+    }
     const ok = await saveToFirestore();
     if (ok) router.push("/onboarding/tfn-declaration");
   }
@@ -304,7 +316,7 @@ export default function PersonalInformationPage() {
               onClick={handleSaveAndExit}
               disabled={saving}
             >
-              {saving ? "저장 중..." : "Save & Exit"}
+              {saving ? "Saving..." : "Save & Exit"}
             </button>
             <button
               type="submit"
@@ -312,7 +324,7 @@ export default function PersonalInformationPage() {
               onClick={handleSaveAndContinue}
               disabled={saving}
             >
-              {saving ? "저장 중..." : <><span>Save &amp; Continue</span> <span className={styles.btnArrow}>›</span></>}
+              {saving ? "Saving..." : <><span>Save &amp; Continue</span> <span className={styles.btnArrow}>›</span></>}
             </button>
           </div>
         </form>
