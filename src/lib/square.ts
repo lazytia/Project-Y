@@ -163,6 +163,7 @@ export async function sumRefundCents(
     endTime,
     locationId,
     limit: 100,
+    sortField: "CREATED_AT",
   });
   for await (const refund of iter) {
     total += Number(refund.amountMoney?.amount ?? 0n);
