@@ -65,6 +65,7 @@ export default function PersonalInformationPage() {
         mobileNumber,
         email,
         step: 1,
+        status: "in_progress",
         updatedAt: serverTimestamp(),
       };
       if (preferredName.trim()) {
@@ -82,7 +83,7 @@ export default function PersonalInformationPage() {
 
   async function handleSaveAndContinue() {
     const ok = await saveToFirestore();
-    if (ok) router.push("/onboarding");
+    if (ok) router.push("/onboarding/tfn-declaration");
   }
 
   async function handleSaveAndExit() {
@@ -223,6 +224,7 @@ export default function PersonalInformationPage() {
 
           {showCalendar && (
             <CalendarPicker
+              singleOnly
               value={dateOfBirth || todayKey}
               maxDate={todayKey}
               minDate="1900-01-01"

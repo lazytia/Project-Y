@@ -14,6 +14,7 @@ interface Props {
   value: string;           // YYYY-MM-DD (single selected date)
   maxDate: string;
   minDate?: string;        // YYYY-MM-DD, default 2024-01-01
+  singleOnly?: boolean;    // hides the mode toggle; always single mode
   onChange: (dateKey: string) => void;
   onRangeChange: (start: string, end: string) => void;
   onClose: () => void;
@@ -32,7 +33,7 @@ function formatShort(dateKey: string): string {
   });
 }
 
-export default function CalendarPicker({ value, maxDate, minDate, onChange, onRangeChange, onClose }: Props) {
+export default function CalendarPicker({ value, maxDate, minDate, singleOnly = false, onChange, onRangeChange, onClose }: Props) {
   const [mode, setMode] = useState<Mode>("single");
   const [rangeStart, setRangeStart] = useState<string | null>(null);
   const [rangeEnd,   setRangeEnd]   = useState<string | null>(null);
@@ -141,16 +142,18 @@ export default function CalendarPicker({ value, maxDate, minDate, onChange, onRa
         <div className={styles.handle} />
 
         {/* Mode toggle */}
-        <div className={styles.modeToggle}>
-          <button
-            className={`${styles.modeBtn} ${mode === "single" ? styles.modeBtnActive : ""}`}
-            onClick={() => switchMode("single")}
-          >Single Day</button>
-          <button
-            className={`${styles.modeBtn} ${mode === "range" ? styles.modeBtnActive : ""}`}
-            onClick={() => switchMode("range")}
-          >Date Range</button>
-        </div>
+        {!singleOnly && (
+          <div className={styles.modeToggle}>
+            <button
+              className={`${styles.modeBtn} ${mode === "single" ? styles.modeBtnActive : ""}`}
+              onClick={() => switchMode("single")}
+            >Single Day</button>
+            <button
+              className={`${styles.modeBtn} ${mode === "range" ? styles.modeBtnActive : ""}`}
+              onClick={() => switchMode("range")}
+            >Date Range</button>
+          </div>
+        )}
 
         {/* Range hint */}
         {mode === "range" && (
