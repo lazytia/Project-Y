@@ -3,7 +3,6 @@ import {
   getDateRange,
   getWeekToDateRange,
   fetchOrders,
-  countPayments,
   squareEnv,
   grossAmountCents,
   todayDateKey,
@@ -53,9 +52,11 @@ export async function GET(req: NextRequest) {
     const yesterday = getDateRange(timezone, 0, prevDate);
     const week = getWeekToDateRange(timezone, selectedDate);
 
-    // For today: include OPEN restaurant tickets in live sales total.
-    // For past dates: only COMPLETED is meaningful (OPEN tickets are stale).
-    const restaurantStates = isToday ? ["OPEN", "COMPLETED"] : ["COMPLETED"];
+    // Restaurant: OPEN+COMPLETED always — OPEN tickets are paid-but-not-closed
+    // (Square dashboard counts these in Sales). Even on past dates they may
+    // legitimately remain open. Platter: COMPLETED only (OPEN platter = future
+    // catering reservation, not yet revenue).
+    const RESTAURANT_STATES = ["OPEN", "COMPLETED"];
 
     const [
       todayOrders,
@@ -63,44 +64,48 @@ export async function GET(req: NextRequest) {
       platterOrders,
       weekRestaurantOrders,
       weekPlatterOrders,
-      transactions,
-      yestTransactions,
     ] = await Promise.all([
-      fetchOrders(locationId, today.startAt, today.endAt, restaurantStates),
-      fetchOrders(locationId, yesterday.startAt, yesterday.endAt, ["COMPLETED"]),
+      fetchOrders(locationId, today.startAt, today.endAt, RESTAURANT_STATES),
+      fetchOrders(locationId, yesterday.startAt, yesterday.endAt, RESTAURANT_STATES),
       platterLocationId
         ? fetchOrders(platterLocationId, today.startAt, today.endAt, ["COMPLETED"])
         : Promise.resolve([]),
-      fetchOrders(locationId, week.startAt, week.endAt, ["COMPLETED"]),
+      fetchOrders(locationId, week.startAt, week.endAt, RESTAURANT_STATES),
       platterLocationId
         ? fetchOrders(platterLocationId, week.startAt, week.endAt, ["COMPLETED"])
         : Promise.resolve([]),
-      countPayments(locationId, today.startAt, today.endAt),
-      countPayments(locationId, yesterday.startAt, yesterday.endAt),
     ]);
+
+    // Transactions = restaurant order count (OPEN+COMPLETED). Matches Square
+    // dashboard which counts orders, not payments (split bills can make
+    // payments > orders, but the dashboard sticks with order count).
+    const transactions = todayOrders.length;
+    const yestTransactions = yesterdayOrders.length;
 
     // ── Sales (gross — 세전·할인 전) ───────────────────────────
     const restaurantSales = sumGrossDollars(todayOrders, grossAmountCents);
     const platterSales = sumGrossDollars(platterOrders, grossAmountCents);
     const todaySales = restaurantSales + platterSales;
 
-    // ── Weekly Progress (Mon~선택일, COMPLETED 양 location 합산) ─
+    // ── Weekly Progress (Mon~선택일) — restaurant OPEN+COMPLETED, platter COMPLETED ─
     const weeklyProgress =
       sumGrossDollars(weekRestaurantOrders, grossAmountCents) +
       sumGrossDollars(weekPlatterOrders, grossAmountCents);
 
-    // ── Avg Spend Per Table (COMPLETED gross ÷ COMPLETED 주문 수) ─
-    const completedToday = todayOrders.filter((o) => o.state === "COMPLETED");
-    const restaurantCompletedGross = sumGrossDollars(completedToday, grossAmountCents);
+    // ── Avg Spend Per Table (restaurant gross ÷ restaurant order count) ──
     const avgSpend =
-      completedToday.length > 0
-        ? Math.round((restaurantCompletedGross / completedToday.length) * 100) / 100
+      transactions > 0
+        ? Math.round((restaurantSales / transactions) * 100) / 100
         : 0;
     const yestSales = sumGrossDollars(yesterdayOrders, grossAmountCents);
     const yestAvgSpend =
-      yesterdayOrders.length > 0
-        ? Math.round((yestSales / yesterdayOrders.length) * 100) / 100
+      yestTransactions > 0
+        ? Math.round((yestSales / yestTransactions) * 100) / 100
         : 0;
+
+    // Best sellers still drawn from COMPLETED only (OPEN tickets might have
+    // incomplete line items / no totalMoney rounding).
+    const completedToday = todayOrders.filter((o) => o.state === "COMPLETED");
 
     // ── Peak Hour ────────────────────────────────────────────
     const hourCounts: Record<number, number> = {};
