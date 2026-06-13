@@ -9,6 +9,7 @@ import {
   netAmountCents,
   squareGrossSalesCents,
   todayDateKey,
+  shiftDateKey,
 } from "@/lib/square";
 
 export const dynamic = "force-dynamic";
@@ -60,9 +61,33 @@ export async function GET(req: NextRequest) {
     const yesterday = getDateRange(timezone, 0, prevDate);
     const todaySales9to10 = getSalesDayRange(timezone, selectedDate);
     const yesterdaySales9to10 = getSalesDayRange(timezone, prevDate);
-    const week = getWeekToDateRange(timezone, selectedDate);
 
     const RESTAURANT_STATES = ["OPEN", "COMPLETED"];
+
+    // ── Weekly days (Mon → selectedDate), same 9am–10pm window as range-stats ─
+    const weekRange = getWeekToDateRange(timezone, selectedDate);
+    void weekRange; // used only to find Monday key
+    const monKey = (() => {
+      const noonLocal = new Date(
+        new Date().toLocaleString("en-US", { timeZone: timezone }),
+      );
+      const dow = new Date(
+        new Date(`${selectedDate}T12:00:00`).toLocaleString("en-US", { timeZone: timezone }),
+      ).getDay();
+      const daysSinceMon = (dow + 6) % 7;
+      return shiftDateKey(selectedDate, -daysSinceMon, timezone);
+    })();
+    const weekDays: string[] = [];
+    {
+      const [sy, sm, sd] = monKey.split("-").map(Number);
+      const cur = new Date(Date.UTC(sy, sm - 1, sd));
+      const [ey, em, ed] = selectedDate.split("-").map(Number);
+      const end = new Date(Date.UTC(ey, em - 1, ed));
+      while (cur <= end) {
+        weekDays.push(cur.toISOString().slice(0, 10));
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+    }
 
     void yesterdaySales9to10; // reserved for future yesterday-sales comparison
     const [
@@ -70,10 +95,9 @@ export async function GET(req: NextRequest) {
       yesterdayOrders,
       todayOrdersWindow,
       platterOrdersWindow,
-      weekRestaurantOrders,
-      weekPlatterOrders,
       restaurantRefundsCents,
       platterRefundsCents,
+      ...weekDayResults
     ] = await Promise.all([
       fetchOrders(locationId, today.startAt, today.endAt, RESTAURANT_STATES),
       fetchOrders(locationId, yesterday.startAt, yesterday.endAt, RESTAURANT_STATES),
@@ -81,15 +105,38 @@ export async function GET(req: NextRequest) {
       platterLocationId
         ? fetchOrders(platterLocationId, todaySales9to10.startAt, todaySales9to10.endAt, ["COMPLETED"])
         : Promise.resolve([]),
-      fetchOrders(locationId, week.startAt, week.endAt, RESTAURANT_STATES),
-      platterLocationId
-        ? fetchOrders(platterLocationId, week.startAt, week.endAt, ["COMPLETED"])
-        : Promise.resolve([]),
       sumRefundCents(locationId, todaySales9to10.startAt, todaySales9to10.endAt),
       platterLocationId
         ? sumRefundCents(platterLocationId, todaySales9to10.startAt, todaySales9to10.endAt)
         : Promise.resolve(0),
-    ]);
+      // per-day weekly fetches (4 promises per day: restOrders, platOrders, restRefunds, platRefunds)
+      ...weekDays.flatMap((dk) => {
+        const w = getSalesDayRange(timezone, dk);
+        return [
+          fetchOrders(locationId, w.startAt, w.endAt, RESTAURANT_STATES),
+          platterLocationId
+            ? fetchOrders(platterLocationId, w.startAt, w.endAt, ["COMPLETED"])
+            : Promise.resolve([]),
+          sumRefundCents(locationId, w.startAt, w.endAt),
+          platterLocationId
+            ? sumRefundCents(platterLocationId, w.startAt, w.endAt)
+            : Promise.resolve(0),
+        ] as [Promise<unknown>, Promise<unknown>, Promise<unknown>, Promise<unknown>];
+      }),
+    ] as const);
+
+    // Reassemble per-day weekly results
+    let weeklyProgress = 0;
+    for (let i = 0; i < weekDays.length; i++) {
+      const base = i * 4;
+      const restOrders = weekDayResults[base] as Awaited<ReturnType<typeof fetchOrders>>;
+      const platOrders = weekDayResults[base + 1] as Awaited<ReturnType<typeof fetchOrders>>;
+      const restRef = weekDayResults[base + 2] as number;
+      const platRef = weekDayResults[base + 3] as number;
+      weeklyProgress +=
+        sumDollars(restOrders, squareGrossSalesCents) - restRef / 100 +
+        sumDollars(platOrders, squareGrossSalesCents) - platRef / 100;
+    }
 
     // Transactions = restaurant order count (OPEN+COMPLETED, all-day).
     const transactions = todayOrders.length;
@@ -102,10 +149,7 @@ export async function GET(req: NextRequest) {
       sumDollars(platterOrdersWindow, squareGrossSalesCents) - platterRefundsCents / 100;
     const todaySales = restaurantSales + platterSales;
 
-    // ── Weekly Progress (same formula across the week-to-date span) ───
-    const weeklyProgress =
-      sumDollars(weekRestaurantOrders, squareGrossSalesCents) +
-      sumDollars(weekPlatterOrders, squareGrossSalesCents);
+    // (weeklyProgress computed above via per-day aggregation)
 
     // ── Avg Net Sale (Net Sales ÷ 주문 수, Square 대시보드와 일치) ───
     const restaurantNet = sumDollars(todayOrders, netAmountCents);

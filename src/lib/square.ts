@@ -197,8 +197,9 @@ export function getWeekToDateRange(
     ? new Date().toISOString()
     : zonedToUTC(`${refDateKey}T23:59:59.999`, timezone).toISOString();
 
+  const pad = (n: number) => String(n).padStart(2, "0");
   return {
-    startAt: zonedToUTC(`${monKey}T00:00:00`, timezone).toISOString(),
+    startAt: zonedToUTC(`${monKey}T${pad(SALES_DAY_START_HOUR)}:00:00`, timezone).toISOString(),
     endAt,
   };
 }
