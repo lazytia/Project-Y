@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -33,8 +34,18 @@ export default function PersonalInformationPage() {
   const [mobileNumber, setMobileNumber] = useState("");
   const [email, setEmail] = useState("");
 
+  const [showCalendar, setShowCalendar] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const todayKey = new Date().toLocaleDateString("en-CA");
+
+  function formatDobDisplay(raw: string): string {
+    if (!raw) return "";
+    const [y, m, d] = raw.split("-");
+    return `${d} / ${m} / ${y}`;
+  }
 
   async function saveToFirestore() {
     if (!user) {
@@ -193,16 +204,35 @@ export default function PersonalInformationPage() {
               </span>
               <input
                 type="text"
-                className={styles.input}
+                readOnly
+                className={`${styles.input} ${styles.inputWithRightIcon}`}
                 placeholder="DD / MM / YYYY"
-                value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
+                value={formatDobDisplay(dateOfBirth)}
+                onClick={() => setShowCalendar(true)}
               />
-              <span className={styles.inputIconRight}>
+              <button
+                type="button"
+                className={styles.inputIconRightBtn}
+                onClick={() => setShowCalendar(true)}
+                aria-label="Open date picker"
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              </span>
+              </button>
             </div>
           </div>
+
+          {showCalendar && (
+            <CalendarPicker
+              value={dateOfBirth || todayKey}
+              maxDate={todayKey}
+              onChange={(dateKey) => {
+                setDateOfBirth(dateKey);
+                setShowCalendar(false);
+              }}
+              onRangeChange={() => {}}
+              onClose={() => setShowCalendar(false)}
+            />
+          )}
 
           {/* Gender */}
           <div className={styles.fieldGroup}>
@@ -215,11 +245,9 @@ export default function PersonalInformationPage() {
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
               >
-                <option value="" disabled>Select</option>
+                <option value="">Select</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
-                <option value="non-binary">Non-binary</option>
-                <option value="prefer-not-to-say">Prefer not to say</option>
               </select>
               <span className={styles.selectIcon}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
