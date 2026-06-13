@@ -55,6 +55,7 @@ const NAV: NavGroup[] = [
       { label: "Suppliers", href: "/inventory/suppliers" },
     ],
   },
+  { icon: "🧪", label: "Test", href: "/onboarding" },
 ];
 
 type Props = { open: boolean; onClose?: () => void };
