@@ -1,6 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -19,6 +23,61 @@ const PERCENT = 14;
 
 export default function PersonalInformationPage() {
   const router = useRouter();
+  const { user } = useAuth();
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [preferredName, setPreferredName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gender, setGender] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [email, setEmail] = useState("");
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function saveToFirestore() {
+    if (!user) {
+      setError("로그인 정보를 찾을 수 없습니다. 다시 로그인해 주세요.");
+      return false;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const db = getDb();
+      const payload: Record<string, unknown> = {
+        uid: user.uid,
+        firstName,
+        lastName,
+        dateOfBirth,
+        gender,
+        mobileNumber,
+        email,
+        step: 1,
+        updatedAt: serverTimestamp(),
+      };
+      if (preferredName.trim()) {
+        payload.preferredName = preferredName.trim();
+      }
+      await setDoc(doc(db, "staff_onboarding", user.uid), payload, { merge: true });
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveAndContinue() {
+    const ok = await saveToFirestore();
+    if (ok) router.push("/onboarding");
+  }
+
+  async function handleSaveAndExit() {
+    const ok = await saveToFirestore();
+    if (ok) router.push("/onboarding");
+  }
 
   return (
     <div className={styles.page}>
@@ -65,6 +124,8 @@ export default function PersonalInformationPage() {
         <p className={styles.formTitle}>Let&apos;s start with your personal details.</p>
         <p className={styles.formSubtitle}>All fields marked with * are required.</p>
 
+        {error && <p className={styles.errorMessage}>{error}</p>}
+
         <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
           {/* Legal First Name */}
           <div className={styles.fieldGroup}>
@@ -79,6 +140,8 @@ export default function PersonalInformationPage() {
                 type="text"
                 className={styles.input}
                 placeholder="e.g. Alex"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
               />
             </div>
           </div>
@@ -96,6 +159,8 @@ export default function PersonalInformationPage() {
                 type="text"
                 className={styles.input}
                 placeholder="e.g. Smith"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
               />
             </div>
           </div>
@@ -111,6 +176,8 @@ export default function PersonalInformationPage() {
                 type="text"
                 className={styles.input}
                 placeholder="e.g. Alex"
+                value={preferredName}
+                onChange={(e) => setPreferredName(e.target.value)}
               />
             </div>
           </div>
@@ -128,6 +195,8 @@ export default function PersonalInformationPage() {
                 type="text"
                 className={styles.input}
                 placeholder="DD / MM / YYYY"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
               />
               <span className={styles.inputIconRight}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -141,7 +210,11 @@ export default function PersonalInformationPage() {
               Gender <span className={styles.required}>*</span>
             </label>
             <div className={styles.selectWrapper}>
-              <select className={styles.select} defaultValue="">
+              <select
+                className={styles.select}
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+              >
                 <option value="" disabled>Select</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
@@ -167,6 +240,8 @@ export default function PersonalInformationPage() {
                 type="tel"
                 className={styles.input}
                 placeholder="e.g. 0412 345 678"
+                value={mobileNumber}
+                onChange={(e) => setMobileNumber(e.target.value)}
               />
             </div>
           </div>
@@ -184,6 +259,8 @@ export default function PersonalInformationPage() {
                 type="email"
                 className={styles.input}
                 placeholder="e.g. alex.smith@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </div>
@@ -193,16 +270,18 @@ export default function PersonalInformationPage() {
             <button
               type="button"
               className={styles.btnSecondary}
-              onClick={() => router.push("/onboarding")}
+              onClick={handleSaveAndExit}
+              disabled={saving}
             >
-              Save &amp; Exit
+              {saving ? "저장 중..." : "Save & Exit"}
             </button>
             <button
               type="submit"
               className={styles.btnPrimary}
-              onClick={() => router.push("/onboarding")}
+              onClick={handleSaveAndContinue}
+              disabled={saving}
             >
-              Save &amp; Continue <span className={styles.btnArrow}>›</span>
+              {saving ? "저장 중..." : <><span>Save &amp; Continue</span> <span className={styles.btnArrow}>›</span></>}
             </button>
           </div>
         </form>

@@ -108,17 +108,21 @@
   flex-shrink: 0;
 }
 
+.progressRingWrap {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
 .progressRing {
   width: 80px;
   height: 80px;
-  position: relative;
+  display: block;
 }
 
 .progressInner {
   position: absolute;
-  /* center inside the SVG via negative margin trick */
-  margin-top: -60px;
-  width: 80px;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;

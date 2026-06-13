@@ -65,26 +65,28 @@ export default function OnboardingPage() {
           </div>
 
           <div className={styles.progressWrap}>
-            <svg className={styles.progressRing} viewBox="0 0 100 100">
-              <circle
-                cx="50" cy="50" r={R}
-                fill="none"
-                stroke="var(--color-surface)"
-                strokeWidth="8"
-              />
-              <circle
-                cx="50" cy="50" r={R}
-                fill="none"
-                stroke="var(--color-warm)"
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={CIRC}
-                strokeDashoffset={OFFSET}
-                transform="rotate(-90 50 50)"
-              />
-            </svg>
-            <div className={styles.progressInner}>
-              <span className={styles.progressPct}>{PERCENT}%</span>
+            <div className={styles.progressRingWrap}>
+              <svg className={styles.progressRing} viewBox="0 0 100 100">
+                <circle
+                  cx="50" cy="50" r={R}
+                  fill="none"
+                  stroke="var(--color-surface)"
+                  strokeWidth="8"
+                />
+                <circle
+                  cx="50" cy="50" r={R}
+                  fill="none"
+                  stroke="var(--color-warm)"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={CIRC}
+                  strokeDashoffset={OFFSET}
+                  transform="rotate(-90 50 50)"
+                />
+              </svg>
+              <div className={styles.progressInner}>
+                <span className={styles.progressPct}>{PERCENT}%</span>
+              </div>
             </div>
             <div className={styles.progressMeta}>
               <span className={styles.progressCount}>
