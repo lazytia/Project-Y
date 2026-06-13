@@ -6,6 +6,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
+import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 /** Returns the Wednesday of the calendar week AFTER the given date. */
@@ -109,16 +110,7 @@ export default function OnboardingPage() {
   const payrollCutoff = getPayrollCutoff(startDate);
 
   if (loading) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.greeting}>
-          <h1 className={styles.greetingTitle}>Welcome, {displayName} 👋</h1>
-          <p className={styles.greetingSubtitle}>Let&apos;s get you all set up.</p>
-        </div>
-        <div className={styles.skeletonCard} />
-        <div className={styles.skeletonCardSm} />
-      </div>
-    );
+    return <Splash />;
   }
 
   return (
