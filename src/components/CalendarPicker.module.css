@@ -35,7 +35,7 @@
   to   { transform: translateY(0); }
 }
 
-/* ── Handle bar ── */
+/* ── Handle ── */
 .handle {
   width: 36px;
   height: 4px;
@@ -44,7 +44,53 @@
   margin: 0 auto var(--space-1);
 }
 
-/* ── Header ── */
+/* ── Mode toggle ── */
+.modeToggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 3px;
+  gap: 3px;
+}
+
+.modeBtn {
+  padding: var(--space-2) 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modeBtnActive {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* ── Range hint ── */
+.rangeHint {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  min-height: 20px;
+}
+
+.rangeHintDate {
+  color: var(--color-warm);
+  font-weight: 600;
+}
+
+/* ── Month nav ── */
 .header {
   display: flex;
   align-items: center;
@@ -73,22 +119,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  line-height: 1;
   transition: background 0.15s;
   font-family: inherit;
   -webkit-tap-highlight-color: transparent;
 }
 
-.navBtn:disabled {
-  color: var(--color-fg-subtle);
-  cursor: default;
-}
+.navBtn:disabled { color: var(--color-fg-subtle); cursor: default; }
+.navBtn:not(:disabled):hover { background: var(--color-surface-hover); }
 
-.navBtn:not(:disabled):hover {
-  background: var(--color-surface-hover);
-}
-
-/* ── Day-of-week row ── */
+/* ── Day-of-week headers ── */
 .weekRow {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -105,7 +144,7 @@
   padding: var(--space-1) 0;
 }
 
-/* ── Day grid ── */
+/* ── Grid ── */
 .grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -126,36 +165,67 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s;
+  transition: background 0.1s;
   -webkit-tap-highlight-color: transparent;
   width: 100%;
+  position: relative;
 }
 
-.day:hover:not(:disabled) {
-  background: var(--color-surface);
-}
+.day:hover:not(:disabled) { background: var(--color-surface); }
 
-/* Today — orange outline */
+/* Today — orange ring */
 .dayToday {
   color: var(--color-warm);
   font-weight: 600;
   box-shadow: inset 0 0 0 1.5px var(--color-warm);
 }
 
-/* Selected — filled orange */
+/* Selected (single) / range endpoints — filled orange */
 .daySelected {
   background: var(--color-warm) !important;
   color: #ffffff !important;
   font-weight: 700;
+  border-radius: 99px;
 }
 
-/* Future / disabled */
+/* Range: days between start and end */
+.dayInRange {
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  font-weight: 500;
+  border-radius: 0;
+}
+
+/* Square off inner edge for start/end cells of a range */
+.dayRangeStart { border-radius: 99px 0 0 99px; }
+.dayRangeEnd   { border-radius: 0 99px 99px 0; }
+
+/* Disabled / future */
 .dayDisabled {
   color: var(--color-border);
   cursor: default;
 }
 
-/* ── Today shortcut button ── */
+/* ── Confirm range button ── */
+.confirmBtn {
+  margin-top: var(--space-1);
+  padding: var(--space-3) 0;
+  background: var(--color-warm);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  width: 100%;
+  transition: opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.confirmBtn:hover { opacity: 0.9; }
+
+/* ── Today shortcut ── */
 .todayShortcut {
   margin-top: var(--space-1);
   padding: var(--space-3) 0;
@@ -172,6 +242,4 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.todayShortcut:hover {
-  background: var(--color-surface-hover);
-}
+.todayShortcut:hover { background: var(--color-surface-hover); }

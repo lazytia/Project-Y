@@ -62,6 +62,17 @@
   letter-spacing: 0.03em;
 }
 
+.rangeBadge {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--color-warm);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+  letter-spacing: 0.03em;
+}
+
 .dateNavBtn {
   width: 36px;
   height: 36px;

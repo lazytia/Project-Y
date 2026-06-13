@@ -71,7 +71,9 @@ export default function DashboardPage() {
   const todayKey = useMemo(sydneyTodayKey, []);
   const [selectedDate, setSelectedDate] = useState<string>(todayKey);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const isToday = selectedDate === todayKey;
+  const [rangeDates, setRangeDates] = useState<{ start: string; end: string } | null>(null);
+  const isRangeMode = rangeDates !== null;
+  const isToday = !isRangeMode && selectedDate === todayKey;
   const dailyTarget = DAILY_TARGETS[dowOfDateKey(selectedDate)];
 
   const [stats, setStats] = useState<{
@@ -93,6 +95,16 @@ export default function DashboardPage() {
     lunchStaff: number;
     dinnerStaff: number;
   } | null>(null);
+  const [rangeStats, setRangeStats] = useState<{
+    todaySales: number;
+    restaurantSales: number;
+    platterSales: number;
+    transactions: number;
+    avgSpendPerTable: number;
+    bestSellers: { name: string; sales: number; quantity: number }[];
+    days: number;
+  } | null>(null);
+  const [rangeLoading, setRangeLoading] = useState(false);
   const [statsError, setStatsError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -139,6 +151,17 @@ export default function DashboardPage() {
     };
   }, [selectedDate, isToday, fetchStats, fetchCounts]);
 
+  // Range fetch
+  useEffect(() => {
+    if (!rangeDates) { setRangeStats(null); return; }
+    setRangeStats(null);
+    setRangeLoading(true);
+    fetch(`/api/square/range-stats?startDate=${rangeDates.start}&endDate=${rangeDates.end}`)
+      .then(r => r.json())
+      .then(d => { setRangeStats(d); setRangeLoading(false); })
+      .catch(() => setRangeLoading(false));
+  }, [rangeDates]);
+
   const lunchPax    = counts?.lunchPax ?? null;
   const dinnerPax   = counts?.dinnerPax ?? null;
   const lunchStaff  = counts?.lunchStaff ?? null;
@@ -182,6 +205,7 @@ export default function DashboardPage() {
           type="button"
           className={styles.dateNavBtn}
           onClick={goPrev}
+          disabled={isRangeMode}
           aria-label="Previous day"
         >‹</button>
         <button
@@ -190,26 +214,46 @@ export default function DashboardPage() {
           onClick={() => setCalendarOpen(true)}
           aria-label="Open calendar"
         >
-          <span className={styles.dateLabel}>{formatDateLabel(selectedDate)}</span>
-          <span className={styles.calendarIcon}>📅</span>
-          {!isToday && (
-            <span className={styles.todayBadge}>not today</span>
+          {isRangeMode ? (
+            <>
+              <span className={styles.dateLabel}>
+                {formatDateLabel(rangeDates!.start).split(",")[0]}&nbsp;–&nbsp;{formatDateLabel(rangeDates!.end).split(",")[0]}
+              </span>
+              <span className={styles.rangeBadge}>{rangeStats?.days ?? "…"} days</span>
+            </>
+          ) : (
+            <>
+              <span className={styles.dateLabel}>{formatDateLabel(selectedDate)}</span>
+              <span className={styles.calendarIcon}>📅</span>
+              {!isToday && <span className={styles.todayBadge}>not today</span>}
+            </>
           )}
         </button>
-        <button
-          type="button"
-          className={styles.dateNavBtn}
-          onClick={goNext}
-          disabled={isToday}
-          aria-label="Next day"
-        >›</button>
+        {isRangeMode ? (
+          <button
+            type="button"
+            className={styles.dateNavBtn}
+            onClick={() => setRangeDates(null)}
+            aria-label="Clear range"
+            title="Clear range"
+          >✕</button>
+        ) : (
+          <button
+            type="button"
+            className={styles.dateNavBtn}
+            onClick={goNext}
+            disabled={isToday}
+            aria-label="Next day"
+          >›</button>
+        )}
       </section>
 
       {calendarOpen && (
         <CalendarPicker
           value={selectedDate}
           maxDate={todayKey}
-          onChange={(d) => setSelectedDate(d)}
+          onChange={(d) => { setRangeDates(null); setSelectedDate(d); }}
+          onRangeChange={(start, end) => { setRangeDates({ start, end }); }}
           onClose={() => setCalendarOpen(false)}
         />
       )}
@@ -217,40 +261,40 @@ export default function DashboardPage() {
       {/* TODAY SALES — RESTAURANT / PLATTER 포함 */}
       <section className={styles.card}>
         <div className={styles.cardTopRow}>
-          <p className={styles.cardLabel}>TODAY SALES</p>
-          {lastUpdated && (
+          <p className={styles.cardLabel}>{isRangeMode ? "RANGE TOTAL" : "TODAY SALES"}</p>
+          {isRangeMode && rangeLoading && <p className={styles.lastUpdated}>Loading…</p>}
+          {!isRangeMode && lastUpdated && (
             <p className={styles.lastUpdated}>
-              {lastUpdated.toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })} updated
+              {lastUpdated.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} updated
             </p>
           )}
-          {statsError && (
-            <p className={styles.errorBadge}>Square 연결 오류</p>
-          )}
+          {statsError && <p className={styles.errorBadge}>Square 연결 오류</p>}
         </div>
-        <p className={`${styles.salesAmount} ${todaySales === null ? styles.salesLoading : ""}`}>
-          {todaySales === null ? "—" : fmt(todaySales)}
+        <p className={`${styles.salesAmount} ${(isRangeMode ? rangeStats?.todaySales : todaySales) === null || (isRangeMode && rangeLoading) ? styles.salesLoading : ""}`}>
+          {isRangeMode
+            ? (rangeStats ? fmt(rangeStats.todaySales) : "—")
+            : (todaySales === null ? "—" : fmt(todaySales))}
         </p>
-        <p className={styles.targetLabel}>
-          Target&nbsp;&nbsp;<strong>{fmt(dailyTarget)}</strong>
-        </p>
-        <Progress value={todaySales ?? 0} max={dailyTarget} />
+        {!isRangeMode && (
+          <>
+            <p className={styles.targetLabel}>Target&nbsp;&nbsp;<strong>{fmt(dailyTarget)}</strong></p>
+            <Progress value={todaySales ?? 0} max={dailyTarget} />
+          </>
+        )}
 
         {/* 카드 내부 구분선 + 레스토랑/플래터 분리 */}
         <div className={styles.salesBreakRow}>
           <div className={styles.salesBreakItem}>
             <p className={styles.cardLabel}>RESTAURANT SALES</p>
-            <p className={`${styles.salesBreakAmount} ${restaurantSales === null ? styles.salesLoading : ""}`}>
-              {restaurantSales === null ? "—" : fmt(restaurantSales)}
+            <p className={`${styles.salesBreakAmount} ${(isRangeMode ? rangeStats?.restaurantSales : restaurantSales) === null ? styles.salesLoading : ""}`}>
+              {isRangeMode ? (rangeStats ? fmt(rangeStats.restaurantSales) : "—") : (restaurantSales === null ? "—" : fmt(restaurantSales))}
             </p>
           </div>
           <div className={styles.salesBreakDivider} />
           <div className={styles.salesBreakItem}>
             <p className={styles.cardLabel}>PLATTER SALES</p>
-            <p className={`${styles.salesBreakAmount} ${platterSales === null ? styles.salesLoading : ""}`}>
-              {platterSales === null ? "—" : fmt(platterSales)}
+            <p className={`${styles.salesBreakAmount} ${(isRangeMode ? rangeStats?.platterSales : platterSales) === null ? styles.salesLoading : ""}`}>
+              {isRangeMode ? (rangeStats ? fmt(rangeStats.platterSales) : "—") : (platterSales === null ? "—" : fmt(platterSales))}
             </p>
           </div>
         </div>
@@ -306,7 +350,9 @@ export default function DashboardPage() {
         <div className={styles.statCol}>
           <p className={styles.statLabel}>AVG SPEND PER TABLE</p>
           <p className={`${styles.statValue} ${avgSpendPerTable === null ? styles.salesLoading : ""}`}>
-            {avgSpendPerTable === null ? "—" : fmt(avgSpendPerTable)}
+            {isRangeMode
+              ? (rangeStats ? fmt(rangeStats.avgSpendPerTable) : "—")
+              : (avgSpendPerTable === null ? "—" : fmt(avgSpendPerTable))}
           </p>
           <div className={styles.statDivider} />
           <p className={styles.statSub}>vs yesterday</p>
@@ -322,7 +368,9 @@ export default function DashboardPage() {
         <div className={styles.statCol}>
           <p className={styles.statLabel}>TRANSACTIONS</p>
           <p className={`${styles.statValue} ${transactions === null ? styles.salesLoading : ""}`}>
-            {transactions ?? "—"}
+            {isRangeMode
+              ? (rangeStats ? rangeStats.transactions : "—")
+              : (transactions ?? "—")}
           </p>
           <div className={styles.statDivider} />
           <p className={styles.statSub}>vs yesterday</p>
@@ -336,20 +384,27 @@ export default function DashboardPage() {
 
       {/* BEST SELLERS */}
       <section className={styles.card}>
-        <p className={styles.cardLabel}>BEST SELLER TODAY</p>
-        {bestSellers.length === 0 ? (
-          <p className={`${styles.statSub} ${styles.salesLoading}`}>데이터 로딩 중…</p>
-        ) : (
-          <ul className={styles.sellerList}>
-            {bestSellers.map((item, i) => (
-              <li key={item.name} className={styles.sellerItem}>
-                <span className={styles.sellerRank}>{i + 1}</span>
-                <span className={styles.sellerName}>{item.name}</span>
-                <span className={styles.sellerSales}>{fmt(item.sales)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <p className={styles.cardLabel}>BEST SELLER {isRangeMode ? "THIS RANGE" : "TODAY"}</p>
+        {(() => {
+          const sellers = isRangeMode ? (rangeStats?.bestSellers ?? []) : bestSellers;
+          const loading = isRangeMode ? rangeLoading : sellers.length === 0;
+          if (loading || sellers.length === 0) return (
+            <p className={`${styles.statSub} ${styles.salesLoading}`}>
+              {isRangeMode && rangeLoading ? "Loading…" : "No data yet"}
+            </p>
+          );
+          return (
+            <ul className={styles.sellerList}>
+              {sellers.map((item, i) => (
+                <li key={item.name} className={styles.sellerItem}>
+                  <span className={styles.sellerRank}>{i + 1}</span>
+                  <span className={styles.sellerName}>{item.name}</span>
+                  <span className={styles.sellerSales}>{fmt(item.sales)}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        })()}
       </section>
 
     </div>

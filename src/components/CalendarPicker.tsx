@@ -11,22 +11,41 @@ const MONTH_NAMES = [
 ];
 
 interface Props {
-  value: string;        // YYYY-MM-DD
-  maxDate: string;      // YYYY-MM-DD — cannot select beyond this
+  value: string;           // YYYY-MM-DD (single selected date)
+  maxDate: string;
   onChange: (dateKey: string) => void;
+  onRangeChange: (start: string, end: string) => void;
   onClose: () => void;
 }
 
-function dateKey(y: number, m: number, d: number): string {
+type Mode = "single" | "range";
+
+function buildKey(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export default function CalendarPicker({ value, maxDate, onChange, onClose }: Props) {
-  const [y, m] = value.split("-").map(Number);
-  const [viewYear, setViewYear] = useState(y);
-  const [viewMonth, setViewMonth] = useState(m - 1); // 0-indexed
+function formatShort(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-AU", {
+    day: "numeric", month: "short", timeZone: "UTC",
+  });
+}
 
-  // Close on backdrop click
+export default function CalendarPicker({ value, maxDate, onChange, onRangeChange, onClose }: Props) {
+  const [mode, setMode] = useState<Mode>("single");
+  const [rangeStart, setRangeStart] = useState<string | null>(null);
+  const [rangeEnd,   setRangeEnd]   = useState<string | null>(null);
+  const [hovered,    setHovered]    = useState<string | null>(null);
+
+  const [y, m] = value.split("-").map(Number);
+  const [viewYear,  setViewYear]  = useState(y);
+  const [viewMonth, setViewMonth] = useState(m - 1);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   const handleBackdrop = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (e.target === e.currentTarget) onClose();
@@ -34,15 +53,9 @@ export default function CalendarPicker({ value, maxDate, onChange, onClose }: Pr
     [onClose],
   );
 
-  // Prevent body scroll while open
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, []);
-
   const [maxY, maxM] = maxDate.split("-").map(Number);
   const isMaxMonth = viewYear === maxY && viewMonth === maxM - 1;
-  const isMinMonth = viewYear === 2024 && viewMonth === 0; // don't go earlier than Jan 2024
+  const isMinMonth = viewYear === 2024 && viewMonth === 0;
 
   function prevMonth() {
     if (isMinMonth) return;
@@ -55,77 +68,140 @@ export default function CalendarPicker({ value, maxDate, onChange, onClose }: Pr
     else setViewMonth(m => m + 1);
   }
 
-  // Build calendar grid
-  const firstDow = new Date(Date.UTC(viewYear, viewMonth, 1)).getUTCDay();
+  const firstDow    = new Date(Date.UTC(viewYear, viewMonth, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(viewYear, viewMonth + 1, 0)).getUTCDate();
-
   const cells: (number | null)[] = [
     ...Array(firstDow).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-  // pad to full weeks
   while (cells.length % 7 !== 0) cells.push(null);
 
   const todayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
 
   function handleDay(day: number) {
-    const k = dateKey(viewYear, viewMonth, day);
+    const k = buildKey(viewYear, viewMonth, day);
     if (k > maxDate) return;
-    onChange(k);
-    onClose();
+
+    if (mode === "single") {
+      onChange(k);
+      onClose();
+      return;
+    }
+
+    // Range mode
+    if (!rangeStart || (rangeStart && rangeEnd)) {
+      // Start fresh
+      setRangeStart(k);
+      setRangeEnd(null);
+    } else {
+      // Second tap
+      if (k < rangeStart) {
+        setRangeEnd(rangeStart);
+        setRangeStart(k);
+      } else if (k === rangeStart) {
+        // Tap same day → single day range
+        setRangeEnd(k);
+      } else {
+        setRangeEnd(k);
+      }
+    }
+  }
+
+  function confirmRange() {
+    if (rangeStart && rangeEnd) {
+      onRangeChange(rangeStart, rangeEnd);
+      onClose();
+    }
+  }
+
+  function isInRange(k: string): boolean {
+    const start = rangeStart;
+    const end   = rangeEnd ?? hovered;
+    if (!start || !end) return false;
+    const lo = start < end ? start : end;
+    const hi = start < end ? end   : start;
+    return k > lo && k < hi;
+  }
+
+  function isRangeStart(k: string) { return k === rangeStart; }
+  function isRangeEnd(k: string)   { return rangeEnd ? k === rangeEnd : (hovered && rangeStart && k === hovered && hovered > rangeStart) ? true : false; }
+
+  function switchMode(m: Mode) {
+    setMode(m);
+    setRangeStart(null);
+    setRangeEnd(null);
+    setHovered(null);
   }
 
   return (
     <div className={styles.backdrop} onClick={handleBackdrop}>
       <div className={styles.sheet}>
-        {/* Handle bar */}
         <div className={styles.handle} />
 
-        {/* Month navigation */}
+        {/* Mode toggle */}
+        <div className={styles.modeToggle}>
+          <button
+            className={`${styles.modeBtn} ${mode === "single" ? styles.modeBtnActive : ""}`}
+            onClick={() => switchMode("single")}
+          >Single Day</button>
+          <button
+            className={`${styles.modeBtn} ${mode === "range" ? styles.modeBtnActive : ""}`}
+            onClick={() => switchMode("range")}
+          >Date Range</button>
+        </div>
+
+        {/* Range hint */}
+        {mode === "range" && (
+          <div className={styles.rangeHint}>
+            {!rangeStart
+              ? "Tap start date"
+              : !rangeEnd
+              ? <><span className={styles.rangeHintDate}>{formatShort(rangeStart)}</span> → tap end date</>
+              : <><span className={styles.rangeHintDate}>{formatShort(rangeStart)}</span> – <span className={styles.rangeHintDate}>{formatShort(rangeEnd)}</span></>
+            }
+          </div>
+        )}
+
+        {/* Month nav */}
         <div className={styles.header}>
-          <button
-            className={styles.navBtn}
-            onClick={prevMonth}
-            disabled={isMinMonth}
-            aria-label="Previous month"
-          >‹</button>
-          <span className={styles.monthTitle}>
-            {MONTH_NAMES[viewMonth]} {viewYear}
-          </span>
-          <button
-            className={styles.navBtn}
-            onClick={nextMonth}
-            disabled={isMaxMonth}
-            aria-label="Next month"
-          >›</button>
+          <button className={styles.navBtn} onClick={prevMonth} disabled={isMinMonth} aria-label="Prev month">‹</button>
+          <span className={styles.monthTitle}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
+          <button className={styles.navBtn} onClick={nextMonth} disabled={isMaxMonth} aria-label="Next month">›</button>
         </div>
 
-        {/* Day of week headers */}
+        {/* Day-of-week headers */}
         <div className={styles.weekRow}>
-          {DAYS_OF_WEEK.map(d => (
-            <span key={d} className={styles.weekLabel}>{d}</span>
-          ))}
+          {DAYS_OF_WEEK.map(d => <span key={d} className={styles.weekLabel}>{d}</span>)}
         </div>
 
-        {/* Day grid */}
+        {/* Grid */}
         <div className={styles.grid}>
           {cells.map((day, i) => {
-            if (!day) return <span key={`empty-${i}`} />;
-            const k = dateKey(viewYear, viewMonth, day);
-            const isFuture = k > maxDate;
-            const isSelected = k === value;
-            const isToday = k === todayKey;
+            if (!day) return <span key={`e-${i}`} />;
+            const k = buildKey(viewYear, viewMonth, day);
+            const isFuture  = k > maxDate;
+            const isSingle  = mode === "single" && k === value;
+            const isStart   = mode === "range" && isRangeStart(k);
+            const isEnd     = mode === "range" && !!rangeEnd && isRangeEnd(k);
+            const inRange   = mode === "range" && isInRange(k);
+            const isToday   = k === todayKey;
+
             return (
               <button
                 key={k}
                 type="button"
                 className={[
                   styles.day,
-                  isSelected ? styles.daySelected : "",
-                  isToday && !isSelected ? styles.dayToday : "",
+                  isSingle || isStart || isEnd ? styles.daySelected : "",
+                  inRange ? styles.dayInRange : "",
+                  isToday && !isSingle && !isStart && !isEnd ? styles.dayToday : "",
                   isFuture ? styles.dayDisabled : "",
+                  isStart && rangeEnd ? styles.dayRangeStart : "",
+                  isEnd ? styles.dayRangeEnd : "",
                 ].join(" ")}
                 onClick={() => handleDay(day)}
+                onMouseEnter={() => { if (mode === "range" && rangeStart && !rangeEnd) setHovered(k); }}
+                onMouseLeave={() => setHovered(null)}
                 disabled={isFuture}
               >
                 {day}
@@ -134,10 +210,16 @@ export default function CalendarPicker({ value, maxDate, onChange, onClose }: Pr
           })}
         </div>
 
-        {/* Today shortcut */}
-        <button className={styles.todayShortcut} onClick={() => { onChange(todayKey); onClose(); }}>
-          Go to Today
-        </button>
+        {/* Actions */}
+        {mode === "range" && rangeStart && rangeEnd ? (
+          <button className={styles.confirmBtn} onClick={confirmRange}>
+            View {formatShort(rangeStart)} – {formatShort(rangeEnd)}
+          </button>
+        ) : (
+          <button className={styles.todayShortcut} onClick={() => { onChange(todayKey); onClose(); }}>
+            Go to Today
+          </button>
+        )}
       </div>
     </div>
   );
