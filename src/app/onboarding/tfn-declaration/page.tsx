@@ -536,22 +536,11 @@ export default function TfnDeclarationPage() {
                 ))}
               </div>
             </div>
-
-            <div className={styles.infoBox}>
-              These questions help us meet our tax and super reporting obligations with the ATO.
-            </div>
           </div>
 
           {/* ── Section 4: Declaration ── */}
           <div className={styles.formSection}>
             <h3 className={styles.sectionTitle}>Declaration</h3>
-
-            <div className={styles.infoBox}>
-              <div className={styles.infoBoxRow}>
-                {shieldSvg}
-                <span>I confirm that the information provided is true and correct.</span>
-              </div>
-            </div>
 
             {/* Declaration checkbox */}
             <div className={styles.fieldGroup}>
