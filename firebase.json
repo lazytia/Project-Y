@@ -1,8 +1,14 @@
-{
+﻿{
   "firestore": [
     {
       "database": "project-y",
       "rules": "firestore.rules"
+    }
+  ],
+  "storage": [
+    {
+      "bucket": "project-y-d04dc.firebasestorage.app",
+      "rules": "storage.rules"
     }
   ]
 }
