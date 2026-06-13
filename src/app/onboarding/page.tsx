@@ -178,24 +178,6 @@ export default function OnboardingPage() {
         </button>
       </section>
 
-      {/* Next Step */}
-      <section className={styles.card}>
-        <p className={styles.sectionLabel}>YOUR NEXT STEP</p>
-        <div className={styles.nextStepRow}>
-          <div className={styles.nextStepIcon}>
-            <span>{nextStep.icon}</span>
-          </div>
-          <div className={styles.nextStepInfo}>
-            <p className={styles.nextStepTitle}>{nextStep.label}</p>
-            <p className={styles.nextStepDesc}>{nextStep.desc}</p>
-            {nextStep.time && <p className={styles.nextStepTime}>🕐 {nextStep.time}</p>}
-          </div>
-          <button className={styles.startBtn} onClick={() => router.push(nextStep.path)}>
-            {completedStep > 0 ? "Continue" : "Start"}
-          </button>
-        </div>
-      </section>
-
       {/* Remaining Items */}
       {remainingSteps.length > 0 && (
         <section className={styles.card}>
