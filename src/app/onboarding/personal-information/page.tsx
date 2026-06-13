@@ -38,6 +38,7 @@ export default function PersonalInformationPage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   const todayKey = new Date().toLocaleDateString("en-CA");
 
@@ -91,7 +92,8 @@ export default function PersonalInformationPage() {
     if (!mobileNumber.trim()) missing.push("Mobile Number");
     if (!email.trim()) missing.push("Email Address");
     if (missing.length > 0) {
-      setError(`Please fill in the required fields: ${missing.join(", ")}`);
+      setError(`Please fill in the required fields:\n${missing.join("\n")}`);
+      setShowErrorModal(true);
       return;
     }
     const ok = await saveToFirestore();
@@ -329,6 +331,27 @@ export default function PersonalInformationPage() {
           </div>
         </form>
       </div>
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className={styles.modalBackdrop} onClick={() => setShowErrorModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalIcon}>⚠️</div>
+            <h3 className={styles.modalTitle}>Required Fields Missing</h3>
+            <ul className={styles.modalList}>
+              {error?.split("\n").slice(1).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <button
+              className={styles.modalBtn}
+              onClick={() => setShowErrorModal(false)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
