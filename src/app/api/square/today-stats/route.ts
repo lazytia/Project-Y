@@ -16,10 +16,13 @@ export const dynamic = "force-dynamic";
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function formatHour(h: number): string {
-  if (h === 0) return "12:00 AM";
-  if (h < 12) return `${h}:00 AM`;
-  if (h === 12) return "12:00 PM";
-  return `${h - 12}:00 PM`;
+  const fmt = (n: number) => {
+    if (n === 0)  return "12:00 AM";
+    if (n < 12)   return `${n}:00 AM`;
+    if (n === 12) return "12:00 PM";
+    return `${n - 12}:00 PM`;
+  };
+  return `${fmt(h)} – ${fmt(h + 1)}`;
 }
 
 function sumDollars<T>(orders: T[], cents: (o: T) => number): number {
