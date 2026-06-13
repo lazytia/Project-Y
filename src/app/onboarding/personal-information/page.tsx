@@ -225,6 +225,7 @@ export default function PersonalInformationPage() {
             <CalendarPicker
               value={dateOfBirth || todayKey}
               maxDate={todayKey}
+              minDate="1900-01-01"
               onChange={(dateKey) => {
                 setDateOfBirth(dateKey);
                 setShowCalendar(false);

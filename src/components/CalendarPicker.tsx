@@ -13,6 +13,7 @@ const MONTH_NAMES = [
 interface Props {
   value: string;           // YYYY-MM-DD (single selected date)
   maxDate: string;
+  minDate?: string;        // YYYY-MM-DD, default 2024-01-01
   onChange: (dateKey: string) => void;
   onRangeChange: (start: string, end: string) => void;
   onClose: () => void;
@@ -31,7 +32,7 @@ function formatShort(dateKey: string): string {
   });
 }
 
-export default function CalendarPicker({ value, maxDate, onChange, onRangeChange, onClose }: Props) {
+export default function CalendarPicker({ value, maxDate, minDate, onChange, onRangeChange, onClose }: Props) {
   const [mode, setMode] = useState<Mode>("single");
   const [rangeStart, setRangeStart] = useState<string | null>(null);
   const [rangeEnd,   setRangeEnd]   = useState<string | null>(null);
@@ -55,7 +56,8 @@ export default function CalendarPicker({ value, maxDate, onChange, onRangeChange
 
   const [maxY, maxM] = maxDate.split("-").map(Number);
   const isMaxMonth = viewYear === maxY && viewMonth === maxM - 1;
-  const isMinMonth = viewYear === 2024 && viewMonth === 0;
+  const [minY, minM] = (minDate ?? "2024-01-01").split("-").map(Number);
+  const isMinMonth = viewYear === minY && viewMonth === (minM - 1);
 
   function prevMonth() {
     if (isMinMonth) return;
