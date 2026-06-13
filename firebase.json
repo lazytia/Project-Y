@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "project-y",
+      "rules": "firestore.rules"
+    }
+  ]
+}
