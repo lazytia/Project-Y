@@ -201,7 +201,6 @@ export default function OnboardingPage() {
                 <span className={styles.itemIcon}>{step.icon}</span>
                 <span className={styles.itemLabel}>{step.label}</span>
                 <span className={styles.itemStatus}>Pending</span>
-                <span className={styles.itemChevron}>›</span>
               </li>
             ))}
           </ul>
