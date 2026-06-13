@@ -563,3 +563,34 @@
 .modalBtn:active {
   opacity: 0.9;
 }
+
+/* ── Signature preview ── */
+.signaturePreview {
+  margin-top: var(--space-2);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+}
+
+.signatureImg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100px;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.resignBtn {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-warm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 4px;
+}

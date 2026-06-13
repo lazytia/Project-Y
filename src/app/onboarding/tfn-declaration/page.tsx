@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import CalendarPicker from "@/components/CalendarPicker";
 import Toast from "@/components/Toast";
+import SignaturePad from "@/components/SignaturePad";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -60,7 +61,8 @@ export default function TfnDeclarationPage() {
 
   // Section 4: Declaration
   const [declarationAgreed, setDeclarationAgreed] = useState(false);
-  const [declarationName, setDeclarationName] = useState("");
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -95,8 +97,8 @@ export default function TfnDeclarationPage() {
           taxFreeThreshold,
           helpDebt,
           otherGovDebt,
-          declarationName,
           declarationAgreed: true,
+          ...(signatureDataUrl && { signatureDataUrl }),
         },
         step: CURRENT_STEP,
         status: markComplete ? "step_complete" : "in_progress",
@@ -126,8 +128,7 @@ export default function TfnDeclarationPage() {
     if (!auState) missing.push("State");
     if (!postcode.trim()) missing.push("Postcode");
     if (!taxFileNumber.trim()) missing.push("Tax File Number");
-    if (!declarationAgreed) missing.push("Employee Declaration (must be checked)");
-    if (!declarationName.trim()) missing.push("Full Name (Declaration)");
+    if (!declarationAgreed) missing.push("Employee Declaration (must be signed)");
 
     if (missing.length > 0) {
       setErrorTitle("Required Fields Missing");
@@ -540,35 +541,41 @@ export default function TfnDeclarationPage() {
           <div className={styles.formSection}>
             <h3 className={styles.sectionTitle}>Declaration</h3>
 
-            {/* Declaration checkbox */}
+            {/* Declaration checkbox → opens signature pad */}
             <div className={styles.fieldGroup}>
-              <label className={styles.checkboxItem}>
+              <label className={styles.checkboxItem} style={undefined}>
                 <input
                   type="checkbox"
                   className={styles.checkboxInput}
                   checked={declarationAgreed}
-                  onChange={(e) => setDeclarationAgreed(e.target.checked)}
+                  readOnly
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (declarationAgreed) {
+                      setDeclarationAgreed(false);
+                      setSignatureDataUrl(null);
+                    } else {
+                      setShowSignaturePad(true);
+                    }
+                  }}
                 />
                 <span className={styles.radioLabel}>
                   Employee Declaration <span className={styles.required}>*</span> — I declare that the information I have given is true and correct.
                 </span>
               </label>
-            </div>
-
-            {/* Full Name */}
-            <div className={styles.fieldGroup}>
-              <label className={styles.label}>
-                Full Name <span className={styles.required}>*</span>
-              </label>
-              <div className={styles.inputWrapper}>
-                <input
-                  type="text"
-                  className={`${styles.input} ${styles.inputNoIcon}`}
-                  placeholder="Enter your full name"
-                  value={declarationName}
-                  onChange={(e) => setDeclarationName(e.target.value)}
-                />
-              </div>
+              {signatureDataUrl && (
+                <div className={styles.signaturePreview}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={signatureDataUrl} alt="Your signature" className={styles.signatureImg} />
+                  <button
+                    type="button"
+                    className={styles.resignBtn}
+                    onClick={() => setShowSignaturePad(true)}
+                  >
+                    Re-sign
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Date (read-only) */}
@@ -621,6 +628,18 @@ export default function TfnDeclarationPage() {
           </div>
         </form>
       </div>
+
+      {/* Signature Pad Modal */}
+      {showSignaturePad && (
+        <SignaturePad
+          onConfirm={(dataUrl) => {
+            setSignatureDataUrl(dataUrl);
+            setDeclarationAgreed(true);
+            setShowSignaturePad(false);
+          }}
+          onClose={() => setShowSignaturePad(false)}
+        />
+      )}
 
       {/* Toast */}
       {showToast && (
