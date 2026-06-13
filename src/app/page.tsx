@@ -241,22 +241,16 @@ export default function DashboardPage() {
         <div className={styles.salesBreakRow}>
           <div className={styles.salesBreakItem}>
             <p className={styles.cardLabel}>RESTAURANT SALES</p>
-            <div className={styles.salesBreakItemBottom}>
-              <p className={`${styles.salesBreakAmount} ${restaurantSales === null ? styles.salesLoading : ""}`}>
-                {restaurantSales === null ? "—" : fmt(restaurantSales)}
-              </p>
-              <div className={styles.salesBreakIcon}>🍴</div>
-            </div>
+            <p className={`${styles.salesBreakAmount} ${restaurantSales === null ? styles.salesLoading : ""}`}>
+              {restaurantSales === null ? "—" : fmt(restaurantSales)}
+            </p>
           </div>
           <div className={styles.salesBreakDivider} />
           <div className={styles.salesBreakItem}>
             <p className={styles.cardLabel}>PLATTER SALES</p>
-            <div className={styles.salesBreakItemBottom}>
-              <p className={`${styles.salesBreakAmount} ${platterSales === null ? styles.salesLoading : ""}`}>
-                {platterSales === null ? "—" : fmt(platterSales)}
-              </p>
-              <div className={styles.salesBreakIcon}>🍽</div>
-            </div>
+            <p className={`${styles.salesBreakAmount} ${platterSales === null ? styles.salesLoading : ""}`}>
+              {platterSales === null ? "—" : fmt(platterSales)}
+            </p>
           </div>
         </div>
       </section>

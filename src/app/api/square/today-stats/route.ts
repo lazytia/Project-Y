@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getDateRange,
+  getSalesDayRange,
   getWeekToDateRange,
   fetchOrders,
+  sumRefundCents,
   squareEnv,
   netAmountCents,
-  totalCollectedCents,
+  squareGrossSalesCents,
   todayDateKey,
 } from "@/lib/square";
 
@@ -49,49 +51,58 @@ export async function GET(req: NextRequest) {
   const prevDate = shiftKey(selectedDate, -1);
 
   try {
+    // Sales window matches Square's Sales Summary: 9am–10pm AET.
+    // "All-day" window kept for transactions / peak hour / best sellers etc.
     const today = getDateRange(timezone, 0, selectedDate);
     const yesterday = getDateRange(timezone, 0, prevDate);
+    const todaySales9to10 = getSalesDayRange(timezone, selectedDate);
+    const yesterdaySales9to10 = getSalesDayRange(timezone, prevDate);
     const week = getWeekToDateRange(timezone, selectedDate);
 
-    // Restaurant: OPEN+COMPLETED always — OPEN tickets are paid-but-not-closed
-    // (Square dashboard counts these in Sales). Even on past dates they may
-    // legitimately remain open. Platter: COMPLETED only (OPEN platter = future
-    // catering reservation, not yet revenue).
     const RESTAURANT_STATES = ["OPEN", "COMPLETED"];
 
+    void yesterdaySales9to10; // reserved for future yesterday-sales comparison
     const [
       todayOrders,
       yesterdayOrders,
-      platterOrders,
+      todayOrdersWindow,
+      platterOrdersWindow,
       weekRestaurantOrders,
       weekPlatterOrders,
+      restaurantRefundsCents,
+      platterRefundsCents,
     ] = await Promise.all([
       fetchOrders(locationId, today.startAt, today.endAt, RESTAURANT_STATES),
       fetchOrders(locationId, yesterday.startAt, yesterday.endAt, RESTAURANT_STATES),
+      fetchOrders(locationId, todaySales9to10.startAt, todaySales9to10.endAt, RESTAURANT_STATES),
       platterLocationId
-        ? fetchOrders(platterLocationId, today.startAt, today.endAt, ["COMPLETED"])
+        ? fetchOrders(platterLocationId, todaySales9to10.startAt, todaySales9to10.endAt, ["COMPLETED"])
         : Promise.resolve([]),
       fetchOrders(locationId, week.startAt, week.endAt, RESTAURANT_STATES),
       platterLocationId
         ? fetchOrders(platterLocationId, week.startAt, week.endAt, ["COMPLETED"])
         : Promise.resolve([]),
+      sumRefundCents(locationId, todaySales9to10.startAt, todaySales9to10.endAt),
+      platterLocationId
+        ? sumRefundCents(platterLocationId, todaySales9to10.startAt, todaySales9to10.endAt)
+        : Promise.resolve(0),
     ]);
 
-    // Transactions = restaurant order count (OPEN+COMPLETED). Matches Square
-    // dashboard which counts orders, not payments (split bills can make
-    // payments > orders, but the dashboard sticks with order count).
+    // Transactions = restaurant order count (OPEN+COMPLETED, all-day).
     const transactions = todayOrders.length;
     const yestTransactions = yesterdayOrders.length;
 
-    // ── Sales (Total Collected = 세금/팁/서비스차지 포함, Square 앱과 일치) ──
-    const restaurantSales = sumDollars(todayOrders, totalCollectedCents);
-    const platterSales = sumDollars(platterOrders, totalCollectedCents);
+    // ── Sales (Square Web "Gross sales" — 9am–10pm window, refunds removed) ─
+    const restaurantSales =
+      sumDollars(todayOrdersWindow, squareGrossSalesCents) - restaurantRefundsCents / 100;
+    const platterSales =
+      sumDollars(platterOrdersWindow, squareGrossSalesCents) - platterRefundsCents / 100;
     const todaySales = restaurantSales + platterSales;
 
-    // ── Weekly Progress ────────────────────────────────────────
+    // ── Weekly Progress (same formula across the week-to-date span) ───
     const weeklyProgress =
-      sumDollars(weekRestaurantOrders, totalCollectedCents) +
-      sumDollars(weekPlatterOrders, totalCollectedCents);
+      sumDollars(weekRestaurantOrders, squareGrossSalesCents) +
+      sumDollars(weekPlatterOrders, squareGrossSalesCents);
 
     // ── Avg Net Sale (Net Sales ÷ 주문 수, Square 대시보드와 일치) ───
     const restaurantNet = sumDollars(todayOrders, netAmountCents);

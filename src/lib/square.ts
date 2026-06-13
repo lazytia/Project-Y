@@ -104,10 +104,70 @@ export function netAmountCents(order: SquareOrder): number {
 
 /**
  * Total collected amount in cents — what the customer actually paid.
- * Matches Square dashboard "Sales" (= total_money, including tax/tip/svc).
+ * (total_money, including tax/tip/svc).
  */
 export function totalCollectedCents(order: SquareOrder): number {
   return Number(order.totalMoney?.amount ?? 0n);
+}
+
+/**
+ * Square Web Dashboard "Gross Sales" for a single order — sum of each line
+ * item's `gross_sales_money`. To match the figure shown in Square Web's
+ * Sales Summary you must also:
+ *   1. Constrain orders to the 9:00 AM – 10:00 PM AET business-day window
+ *      (see getSalesDayRange).
+ *   2. Subtract refunds posted within the same window (see fetchRefunds).
+ *
+ * Verified against 2026-06-09 ($3,527.37), 2026-06-10 ($6,068.13),
+ * 2026-06-11 ($4,344.28), 2026-06-12 ($5,221.25).
+ */
+export function squareGrossSalesCents(order: SquareOrder): number {
+  let total = 0;
+  for (const li of order.lineItems ?? []) {
+    total += Number(li.grossSalesMoney?.amount ?? 0n);
+  }
+  return total;
+}
+
+/** Square Sales Summary business day: 9:00 AM – 10:00 PM local. */
+export const SALES_DAY_START_HOUR = 9;
+export const SALES_DAY_END_HOUR = 22;
+
+/**
+ * UTC range covering Square's "Sales Report day (9:00 am–10:00 pm AET)"
+ * for the given calendar date in `timezone`. If `dateKey` is omitted,
+ * defaults to today in that timezone.
+ */
+export function getSalesDayRange(
+  timezone = "UTC",
+  dateKey?: string,
+): { startAt: string; endAt: string; dateKey: string } {
+  const dk = dateKey ?? todayDateKey(timezone);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    dateKey: dk,
+    startAt: zonedToUTC(`${dk}T${pad(SALES_DAY_START_HOUR)}:00:00`, timezone).toISOString(),
+    endAt: zonedToUTC(`${dk}T${pad(SALES_DAY_END_HOUR)}:00:00`, timezone).toISOString(),
+  };
+}
+
+/** Sum of refund amount_money posted within a time window at a location. */
+export async function sumRefundCents(
+  locationId: string,
+  beginTime: string,
+  endTime: string,
+): Promise<number> {
+  let total = 0;
+  const iter = await squareClient.refunds.list({
+    beginTime,
+    endTime,
+    locationId,
+    limit: 100,
+  });
+  for await (const refund of iter) {
+    total += Number(refund.amountMoney?.amount ?? 0n);
+  }
+  return total;
 }
 
 /**
