@@ -1,6 +1,7 @@
 /**
  * Client for the system_yurica integration endpoint that exposes today's
  * booking PAX and roster staff counts to this dashboard.
+ * Upstream: https://project-y.yurica.com.au
  */
 
 const UPSTREAM_BASE =
