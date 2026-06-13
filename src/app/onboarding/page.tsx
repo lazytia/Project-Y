@@ -31,6 +31,8 @@ export default function OnboardingPage() {
   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
 
   const [completedStep, setCompletedStep] = useState(0);
+  // inProgressStep: step they were last WORKING on (including partial Save & Exit)
+  const [inProgressStep, setInProgressStep] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,7 +42,11 @@ export default function OnboardingPage() {
         const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
         if (snap.exists()) {
           const data = snap.data();
-          setCompletedStep(typeof data.completedStep === "number" ? data.completedStep : 0);
+          const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
+          const inProgress = typeof data.step === "number" ? data.step : 0;
+          setCompletedStep(completed);
+          // Continue Onboarding lands on the further of the two
+          setInProgressStep(Math.max(completed, inProgress - 1));
         }
       } catch {
         // silently ignore — default to 0
@@ -52,8 +58,11 @@ export default function OnboardingPage() {
 
   const percent = Math.round((completedStep / TOTAL_STEPS) * 100);
   const offset = CIRC * (1 - percent / 100);
-  const nextStepIndex = completedStep; // 0-based index into ALL_STEPS
+  // "YOUR NEXT STEP" shows the step after the last completed one
+  const nextStepIndex = completedStep;
   const nextStep = ALL_STEPS[nextStepIndex] ?? ALL_STEPS[TOTAL_STEPS - 1];
+  // "Continue Onboarding" resumes from where they last saved data
+  const continueStep = ALL_STEPS[inProgressStep] ?? nextStep;
   const remainingSteps = ALL_STEPS.slice(nextStepIndex + 1);
 
   return (
@@ -119,7 +128,7 @@ export default function OnboardingPage() {
 
         <button
           className={styles.continueBtn}
-          onClick={() => router.push(nextStep.path)}
+          onClick={() => router.push(continueStep.path)}
           disabled={loading}
         >
           Continue Onboarding <span className={styles.continueBtnArrow}>›</span>
