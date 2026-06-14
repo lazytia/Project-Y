@@ -58,25 +58,24 @@ export async function POST(req: NextRequest) {
 
   const messageBody = body.message?.trim() || NOTIFICATION_BODY;
 
-  // For iOS PWA web push the notification fields must live under webpush.notification.
-  // Sending them only there (no top-level `notification`) avoids a duplicate
-  // shown by some FCM SDK paths.
+  // Use a top-level `notification` so the FCM SDK in the SW auto-displays it,
+  // plus a webpush override block for the icon/badge/click URL.
   const res = await adminMessaging().sendEachForMulticast({
     tokens,
+    notification: {
+      title: NOTIFICATION_TITLE,
+      body: messageBody,
+    },
     data: {
       url: LANDING_URL,
-      tag: "onboarding-reminder",
     },
     webpush: {
       fcmOptions: { link: LANDING_URL },
       notification: {
-        title: NOTIFICATION_TITLE,
-        body: messageBody,
         icon: "/icon-192.png",
         badge: "/icon-192.png",
         tag: "onboarding-reminder",
         renotify: true,
-        requireInteraction: false,
       },
     },
   });

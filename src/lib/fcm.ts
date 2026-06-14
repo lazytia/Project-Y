@@ -31,19 +31,11 @@ export async function registerFcmToken(uid: string): Promise<string | null> {
   }
   if (permission !== "granted") return null;
 
-  // Register (or reuse) the SW that handles background push.
+  // Register (or reuse) the SW that handles background push. The SW
+  // initializes Firebase on its own with the public config baked in, so we
+  // don't need to forward any data here.
   const swReg = await navigator.serviceWorker.register(SW_PATH);
   await navigator.serviceWorker.ready;
-
-  // Send the public Firebase config so the SW can initialize messaging
-  // (App Hosting doesn't expose NEXT_PUBLIC_* env vars to the server runtime,
-  // so a /api endpoint isn't reliable for this).
-  const activeWorker =
-    swReg.active ?? swReg.waiting ?? swReg.installing ?? null;
-  activeWorker?.postMessage({
-    type: "FIREBASE_CONFIG",
-    config: getFirebaseApp().options,
-  });
 
   const messaging = getMessaging(getFirebaseApp());
   const token = await getToken(messaging, {
