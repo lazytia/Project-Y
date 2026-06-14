@@ -1,6 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
+import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -19,6 +24,32 @@ const PERCENT = Math.round(((CURRENT_STEP - 1) / TOTAL_STEPS) * 100);
 
 export default function ReviewSignPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+
+  // Final step of onboarding: mark the staff doc complete and send them to
+  // their working homepage (reservations). Failing the write is non-fatal —
+  // we still navigate so they aren't stuck on this screen.
+  async function handleFinish() {
+    if (!user || submitting) return;
+    setSubmitting(true);
+    try {
+      await setDoc(
+        doc(getDb(), "staff_onboarding", user.uid),
+        {
+          completedStep: TOTAL_STEPS,
+          step: TOTAL_STEPS,
+          status: "complete",
+          completedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch {
+      /* best-effort */
+    }
+    router.replace(ROUTES.reservations);
+  }
 
   const checkSvg = (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -91,9 +122,10 @@ export default function ReviewSignPage() {
           <button
             type="button"
             className={styles.btnPrimary}
-            onClick={() => router.push("/onboarding/complete")}
+            onClick={handleFinish}
+            disabled={submitting}
           >
-            <span>Save &amp; Continue</span>
+            <span>{submitting ? "…" : "Save & Continue"}</span>
             <span className={styles.btnArrow}>›</span>
           </button>
         </div>

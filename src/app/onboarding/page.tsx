@@ -6,6 +6,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
+import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -97,6 +98,16 @@ export default function OnboardingPage() {
       }
     })();
   }, [user]);
+
+  // Once every onboarding step is done the staff member's "home" is the
+  // reservations workspace, not this overview. Bounce them there as soon as
+  // we know the saved state.
+  useEffect(() => {
+    if (loading) return;
+    if (completedStep >= TOTAL_STEPS) {
+      router.replace(ROUTES.reservations);
+    }
+  }, [loading, completedStep, router]);
 
   const percent = Math.round((completedStep / TOTAL_STEPS) * 100);
   const offset = CIRC * (1 - percent / 100);
