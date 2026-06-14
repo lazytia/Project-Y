@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
 import { usernameToEmail } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
@@ -46,8 +46,30 @@ export default function LoginPage() {
         password,
       );
 
-      // Best-effort: store the FCM token now that we have the uid. This is
-      // silent — only succeeds if the user granted permission above.
+      // Staff MUST have notifications enabled — they're the channel managers
+      // use to remind staff about pending onboarding work. If a non-owner
+      // didn't grant permission, sign them straight back out and show
+      // actionable guidance for each failure mode.
+      if (!isOwner(cred.user) && notifPermission !== "granted") {
+        await signOut(getAuth()).catch(() => {});
+        if (notifPermission === "denied") {
+          setError(
+            "Notifications are blocked. Open iPhone Settings → Notifications → Project Y, turn on \"Allow Notifications\", then sign in again.",
+          );
+        } else if (notifPermission === "unsupported") {
+          setError(
+            "This device can't receive notifications. Install the Project Y app on your iPhone or Android, open it from the home screen, and sign in there.",
+          );
+        } else {
+          setError(
+            "Please allow notifications when prompted, then sign in again.",
+          );
+        }
+        setBusy(false);
+        return;
+      }
+
+      // Best-effort: store the FCM token now that we have the uid.
       if (notifPermission === "granted") {
         registerFcmToken(cred.user.uid).catch(() => { /* silent */ });
       }
