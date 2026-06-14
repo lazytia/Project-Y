@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, doc, getDocs, setDoc, type Timestamp } from "firebase/firestore";
+import { collection, getDocs, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
@@ -156,16 +156,13 @@ export default function ManagerOnboardingPage() {
     if (!user) return;
     try {
       // The owner pressing this button counts as a user gesture, so iOS will
-      // surface the permission prompt now if it hasn't been asked yet. We send
-      // to BOTH the staff member and the owner so the owner sees the result on
+      // surface the permission prompt now if it hasn't been asked yet. We
+      // register the owner's FCM token (no role marker, no other writes that
+      // would cause the staff card to vanish from the list) and then send to
+      // BOTH the staff member and the owner so the owner sees the result on
       // their own device.
       try {
         await registerFcmToken(user.uid);
-        await setDoc(
-          doc(getDb(), "staff_onboarding", user.uid),
-          { uid: user.uid, role: "owner" },
-          { merge: true },
-        );
       } catch {
         // Best-effort — don't block the actual reminder send if registration fails.
       }
