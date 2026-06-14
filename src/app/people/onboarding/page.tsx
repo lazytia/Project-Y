@@ -106,6 +106,17 @@ export default function ManagerOnboardingPage() {
     if (!allowed) router.replace(ROUTES.home);
   }, [allowed, authLoading, router]);
 
+  // Best-effort: register THIS owner's FCM token on mount so another owner
+  // (e.g. tia) can send them a test reminder. iOS will only show the
+  // permission prompt inside a user gesture, so this silently no-ops on the
+  // very first visit if permission is still "default" — the user must then
+  // grant permission via a Remind click. Once granted, subsequent visits
+  // refresh the token automatically.
+  useEffect(() => {
+    if (authLoading || !allowed || !user) return;
+    registerFcmToken(user.uid).catch(() => { /* silent */ });
+  }, [authLoading, allowed, user]);
+
   useEffect(() => {
     if (!allowed) return;
     let cancelled = false;
@@ -155,13 +166,19 @@ export default function ManagerOnboardingPage() {
   async function handleRemind(row: StaffOnboarding) {
     if (!user) return;
     try {
-      // Register owner's token (user gesture → iOS permission prompt fires here)
+      // The click itself is a user gesture, so iOS will surface the
+      // permission prompt now if the owner hasn't been asked yet. We register
+      // the owner's own token (best-effort) so that another owner can later
+      // send THIS owner a test reminder.
       try { await registerFcmToken(user.uid); } catch { /* best-effort */ }
 
+      // Send only to the card owner. aa (test staff) → only aa's tokens.
+      // Yuri (other owner) → only Yuri's tokens. The clicker no longer
+      // receives a copy by default.
       const res = await fetch("/api/staff/remind", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uids: [row.uid, user.uid] }),
+        body: JSON.stringify({ uids: [row.uid] }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
