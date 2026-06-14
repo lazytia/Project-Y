@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs, type Timestamp } from "firebase/firestore";
+import { collection, doc, getDocs, setDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { registerFcmToken } from "@/lib/fcm";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -16,6 +17,7 @@ type StaffOnboarding = {
   lastName?: string;
   preferredName?: string;
   email?: string;
+  role?: string;
   startDate?: Date | null;
   completedStep?: number;
   step?: number;
@@ -118,6 +120,7 @@ export default function ManagerOnboardingPage() {
             lastName: raw.lastName as string | undefined,
             preferredName: raw.preferredName as string | undefined,
             email: raw.email as string | undefined,
+            role: raw.role as string | undefined,
             startDate: tsToDate(raw.startDate),
             completedStep: raw.completedStep as number | undefined,
             step: raw.step as number | undefined,
@@ -127,13 +130,15 @@ export default function ManagerOnboardingPage() {
           };
         });
         if (cancelled) return;
+        // Owners might have a doc here (for FCM tokens) — keep those out of the staff list.
+        const staffOnly = data.filter((r) => r.role !== "owner");
         // Sort by start date ascending (soonest first), unknowns last.
-        data.sort((a, b) => {
+        staffOnly.sort((a, b) => {
           const at = a.startDate?.getTime() ?? Infinity;
           const bt = b.startDate?.getTime() ?? Infinity;
           return at - bt;
         });
-        setRows(data);
+        setRows(staffOnly);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
       }
@@ -148,11 +153,27 @@ export default function ManagerOnboardingPage() {
   const activeCount = useMemo(() => rows?.length ?? 0, [rows]);
 
   async function handleRemind(row: StaffOnboarding) {
+    if (!user) return;
     try {
+      // The owner pressing this button counts as a user gesture, so iOS will
+      // surface the permission prompt now if it hasn't been asked yet. We send
+      // to BOTH the staff member and the owner so the owner sees the result on
+      // their own device.
+      try {
+        await registerFcmToken(user.uid);
+        await setDoc(
+          doc(getDb(), "staff_onboarding", user.uid),
+          { uid: user.uid, role: "owner" },
+          { merge: true },
+        );
+      } catch {
+        // Best-effort — don't block the actual reminder send if registration fails.
+      }
+
       const res = await fetch("/api/staff/remind", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: row.uid }),
+        body: JSON.stringify({ uids: [row.uid, user.uid] }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -160,11 +181,11 @@ export default function ManagerOnboardingPage() {
         return;
       }
       if (data.delivered > 0) {
-        alert(`Reminder sent (${data.delivered} device${data.delivered === 1 ? "" : "s"}).`);
+        alert(`Reminder sent to ${data.delivered} device${data.delivered === 1 ? "" : "s"}.`);
       } else {
         alert(
           data.reason ??
-            "No device registered yet. The staff member needs to open the app and allow notifications first.",
+            "No device registered yet. Either you or the staff need to open the app and allow notifications first.",
         );
       }
     } catch (err) {

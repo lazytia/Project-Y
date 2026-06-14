@@ -9,31 +9,48 @@ const NOTIFICATION_BODY =
 const LANDING_URL = "/onboarding";
 
 export async function POST(req: NextRequest) {
-  let body: { uid?: string; message?: string };
+  let body: { uid?: string; uids?: string[]; message?: string };
   try {
-    body = (await req.json()) as { uid?: string; message?: string };
+    body = (await req.json()) as { uid?: string; uids?: string[]; message?: string };
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const uid = body.uid?.trim();
-  if (!uid) {
+  const uids = Array.from(
+    new Set(
+      [
+        ...(body.uids ?? []),
+        ...(body.uid ? [body.uid] : []),
+      ]
+        .map((u) => (typeof u === "string" ? u.trim() : ""))
+        .filter((u) => u.length > 0),
+    ),
+  );
+  if (uids.length === 0) {
     return NextResponse.json({ error: "uid is required" }, { status: 400 });
   }
 
-  const snap = await adminDb().collection("staff_onboarding").doc(uid).get();
-  if (!snap.exists) {
-    return NextResponse.json({ error: "Staff not found" }, { status: 404 });
+  // Collect tokens for every requested uid. Track which doc each token came
+  // from so we can prune invalid ones afterwards.
+  const tokenOwners = new Map<string, string>(); // token → uid
+  for (const u of uids) {
+    const snap = await adminDb().collection("staff_onboarding").doc(u).get();
+    if (!snap.exists) continue;
+    const data = snap.data() ?? {};
+    if (Array.isArray(data.fcmTokens)) {
+      for (const t of data.fcmTokens) {
+        if (typeof t === "string" && t.length > 0 && !tokenOwners.has(t)) {
+          tokenOwners.set(t, u);
+        }
+      }
+    }
   }
-  const data = snap.data() ?? {};
-  const tokens: string[] = Array.isArray(data.fcmTokens)
-    ? data.fcmTokens.filter((t: unknown): t is string => typeof t === "string" && t.length > 0)
-    : [];
+  const tokens = Array.from(tokenOwners.keys());
 
   if (tokens.length === 0) {
     return NextResponse.json(
       {
         delivered: 0,
-        reason: "No FCM tokens — staff hasn't opened the app with notifications allowed yet.",
+        reason: "No FCM tokens — open the app and allow notifications first.",
       },
       { status: 200 },
     );
@@ -64,8 +81,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Drop tokens that the FCM server reports as invalid so we don't keep retrying them.
-  const invalidTokens: string[] = [];
+  // Drop tokens the FCM server reports as invalid. Group by owning doc so we
+  // can update each doc's fcmTokens array independently.
+  const invalidByDoc = new Map<string, Set<string>>();
   res.responses.forEach((r, i) => {
     if (
       !r.success &&
@@ -75,15 +93,27 @@ export async function POST(req: NextRequest) {
         "messaging/registration-token-not-registered",
       ].includes(r.error.code)
     ) {
-      invalidTokens.push(tokens[i]);
+      const token = tokens[i];
+      const owner = tokenOwners.get(token);
+      if (!owner) return;
+      const set = invalidByDoc.get(owner) ?? new Set<string>();
+      set.add(token);
+      invalidByDoc.set(owner, set);
     }
   });
-  if (invalidTokens.length > 0) {
-    const remaining = tokens.filter((t) => !invalidTokens.includes(t));
-    await adminDb()
-      .collection("staff_onboarding")
-      .doc(uid)
-      .update({ fcmTokens: remaining });
+  for (const [owner, badSet] of invalidByDoc) {
+    const ownerSnap = await adminDb().collection("staff_onboarding").doc(owner).get();
+    const ownerData = ownerSnap.data() ?? {};
+    const current: string[] = Array.isArray(ownerData.fcmTokens)
+      ? ownerData.fcmTokens.filter((t: unknown): t is string => typeof t === "string")
+      : [];
+    const remaining = current.filter((t) => !badSet.has(t));
+    if (remaining.length !== current.length) {
+      await adminDb()
+        .collection("staff_onboarding")
+        .doc(owner)
+        .update({ fcmTokens: remaining });
+    }
   }
 
   return NextResponse.json({
