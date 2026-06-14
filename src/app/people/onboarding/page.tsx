@@ -7,7 +7,6 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
-import { registerFcmToken } from "@/lib/fcm";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -155,22 +154,10 @@ export default function ManagerOnboardingPage() {
   async function handleRemind(row: StaffOnboarding) {
     if (!user) return;
     try {
-      // The owner pressing this button counts as a user gesture, so iOS will
-      // surface the permission prompt now if it hasn't been asked yet. We
-      // register the owner's FCM token (no role marker, no other writes that
-      // would cause the staff card to vanish from the list) and then send to
-      // BOTH the staff member and the owner so the owner sees the result on
-      // their own device.
-      try {
-        await registerFcmToken(user.uid);
-      } catch {
-        // Best-effort — don't block the actual reminder send if registration fails.
-      }
-
       const res = await fetch("/api/staff/remind", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uids: [row.uid, user.uid] }),
+        body: JSON.stringify({ uid: row.uid }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
