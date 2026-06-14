@@ -6,6 +6,8 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
 import { usernameToEmail } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
+import { isOwner } from "@/lib/permissions";
+import { registerFcmToken } from "@/lib/fcm";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
@@ -18,15 +20,41 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // iOS only shows the notification permission prompt when
+    // Notification.requestPermission() is called INSIDE a user gesture
+    // (transient activation, ~5s window after the click). We trigger it
+    // BEFORE the network signIn so the gesture context is fresh, then
+    // register the FCM token once we know the uid.
+    let notifPermission: NotificationPermission | "unsupported" = "unsupported";
+    if (typeof window !== "undefined" && "Notification" in window) {
+      notifPermission = Notification.permission;
+      if (notifPermission === "default") {
+        try {
+          notifPermission = await Notification.requestPermission();
+        } catch {
+          /* ignore — proceed with sign-in regardless */
+        }
+      }
+    }
+
     setBusy(true);
     try {
-      await signInWithEmailAndPassword(
+      const cred = await signInWithEmailAndPassword(
         getAuth(),
         usernameToEmail(username),
         password,
       );
-      // 인증 성공 즉시 이동 — AuthProvider의 effect 체인을 기다리지 않음
-      router.push(ROUTES.home);
+
+      // Best-effort: store the FCM token now that we have the uid. This is
+      // silent — only succeeds if the user granted permission above.
+      if (notifPermission === "granted") {
+        registerFcmToken(cred.user.uid).catch(() => { /* silent */ });
+      }
+
+      // Owners land on the dashboard; staff land on their onboarding overview.
+      const dest = isOwner(cred.user) ? ROUTES.home : ROUTES.staffOnboarding;
+      router.push(dest);
     } catch {
       setError("Invalid username or password");
       setBusy(false);

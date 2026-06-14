@@ -4,7 +4,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth } from "@/lib/firebase";
-import { PUBLIC_ROUTES, ROUTES } from "@/lib/routes";
+import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
+import { isOwner } from "@/lib/permissions";
 
 type AuthContextValue = {
   user: User | null;
@@ -37,8 +38,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPublic = PUBLIC_ROUTES.has(pathname);
     if (!user && !isPublic) {
       router.replace(ROUTES.login);
-    } else if (user && isPublic) {
-      router.replace(ROUTES.home);
+      return;
+    }
+    if (user && isPublic) {
+      // Just signed in — owners go to dashboard, staff to their onboarding.
+      router.replace(isOwner(user) ? ROUTES.home : ROUTES.staffOnboarding);
+      return;
+    }
+    // Non-owner trying to visit an owner-only path → bounce to onboarding.
+    if (user && !isOwner(user) && !isStaffAllowedPath(pathname)) {
+      router.replace(ROUTES.staffOnboarding);
     }
   }, [user, loading, pathname, router]);
 

@@ -3,14 +3,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Owners are identified by the synthetic email we mint from usernames
+    // (see src/lib/username.ts → usernameToEmail). Keep this list in sync with
+    // OWNER_USERNAMES in src/lib/permissions.ts.
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email in [
+          "tia@projecty.local",
+          "yurica@projecty.local"
+        ];
+    }
+
     // Staff onboarding:
     //  - Any signed-in user can read (manager view at /people/onboarding lists
     //    every doc; the app's sign-in is currently restricted to owner accounts).
-    //  - Writes are restricted to the user's own doc so staff can't edit each
-    //    other's onboarding.
+    //  - Staff can write their OWN doc (onboarding form progress).
+    //  - Owners can write ANY staff doc (seeding new staff accounts from the
+    //    Staff + page, sending reminders, pruning invalid FCM tokens, etc.).
     match /staff_onboarding/{uid} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if isOwner()
+        || (request.auth != null && request.auth.uid == uid);
     }
 
     // Default: deny all other access
