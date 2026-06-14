@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, type Timestamp } from "firebase/firestore";
@@ -7,6 +5,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { registerFcmToken } from "@/lib/fcm";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -154,10 +153,13 @@ export default function ManagerOnboardingPage() {
   async function handleRemind(row: StaffOnboarding) {
     if (!user) return;
     try {
+      // Register owner's token (user gesture → iOS permission prompt fires here)
+      try { await registerFcmToken(user.uid); } catch { /* best-effort */ }
+
       const res = await fetch("/api/staff/remind", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: row.uid }),
+        body: JSON.stringify({ uids: [row.uid, user.uid] }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -165,11 +167,11 @@ export default function ManagerOnboardingPage() {
         return;
       }
       if (data.delivered > 0) {
-        alert(`Reminder sent to ${data.delivered} device${data.delivered === 1 ? "" : "s"}.`);
+        alert("Reminder sent.");
       } else {
         alert(
           data.reason ??
-            "No device registered yet. Either you or the staff need to open the app and allow notifications first.",
+            "No device registered yet. Open the app and allow notifications first.",
         );
       }
     } catch (err) {
