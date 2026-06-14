@@ -58,25 +58,18 @@ export async function POST(req: NextRequest) {
 
   const messageBody = body.message?.trim() || NOTIFICATION_BODY;
 
-  // Use a top-level `notification` so the FCM SDK in the SW auto-displays it,
-  // plus a webpush override block for the icon/badge/click URL.
+  // IMPORTANT (iOS): send a DATA-ONLY message. iOS Safari PWAs do not reliably
+  // auto-display messages that carry a top-level `notification` block — the
+  // FCM compat SDK's onBackgroundMessage auto-display path frequently never
+  // fires. Instead we put everything in `data` and let our service worker's
+  // explicit `push` event handler call showNotification() itself, which DOES
+  // fire on iOS. No top-level `notification` => no double display.
   const res = await adminMessaging().sendEachForMulticast({
     tokens,
-    notification: {
+    data: {
       title: NOTIFICATION_TITLE,
       body: messageBody,
-    },
-    data: {
       url: LANDING_URL,
-    },
-    webpush: {
-      fcmOptions: { link: LANDING_URL },
-      notification: {
-        icon: "/icon-192.png",
-        badge: "/icon-192.png",
-        tag: "onboarding-reminder",
-        renotify: true,
-      },
     },
   });
 

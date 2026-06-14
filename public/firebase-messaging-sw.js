@@ -35,25 +35,38 @@ self.addEventListener("activate", (event) =>
 if (!firebase.apps.length) {
   firebase.initializeApp(FIREBASE_CONFIG);
 }
-const messaging = firebase.messaging();
+// Initialize messaging so the FCM SDK is wired up (token handling etc.), but we
+// deliberately do NOT use onBackgroundMessage for display — on iOS Safari PWAs
+// that path is unreliable. We handle the raw `push` event ourselves below.
+firebase.messaging();
 
-// FCM compat SDK already auto-displays the notification when payload has a
-// top-level `notification` block, but if a data-only message arrives we
-// still want to surface something.
-messaging.onBackgroundMessage((payload) => {
-  // If the message had a top-level notification block FCM already showed it
-  // (calling showNotification here would create a duplicate). Only synthesise
-  // one for data-only messages.
-  if (payload.notification) return;
-  const data = payload.data ?? {};
-  self.registration.showNotification("Project Y", {
-    body: data.body ?? "",
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
-    data: { url: data.url || DEFAULT_LANDING },
-    tag: data.tag || "project-y",
-    renotify: true,
-  });
+// Explicit push handler. We send DATA-ONLY messages from the server, so iOS
+// will not auto-display anything; we must call showNotification() here. This is
+// the path that reliably fires inside an installed iOS PWA.
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {};
+  }
+  // FCM data-only messages arrive as { data: { ... } }; be tolerant of either
+  // shape in case a notification-style payload sneaks through.
+  const data = payload.data || payload.notification || payload || {};
+  const title = data.title || "Project Y";
+  const body = data.body || "";
+  const url = data.url || DEFAULT_LANDING;
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url },
+      tag: data.tag || "onboarding-reminder",
+      renotify: true,
+    }),
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
