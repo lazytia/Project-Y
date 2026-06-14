@@ -58,10 +58,14 @@ export async function createStaffAccount(
     // Drop the secondary session immediately — we only needed it to create the user.
     await signOut(secAuth).catch(() => {});
 
+    const normalizedUsername = input.username.trim().toLowerCase();
     await setDoc(
       doc(getDb(), "staff_onboarding", uid),
       {
         uid,
+        username: normalizedUsername,
+        email: usernameToEmail(normalizedUsername),
+        role: "staff",
         startDate: Timestamp.fromDate(input.startDate),
         step: 0,
         completedStep: 0,

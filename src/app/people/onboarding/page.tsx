@@ -16,6 +16,7 @@ type StaffOnboarding = {
   firstName?: string;
   lastName?: string;
   preferredName?: string;
+  username?: string;
   email?: string;
   role?: string;
   startDate?: Date | null;
@@ -29,6 +30,14 @@ type StaffOnboarding = {
   taxFileNumber?: string;
   bankSuper?: { bsb?: string };
 };
+
+/** Username derived from the synthetic auth email, or the stored field. */
+function usernameOf(row: StaffOnboarding): string {
+  if (row.username) return row.username;
+  const email = row.email ?? "";
+  const at = email.indexOf("@");
+  return at === -1 ? email : email.slice(0, at);
+}
 
 const TOTAL_STEPS = 7;
 
@@ -67,15 +76,20 @@ function initials(row: StaffOnboarding): string {
   const f = (row.firstName ?? "").trim();
   const l = (row.lastName ?? "").trim();
   if (f || l) return `${f.charAt(0)}${l.charAt(0)}`.toUpperCase();
-  const e = row.email ?? "";
-  return e.slice(0, 2).toUpperCase() || "??";
+  const u = usernameOf(row);
+  return u.slice(0, 2).toUpperCase() || "??";
 }
 
 function fullName(row: StaffOnboarding): string {
   const f = (row.firstName ?? "").trim();
   const l = (row.lastName ?? "").trim();
   if (f || l) return [f, l].filter(Boolean).join(" ");
-  return row.email ?? row.uid;
+  // Capitalize the username for display (e.g. "yurico" → "Yurico"). Falling
+  // back to the raw uid (which we used to show) produces a noisy 28-char
+  // string that doesn't help the manager identify the staff.
+  const u = usernameOf(row);
+  if (u) return u.charAt(0).toUpperCase() + u.slice(1);
+  return row.uid;
 }
 
 /** First incomplete item we can flag for the manager. */
