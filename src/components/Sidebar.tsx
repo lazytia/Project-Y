@@ -85,6 +85,7 @@ export default function Sidebar({ open, onClose }: Props) {
   if (!userIsOwner) {
     const staffNav: NavGroup[] = [
       { icon: "🏠", label: "Home", href: "/staff" },
+      { icon: "📋", label: "Onboarding", href: "/onboarding" },
       {
         icon: "📅",
         label: "Schedule",
@@ -98,7 +99,7 @@ export default function Sidebar({ open, onClose }: Props) {
     ];
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
-        <div className={styles.brand}>Project Y</div>
+        <div className={styles.brand}>YURICA</div>
         <nav className={styles.nav}>
           {staffNav.map((group) => {
             const isExpanded = !group.children || openGroup === group.label;
@@ -159,7 +160,7 @@ export default function Sidebar({ open, onClose }: Props) {
 
   return (
     <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
-      <div className={styles.brand}>Project Y</div>
+      <div className={styles.brand}>YURICA</div>
       <nav className={styles.nav}>
         {visibleNav.map((group) => {
           const isExpanded = !group.children || openGroup === group.label;
