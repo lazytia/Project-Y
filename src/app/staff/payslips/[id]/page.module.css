@@ -1,0 +1,182 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 480px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.backBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-fg);
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.sectionTitle {
+  margin: var(--space-3) 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+/* ── Meta card ── */
+.metaCard {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  gap: var(--space-3);
+}
+
+.metaRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metaLabel {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+}
+
+.metaValue {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.metaDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 0 calc(-1 * var(--space-4));
+}
+
+/* ── Net Pay hero ── */
+.netCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--space-5);
+  background: #111;
+  color: #fff;
+  border-radius: var(--radius-lg);
+}
+
+.netLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.netAmount {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* ── Payment Summary card ── */
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) 0;
+}
+
+.summaryLabel {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-fg);
+}
+
+.summaryValue {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.summaryLabelStrong {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.summaryValueStrong {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.summaryDivider {
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* ── Info box ── */
+.infoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+.infoIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.infoBody {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+  line-height: 1.55;
+}
+
+/* Hide chrome when printing so PDF only shows the slip. */
+@media print {
+  .backBtn,
+  .infoBox { display: none !important; }
+  .page { max-width: 100%; padding: 0; }
+}

@@ -1,0 +1,249 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 480px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.sectionTitle {
+  margin: var(--space-3) 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+/* ── Next Pay Date ── */
+.nextPayCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.payIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(234, 88, 12, 0.10);
+  color: var(--color-warm);
+  flex-shrink: 0;
+}
+
+.nextPayBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.nextPayLabel {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+}
+
+.nextPayDate {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.nextPaySub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Latest Payslip ── */
+.latestCard {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  gap: var(--space-3);
+}
+
+.latestHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.latestIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(234, 88, 12, 0.10);
+  color: var(--color-warm);
+  flex-shrink: 0;
+}
+
+.latestHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.latestMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+}
+
+.latestPeriod {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.latestDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px calc(-1 * var(--space-4));
+}
+
+.latestSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: calc(44px + var(--space-3));
+}
+
+.latestAmount {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.latestPaidDate {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.viewBtn {
+  margin-top: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 52px;
+  background: var(--color-warm);
+  color: #ffffff;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 700;
+  transition: opacity 0.15s;
+}
+
+.viewBtn:hover { opacity: 0.92; }
+
+/* ── Previous Payslips ── */
+.prevList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.prevRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.prevList li:last-child .prevRow { border-bottom: none; }
+
+.prevRow:hover { background: var(--color-surface); }
+
+.prevIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.prevDate {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.prevAmount {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-fg);
+  white-space: nowrap;
+}
+
+.prevChevron {
+  font-size: 20px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+/* ── Info box ── */
+.infoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+.infoIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.infoBody {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+  line-height: 1.55;
+}
