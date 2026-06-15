@@ -156,6 +156,11 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .notifLink:hover { color: var(--color-fg); }
