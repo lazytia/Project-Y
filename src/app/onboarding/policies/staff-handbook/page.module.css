@@ -65,6 +65,16 @@
   margin: var(--space-2) 0;
 }
 
+.coverHeadline {
+  margin: var(--space-3) 0 0;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  text-align: center;
+  color: #111;
+}
+
 .coverWelcome {
   margin: 0;
   font-size: 16px;

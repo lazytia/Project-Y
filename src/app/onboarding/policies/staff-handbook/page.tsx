@@ -28,7 +28,7 @@ export default function StaffHandbookPage() {
       await setDoc(
         doc(getDb(), "staff_onboarding", user.uid),
         {
-          reviewSign: {
+          policies: {
             handbookSignedAt: serverTimestamp(),
             handbookVersion: HANDBOOK_VERSION,
             handbookReadAcknowledged: true,
@@ -38,7 +38,7 @@ export default function StaffHandbookPage() {
         },
         { merge: true },
       );
-      router.push("/onboarding/review-sign");
+      router.push("/onboarding/policies");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save. Try again.");
       setSubmitting(false);
@@ -371,7 +371,7 @@ export default function StaffHandbookPage() {
           <button
             type="button"
             className={styles.secondaryBtn}
-            onClick={() => router.push("/onboarding/review-sign")}
+            onClick={() => router.push("/onboarding/policies")}
           >
             BACK
           </button>

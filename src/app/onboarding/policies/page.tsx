@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  type Timestamp,
+} from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import Toast from "@/components/Toast";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -22,103 +27,127 @@ const CURRENT_STEP = 5;
 const TOTAL_STEPS = 7;
 const PERCENT = Math.round(((CURRENT_STEP - 1) / TOTAL_STEPS) * 100);
 
+type DocKey = "handbook" | "privacy" | "agreement";
+
+type DocCardConfig = {
+  key: DocKey;
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ReactNode;
+};
+
+const DOC_CARDS: DocCardConfig[] = [
+  {
+    key: "handbook",
+    title: "Staff Handbook",
+    description: "Review the company handbook.",
+    href: "/onboarding/policies/staff-handbook",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="8" y1="13" x2="16" y2="13" />
+        <line x1="8" y1="17" x2="14" y2="17" />
+      </svg>
+    ),
+  },
+  {
+    key: "privacy",
+    title: "Privacy Policy",
+    description: "Review how we collect and protect your data.",
+    href: "/onboarding/policies/privacy-policy",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="11" width="16" height="10" rx="2" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      </svg>
+    ),
+  },
+  {
+    key: "agreement",
+    title: "Employee Agreement",
+    description: "Review and sign your employment agreement.",
+    href: "/onboarding/policies/employee-agreement",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 19l7-7 3 3-7 7-3-3z" />
+        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+        <path d="M2 2l7.586 7.586" />
+        <circle cx="11" cy="11" r="2" />
+      </svg>
+    ),
+  },
+];
+
+function fmtDate(t: Timestamp | Date | null | undefined): string {
+  if (!t) return "";
+  const d = "toDate" in t ? t.toDate() : t;
+  return d.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function PoliciesPage() {
   const router = useRouter();
   const { user } = useAuth();
-
-  const [handbookAgreed, setHandbookAgreed] = useState(false);
-  const [privacyAgreed, setPrivacyAgreed] = useState(false);
-  const [agreementAgreed, setAgreementAgreed] = useState(false);
-
+  const [signedAt, setSignedAt] = useState<Record<DocKey, Timestamp | null>>({
+    handbook: null,
+    privacy: null,
+    agreement: null,
+  });
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [errorTitle, setErrorTitle] = useState("Acknowledgement Required");
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [showToast, setShowToast] = useState(false);
 
-  async function saveToFirestore(markComplete = false) {
-    if (!user) {
-      setError("Could not find your login info. Please sign in again.");
-      return false;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      const db = getDb();
-      const payload: Record<string, unknown> = {
-        uid: user.uid,
-        policies: { handbookAgreed, privacyAgreed, agreementAgreed },
-        step: CURRENT_STEP,
-        status: markComplete ? "step_complete" : "in_progress",
-        updatedAt: serverTimestamp(),
-      };
-      if (markComplete) payload.completedStep = CURRENT_STEP;
-      await setDoc(doc(db, "staff_onboarding", user.uid), payload, { merge: true });
-      return true;
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to save. Please try again.";
-      setError(msg);
-      setErrorTitle("Save Failed");
-      setShowErrorModal(true);
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        const data = snap.data() ?? {};
+        const p = (data.policies ?? {}) as Record<string, Timestamp | null>;
+        setSignedAt({
+          handbook: p.handbookSignedAt ?? null,
+          privacy: p.privacySignedAt ?? null,
+          agreement: p.agreementSignedAt ?? null,
+        });
+      } catch {
+        /* ignore */
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user]);
+
+  const signedCount = Object.values(signedAt).filter(Boolean).length;
+  const allSigned = signedCount === DOC_CARDS.length;
+  const progressPct = Math.round((signedCount / DOC_CARDS.length) * 100);
 
   async function handleSaveAndContinue() {
-    const missing: string[] = [];
-    if (!handbookAgreed) missing.push("Staff Handbook");
-    if (!privacyAgreed) missing.push("Privacy Policy");
-    if (!agreementAgreed) missing.push("Employee Agreement");
-
-    if (missing.length > 0) {
-      setErrorTitle("Acknowledgement Required");
-      setError(`Please acknowledge the following policies:\n${missing.join("\n")}`);
-      setShowErrorModal(true);
-      return;
+    if (!user || !allSigned || saving) return;
+    setSaving(true);
+    try {
+      await setDoc(
+        doc(getDb(), "staff_onboarding", user.uid),
+        {
+          step: CURRENT_STEP,
+          completedStep: CURRENT_STEP,
+          status: "step_complete",
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch {
+      /* best-effort */
     }
-
-    const ok = await saveToFirestore(true);
-    if (ok) {
-      setShowToast(true);
-      setTimeout(() => router.push("/onboarding/review-sign"), 1800);
-    }
-  }
-
-  async function handleSaveAndExit() {
-    const ok = await saveToFirestore(false);
-    if (ok) router.push("/onboarding");
+    router.push("/onboarding/review-sign");
   }
 
   const checkSvg = (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-
-  const bookSvg = (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  );
-
-  const lockSvg = (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-
-  const docSvg = (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
     </svg>
   );
 
@@ -166,143 +195,108 @@ export default function PoliciesPage() {
       {/* Progress Bar */}
       <div className={styles.progressSection}>
         <div className={styles.progressBarTrack}>
-          <div
-            className={styles.progressBarFill}
-            style={{ width: `${PERCENT}%` }}
-          />
+          <div className={styles.progressBarFill} style={{ width: `${PERCENT}%` }} />
         </div>
         <span className={styles.progressText}>{PERCENT}% Complete</span>
       </div>
 
-      {/* Form Card */}
-      <div className={styles.formCard}>
-        <p className={styles.formTitle}>Review and acknowledge our workplace policies.</p>
-        <p className={styles.formSubtitle}>All policies must be acknowledged before proceeding.</p>
-
-        <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
-
-          {/* ── Section 1: Staff Handbook ── */}
-          <div className={styles.formSection}>
-            <div className={styles.sectionHeader}>
-              <span className={styles.sectionIcon}>{bookSvg}</span>
-              <h3 className={styles.sectionTitle}>Staff Handbook</h3>
-            </div>
-            <div className={styles.infoBox}>
-              <p className={styles.infoBoxBody}>
-                Our Staff Handbook outlines workplace expectations, code of conduct, leave entitlements, and your rights and responsibilities as an employee.
-              </p>
-            </div>
-            <label className={`${styles.policyCheck} ${handbookAgreed ? styles.policyCheckActive : ""}`}>
-              <input
-                type="checkbox"
-                className={styles.checkboxInput}
-                checked={handbookAgreed}
-                onChange={(e) => setHandbookAgreed(e.target.checked)}
-              />
-              <span className={styles.checkboxLabel}>I have read and understood the Staff Handbook</span>
-            </label>
-          </div>
-
-          {/* ── Section 2: Privacy Policy ── */}
-          <div className={styles.formSection}>
-            <div className={styles.sectionHeader}>
-              <span className={styles.sectionIcon}>{lockSvg}</span>
-              <h3 className={styles.sectionTitle}>Privacy Policy</h3>
-            </div>
-            <div className={styles.infoBox}>
-              <p className={styles.infoBoxBody}>
-                We are committed to protecting your personal information. This policy explains how we collect, use, and store your data in compliance with the Privacy Act 1988.
-              </p>
-            </div>
-            <label className={`${styles.policyCheck} ${privacyAgreed ? styles.policyCheckActive : ""}`}>
-              <input
-                type="checkbox"
-                className={styles.checkboxInput}
-                checked={privacyAgreed}
-                onChange={(e) => setPrivacyAgreed(e.target.checked)}
-              />
-              <span className={styles.checkboxLabel}>I have read and understood the Privacy Policy</span>
-            </label>
-          </div>
-
-          {/* ── Section 3: Employee Agreement ── */}
-          <div className={styles.formSection}>
-            <div className={styles.sectionHeader}>
-              <span className={styles.sectionIcon}>{docSvg}</span>
-              <h3 className={styles.sectionTitle}>Employee Agreement</h3>
-            </div>
-            <div className={styles.infoBox}>
-              <p className={styles.infoBoxBody}>
-                This agreement sets out the terms and conditions of your employment, including your role, remuneration, hours of work, and leave entitlements.
-              </p>
-            </div>
-            <label className={`${styles.policyCheck} ${agreementAgreed ? styles.policyCheckActive : ""}`}>
-              <input
-                type="checkbox"
-                className={styles.checkboxInput}
-                checked={agreementAgreed}
-                onChange={(e) => setAgreementAgreed(e.target.checked)}
-              />
-              <span className={styles.checkboxLabel}>I have read and understood the Employee Agreement</span>
-            </label>
-          </div>
-
-          {/* Buttons */}
-          <div className={styles.buttonRow}>
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={handleSaveAndExit}
-              disabled={saving}
-            >
-              {saving ? "Saving..." : "Save & Exit"}
-            </button>
-            <button
-              type="submit"
-              className={styles.btnPrimary}
-              onClick={handleSaveAndContinue}
-              disabled={saving}
-            >
-              {saving ? "Saving..." : (
-                <>
-                  <span>Save &amp; Continue</span>
-                  <span className={styles.btnArrow}>›</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+      {/* Section heading */}
+      <div className={styles.sectionHeading}>
+        <h2 className={styles.docSectionTitle}>Review &amp; Sign</h2>
+        <p className={styles.sectionSubtitle}>
+          Please read and sign the documents below.
+        </p>
       </div>
 
-      {/* Toast */}
-      {showToast && (
-        <Toast
-          title="Policies acknowledged"
-          message="All policies have been read and acknowledged."
-          onClose={() => setShowToast(false)}
-        />
-      )}
-
-      {/* Error Modal */}
-      {showErrorModal && (
-        <div className={styles.modalBackdrop} onClick={() => setShowErrorModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalIcon}>⚠️</div>
-            <h3 className={styles.modalTitle}>{errorTitle}</h3>
-            <ul className={styles.modalList}>
-              {error?.split("\n").slice(1).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+      {/* Document cards */}
+      <div className={styles.docList}>
+        {DOC_CARDS.map((card) => {
+          const signed = signedAt[card.key];
+          return (
             <button
-              className={styles.modalBtn}
-              onClick={() => setShowErrorModal(false)}
+              key={card.key}
+              type="button"
+              className={styles.docCard}
+              onClick={() => router.push(card.href)}
+              disabled={loading}
             >
-              OK
+              <div className={styles.docIcon}>{card.icon}</div>
+              <div className={styles.docBody}>
+                <p className={styles.docTitle}>{card.title}</p>
+                <p className={styles.docDesc}>{card.description}</p>
+                {signed ? (
+                  <div className={styles.statusRow}>
+                    <span className={styles.signedBadge}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="9 12 11 14 15 10" />
+                      </svg>
+                      Signed
+                    </span>
+                    <span className={styles.statusDot}>·</span>
+                    <span className={styles.signedDate}>{fmtDate(signed)}</span>
+                  </div>
+                ) : (
+                  <div className={styles.statusRow}>
+                    <span className={styles.pendingBadge}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      Pending
+                    </span>
+                  </div>
+                )}
+              </div>
+              <span className={styles.docChevron} aria-hidden="true">›</span>
             </button>
+          );
+        })}
+      </div>
+
+      {/* Progress card */}
+      <div className={styles.progressCard}>
+        <div className={styles.progressCardIcon}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19l7-7 3 3-7 7-3-3z" />
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+          </svg>
+        </div>
+        <div className={styles.progressCardBody}>
+          <p className={styles.progressCardTitle}>Review &amp; Sign Progress</p>
+          <div className={styles.progressCardRow}>
+            <div className={styles.progressCardTrack}>
+              <div
+                className={styles.progressCardFill}
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <span className={styles.progressCardCount}>
+              {signedCount} / {DOC_CARDS.length} Completed
+            </span>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Save & Exit / Save & Continue */}
+      <div className={styles.buttonRow}>
+        <button
+          type="button"
+          className={styles.btnSecondary}
+          onClick={() => router.push("/onboarding")}
+        >
+          Save &amp; Exit
+        </button>
+        <button
+          type="button"
+          className={styles.btnPrimary}
+          onClick={handleSaveAndContinue}
+          disabled={!allSigned || saving}
+        >
+          <span>{saving ? "…" : "Save & Continue"}</span>
+          <span className={styles.btnArrow}>›</span>
+        </button>
+      </div>
     </div>
   );
 }

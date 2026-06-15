@@ -28,7 +28,7 @@ export default function EmployeeAgreementPage() {
       await setDoc(
         doc(getDb(), "staff_onboarding", user.uid),
         {
-          reviewSign: {
+          policies: {
             agreementSignedAt: serverTimestamp(),
             agreementVersion: AGREEMENT_VERSION,
             agreementReadAcknowledged: true,
@@ -38,7 +38,7 @@ export default function EmployeeAgreementPage() {
         },
         { merge: true },
       );
-      router.push("/onboarding/review-sign");
+      router.push("/onboarding/policies");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save. Try again.");
       setSubmitting(false);
@@ -50,94 +50,108 @@ export default function EmployeeAgreementPage() {
       <header className={styles.brand}>YURICA</header>
 
       <article className={styles.doc}>
+        {/* Cover */}
         <section className={styles.coverSection}>
           <h1 className={styles.coverTitle}>
             YURICA<br />
-            <span className={styles.coverTitleSub}>EMPLOYEE AGREEMENT</span>
+            <span className={styles.coverTitleSub}>JAPANESE KITCHEN</span>
           </h1>
           <div className={styles.coverDivider} />
-          <p className={styles.coverParagraph}>
-            This document sets out the key terms of your employment with YURICA.
-            It should be read alongside the YURICA Staff Handbook.
-          </p>
+          <h2 className={styles.coverHeadline}>
+            EMPLOYMENT<br />AGREEMENT
+          </h2>
         </section>
 
+        {/* 1. Employment */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>1. POSITION &amp; DUTIES</h2>
+          <h2 className={styles.sectionH}>1. EMPLOYMENT</h2>
           <p className={styles.paragraph}>
-            You are engaged in the position offered to you at the time of
-            hiring. You agree to perform your duties with due care, skill, and
-            diligence, and to follow lawful and reasonable directions from
-            management.
+            The Employee agrees to perform their duties professionally and in
+            the best interests of YURICA Japanese Kitchen.
+          </p>
+          <p className={styles.paragraph}>
+            The Employee agrees to follow all lawful and reasonable directions
+            of management and comply with company policies and procedures.
           </p>
         </section>
 
+        {/* 2. Rosters & Availability */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>2. HOURS OF WORK</h2>
+          <h2 className={styles.sectionH}>2. ROSTERS &amp; AVAILABILITY</h2>
           <p className={styles.paragraph}>
-            Hours of work will be communicated through the Project Y roster.
-            Shift times may vary based on operational needs.
+            Work schedules and roster communications will be provided through
+            the Project Y Employee Portal.
+          </p>
+          <p className={styles.paragraph}>
+            Availability changes and holiday requests must be submitted through
+            the Project Y Employee Portal at least{" "}
+            <strong>3 weeks in advance</strong>.
+          </p>
+          <p className={styles.paragraph}>
+            Requests are not approved unless confirmed by management.
           </p>
         </section>
 
+        {/* 3. Pay */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>3. PAY &amp; SUPERANNUATION</h2>
+          <h2 className={styles.sectionH}>3. PAY</h2>
           <p className={styles.paragraph}>
-            You will be paid in accordance with the applicable Modern Award or
-            agreed contract rate.
+            The Employee will be paid in accordance with applicable workplace
+            laws.
           </p>
           <p className={styles.paragraph}>
-            Payment is processed weekly to your nominated bank account.
-            Superannuation contributions are made to your nominated fund at the
-            current statutory rate.
+            The Employee is paid an above-award rate of pay.
+          </p>
+          <p className={styles.paragraph}>
+            This rate is intended to compensate for and absorb applicable award
+            loadings, penalty rates and other monetary entitlements under the
+            Hospitality Industry (General) Award 2020, to the extent permitted
+            by law.
           </p>
         </section>
 
+        {/* 4. Confidentiality */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>4. PROBATION</h2>
+          <h2 className={styles.sectionH}>4. CONFIDENTIALITY</h2>
           <p className={styles.paragraph}>
-            Your employment is subject to a probation period of three (3)
-            months, during which either party may end the employment with one
-            week&apos;s notice.
+            The Employee agrees not to disclose confidential information
+            relating to YURICA&apos;s operations, systems, customers,
+            suppliers, pricing, recipes, or business affairs.
+          </p>
+          <p className={styles.paragraph}>
+            This obligation continues after employment ends.
           </p>
         </section>
 
+        {/* 5. Company Policies */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>5. POLICIES</h2>
+          <h2 className={styles.sectionH}>5. COMPANY POLICIES</h2>
           <p className={styles.paragraph}>
-            You agree to comply with the YURICA Staff Handbook and all related
-            workplace policies, as amended from time to time.
+            The Employee acknowledges receipt of the YURICA Staff Handbook and
+            agrees to comply with company policies and procedures as updated
+            from time to time.
           </p>
         </section>
 
+        {/* 6. Termination */}
         <section className={styles.section}>
           <h2 className={styles.sectionH}>6. TERMINATION</h2>
           <p className={styles.paragraph}>
-            After the probation period, either party may terminate this
-            agreement by giving the notice period required under the applicable
-            Modern Award.
+            Employment may be terminated in accordance with applicable
+            workplace laws.
           </p>
           <p className={styles.paragraph}>
-            YURICA reserves the right to terminate employment without notice in
-            cases of serious misconduct, as defined in the Fair Work
-            Regulations.
+            Upon termination, all company property provided by YURICA must be
+            returned.
           </p>
         </section>
 
+        {/* 7. Acknowledgement */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>7. CONFIDENTIALITY &amp; PROPERTY</h2>
+          <h2 className={styles.sectionH}>7. ACKNOWLEDGEMENT</h2>
           <p className={styles.paragraph}>
-            You agree to keep YURICA&apos;s confidential information private and
-            to return all company property on termination of employment.
-          </p>
-        </section>
-
-        <section className={styles.section}>
-          <h2 className={styles.ackTitle}>EMPLOYEE ACKNOWLEDGEMENT</h2>
-          <div className={styles.ackUnderline} />
-          <p className={styles.ackBody}>
-            Please acknowledge that you have read, understood, and agree to the
-            terms of the YURICA Employee Agreement.
+            I have read and understood this Employment Agreement and agree to
+            its terms.
           </p>
 
           <label className={styles.checkboxRow}>
@@ -148,7 +162,7 @@ export default function EmployeeAgreementPage() {
               onChange={(e) => setReadChecked(e.target.checked)}
             />
             <span className={styles.checkboxLabel}>
-              I have read and understood the YURICA Employee Agreement.
+              I have read and understood this Employment Agreement.
             </span>
           </label>
 
@@ -160,7 +174,7 @@ export default function EmployeeAgreementPage() {
               onChange={(e) => setAgreeChecked(e.target.checked)}
             />
             <span className={styles.checkboxLabel}>
-              I accept the terms of employment set out above.
+              I agree to be bound by the terms of this Employment Agreement.
             </span>
           </label>
 
@@ -188,7 +202,7 @@ export default function EmployeeAgreementPage() {
           <button
             type="button"
             className={styles.secondaryBtn}
-            onClick={() => router.push("/onboarding/review-sign")}
+            onClick={() => router.push("/onboarding/policies")}
           >
             BACK
           </button>
