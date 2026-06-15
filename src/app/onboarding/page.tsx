@@ -105,7 +105,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (loading) return;
     if (completedStep >= TOTAL_STEPS) {
-      router.replace(ROUTES.reservations);
+      router.replace(ROUTES.staffOnboardingComplete);
     }
   }, [loading, completedStep, router]);
 

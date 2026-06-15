@@ -45,7 +45,7 @@ export default function ReviewSignPage() {
     } catch {
       /* best-effort */
     }
-    router.replace(ROUTES.reservations);
+    router.replace(ROUTES.staffOnboardingComplete);
   }
 
   const checkSvg = (

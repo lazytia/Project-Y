@@ -2,6 +2,7 @@ export const ROUTES = {
   home: "/",
   login: "/login",
   staffOnboarding: "/onboarding",
+  staffOnboardingComplete: "/onboarding/complete",
   reservations: "/operations/reservations",
 } as const;
 
