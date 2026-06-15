@@ -158,8 +158,8 @@ export default function RequestHolidayPage() {
   }, [user]);
 
   const todayK = useMemo(todayKey, []);
-  // Minimum start date is always 2 weeks away (14 days)
-  const minStartKey = useMemo(() => addDays(todayK, 14), [todayK]);
+  // Calendar blocks only past dates; notice-period rules are enforced at submit
+  const minStartKey = todayK;
 
   const noticeRule = useMemo((): { weeks: number; met: boolean } | null => {
     if (!startKey || !endKey) return null;
