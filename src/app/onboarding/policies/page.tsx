@@ -25,7 +25,7 @@ const STEPS = [
 
 const CURRENT_STEP = 5;
 const TOTAL_STEPS = 7;
-const PERCENT = Math.round(((CURRENT_STEP - 1) / TOTAL_STEPS) * 100);
+const PERCENT = Math.round((CURRENT_STEP / TOTAL_STEPS) * 100);
 
 type DocKey = "handbook" | "privacy" | "agreement";
 
