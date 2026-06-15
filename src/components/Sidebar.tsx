@@ -86,7 +86,6 @@ export default function Sidebar({ open, onClose }: Props) {
     const staffNav: NavGroup[] = [
       { icon: "🏠", label: "Home", href: "/staff" },
       { icon: "📋", label: "Onboarding", href: "/onboarding" },
-      { icon: "📄", label: "My Documents", href: "/staff/documents" },
       {
         icon: "📅",
         label: "Schedule",
@@ -97,6 +96,7 @@ export default function Sidebar({ open, onClose }: Props) {
         ],
       },
       { icon: "💰", label: "Payslips", href: "/staff/payslips" },
+      { icon: "📄", label: "My Documents", href: "/staff/documents" },
     ];
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
