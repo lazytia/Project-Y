@@ -36,47 +36,67 @@ export default function PayslipDetailPage({
 
       <h1 className={styles.title}>Payslip</h1>
 
-      {/* Meta card */}
+      {/* Meta card (Paid + Pay Period) */}
       <section className={styles.metaCard}>
         <div className={styles.metaRow}>
-          <p className={styles.metaLabel}>Pay Date</p>
-          <p className={styles.metaValue}>{fmtDateLong(slip.payDate)}</p>
+          <span className={styles.metaIconWarm} aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </span>
+          <div className={styles.metaText}>
+            <p className={styles.metaLabel}>Paid</p>
+            <p className={styles.metaValueWarm}>{fmtDateLong(slip.payDate)}</p>
+          </div>
         </div>
+
         <div className={styles.metaDivider} />
+
         <div className={styles.metaRow}>
-          <p className={styles.metaLabel}>Pay Period</p>
-          <p className={styles.metaValue}>
-            {fmtPeriod(slip.periodStart, slip.periodEnd)}
-          </p>
+          <span className={styles.metaIconMuted} aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </span>
+          <div className={styles.metaText}>
+            <p className={styles.metaLabel}>Pay Period</p>
+            <p className={styles.metaValue}>
+              {fmtPeriod(slip.periodStart, slip.periodEnd)}
+            </p>
+          </div>
         </div>
       </section>
 
-      {/* Net Pay hero */}
-      <section className={styles.netCard}>
+      {/* Summary card with Net Pay hero + breakdown */}
+      <section className={styles.summaryCard}>
         <p className={styles.netLabel}>Net Pay</p>
         <p className={styles.netAmount}>{fmtCurrency(slip.netPay)}</p>
-      </section>
 
-      <h2 className={styles.sectionTitle}>Payment Summary</h2>
-      <section className={styles.summaryCard}>
-        <div className={styles.summaryRow}>
-          <p className={styles.summaryLabel}>Gross Pay</p>
-          <p className={styles.summaryValue}>{fmtCurrency(slip.grossPay)}</p>
-        </div>
         <div className={styles.summaryDivider} />
+
         <div className={styles.summaryRow}>
-          <p className={styles.summaryLabel}>Tax</p>
-          <p className={styles.summaryValue}>{fmtCurrency(slip.tax)}</p>
+          <span className={styles.summaryLabel}>Gross Pay</span>
+          <span className={styles.summaryValue}>{fmtCurrency(slip.grossPay)}</span>
         </div>
+
         <div className={styles.summaryDivider} />
+
         <div className={styles.summaryRow}>
-          <p className={styles.summaryLabel}>Super</p>
-          <p className={styles.summaryValue}>{fmtCurrency(slip.super)}</p>
+          <span className={styles.summaryLabel}>Tax</span>
+          <span className={styles.summaryValue}>{fmtCurrency(slip.tax)}</span>
         </div>
+
         <div className={styles.summaryDivider} />
+
         <div className={styles.summaryRow}>
-          <p className={styles.summaryLabelStrong}>Net Pay</p>
-          <p className={styles.summaryValueStrong}>{fmtCurrency(slip.netPay)}</p>
+          <span className={styles.summaryLabel}>Super</span>
+          <span className={styles.summaryValue}>{fmtCurrency(slip.super)}</span>
         </div>
       </section>
 
@@ -89,7 +109,7 @@ export default function PayslipDetailPage({
           </svg>
         </span>
         <p className={styles.infoBody}>
-          If you have any questions, please contact your manager.
+          This is a summary of your payslip.
         </p>
       </div>
     </div>

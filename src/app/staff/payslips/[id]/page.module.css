@@ -24,21 +24,14 @@
 }
 
 .title {
-  margin: 0;
-  font-size: 28px;
+  margin: 0 0 var(--space-2);
+  font-size: 32px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
 }
 
-.sectionTitle {
-  margin: var(--space-3) 0 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--color-fg);
-}
-
-/* ── Meta card ── */
+/* ── Meta card (Paid + Pay Period) ── */
 .metaCard {
   display: flex;
   flex-direction: column;
@@ -46,114 +39,126 @@
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  gap: var(--space-3);
 }
 
 .metaRow {
   display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.metaIconWarm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-warm);
+  flex-shrink: 0;
+}
+
+.metaIconMuted {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.metaText {
+  display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .metaLabel {
   margin: 0;
-  font-size: 13px;
-  color: var(--color-fg-muted);
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg);
 }
 
 .metaValue {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.metaValueWarm {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-warm);
+  letter-spacing: -0.01em;
 }
 
 .metaDivider {
   height: 1px;
   background: var(--color-border);
-  margin: 0 calc(-1 * var(--space-4));
+  margin: var(--space-2) 0;
 }
 
-/* ── Net Pay hero ── */
-.netCard {
+/* ── Summary card (Net Pay hero + breakdown) ── */
+.summaryCard {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   padding: var(--space-5);
-  background: #111;
-  color: #fff;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  gap: var(--space-3);
 }
 
 .netLabel {
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
 }
 
 .netAmount {
-  margin: 0;
-  font-size: 44px;
+  margin: 4px 0 0;
+  font-size: 52px;
   font-weight: 800;
+  color: var(--color-warm);
   letter-spacing: -0.02em;
   line-height: 1;
 }
 
-/* ── Payment Summary card ── */
-.summaryCard {
-  display: flex;
-  flex-direction: column;
-  padding: 0 var(--space-4);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+.summaryDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 8px calc(-1 * var(--space-5));
 }
 
 .summaryRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-4) 0;
+  padding: 8px 0;
 }
 
 .summaryLabel {
-  margin: 0;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--color-fg);
 }
 
 .summaryValue {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-fg);
-}
-
-.summaryLabelStrong {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--color-fg);
-}
-
-.summaryValueStrong {
-  margin: 0;
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--color-fg);
-}
-
-.summaryDivider {
-  height: 1px;
-  background: var(--color-border);
 }
 
 /* ── Info box ── */
 .infoBox {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
   background: var(--color-surface);
@@ -164,7 +169,6 @@
   display: flex;
   color: var(--color-fg-muted);
   flex-shrink: 0;
-  margin-top: 2px;
 }
 
 .infoBody {
@@ -174,7 +178,7 @@
   line-height: 1.55;
 }
 
-/* Hide chrome when printing so PDF only shows the slip. */
+/* Hide chrome when printing. */
 @media print {
   .backBtn,
   .infoBox { display: none !important; }
