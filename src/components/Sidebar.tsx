@@ -81,14 +81,72 @@ export default function Sidebar({ open, onClose }: Props) {
     (group) => group.href || (group.children && group.children.length > 0),
   );
 
-  // Staff get a stripped-down sidebar — brand + footer (username + sign out).
-  // They aren't supposed to navigate anywhere else, but they still need a way
-  // to log out.
+  // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
   if (!userIsOwner) {
+    const staffNav: NavGroup[] = [
+      { icon: "🏠", label: "Home", href: "/staff" },
+      {
+        icon: "📅",
+        label: "Schedule",
+        children: [
+          { label: "Roster", href: "/staff/schedule/roster" },
+          { label: "Request Holiday", href: "/staff/schedule/request-holiday" },
+          { label: "Availability Change", href: "/staff/schedule/availability-change" },
+        ],
+      },
+      { icon: "💰", label: "Payslips", href: "/staff/payslips" },
+    ];
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
         <div className={styles.brand}>Project Y</div>
-        <nav className={styles.nav} aria-hidden="true" />
+        <nav className={styles.nav}>
+          {staffNav.map((group) => {
+            const isExpanded = !group.children || openGroup === group.label;
+            return (
+              <div key={group.label} className={styles.group}>
+                {group.href ? (
+                  <Link
+                    href={group.href}
+                    className={`${styles.groupHeader} ${pathname === group.href ? styles.active : ""}`}
+                    onClick={onClose}
+                  >
+                    <span className={styles.icon}>{group.icon}</span>
+                    <span>{group.label}</span>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.groupHeader}
+                    onClick={() => toggleGroup(group.label)}
+                  >
+                    <span className={styles.icon}>{group.icon}</span>
+                    <span className={styles.groupLabel}>{group.label}</span>
+                    <span className={`${styles.chevron} ${isExpanded ? styles.chevronOpen : ""}`}>
+                      ›
+                    </span>
+                  </button>
+                )}
+                {group.children && (
+                  <div className={`${styles.collapseWrap} ${isExpanded ? styles.collapseOpen : ""}`}>
+                    <ul className={styles.children}>
+                      {group.children.map((item) => (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            className={`${styles.childLink} ${pathname === item.href ? styles.active : ""}`}
+                            onClick={onClose}
+                          >
+                            {item.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
           <button type="button" onClick={signOut} className={styles.signOut}>

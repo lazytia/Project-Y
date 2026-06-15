@@ -3,6 +3,12 @@ export const ROUTES = {
   login: "/login",
   staffOnboarding: "/onboarding",
   staffOnboardingComplete: "/onboarding/complete",
+  staffHome: "/staff",
+  staffSchedule: "/staff/schedule",
+  staffScheduleRoster: "/staff/schedule/roster",
+  staffScheduleRequestHoliday: "/staff/schedule/request-holiday",
+  staffScheduleAvailability: "/staff/schedule/availability-change",
+  staffPayslips: "/staff/payslips",
   reservations: "/operations/reservations",
 } as const;
 
@@ -17,6 +23,7 @@ export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([ROUTES.login]);
 export function isStaffAllowedPath(pathname: string): boolean {
   return (
     pathname.startsWith(ROUTES.staffOnboarding) ||
+    pathname.startsWith(ROUTES.staffHome) ||
     pathname.startsWith(ROUTES.reservations)
   );
 }
