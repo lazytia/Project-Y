@@ -285,7 +285,7 @@ export default function AvailabilityChangePage() {
       </div>
 
       <form className={styles.form} onSubmit={handleSubmit}>
-        <label className={styles.label} htmlFor="ac-reason">Reason <span className={styles.optional}>(optional)</span></label>
+        <label className={styles.label} htmlFor="ac-reason">Reason</label>
         <input
           id="ac-reason"
           className={styles.input}
