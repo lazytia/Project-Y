@@ -6,7 +6,6 @@ import Sidebar from "./Sidebar";
 import Splash from "./Splash";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
-import { isOwner } from "@/lib/permissions";
 import styles from "./AppShell.module.css";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -28,13 +27,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <Splash label="Redirecting…" />;
   }
 
-  // Staff (non-owners) get a chrome-less full-screen experience: no sidebar,
-  // no hamburger header. They only ever see /onboarding/* and
-  // /operations/reservations, both of which provide their own UI.
-  if (!isOwner(user)) {
-    return <div className={styles.public}>{children}</div>;
-  }
-
+  // Both owners and staff get the chrome (hamburger + sidebar), but the
+  // Sidebar component itself renders a stripped-down version for staff — just
+  // brand + sign out — so they can log out without seeing owner nav.
   return (
     <div className={styles.shell}>
       <div className={styles.mobileHeader}>

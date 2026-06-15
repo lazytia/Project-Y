@@ -81,6 +81,24 @@ export default function Sidebar({ open, onClose }: Props) {
     (group) => group.href || (group.children && group.children.length > 0),
   );
 
+  // Staff get a stripped-down sidebar — brand + footer (username + sign out).
+  // They aren't supposed to navigate anywhere else, but they still need a way
+  // to log out.
+  if (!userIsOwner) {
+    return (
+      <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
+        <div className={styles.brand}>Project Y</div>
+        <nav className={styles.nav} aria-hidden="true" />
+        <div className={styles.footer}>
+          <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
+          <button type="button" onClick={signOut} className={styles.signOut}>
+            Sign out
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
       <div className={styles.brand}>Project Y</div>
