@@ -100,14 +100,14 @@ export default function OnboardingPage() {
   }, [user]);
 
   // Once every onboarding step is done the staff member's "home" is the
-  // reservations workspace, not this overview. Bounce them there as soon as
-  // we know the saved state.
+  // completion page, not this overview.
   useEffect(() => {
     if (loading) return;
     if (completedStep >= TOTAL_STEPS) {
       router.replace(ROUTES.staffOnboardingComplete);
     }
   }, [loading, completedStep, router]);
+  const isCompleted = completedStep >= TOTAL_STEPS;
 
   const percent = Math.round((completedStep / TOTAL_STEPS) * 100);
   const offset = CIRC * (1 - percent / 100);
@@ -120,7 +120,9 @@ export default function OnboardingPage() {
 
   const payrollCutoff = getPayrollCutoff(startDate);
 
-  if (loading) {
+  // Keep the splash visible for completed staff so the overview UI never
+  // flashes before the router.replace above lands on /onboarding/complete.
+  if (loading || isCompleted) {
     return <Splash />;
   }
 
