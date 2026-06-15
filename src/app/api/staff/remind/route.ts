@@ -108,8 +108,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Per-token diagnostic. Helps figure out WHY a recipient isn't getting
+  // pushes (stale token, throttled, etc.) without round-tripping through
+  // App Hosting logs. Token is masked to last 8 chars to avoid leaking the
+  // full credential into the browser console.
+  const perToken = res.responses.map((r, i) => {
+    const tok = tokens[i] ?? "";
+    return {
+      uid: tokenOwners.get(tok) ?? null,
+      tokenTail: tok.slice(-8),
+      success: r.success,
+      error: r.error?.code ?? null,
+    };
+  });
+
   return NextResponse.json({
     delivered: res.successCount,
     failed: res.failureCount,
+    perToken,
   });
 }

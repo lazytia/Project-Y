@@ -195,16 +195,36 @@ export default function ManagerOnboardingPage() {
         body: JSON.stringify({ uids: [row.uid] }),
       });
       const data = await res.json().catch(() => ({}));
+      // Surface the per-token diagnostic in the console so we can see WHY
+      // a particular device isn't getting the push (stale token, throttled,
+      // …) without trawling App Hosting logs.
+      // eslint-disable-next-line no-console
+      console.log("[remind]", data);
       if (!res.ok) {
         alert(`Reminder failed: ${data.error ?? res.status}`);
         return;
       }
       if (data.delivered > 0) {
-        alert("Reminder sent.");
+        const tail = Array.isArray(data.perToken)
+          ? data.perToken
+              .map((t: { success: boolean; tokenTail: string; error: string | null }) =>
+                t.success ? `✓${t.tokenTail}` : `✗${t.tokenTail}(${t.error ?? "?"})`,
+              )
+              .join("  ")
+          : "";
+          alert(`Reminder: ${data.delivered}/${data.delivered + (data.failed ?? 0)} ok\n${tail}`);
       } else {
+        const tail = Array.isArray(data.perToken)
+          ? data.perToken
+              .map((t: { success: boolean; tokenTail: string; error: string | null }) =>
+                t.success ? `✓${t.tokenTail}` : `✗${t.tokenTail}(${t.error ?? "?"})`,
+              )
+              .join("\n")
+          : "";
         alert(
-          data.reason ??
-            "No device registered yet. Open the app and allow notifications first.",
+          data.reason
+            ? `${data.reason}\n${tail}`
+            : `No device delivered.\n${tail || "Open the app and allow notifications first."}`,
         );
       }
     } catch (err) {
