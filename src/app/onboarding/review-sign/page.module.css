@@ -8,7 +8,7 @@
   gap: var(--space-5);
 }
 
-/* ?€?€ Header ?€?€ */
+/* ?ï¿½?ï¿½ Header ?ï¿½?ï¿½ */
 .header {
   display: flex;
   flex-direction: column;
@@ -49,7 +49,7 @@
   line-height: 1.2;
 }
 
-/* ?€?€ Step Indicators ?€?€ */
+/* ?ï¿½?ï¿½ Step Indicators ?ï¿½?ï¿½ */
 .stepsContainer {
   display: flex;
   align-items: flex-start;
@@ -121,7 +121,7 @@
   max-width: 40px;
 }
 
-/* ?€?€ Progress Bar ?€?€ */
+/* ?ï¿½?ï¿½ Progress Bar ?ï¿½?ï¿½ */
 .progressSection {
   display: flex;
   align-items: center;
@@ -150,38 +150,216 @@
   white-space: nowrap;
 }
 
-/* ?€?€ Form Card ?€?€ */
-.formCard {
-  background: var(--color-bg);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
+/* â”€â”€ Section heading (above doc cards) â”€â”€ */
+.sectionHeading {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
-.formTitle {
+.sectionTitle {
   margin: 0;
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-fg);
+  line-height: 1.2;
+}
+
+.sectionSubtitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+/* â”€â”€ Document cards â”€â”€ */
+.docList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.docCard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.docCard:hover:not(:disabled) {
+  border-color: var(--color-warm);
+}
+
+.docCard:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.docIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  flex-shrink: 0;
+}
+
+.docBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.docTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
   font-weight: 700;
   color: var(--color-fg);
 }
 
-.formSubtitle {
+.docDesc {
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-fg-muted);
 }
 
-/* ?€?€ Form ?€?€ */
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.signedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(234, 88, 12, 0.08);
+  color: var(--color-warm);
+  border: 1px solid rgba(234, 88, 12, 0.2);
+  border-radius: 99px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.pendingBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-bg);
+  color: var(--color-warm);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.statusDot {
+  color: var(--color-fg-muted);
+  font-weight: 700;
+}
+
+.signedDate {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.docChevron {
+  align-self: center;
+  font-size: 20px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+/* â”€â”€ Progress card â”€â”€ */
+.progressCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.progressCardIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  flex-shrink: 0;
+}
+
+.progressCardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.progressCardTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.progressCardRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.progressCardTrack {
+  flex: 1;
+  height: 6px;
+  background: var(--color-surface);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progressCardFill {
+  height: 100%;
+  background: var(--color-warm);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.progressCardCount {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* ?ï¿½?ï¿½ Form ?ï¿½?ï¿½ */
 .form {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
 
-/* ?€?€ Form Section ?€?€ */
+/* ?ï¿½?ï¿½ Form Section ?ï¿½?ï¿½ */
 .formSection {
   display: flex;
   flex-direction: column;
@@ -211,7 +389,7 @@
   color: var(--color-warm);
 }
 
-/* ?€?€ Input ?€?€ */
+/* ?ï¿½?ï¿½ Input ?ï¿½?ï¿½ */
 .inputWrapper {
   position: relative;
   display: flex;
@@ -254,7 +432,7 @@
   padding-left: var(--space-3);
 }
 
-/* ?€?€ Info Box ?€?€ */
+/* ?ï¿½?ï¿½ Info Box ?ï¿½?ï¿½ */
 .infoBox {
   background: var(--color-surface);
   border-radius: var(--radius-md);
@@ -292,7 +470,7 @@
   margin: 0;
 }
 
-/* ?€?€ Buttons ?€?€ */
+/* ?ï¿½?ï¿½ Buttons ?ï¿½?ï¿½ */
 .buttonRow {
   display: flex;
   gap: var(--space-3);
@@ -350,7 +528,7 @@
   cursor: not-allowed;
 }
 
-/* ?€?€ Error Modal ?€?€ */
+/* ?ï¿½?ï¿½ Error Modal ?ï¿½?ï¿½ */
 .modalBackdrop {
   position: fixed;
   inset: 0;
