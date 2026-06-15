@@ -140,26 +140,28 @@
 .proposeChoices {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
+  gap: 4px;
 }
 
 .choice {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 10px 6px;
+  gap: 3px;
+  padding: 8px 4px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--color-fg-muted);
   cursor: pointer;
   text-align: center;
   line-height: 1.2;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
+  word-break: keep-all;
+  overflow: hidden;
 }
 
 .choice:hover { border-color: var(--color-fg-muted); }
