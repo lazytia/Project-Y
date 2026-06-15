@@ -45,8 +45,27 @@ function toDate(v: unknown): Date | null {
 }
 
 function todayKey(): string {
-  // Sydney local date so the calendar opens on today's date for the user.
   return new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
+}
+
+function addDays(key: string, days: number): string {
+  const d = keyToDate(key);
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("en-CA");
+}
+
+function daysFromToday(key: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = keyToDate(key);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function durationDays(startKey: string, endKey: string): number {
+  const s = keyToDate(startKey);
+  const e = keyToDate(endKey);
+  return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
 function keyToDate(key: string): Date {
@@ -139,8 +158,20 @@ export default function RequestHolidayPage() {
   }, [user]);
 
   const todayK = useMemo(todayKey, []);
+  // Minimum start date is always 2 weeks away (14 days)
+  const minStartKey = useMemo(() => addDays(todayK, 14), [todayK]);
+
+  const noticeRule = useMemo((): { weeks: number; met: boolean } | null => {
+    if (!startKey || !endKey) return null;
+    const dur = durationDays(startKey, endKey);
+    const notice = daysFromToday(startKey);
+    if (dur >= 3) return { weeks: 3, met: notice >= 21 };
+    return { weeks: 2, met: notice >= 14 };
+  }, [startKey, endKey]);
+
   const canSubmit = Boolean(
-    user && startKey && endKey && reason.trim() && !submitting && endKey >= startKey,
+    user && startKey && endKey && reason.trim() && !submitting &&
+    endKey >= startKey && (noticeRule?.met ?? false),
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -148,6 +179,10 @@ export default function RequestHolidayPage() {
     if (!user || !canSubmit) return;
     if (endKey < startKey) {
       setError("End date must be on or after the start date.");
+      return;
+    }
+    if (noticeRule && !noticeRule.met) {
+      setError(`This request requires at least ${noticeRule.weeks} weeks notice.`);
       return;
     }
     setSubmitting(true);
@@ -284,6 +319,21 @@ export default function RequestHolidayPage() {
           placeholder="e.g. Family holiday"
         />
 
+        {noticeRule && (
+          <div className={`${styles.ruleHint} ${noticeRule.met ? styles.ruleHintOk : styles.ruleHintWarn}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>
+              This request requires at least{" "}
+              <strong>{noticeRule.weeks} weeks</strong> notice.
+              {!noticeRule.met && " Please select a later start date."}
+            </span>
+          </div>
+        )}
+
         {error && <p className={styles.error}>{error}</p>}
 
         <button
@@ -342,11 +392,11 @@ export default function RequestHolidayPage() {
         <CalendarPicker
           value={
             pickerOpen === "start"
-              ? (startKey || todayK)
-              : (endKey || startKey || todayK)
+              ? (startKey || minStartKey)
+              : (endKey || startKey || minStartKey)
           }
           maxDate={FAR_FUTURE_MAX}
-          minDate={pickerOpen === "end" && startKey ? startKey : todayK}
+          minDate={pickerOpen === "end" && startKey ? startKey : minStartKey}
           singleOnly
           onChange={(k) => {
             if (pickerOpen === "start") {
