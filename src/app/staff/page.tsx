@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
 
@@ -16,8 +17,11 @@ const NEXT_SHIFT = {
 const NEXT_PAY_DATE = new Date("2026-06-18T00:00:00+10:00");
 
 const NOTIFICATIONS = [
-  { id: 1, label: "Holiday request approved", ago: "2h ago" },
-  { id: 2, label: "New roster published", ago: "5h ago" },
+  { id: 1, label: "Holiday request approved", ago: "2h ago", detail: "Your holiday request for 22 – 24 Jun has been approved by management." },
+  { id: 2, label: "New roster published", ago: "5h ago", detail: "The roster for the week of 15 – 21 Jun is now available in Schedule → Roster." },
+  { id: 3, label: "Payslip ready", ago: "2d ago", detail: "Your payslip for the week ending 8 Jun is now available in Payslips." },
+  { id: 4, label: "Shift swap requested", ago: "3d ago", detail: "Sarah has asked to swap her Saturday dinner shift with you. Approve or decline from the Roster." },
+  { id: 5, label: "Onboarding complete", ago: "1w ago", detail: "Welcome to YURICA! Your onboarding has been submitted and is currently being reviewed." },
 ];
 
 function fmtShiftDate(d: Date): string {
@@ -29,6 +33,27 @@ function fmtShiftDate(d: Date): string {
 }
 
 export default function StaffDashboardPage() {
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  // Lock body scroll while the modal is open.
+  useEffect(() => {
+    if (!notifOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [notifOpen]);
+
+  // Close on Escape.
+  useEffect(() => {
+    if (!notifOpen) return;
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setNotifOpen(false); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [notifOpen]);
+
+  // Show only the top 2 on the dashboard card; the rest live in the modal.
+  const preview = NOTIFICATIONS.slice(0, 2);
+
   return (
     <div className={styles.page}>
       {/* Next Shift */}
@@ -55,12 +80,16 @@ export default function StaffDashboardPage() {
       <section className={styles.notifCard}>
         <div className={styles.notifHeader}>
           <p className={styles.notifTitle}>Notifications</p>
-          <Link href="/staff" className={styles.notifLink}>
+          <button
+            type="button"
+            className={styles.notifLink}
+            onClick={() => setNotifOpen(true)}
+          >
             View all <span aria-hidden="true">›</span>
-          </Link>
+          </button>
         </div>
         <ul className={styles.notifList}>
-          {NOTIFICATIONS.map((n) => (
+          {preview.map((n) => (
             <li key={n.id} className={styles.notifItem}>
               <span className={styles.notifDot} aria-hidden="true" />
               <span className={styles.notifText}>{n.label}</span>
@@ -115,6 +144,50 @@ export default function StaffDashboardPage() {
           <span className={styles.chevron} aria-hidden="true">›</span>
         </Link>
       </section>
+
+      {notifOpen && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={() => setNotifOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="All notifications"
+        >
+          <div
+            className={styles.modal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Notifications</h2>
+              <button
+                type="button"
+                className={styles.modalClose}
+                onClick={() => setNotifOpen(false)}
+                aria-label="Close"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <ul className={styles.modalList}>
+              {NOTIFICATIONS.map((n) => (
+                <li key={n.id} className={styles.modalItem}>
+                  <span className={styles.modalDot} aria-hidden="true" />
+                  <div className={styles.modalItemBody}>
+                    <div className={styles.modalItemTopRow}>
+                      <span className={styles.modalItemTitle}>{n.label}</span>
+                      <span className={styles.modalItemAgo}>{n.ago}</span>
+                    </div>
+                    <p className={styles.modalItemDetail}>{n.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

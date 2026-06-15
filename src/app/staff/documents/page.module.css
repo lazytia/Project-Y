@@ -24,82 +24,160 @@
   line-height: 1.6;
 }
 
-/* ── Document card ── */
+/* ── Document card (full-width, stacked) ── */
 .docCard {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
   padding: var(--space-4);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  text-decoration: none;
-  color: inherit;
-  transition: border-color 0.15s;
 }
 
-.docCard:hover { border-color: var(--color-warm); }
-
-.docCard[aria-disabled="true"] {
-  pointer-events: none;
-  opacity: 0.75;
+.docCardTop {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
 }
 
 .docIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   background: rgba(234, 88, 12, 0.10);
   color: var(--color-warm);
   flex-shrink: 0;
 }
 
-.docBody {
-  flex: 1;
+.docCardHeading {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
+  flex: 1;
   min-width: 0;
 }
 
 .docName {
-  font-size: 18px;
+  margin: 0;
+  font-size: 22px;
   font-weight: 800;
   color: var(--color-fg);
-}
-
-.docMeta {
-  font-size: 13px;
-  color: var(--color-fg-muted);
+  letter-spacing: -0.01em;
 }
 
 .activeBadge {
-  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
   background: rgba(34, 139, 95, 0.10);
   color: #228b5f;
   border-radius: 99px;
   font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.activeBadge .badgeDot {
+  background: #228b5f;
 }
 
 .missingBadge {
-  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
   background: rgba(234, 88, 12, 0.10);
   color: var(--color-warm);
   border-radius: 99px;
   font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
+  align-self: flex-start;
 }
 
-.docChevron {
-  font-size: 22px;
+.missingBadge .badgeDot {
+  background: var(--color-warm);
+}
+
+.badgeDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.docMeta {
+  margin: 4px 0 0;
+  font-size: 15px;
   color: var(--color-fg-muted);
-  flex-shrink: 0;
+}
+
+/* ── Divider + action row ── */
+.divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 0 calc(-1 * var(--space-4));
+}
+
+.actionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.btnGhost,
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 48px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btnGhost {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+}
+
+.btnGhost:hover { background: var(--color-surface); }
+
+.btnPrimary {
+  background: var(--color-bg);
+  color: var(--color-warm);
+  border: 1.5px solid var(--color-warm);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: rgba(234, 88, 12, 0.08);
+}
+
+.btnPrimary:disabled,
+.btnDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.error {
+  margin: 0;
+  color: #c00;
+  font-size: 14px;
 }
 
 /* ── Info box ── */
@@ -115,7 +193,6 @@
 
 .infoIcon {
   display: flex;
-  align-items: flex-start;
   color: var(--color-fg-muted);
   flex-shrink: 0;
   margin-top: 2px;
