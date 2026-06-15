@@ -86,6 +86,7 @@ export default function Sidebar({ open, onClose }: Props) {
     const staffNav: NavGroup[] = [
       { icon: "🏠", label: "Home", href: "/staff" },
       { icon: "📋", label: "Onboarding", href: "/onboarding" },
+      { icon: "📄", label: "My Documents", href: "/staff/documents" },
       {
         icon: "📅",
         label: "Schedule",

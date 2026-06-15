@@ -9,6 +9,7 @@ export const ROUTES = {
   staffScheduleRequestHoliday: "/staff/schedule/request-holiday",
   staffScheduleAvailability: "/staff/schedule/availability-change",
   staffPayslips: "/staff/payslips",
+  staffDocuments: "/staff/documents",
   reservations: "/operations/reservations",
 } as const;
 

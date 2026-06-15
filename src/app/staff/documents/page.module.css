@@ -1,0 +1,129 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 480px;
+  margin: 0;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-fg);
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: 0 0 var(--space-2);
+  font-size: 14px;
+  color: var(--color-fg-muted);
+  line-height: 1.6;
+}
+
+/* ── Document card ── */
+.docCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+
+.docCard:hover { border-color: var(--color-warm); }
+
+.docCard[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+.docIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(234, 88, 12, 0.10);
+  color: var(--color-warm);
+  flex-shrink: 0;
+}
+
+.docBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.docName {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.docMeta {
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.activeBadge {
+  padding: 6px 14px;
+  background: rgba(34, 139, 95, 0.10);
+  color: #228b5f;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.missingBadge {
+  padding: 6px 14px;
+  background: rgba(234, 88, 12, 0.10);
+  color: var(--color-warm);
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.docChevron {
+  font-size: 22px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+/* ── Info box ── */
+.infoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-2);
+}
+
+.infoIcon {
+  display: flex;
+  align-items: flex-start;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.infoBody {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+  line-height: 1.55;
+}
