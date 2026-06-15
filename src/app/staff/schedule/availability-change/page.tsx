@@ -297,6 +297,19 @@ export default function AvailabilityChangePage() {
 
         {error && <p className={styles.error}>{error}</p>}
 
+        <div className={styles.infoBoxWarm}>
+          <span className={styles.infoIcon} aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+          </span>
+          <p className={styles.infoBody}>
+            Availability changes are requests only and are not approved until confirmed by management.
+          </p>
+        </div>
+
         <button
           type="submit"
           className={styles.submitBtn}
@@ -305,19 +318,6 @@ export default function AvailabilityChangePage() {
           {submitting ? "Submitting…" : "Submit Availability Change"}
         </button>
       </form>
-
-      <div className={styles.infoBoxWarm}>
-        <span className={styles.infoIcon} aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
-        </span>
-        <p className={styles.infoBody}>
-          Availability changes are requests only and are not approved until confirmed by management.
-        </p>
-      </div>
 
       {editingDay && (
         <PartialSheet
