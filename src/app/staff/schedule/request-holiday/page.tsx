@@ -158,8 +158,10 @@ export default function RequestHolidayPage() {
   }, [user]);
 
   const todayK = useMemo(todayKey, []);
-  // Calendar blocks only past dates; notice-period rules are enforced at submit
-  const minStartKey = todayK;
+  // Block the calendar to dates at least 14 days out — staff cannot request
+  // holidays inside the 2-week notice window. Longer requests still need
+  // the 3-week notice check at submit (noticeRule below).
+  const minStartKey = useMemo(() => addDays(todayK, 14), [todayK]);
 
   const noticeRule = useMemo((): { weeks: number; met: boolean } | null => {
     if (!startKey || !endKey) return null;
