@@ -184,7 +184,8 @@ export default function CalendarPicker({ value, maxDate, minDate, singleOnly = f
           {cells.map((day, i) => {
             if (!day) return <span key={`e-${i}`} />;
             const k = buildKey(viewYear, viewMonth, day);
-            const isFuture  = k > maxDate;
+            const isFuture   = k > maxDate;
+            const isBeforeMin = minDate ? k < minDate : false;
             const isSingle  = mode === "single" && k === value;
             const isStart   = mode === "range" && isRangeStart(k);
             const isEnd     = mode === "range" && !!rangeEnd && isRangeEnd(k);
@@ -200,14 +201,14 @@ export default function CalendarPicker({ value, maxDate, minDate, singleOnly = f
                   isSingle || isStart || isEnd ? styles.daySelected : "",
                   inRange ? styles.dayInRange : "",
                   isToday && !isSingle && !isStart && !isEnd ? styles.dayToday : "",
-                  isFuture ? styles.dayDisabled : "",
+                  isFuture || isBeforeMin ? styles.dayDisabled : "",
                   isStart && rangeEnd ? styles.dayRangeStart : "",
                   isEnd ? styles.dayRangeEnd : "",
                 ].join(" ")}
                 onClick={() => handleDay(day)}
                 onMouseEnter={() => { if (mode === "range" && rangeStart && !rangeEnd) setHovered(k); }}
                 onMouseLeave={() => setHovered(null)}
-                disabled={isFuture}
+                disabled={isFuture || isBeforeMin}
               >
                 {day}
               </button>
