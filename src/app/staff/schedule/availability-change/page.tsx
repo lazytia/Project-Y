@@ -243,14 +243,14 @@ export default function AvailabilityChangePage() {
                       <polyline points="9 12 11 14 15 10" />
                     </svg>
                   )}
-                  Available All Day
+                  All Day
                 </button>
                 <button
                   type="button"
                   className={`${styles.choice} ${a.kind === "partial" ? styles.choicePartialActive : ""}`}
                   onClick={() => handleChoose(d.key, "partial")}
                 >
-                  Available Partially
+                  Partially
                 </button>
                 <button
                   type="button"
