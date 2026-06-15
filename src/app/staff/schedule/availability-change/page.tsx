@@ -189,42 +189,8 @@ export default function AvailabilityChangePage() {
         </p>
       </div>
 
-      {/* Current Availability */}
-      <h2 className={styles.sectionTitle}>Current Availability</h2>
-      <div className={styles.currentList}>
-        {DAYS.map((d) => {
-          const a = current[d.key];
-          const isAvail = a.kind === "available";
-          const isPartial = a.kind === "partial";
-          return (
-            <div key={d.key} className={styles.currentRow}>
-              <span className={styles.currentDay}>{d.short}</span>
-              <span
-                className={`${styles.currentBadge} ${
-                  isAvail ? styles.badgeAvailable : isPartial ? styles.badgePartial : styles.badgeUnavailable
-                }`}
-              >
-                {isAvail ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="9 12 11 14 15 10" />
-                  </svg>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                  </svg>
-                )}
-                {labelFor(a)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* New Availability */}
-      <h2 className={styles.sectionTitle}>New Availability</h2>
+      {/* Availability */}
+      <h2 className={styles.sectionTitle}>Availability</h2>
       <div className={styles.proposeList}>
         {DAYS.map((d) => {
           const a = proposed[d.key];
