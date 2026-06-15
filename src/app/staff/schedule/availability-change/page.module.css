@@ -48,6 +48,20 @@
   border-radius: var(--radius-lg);
 }
 
+.infoBoxWarm {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: rgba(234, 88, 12, 0.07);
+  border-radius: var(--radius-lg);
+  color: var(--color-warm);
+}
+
+.infoBoxWarm .infoBody {
+  color: var(--color-fg);
+}
+
 .infoIcon {
   display: flex;
   color: var(--color-fg-muted);
@@ -55,11 +69,80 @@
   margin-top: 2px;
 }
 
+.infoBoxWarm .infoIcon {
+  color: var(--color-warm);
+}
+
 .infoBody {
   margin: 0;
   font-size: 14px;
   color: var(--color-fg);
   line-height: 1.55;
+}
+
+/* ── Effective From card ── */
+.effectiveCard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: rgba(34, 139, 95, 0.06);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(34, 139, 95, 0.18);
+}
+
+.effectiveIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: rgba(34, 139, 95, 0.10);
+  color: #228b5f;
+  flex-shrink: 0;
+}
+
+.effectiveBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.effectiveLabel {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #228b5f;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.effectiveDate {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #228b5f;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.effectiveBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  background: rgba(34, 139, 95, 0.12);
+  color: #228b5f;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.effectiveNote {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  line-height: 1.5;
 }
 
 /* ── Current Availability list ── */
@@ -223,6 +306,12 @@
 
 .input:focus { border-color: var(--color-warm); }
 .input::placeholder { color: var(--color-fg-muted); }
+
+.optional {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-fg-muted);
+}
 
 .error { margin: var(--space-2) 0 0; color: #c00; font-size: 14px; }
 

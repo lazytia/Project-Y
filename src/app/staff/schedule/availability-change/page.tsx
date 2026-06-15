@@ -89,9 +89,29 @@ function labelFor(a: Availability): string {
   }
 }
 
+/** Returns the Monday that is at least 21 days from today. */
+function nextMondayAfter3Weeks(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 21);
+  const dow = d.getDay(); // 0=Sun…6=Sat
+  if (dow !== 1) d.setDate(d.getDate() + ((1 + 7 - dow) % 7 || 7));
+  return d;
+}
+
+function fmtEffective(d: Date): string {
+  return d.toLocaleDateString("en-AU", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function AvailabilityChangePage() {
   const router = useRouter();
   const { user } = useAuth();
+  const effectiveDate = useMemo(nextMondayAfter3Weeks, []);
 
   const [current, setCurrent] = useState<AvailabilityMap>(DEFAULT_AVAILABILITY);
   const [proposed, setProposed] = useState<AvailabilityMap>(DEFAULT_AVAILABILITY);
@@ -129,9 +149,9 @@ export default function AvailabilityChangePage() {
   }
 
   const canSubmit = useMemo(() => {
-    if (submitting || !reason.trim()) return false;
+    if (submitting) return false;
     return JSON.stringify(current) !== JSON.stringify(proposed);
-  }, [submitting, reason, current, proposed]);
+  }, [submitting, current, proposed]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -146,7 +166,8 @@ export default function AvailabilityChangePage() {
           availabilityRequests: arrayUnion({
             id,
             requested: proposed,
-            reason: reason.trim(),
+            reason: reason.trim() || null,
+            effectiveDate: Timestamp.fromDate(effectiveDate),
             status: "pending",
             createdAt: Timestamp.now(),
           }),
@@ -185,8 +206,28 @@ export default function AvailabilityChangePage() {
           </svg>
         </span>
         <p className={styles.infoBody}>
-          Availability changes should be submitted at least 3 weeks in advance.
+          Availability changes require at least 3 weeks notice.
         </p>
+      </div>
+
+      {/* Effective From card */}
+      <div className={styles.effectiveCard}>
+        <div className={styles.effectiveIconWrap} aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        </div>
+        <div className={styles.effectiveBody}>
+          <p className={styles.effectiveLabel}>Effective From</p>
+          <p className={styles.effectiveDate}>{fmtEffective(effectiveDate)}</p>
+          <span className={styles.effectiveBadge}>Subject to approval</span>
+          <p className={styles.effectiveNote}>
+            Your new availability will apply from this date if approved by management.
+          </p>
+        </div>
       </div>
 
       {/* Availability */}
@@ -244,7 +285,7 @@ export default function AvailabilityChangePage() {
       </div>
 
       <form className={styles.form} onSubmit={handleSubmit}>
-        <label className={styles.label} htmlFor="ac-reason">Reason</label>
+        <label className={styles.label} htmlFor="ac-reason">Reason <span className={styles.optional}>(optional)</span></label>
         <input
           id="ac-reason"
           className={styles.input}
@@ -265,7 +306,7 @@ export default function AvailabilityChangePage() {
         </button>
       </form>
 
-      <div className={styles.infoBox}>
+      <div className={styles.infoBoxWarm}>
         <span className={styles.infoIcon} aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
@@ -274,8 +315,7 @@ export default function AvailabilityChangePage() {
           </svg>
         </span>
         <p className={styles.infoBody}>
-          Availability changes are requests only and are not approved until
-          confirmed by management.
+          Availability changes are requests only and are not approved until confirmed by management.
         </p>
       </div>
 
