@@ -45,7 +45,7 @@ const NAV: NavGroup[] = [
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering Orders", href: "/operations/catering-orders" },
       { label: "Online Orders", href: "/operations/online-orders" },
-      { label: "ARS", href: "/operations/ars" },
+      { label: "ARS", href: "/operations/ars", ownerOnly: true },
     ],
   },
   {
