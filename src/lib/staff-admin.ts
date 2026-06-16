@@ -8,6 +8,7 @@ import {
   getAuth as fbGetAuth,
   createUserWithEmailAndPassword,
   signOut,
+  type AuthError,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { getDb, getFirebaseApp } from "./firebase";
@@ -49,11 +50,30 @@ export async function createStaffAccount(
 
   try {
     const secAuth = fbGetAuth(secondary);
-    const cred = await createUserWithEmailAndPassword(
-      secAuth,
-      usernameToEmail(input.username),
-      input.password,
-    );
+    let cred;
+    try {
+      cred = await createUserWithEmailAndPassword(
+        secAuth,
+        usernameToEmail(input.username),
+        input.password,
+      );
+    } catch (err) {
+      const code = (err as AuthError)?.code ?? "";
+      const friendly =
+        code === "auth/email-already-in-use"
+          ? `Staff ID "${input.username}" is already taken. Pick a different one.`
+          : code === "auth/weak-password"
+            ? "Password must be at least 6 characters."
+            : code === "auth/invalid-email"
+              ? "That Staff ID isn't valid. Use 3–30 lowercase letters / numbers / . _ -"
+              : code === "auth/operation-not-allowed"
+                ? "Email/password sign-in is disabled in Firebase Auth. Enable it in the console."
+                : code === "auth/too-many-requests"
+                  ? "Too many attempts. Wait a minute and try again."
+                  : null;
+      if (friendly) throw new Error(friendly);
+      throw err;
+    }
     const uid = cred.user.uid;
     // Drop the secondary session immediately — we only needed it to create the user.
     await signOut(secAuth).catch(() => {});
