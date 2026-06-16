@@ -42,6 +42,8 @@ export default function CalendarPicker({ value, maxDate, minDate, singleOnly = f
   const [y, m] = value.split("-").map(Number);
   const [viewYear,  setViewYear]  = useState(y);
   const [viewMonth, setViewMonth] = useState(m - 1);
+  /** Year picker overlay (tap year in header → grid of selectable years). */
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -70,6 +72,11 @@ export default function CalendarPicker({ value, maxDate, minDate, singleOnly = f
     if (viewMonth === 11) { setViewYear(v => v + 1); setViewMonth(0); }
     else setViewMonth(m => m + 1);
   }
+
+  // Year grid bounds — descending so the most recent year is at the top,
+  // which feels right for a Date-of-Birth selector.
+  const yearsForPicker: number[] = [];
+  for (let yr = maxY; yr >= minY; yr--) yearsForPicker.push(yr);
 
   const firstDow    = new Date(Date.UTC(viewYear, viewMonth, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(viewYear, viewMonth + 1, 0)).getUTCDate();
@@ -169,17 +176,50 @@ export default function CalendarPicker({ value, maxDate, minDate, singleOnly = f
 
         {/* Month nav */}
         <div className={styles.header}>
-          <button className={styles.navBtn} onClick={prevMonth} disabled={isMinMonth} aria-label="Prev month">‹</button>
-          <span className={styles.monthTitle}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
-          <button className={styles.navBtn} onClick={nextMonth} disabled={isMaxMonth} aria-label="Next month">›</button>
+          <button className={styles.navBtn} onClick={prevMonth} disabled={isMinMonth || yearPickerOpen} aria-label="Prev month">‹</button>
+          <button
+            type="button"
+            className={styles.monthTitleBtn}
+            onClick={() => setYearPickerOpen((o) => !o)}
+            aria-label="Jump to year"
+            aria-expanded={yearPickerOpen}
+          >
+            <span className={styles.monthTitle}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
+            <span className={`${styles.monthTitleChev} ${yearPickerOpen ? styles.monthTitleChevOpen : ""}`} aria-hidden="true">▾</span>
+          </button>
+          <button className={styles.navBtn} onClick={nextMonth} disabled={isMaxMonth || yearPickerOpen} aria-label="Next month">›</button>
         </div>
+
+        {/* Year grid overlay */}
+        {yearPickerOpen && (
+          <div className={styles.yearGrid} role="listbox">
+            {yearsForPicker.map((yr) => (
+              <button
+                key={yr}
+                type="button"
+                role="option"
+                aria-selected={yr === viewYear}
+                className={`${styles.yearCell} ${yr === viewYear ? styles.yearCellActive : ""}`}
+                onClick={() => {
+                  setViewYear(yr);
+                  setYearPickerOpen(false);
+                }}
+              >
+                {yr}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Day-of-week headers */}
-        <div className={styles.weekRow}>
-          {DAYS_OF_WEEK.map(d => <span key={d} className={styles.weekLabel}>{d}</span>)}
-        </div>
+        {!yearPickerOpen && (
+          <div className={styles.weekRow}>
+            {DAYS_OF_WEEK.map(d => <span key={d} className={styles.weekLabel}>{d}</span>)}
+          </div>
+        )}
 
         {/* Grid */}
+        {!yearPickerOpen && (
         <div className={styles.grid}>
           {cells.map((day, i) => {
             if (!day) return <span key={`e-${i}`} />;
@@ -215,6 +255,7 @@ export default function CalendarPicker({ value, maxDate, minDate, singleOnly = f
             );
           })}
         </div>
+        )}
 
         {/* Actions */}
         {mode === "range" && rangeStart && rangeEnd ? (
