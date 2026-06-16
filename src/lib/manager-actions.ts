@@ -89,6 +89,24 @@ async function decideRequest(
     notifications: arrayUnion(notification),
     updatedAt: serverTimestamp(),
   });
+
+  // Fire-and-forget push notification to the staff's phone. We don't block
+  // the manager UI on this — the in-app notifications card is the source of
+  // truth, FCM is best-effort.
+  try {
+    void fetch("/api/staff/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uid: staffUid,
+        title: notification.title,
+        body: notification.detail,
+        url: "/staff",
+      }),
+    });
+  } catch {
+    /* swallow — push is best-effort */
+  }
 }
 
 function buildNotification(
