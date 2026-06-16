@@ -1,0 +1,342 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 480px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Greeting ── */
+.greeting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-2) 0 var(--space-1);
+}
+
+.greetingTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.greetingRole {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Section heads ── */
+.sectionLabel {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-fg);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.sectionHead .sectionLabel {
+  margin: 0;
+}
+
+.attentionBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 99px;
+  background: var(--color-warm);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sectionChev {
+  margin-left: auto;
+  font-size: 22px;
+  color: var(--color-fg-muted);
+  text-decoration: none;
+  line-height: 1;
+}
+
+/* ── Attention required card ── */
+.attentionCard {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.attentionCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-4) var(--space-2);
+  text-decoration: none;
+  color: inherit;
+  border-right: 1px solid var(--color-border);
+  transition: background 0.15s;
+}
+
+.attentionCell:last-child { border-right: none; }
+.attentionCell:hover { background: var(--color-surface); }
+
+.attentionIcon {
+  color: var(--color-fg);
+}
+
+.attentionValue {
+  margin: 6px 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-warm);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.attentionLabel {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* ── Today's Operations ── */
+.opsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.opsCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+
+.opsCard:hover { border-color: var(--color-warm); }
+
+.opsIcon {
+  color: var(--color-fg);
+}
+
+.opsValue {
+  margin: 6px 0 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.opsUnit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  letter-spacing: 0;
+}
+
+.opsLabel {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+}
+
+/* ── Sales ── */
+.salesCard {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.salesBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-4);
+}
+
+.salesLabel {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg);
+  font-weight: 500;
+}
+
+.salesValue {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.salesDivider {
+  background: var(--color-border);
+  margin: var(--space-3) 0;
+}
+
+/* ── Peak Hour ── */
+.peakCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.peakIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  flex-shrink: 0;
+}
+
+.peakBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.peakRange {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.peakSub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Today's Team ── */
+.teamCard {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.teamRow {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+}
+
+.teamBlock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.teamIcon {
+  color: var(--color-fg);
+}
+
+.teamValue {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.teamLabel {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+  font-weight: 500;
+}
+
+.teamDivider {
+  background: var(--color-border);
+  margin: var(--space-3) 0;
+}
+
+.teamFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  text-decoration: none;
+  color: var(--color-fg);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.teamFooter:hover { background: var(--color-surface); }
+
+.teamChev {
+  margin-left: auto;
+  font-size: 22px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Footer note ── */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+.noteIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.noteBody {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+  line-height: 1.55;
+}

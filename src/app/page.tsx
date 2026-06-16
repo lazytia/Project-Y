@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import styles from "./page.module.css";
 import CalendarPicker from "@/components/CalendarPicker";
+import ManagerDashboard from "@/components/ManagerDashboard";
+import { useAuth } from "@/components/AuthProvider";
+import { isOwner, isStrictOwner } from "@/lib/permissions";
 
 const SYDNEY_TZ = "Australia/Sydney";
 
@@ -68,6 +71,15 @@ function Progress({ value, max }: { value: number; max: number }) {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const userIsManager = isOwner(user) && !isStrictOwner(user);
+  if (userIsManager) {
+    return <ManagerDashboard />;
+  }
+  return <OwnerDashboard />;
+}
+
+function OwnerDashboard() {
   const todayKey = useMemo(sydneyTodayKey, []);
   const [selectedDate, setSelectedDate] = useState<string>(todayKey);
   const [calendarOpen, setCalendarOpen] = useState(false);
