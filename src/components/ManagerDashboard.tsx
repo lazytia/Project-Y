@@ -93,7 +93,7 @@ export default function ManagerDashboard() {
         <div className={styles.sectionHead}>
           <p className={styles.sectionLabel}>ATTENTION REQUIRED</p>
           <span className={styles.attentionBadge}>{attentionTotal}</span>
-          <Link href="/people/onboarding" className={styles.sectionChev} aria-label="View all">›</Link>
+          <Link href="/attention-required" className={styles.sectionChev} aria-label="View all">›</Link>
         </div>
         <div className={styles.attentionCard}>
           <Link href="/scheduling/holiday-requests" className={styles.attentionCell}>
