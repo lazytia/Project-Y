@@ -289,3 +289,55 @@
   color: var(--color-fg-muted);
   line-height: 1.5;
 }
+
+/* "View all" link on the right side of each section head */
+.viewAll {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  cursor: default;
+}
+
+/* ── Requested Availability mini-table ── */
+.availBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.availLabel {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+}
+
+.availTable {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.availRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.availRow:last-child { border-bottom: none; }
+
+.availRange {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.availValue {
+  font-size: 15px;
+  color: var(--color-fg);
+  font-weight: 500;
+}

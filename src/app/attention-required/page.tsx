@@ -71,6 +71,7 @@ type ReqItemAvail = {
   lastName: string;
   effectiveDate: Date | null;
   reason: string;
+  requested: Record<string, DayAvailability>;
   createdAt: Date | null;
 };
 
@@ -156,6 +157,63 @@ function fmtRelative(d: Date | null): string {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+function fmtTime12h(t: string): string {
+  if (!/^\d{1,2}:\d{2}$/.test(t)) return t;
+  const [hStr, mStr] = t.split(":");
+  let h = parseInt(hStr, 10);
+  const period = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${mStr} ${period}`;
+}
+
+function availabilityLabel(a: DayAvailability): string {
+  if (a.kind === "available") return "Available";
+  if (a.kind === "unavailable") return "Unavailable";
+  return `${fmtTime12h(a.from)} – ${fmtTime12h(a.until)}`;
+}
+
+function availabilityKey(a: DayAvailability): string {
+  if (a.kind === "available") return "available";
+  if (a.kind === "unavailable") return "unavailable";
+  return `partial:${a.from}-${a.until}`;
+}
+
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const DAY_SHORT: Record<typeof DAY_KEYS[number], string> = {
+  mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu",
+  fri: "Fri", sat: "Sat", sun: "Sun",
+};
+
+/**
+ * Compress a Mon→Sun availability dict into the smallest list of ranges
+ * the manager has to read. Adjacent days with the same value collapse into
+ * "Mon–Fri", isolated days stay as "Wed". Default to "Available" for any
+ * unset weekday so the manager sees the full week's intent.
+ */
+function groupAvailability(
+  requested: Record<string, DayAvailability>,
+): { range: string; value: DayAvailability }[] {
+  const filled: DayAvailability[] = DAY_KEYS.map(
+    (k) => requested[k] ?? { kind: "available" as const },
+  );
+  const out: { range: string; value: DayAvailability }[] = [];
+  let i = 0;
+  while (i < filled.length) {
+    const key = availabilityKey(filled[i]);
+    let j = i;
+    while (j + 1 < filled.length && availabilityKey(filled[j + 1]) === key) {
+      j += 1;
+    }
+    const startShort = DAY_SHORT[DAY_KEYS[i]];
+    const endShort = DAY_SHORT[DAY_KEYS[j]];
+    const range = i === j ? startShort : `${startShort}–${endShort}`;
+    out.push({ range, value: filled[i] });
+    i = j + 1;
+  }
+  return out;
+}
+
 const VISA_EXPIRING_WINDOW_DAYS = 60;
 
 function isVisaExpiringSoon(exp: Date | null): boolean {
@@ -218,6 +276,7 @@ export default function AttentionRequiredPage() {
           firstName, lastName,
           effectiveDate: tsDate(r.effectiveDate),
           reason: r.reason ?? "",
+          requested: (r.requested ?? {}) as Record<string, DayAvailability>,
           createdAt: tsDate(r.createdAt),
         });
       }
@@ -317,6 +376,7 @@ export default function AttentionRequiredPage() {
           </span>
           <p className={styles.sectionLabel}>REQUESTS</p>
           <span className={styles.sectionCount}>{requests.length}</span>
+          <span className={styles.viewAll}>View all</span>
         </div>
 
         {requests.length === 0 ? (
@@ -350,6 +410,21 @@ export default function AttentionRequiredPage() {
                   </div>
                   <span className={styles.ago}>{fmtRelative(r.createdAt)}</span>
                 </div>
+                {r.kind === "availability" && (
+                  <div className={styles.availBlock}>
+                    <p className={styles.availLabel}>Requested Availability</p>
+                    <div className={styles.availTable}>
+                      {groupAvailability(r.requested).map((row, idx) => (
+                        <div key={idx} className={styles.availRow}>
+                          <span className={styles.availRange}>{row.range}</span>
+                          <span className={styles.availValue}>
+                            {availabilityLabel(row.value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {r.reason && (
                   <p className={styles.note}>
                     <span className={styles.noteLabel}>Note:</span> {r.reason}
@@ -392,6 +467,7 @@ export default function AttentionRequiredPage() {
           </span>
           <p className={styles.sectionLabel}>ONBOARDING</p>
           <span className={styles.sectionCount}>{onboarding.length}</span>
+          <span className={styles.viewAll}>View all</span>
         </div>
 
         {onboarding.length === 0 ? (
@@ -443,6 +519,7 @@ export default function AttentionRequiredPage() {
           </span>
           <p className={styles.sectionLabel}>COMPLIANCE</p>
           <span className={styles.sectionCount}>{compliance.length}</span>
+          <span className={styles.viewAll}>View all</span>
         </div>
 
         {compliance.length === 0 ? (
