@@ -6,11 +6,12 @@ import Sidebar from "./Sidebar";
 import Splash from "./Splash";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
+import { isOwner } from "@/lib/permissions";
 import styles from "./AppShell.module.css";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const { user, loading, staffCompletedStep } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
   // 모바일: 기본 닫힘 / 데스크탑: CSS에서 항상 강제 표시
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -25,6 +26,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Splash label="Redirecting…" />;
+  }
+
+  // Staff: wait for completedStep to load before rendering anything, so we
+  // don't flash /staff before AuthProvider bounces them to /onboarding.
+  if (!isOwner(user) && staffCompletedStep === null) {
+    return <Splash />;
   }
 
   // Both owners and staff get the chrome (hamburger + sidebar), but the

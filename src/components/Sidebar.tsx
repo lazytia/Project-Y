@@ -72,7 +72,7 @@ type Props = { open: boolean; onClose?: () => void };
 
 export default function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, signOut, staffNeedsOnboarding } = useAuth();
   const userIsOwner = isOwner(user);
   const userIsStrictOwner = isStrictOwner(user);
   const userIsManager = userIsOwner && !userIsStrictOwner;
@@ -129,6 +129,25 @@ export default function Sidebar({ open, onClose }: Props) {
     );
 
   const visibleNav: NavGroup[] = userIsManager ? MANAGER_NAV : ownerNav;
+
+  // Staff who haven't completed onboarding get a stripped sidebar — no nav
+  // links, just brand + sign out. AuthProvider keeps them locked to
+  // /onboarding/*, so destinations they aren't allowed to reach yet would
+  // just look broken.
+  if (!userIsOwner && staffNeedsOnboarding) {
+    return (
+      <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
+        <div className={styles.brand}>YURICA</div>
+        <nav className={styles.nav} aria-hidden="true" />
+        <div className={styles.footer}>
+          <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
+          <button type="button" onClick={signOut} className={styles.signOut}>
+            Sign out
+          </button>
+        </div>
+      </aside>
+    );
+  }
 
   // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
   if (!userIsOwner) {

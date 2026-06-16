@@ -2,28 +2,44 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth, getDb } from "@/lib/firebase";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
 import { isOwner } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 
+const TOTAL_ONBOARDING_STEPS = 7;
+
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  /**
+   * For non-owner users only: how many onboarding steps the staff has
+   * completed (0–TOTAL_ONBOARDING_STEPS). `null` while still loading or
+   * for owners/managers.
+   */
+  staffCompletedStep: number | null;
+  /**
+   * True if the signed-in user is a non-owner who has NOT yet completed
+   * onboarding. Used by the shell to lock down nav.
+   */
+  staffNeedsOnboarding: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   signOut: async () => {},
+  staffCompletedStep: null,
+  staffNeedsOnboarding: false,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [staffCompletedStep, setStaffCompletedStep] = useState<number | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -31,30 +47,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsub = onAuthStateChanged(getAuth(), (u) => {
       setUser(u);
       setLoading(false);
+      if (!u) setStaffCompletedStep(null);
     });
     return () => unsub();
   }, []);
 
-  // One-shot backfill on auth state change: make sure every staff_onboarding
-  // doc has a `role` marker and a human-readable identifier (username/email).
-  // Owners get role:"owner" so they're filtered out of the staff list; staff
-  // accounts created before we started persisting username get patched too.
+  // On auth-state change: backfill role/username on the staff_onboarding doc
+  // AND read back the user's completedStep so we know whether they still
+  // owe us an onboarding flow.
   useEffect(() => {
     if (loading || !user) return;
     const username = emailToUsername(user.email ?? "").toLowerCase();
     const role = isOwner(user) ? "owner" : "staff";
-    setDoc(
-      doc(getDb(), "staff_onboarding", user.uid),
-      {
-        uid: user.uid,
-        username,
-        email: user.email ?? null,
-        role,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    ).catch(() => { /* best-effort backfill */ });
+    const ref = doc(getDb(), "staff_onboarding", user.uid);
+    (async () => {
+      try {
+        await setDoc(
+          ref,
+          {
+            uid: user.uid,
+            username,
+            email: user.email ?? null,
+            role,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        );
+        if (!isOwner(user)) {
+          const snap = await getDoc(ref);
+          const data = snap.data() ?? {};
+          const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
+          setStaffCompletedStep(completed);
+        }
+      } catch {
+        /* best-effort */
+      }
+    })();
   }, [user, loading]);
+
+  const userIsOwner = isOwner(user);
+  const staffNeedsOnboarding =
+    !!user &&
+    !userIsOwner &&
+    staffCompletedStep !== null &&
+    staffCompletedStep < TOTAL_ONBOARDING_STEPS;
 
   useEffect(() => {
     if (loading) return;
@@ -63,18 +99,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.replace(ROUTES.login);
       return;
     }
+
+    // Wait until we know the staff's completedStep before routing them around
+    // — otherwise we'd flash /staff before bouncing back to /onboarding.
+    const userIsOwnerNow = isOwner(user);
+    if (user && !userIsOwnerNow && staffCompletedStep === null) return;
+
+    const inOnboarding = pathname.startsWith(ROUTES.staffOnboarding);
+
     if (user && isPublic) {
-      // Just signed in — owners + managers go to the dashboard, staff to
-      // their staff Home page. Onboarding is reachable from the sidebar
-      // for staff who still need to finish it.
-      router.replace(isOwner(user) ? ROUTES.home : ROUTES.staffHome);
+      // Just signed in. Staff who still owe us onboarding go straight to it,
+      // everyone else goes to their Home / Dashboard.
+      if (staffNeedsOnboarding) {
+        router.replace(ROUTES.staffOnboarding);
+      } else {
+        router.replace(userIsOwnerNow ? ROUTES.home : ROUTES.staffHome);
+      }
       return;
     }
-    // Non-owner trying to visit an owner-only path → bounce to staff Home.
-    if (user && !isOwner(user) && !isStaffAllowedPath(pathname)) {
+
+    // Staff who haven't finished onboarding are locked to /onboarding/*.
+    if (user && staffNeedsOnboarding && !inOnboarding) {
+      router.replace(ROUTES.staffOnboarding);
+      return;
+    }
+
+    // Completed non-owner trying to visit an owner-only path → bounce to Home.
+    if (user && !userIsOwnerNow && !isStaffAllowedPath(pathname)) {
       router.replace(ROUTES.staffHome);
     }
-  }, [user, loading, pathname, router]);
+  }, [user, loading, pathname, router, staffCompletedStep, staffNeedsOnboarding]);
 
   const signOut = async () => {
     await fbSignOut(getAuth());
@@ -82,7 +136,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signOut,
+        staffCompletedStep,
+        staffNeedsOnboarding,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
