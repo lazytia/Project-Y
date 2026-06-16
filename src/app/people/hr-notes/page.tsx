@@ -1,38 +1,45 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { collection, getDocs, type Timestamp } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
+import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────
- * Placeholder team-members + last-note summary. Will be replaced with a
- * Firestore query over staff_onboarding + a notes subcollection in a
- * follow-up.
+ * HR notes are stored as an array on the staff_onboarding doc:
+ *   hrNotes: [{ id, kind, body, createdAt, authorUid }, …]
+ * The schema is open-ended — the Add Note dialog (coming next) will be
+ * what populates these. For now we just read whatever's there.
  * ──────────────────────────────────────────────────────────────────── */
 
-type Role = "Hall Staff" | "Kitchen Staff" | "Manager";
-type LastNoteKind = "Formal Warning" | "Performance Review" | "Incident Report";
-
-type Member = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  role: Role;
-  active: boolean;
-  notesCount: number;
-  lastNoteKind?: LastNoteKind;
-  lastNoteISO?: string;
+type HrNote = {
+  id?: string;
+  kind?: string; // "Formal Warning" | "Performance Review" | "Incident Report" | ...
+  body?: string;
+  createdAt?: Timestamp;
 };
 
-const MEMBERS: Member[] = [
-  { id: "yt", firstName: "Yuki",   lastName: "Tanaka",   role: "Kitchen Staff", active: true, notesCount: 2, lastNoteKind: "Formal Warning",    lastNoteISO: "2026-06-12" },
-  { id: "sl", firstName: "Sam",    lastName: "Lee",      role: "Hall Staff",    active: true, notesCount: 1, lastNoteKind: "Performance Review", lastNoteISO: "2026-03-03" },
-  { id: "hs", firstName: "Hiyori", lastName: "Sato",     role: "Kitchen Staff", active: true, notesCount: 0 },
-  { id: "kw", firstName: "Kenji",  lastName: "Watanabe", role: "Hall Staff",    active: true, notesCount: 1, lastNoteKind: "Incident Report",    lastNoteISO: "2026-04-10" },
-  { id: "mc", firstName: "Mei",    lastName: "Chen",     role: "Kitchen Staff", active: true, notesCount: 1, lastNoteKind: "Formal Warning",    lastNoteISO: "2026-06-08" },
-  { id: "th", firstName: "Taro",   lastName: "Honda",    role: "Hall Staff",    active: true, notesCount: 2, lastNoteKind: "Performance Review", lastNoteISO: "2026-05-01" },
-  { id: "ay", firstName: "Aya",    lastName: "Yamamoto", role: "Kitchen Staff", active: true, notesCount: 1, lastNoteKind: "Incident Report",    lastNoteISO: "2026-04-29" },
-  { id: "rk", firstName: "Ryo",    lastName: "Kimura",   role: "Hall Staff",    active: true, notesCount: 0 },
-];
+type StaffDoc = {
+  uid: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+  hrNotes?: HrNote[];
+};
+
+type Member = {
+  uid: string;
+  firstName: string;
+  lastName: string;
+  role: "Staff" | "Manager";
+  active: boolean;
+  notesCount: number;
+  lastNoteKind?: string;
+  lastNoteAt?: Date;
+};
 
 type Sort = "az" | "za" | "mostNotes" | "recent";
 
@@ -43,13 +50,30 @@ const SORT_OPTIONS: { key: Sort; label: string }[] = [
   { key: "recent",    label: "Most Recent Note" },
 ];
 
-function initials(m: Member): string {
-  return (m.firstName.charAt(0) + m.lastName.charAt(0)).toUpperCase();
+function tsDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
+    try { return (v as Timestamp).toDate(); } catch { return null; }
+  }
+  return null;
 }
 
-function fmtDate(iso: string): string {
-  const [y, mo, d] = iso.split("-").map(Number);
-  return new Date(y, mo - 1, d).toLocaleDateString("en-AU", {
+function displayName(d: StaffDoc): { firstName: string; lastName: string } {
+  const f = (d.firstName ?? "").trim();
+  const l = (d.lastName ?? "").trim();
+  if (f || l) return { firstName: f, lastName: l };
+  const u = (d.username ?? "").trim();
+  if (u) return { firstName: u.charAt(0).toUpperCase() + u.slice(1), lastName: "" };
+  return { firstName: d.uid.slice(0, 6), lastName: "" };
+}
+
+function initials(m: Member): string {
+  return ((m.firstName.charAt(0) || "?") + (m.lastName.charAt(0) || "")).toUpperCase();
+}
+
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString("en-AU", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -57,13 +81,57 @@ function fmtDate(iso: string): string {
 }
 
 export default function HrNotesPage() {
+  const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<Member[]>([]);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("az");
   const [sortOpen, setSortOpen] = useState(false);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(collection(getDb(), "staff_onboarding"));
+        const list: Member[] = snap.docs
+          .map((dSnap) => ({ uid: dSnap.id, ...(dSnap.data() as Omit<StaffDoc, "uid">) }))
+          // Owners excluded.
+          .filter((d) => d.role !== "owner")
+          .map((d) => {
+            const { firstName, lastName } = displayName(d);
+            const notes = (d.hrNotes ?? []) as HrNote[];
+            // Pick the newest note (by createdAt) for the "Last:" line.
+            let lastNoteKind: string | undefined;
+            let lastNoteAt: Date | undefined;
+            for (const n of notes) {
+              const at = tsDate(n.createdAt) ?? undefined;
+              if (!at) continue;
+              if (!lastNoteAt || at.getTime() > lastNoteAt.getTime()) {
+                lastNoteAt = at;
+                lastNoteKind = n.kind ?? "Note";
+              }
+            }
+            return {
+              uid: d.uid,
+              firstName,
+              lastName,
+              role: d.role === "manager" ? "Manager" : "Staff",
+              active: true,
+              notesCount: notes.length,
+              lastNoteKind,
+              lastNoteAt,
+            } as Member;
+          });
+        setMembers(list);
+      } catch {
+        /* keep empty */
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = MEMBERS.filter((m) => {
+    const filtered = members.filter((m) => {
       if (!q) return true;
       const full = `${m.firstName} ${m.lastName}`.toLowerCase();
       return full.includes(q) || m.role.toLowerCase().includes(q);
@@ -78,14 +146,14 @@ export default function HrNotesPage() {
         case "mostNotes":
           return (b.notesCount - a.notesCount) || a.firstName.localeCompare(b.firstName);
         case "recent": {
-          const ax = a.lastNoteISO ?? "";
-          const bx = b.lastNoteISO ?? "";
-          return bx.localeCompare(ax);
+          const ax = a.lastNoteAt?.getTime() ?? 0;
+          const bx = b.lastNoteAt?.getTime() ?? 0;
+          return bx - ax;
         }
       }
     });
     return sorted;
-  }, [query, sort]);
+  }, [members, query, sort]);
 
   function handleAddNote() {
     alert("Add Note — coming soon.\n\nA dialog to pick the employee and note type will land here.");
@@ -94,6 +162,8 @@ export default function HrNotesPage() {
   function openMember(m: Member) {
     alert(`${m.firstName} ${m.lastName} — notes detail page coming soon.`);
   }
+
+  if (loading) return <Splash />;
 
   return (
     <div className={styles.page}>
@@ -168,42 +238,45 @@ export default function HrNotesPage() {
         </div>
       </div>
 
-      <ul className={styles.list}>
-        {list.map((m) => (
-          <li key={m.id}>
-            <button type="button" className={styles.row} onClick={() => openMember(m)}>
-              <div className={styles.avatar} aria-hidden="true">{initials(m)}</div>
-              <div className={styles.rowBody}>
-                <p className={styles.name}>{m.firstName} {m.lastName}</p>
-                <p className={styles.roleLine}>{m.role}</p>
-                {m.active && (
-                  <span className={styles.activeBadge}>
-                    <span className={styles.dotGreen} aria-hidden="true" />
-                    Active
-                  </span>
-                )}
-              </div>
-              <div className={styles.rowMeta}>
-                <p className={styles.notesCount}>
-                  <strong>{m.notesCount}</strong> {m.notesCount === 1 ? "Note" : "Notes"}
-                </p>
-                {m.notesCount > 0 && m.lastNoteKind ? (
-                  <>
-                    <p className={styles.lastLabel}>Last: {m.lastNoteKind}</p>
-                    <p className={styles.lastDate}>{m.lastNoteISO ? fmtDate(m.lastNoteISO) : ""}</p>
-                  </>
-                ) : (
-                  <p className={styles.lastLabel}>—</p>
-                )}
-              </div>
-              <span className={styles.chev} aria-hidden="true">›</span>
-            </button>
-          </li>
-        ))}
-        {list.length === 0 && (
-          <li className={styles.empty}>No team members match.</li>
-        )}
-      </ul>
+      {members.length === 0 ? (
+        <p className={styles.empty}>No staff registered yet. Create one from People → Staff +.</p>
+      ) : list.length === 0 ? (
+        <p className={styles.empty}>No team members match.</p>
+      ) : (
+        <ul className={styles.list}>
+          {list.map((m) => (
+            <li key={m.uid}>
+              <button type="button" className={styles.row} onClick={() => openMember(m)}>
+                <div className={styles.avatar} aria-hidden="true">{initials(m)}</div>
+                <div className={styles.rowBody}>
+                  <p className={styles.name}>{m.firstName} {m.lastName}</p>
+                  <p className={styles.roleLine}>{m.role}</p>
+                  {m.active && (
+                    <span className={styles.activeBadge}>
+                      <span className={styles.dotGreen} aria-hidden="true" />
+                      Active
+                    </span>
+                  )}
+                </div>
+                <div className={styles.rowMeta}>
+                  <p className={styles.notesCount}>
+                    <strong>{m.notesCount}</strong> {m.notesCount === 1 ? "Note" : "Notes"}
+                  </p>
+                  {m.notesCount > 0 && m.lastNoteKind && m.lastNoteAt ? (
+                    <>
+                      <p className={styles.lastLabel}>Last: {m.lastNoteKind}</p>
+                      <p className={styles.lastDate}>{fmtDate(m.lastNoteAt)}</p>
+                    </>
+                  ) : (
+                    <p className={styles.lastLabel}>—</p>
+                  )}
+                </div>
+                <span className={styles.chev} aria-hidden="true">›</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
