@@ -1,0 +1,308 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 480px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+/* ── Week label ── */
+.weekLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+.weekTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.weekRange {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Next Shift hero card (orange outline) ── */
+.nextCard {
+  position: relative;
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 2px solid var(--color-warm);
+  border-radius: var(--radius-lg);
+}
+
+.nextHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.nextLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-warm);
+}
+
+.nextDate {
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.nextTime {
+  margin: 8px 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.nextTimeKicker {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-warm);
+  letter-spacing: 0.05em;
+}
+
+.nextIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(234, 88, 12, 0.10);
+  color: var(--color-warm);
+  flex-shrink: 0;
+}
+
+.nextDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-3) 0;
+}
+
+.nextSubLabel {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+}
+
+.nextFinish {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.nextShiftName {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+}
+
+.nextRelative {
+  margin: var(--space-3) 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-warm);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.emptyText {
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+/* ── Section title ── */
+.sectionTitle {
+  margin: var(--space-3) 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+/* ── Week breakdown list ── */
+.weekList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.weekRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.weekRow:last-child { border-bottom: none; }
+
+.weekDay {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.weekShift {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+}
+
+.weekStart {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.weekFinish {
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.weekChevron {
+  font-size: 20px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.offBadge {
+  padding: 5px 14px;
+  background: rgba(120, 120, 128, 0.16);
+  color: var(--color-fg-muted);
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ── Totals row ── */
+.statsCard {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  align-items: center;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.statBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-4) var(--space-3);
+  gap: 6px;
+}
+
+.statIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  margin-bottom: 4px;
+}
+
+.statValue {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.statLabel {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+}
+
+.statDivider {
+  align-self: stretch;
+  background: var(--color-border);
+  margin: var(--space-4) 0;
+}
+
+/* ── Roster Published ── */
+.publishedCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.publishedIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.publishedBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.publishedTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.publishedDate {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
