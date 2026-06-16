@@ -74,8 +74,9 @@ export default function LoginPage() {
         registerFcmToken(cred.user.uid).catch(() => { /* silent */ });
       }
 
-      // Owners land on the dashboard; staff land on their onboarding overview.
-      const dest = isOwner(cred.user) ? ROUTES.home : ROUTES.staffOnboarding;
+      // Owners + managers land on the dashboard; staff land on their staff
+      // Home page (onboarding is still reachable from their sidebar).
+      const dest = isOwner(cred.user) ? ROUTES.home : ROUTES.staffHome;
       router.push(dest);
     } catch {
       setError("Invalid username or password");

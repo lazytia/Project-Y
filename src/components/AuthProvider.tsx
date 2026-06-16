@@ -64,13 +64,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (user && isPublic) {
-      // Just signed in — owners go to dashboard, staff to their onboarding.
-      router.replace(isOwner(user) ? ROUTES.home : ROUTES.staffOnboarding);
+      // Just signed in — owners + managers go to the dashboard, staff to
+      // their staff Home page. Onboarding is reachable from the sidebar
+      // for staff who still need to finish it.
+      router.replace(isOwner(user) ? ROUTES.home : ROUTES.staffHome);
       return;
     }
-    // Non-owner trying to visit an owner-only path → bounce to onboarding.
+    // Non-owner trying to visit an owner-only path → bounce to staff Home.
     if (user && !isOwner(user) && !isStaffAllowedPath(pathname)) {
-      router.replace(ROUTES.staffOnboarding);
+      router.replace(ROUTES.staffHome);
     }
   }, [user, loading, pathname, router]);
 
