@@ -151,3 +151,149 @@
     to   { opacity: 1; }
   }
 }
+
+/* ── Bell modal ── */
+.bellBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 500;
+  padding: var(--space-4);
+  animation: bellFade 0.18s ease;
+}
+
+@keyframes bellFade { from { opacity: 0; } to { opacity: 1; } }
+
+.bellModal {
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  animation: bellRise 0.22s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+@keyframes bellRise {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (min-width: 700px) {
+  .bellBackdrop { align-items: center; }
+}
+
+.bellHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.bellTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.bellClose {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--color-fg);
+}
+
+.bellClose:hover { background: var(--color-surface); }
+
+.bellList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.bellItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: inherit;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.bellItem:hover { background: var(--color-surface); }
+
+.bellDotMini {
+  width: 8px;
+  height: 8px;
+  background: var(--color-warm);
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+.bellItemBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bellItemTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.bellItemTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.bellItemAgo {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+}
+
+.bellItemDetail {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  line-height: 1.5;
+}
+
+.bellEmpty {
+  margin: 0;
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-fg-muted);
+  font-size: 14px;
+}
