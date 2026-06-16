@@ -295,12 +295,19 @@
   border-radius: var(--radius-lg);
 }
 
-/* ── Responsive: tighten on phone ── */
+/* ── Responsive: tighten on phone but keep 4 stat columns ── */
 @media (max-width: 520px) {
-  .statsRow {
-    grid-template-columns: 1fr 1fr;
-  }
   .row {
     padding: var(--space-3);
+  }
+  .statCard {
+    padding: var(--space-2);
+    min-height: 84px;
+  }
+  .statValue {
+    font-size: 22px;
+  }
+  .statLabel {
+    font-size: 11px;
   }
 }
