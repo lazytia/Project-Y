@@ -126,6 +126,7 @@ export default function RequestHolidayPage() {
   const [error, setError] = useState<string | null>(null);
   const [requests, setRequests] = useState<HolidayRequest[]>([]);
   const [pickerOpen, setPickerOpen] = useState<null | "start" | "end">(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -221,6 +222,7 @@ export default function RequestHolidayPage() {
       setStartKey("");
       setEndKey("");
       setReason("");
+      setConfirmOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit.");
     } finally {
@@ -417,6 +419,37 @@ export default function RequestHolidayPage() {
           onRangeChange={() => { /* unused — singleOnly */ }}
           onClose={() => setPickerOpen(null)}
         />
+      )}
+
+      {confirmOpen && (
+        <div
+          className={styles.confirmBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Request submitted"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmOpen(false); }}
+        >
+          <div className={styles.confirmModal}>
+            <div className={styles.confirmIcon} aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
+            <p className={styles.confirmBody}>
+              Management will review your request.<br />
+              You will receive an update once reviewed.
+            </p>
+            <button
+              type="button"
+              className={styles.confirmBtn}
+              onClick={() => setConfirmOpen(false)}
+              autoFocus
+            >
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
