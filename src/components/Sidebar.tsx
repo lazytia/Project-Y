@@ -75,6 +75,7 @@ export default function Sidebar({ open, onClose }: Props) {
   const { user, signOut } = useAuth();
   const userIsOwner = isOwner(user);
   const userIsStrictOwner = isStrictOwner(user);
+  const userIsManager = userIsOwner && !userIsStrictOwner;
 
   // 기본값: 모두 닫힘. 한 번에 하나만 열림.
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -83,8 +84,42 @@ export default function Sidebar({ open, onClose }: Props) {
     setOpenGroup((prev) => (prev === label ? null : label));
   };
 
+  // Managers (yurina) get a curated nav — narrower than the owner nav and
+  // explicit so the structure isn't accidentally widened later.
+  const MANAGER_NAV: NavGroup[] = [
+    { icon: "🏠", label: "Dashboard", href: "/" },
+    {
+      icon: "👥",
+      label: "People",
+      children: [
+        { label: "Onboarding", href: "/people/onboarding" },
+        { label: "Active Staff", href: "/people/active-staff" },
+        { label: "HR Notes", href: "/people/hr-notes" },
+      ],
+    },
+    {
+      icon: "📅",
+      label: "Scheduling",
+      children: [
+        { label: "Roster", href: "/scheduling/roster" },
+        { label: "Holiday Requests", href: "/scheduling/holiday-requests" },
+        { label: "Availability Requests", href: "/scheduling/availability-requests" },
+        { label: "Roster Insights", href: "/scheduling/insights" },
+      ],
+    },
+    {
+      icon: "🍽",
+      label: "Operations",
+      children: [
+        { label: "Reservations", href: "/operations/reservations" },
+        { label: "Catering Orders", href: "/operations/catering-orders" },
+        { label: "Online Orders", href: "/operations/online-orders" },
+      ],
+    },
+  ];
+
   // ownerOnly (on groups and on children) hides the entry from managers.
-  const visibleNav = NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
+  const ownerNav = NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
     .map((group) => ({
       ...group,
       children: group.children?.filter((c) => !c.ownerOnly || userIsStrictOwner),
@@ -92,6 +127,8 @@ export default function Sidebar({ open, onClose }: Props) {
     .filter(
       (group) => group.href || (group.children && group.children.length > 0),
     );
+
+  const visibleNav: NavGroup[] = userIsManager ? MANAGER_NAV : ownerNav;
 
   // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
   if (!userIsOwner) {
