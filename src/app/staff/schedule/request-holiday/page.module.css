@@ -277,3 +277,15 @@
   color: var(--color-fg-muted);
   flex-shrink: 0;
 }
+
+/* Wrap so the urgency footer can sit on its own line under the main hint. */
+.ruleHintText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ruleHintFooter {
+  opacity: 0.85;
+  font-weight: 500;
+}
