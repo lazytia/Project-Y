@@ -113,6 +113,14 @@
   gap: 8px;
   flex: 1;
   overflow-x: auto;
+  /* Hide the scrollbar — the tabs can still scroll horizontally with
+     touch / wheel, but the grey bar across the middle is gone. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.filterTabs::-webkit-scrollbar {
+  display: none;
 }
 
 .filterTab {
