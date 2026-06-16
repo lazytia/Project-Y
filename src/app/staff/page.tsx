@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { doc, getDoc, type Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import styles from "./page.module.css";
@@ -69,12 +69,15 @@ export default function StaffDashboardPage() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Fetch the signed-in user's notifications from staff_onboarding/{uid}.
+  // Fetch the signed-in user's notifications from staff_onboarding/{uid}
+  // AND stamp notificationsReadAt so the top-bar bell dot clears once they
+  // open the Home page.
   useEffect(() => {
     if (!user) return;
     (async () => {
       try {
-        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        const ref = doc(getDb(), "staff_onboarding", user.uid);
+        const snap = await getDoc(ref);
         const data = snap.data() ?? {};
         const arr = (data.notifications ?? []) as StoredNotification[];
         const parsed: Notification[] = arr
@@ -90,6 +93,12 @@ export default function StaffDashboardPage() {
           })
           .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
         setNotifications(parsed);
+        // Best-effort: mark notifications as read.
+        await setDoc(
+          ref,
+          { notificationsReadAt: serverTimestamp() },
+          { merge: true },
+        ).catch(() => {});
       } catch {
         /* ignore */
       }

@@ -7,6 +7,7 @@ import Splash from "./Splash";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
 import { isOwner } from "@/lib/permissions";
+import { useBellDot } from "@/hooks/useBellDot";
 import styles from "./AppShell.module.css";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <Splash />;
   }
 
+  return <Shell sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>{children}</Shell>;
+}
+
+/**
+ * Inner shell — split out so we can use the useBellDot hook after the early
+ * returns above without violating the rules of hooks.
+ */
+function Shell({
+  sidebarOpen,
+  setSidebarOpen,
+  children,
+}: {
+  sidebarOpen: boolean;
+  setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  children: React.ReactNode;
+}) {
+  const showBellDot = useBellDot();
+
   // Both owners and staff get the chrome (hamburger + sidebar), but the
   // Sidebar component itself renders a stripped-down version for staff — just
   // brand + sign out — so they can log out without seeing owner nav.
@@ -59,7 +78,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-          <span className={styles.bellDot} aria-hidden="true" />
+          {showBellDot && <span className={styles.bellDot} aria-hidden="true" />}
         </button>
       </div>
       {sidebarOpen && (
