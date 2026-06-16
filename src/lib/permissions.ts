@@ -10,8 +10,22 @@ import { emailToUsername } from "./username";
  */
 export const OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica", "yurina"]);
 
-/** True if the given user has owner-level permissions. */
+/**
+ * Strict-owner accounts (real business owners). Managers like yurina are
+ * inside OWNER_USERNAMES so they get owner-level routing and UI, but a few
+ * sensitive areas (Staff +, Onboarding management, Payroll, Test) should
+ * still be hidden from them. Use this set for those gates.
+ */
+export const STRICT_OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica"]);
+
+/** True if the given user has owner-level permissions (owner or manager). */
 export function isOwner(user: User | null | undefined): boolean {
   if (!user) return false;
   return OWNER_USERNAMES.has(emailToUsername(user.email).toLowerCase());
+}
+
+/** True only for the real business owners (excludes managers). */
+export function isStrictOwner(user: User | null | undefined): boolean {
+  if (!user) return false;
+  return STRICT_OWNER_USERNAMES.has(emailToUsername(user.email).toLowerCase());
 }

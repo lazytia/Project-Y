@@ -5,11 +5,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { emailToUsername } from "@/lib/username";
-import { isOwner } from "@/lib/permissions";
+import { isOwner, isStrictOwner } from "@/lib/permissions";
 import styles from "./Sidebar.module.css";
 
 type NavItem = { label: string; href: string; ownerOnly?: boolean };
-type NavGroup = { icon: string; label: string; href?: string; children?: NavItem[] };
+type NavGroup = {
+  icon: string;
+  label: string;
+  href?: string;
+  children?: NavItem[];
+  /** Hidden from managers (yurina); shown only to strict owners. */
+  ownerOnly?: boolean;
+};
 
 const NAV: NavGroup[] = [
   { icon: "🏠", label: "Dashboard", href: "/" },
@@ -44,6 +51,7 @@ const NAV: NavGroup[] = [
   {
     icon: "💵",
     label: "Payroll",
+    ownerOnly: true,
     children: [
       { label: "Payroll", href: "/payroll/payroll" },
       { label: "Timesheets", href: "/payroll/timesheets" },
@@ -57,7 +65,7 @@ const NAV: NavGroup[] = [
       { label: "Suppliers", href: "/inventory/suppliers" },
     ],
   },
-  { icon: "🧪", label: "Test", href: "/onboarding" },
+  { icon: "🧪", label: "Test", href: "/onboarding", ownerOnly: true },
 ];
 
 type Props = { open: boolean; onClose?: () => void };
@@ -66,6 +74,7 @@ export default function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const userIsOwner = isOwner(user);
+  const userIsStrictOwner = isStrictOwner(user);
 
   // 기본값: 모두 닫힘. 한 번에 하나만 열림.
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -74,12 +83,15 @@ export default function Sidebar({ open, onClose }: Props) {
     setOpenGroup((prev) => (prev === label ? null : label));
   };
 
-  const visibleNav = NAV.map((group) => ({
-    ...group,
-    children: group.children?.filter((c) => !c.ownerOnly || userIsOwner),
-  })).filter(
-    (group) => group.href || (group.children && group.children.length > 0),
-  );
+  // ownerOnly (on groups and on children) hides the entry from managers.
+  const visibleNav = NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
+    .map((group) => ({
+      ...group,
+      children: group.children?.filter((c) => !c.ownerOnly || userIsStrictOwner),
+    }))
+    .filter(
+      (group) => group.href || (group.children && group.children.length > 0),
+    );
 
   // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
   if (!userIsOwner) {
