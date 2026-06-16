@@ -74,7 +74,9 @@ export default function TfnDeclarationPage() {
   const todayKey = new Date().toLocaleDateString("en-CA");
   const declarationDate = getTodayDisplay();
 
-  // Restore previously saved values when revisiting this step.
+  // Restore previously saved values when revisiting this step. Save uses a
+  // nested `tfn: {…}` object, so we read from there first and fall back to
+  // any top-level legacy values that might exist from an older save.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -83,19 +85,44 @@ export default function TfnDeclarationPage() {
         const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
         if (cancelled || !snap.exists()) return;
         const d = snap.data() as Record<string, unknown>;
-        if (typeof d.fullLegalName === "string") setFullLegalName(d.fullLegalName);
-        if (typeof d.dateOfBirth === "string") setDateOfBirth(d.dateOfBirth);
-        if (typeof d.homeAddress === "string") setHomeAddress(d.homeAddress);
-        if (typeof d.suburb === "string") setSuburb(d.suburb);
-        if (typeof d.auState === "string") setAuState(d.auState);
-        if (typeof d.postcode === "string") setPostcode(d.postcode);
-        if (typeof d.taxFileNumber === "string") setTaxFileNumber(d.taxFileNumber);
-        if (typeof d.taxResident === "string") setTaxResident(d.taxResident);
-        if (typeof d.taxFreeThreshold === "string") setTaxFreeThreshold(d.taxFreeThreshold);
-        if (typeof d.helpDebt === "string") setHelpDebt(d.helpDebt);
-        if (typeof d.otherGovDebt === "string") setOtherGovDebt(d.otherGovDebt);
-        if (typeof d.declarationAgreed === "boolean") setDeclarationAgreed(d.declarationAgreed);
-        if (typeof d.signatureDataUrl === "string") setSignatureDataUrl(d.signatureDataUrl);
+        const t = (d.tfn ?? {}) as Record<string, unknown>;
+
+        const pick = (k: string) =>
+          (typeof t[k] === "string" ? (t[k] as string) :
+           typeof d[k] === "string" ? (d[k] as string) : undefined);
+
+        const fn = pick("fullLegalName");
+        if (fn !== undefined) setFullLegalName(fn);
+        const dob = pick("dateOfBirth");
+        if (dob !== undefined) setDateOfBirth(dob);
+        const ha = pick("homeAddress");
+        if (ha !== undefined) setHomeAddress(ha);
+        const sub = pick("suburb");
+        if (sub !== undefined) setSuburb(sub);
+        // Field is saved as `state` inside tfn, but we keep the local name
+        // `auState` to avoid colliding with React reserved props.
+        const st =
+          (typeof t.state === "string" ? (t.state as string) : undefined) ??
+          (typeof d.auState === "string" ? (d.auState as string) : undefined);
+        if (st !== undefined) setAuState(st);
+        const pc = pick("postcode");
+        if (pc !== undefined) setPostcode(pc);
+        const tfn = pick("taxFileNumber");
+        if (tfn !== undefined) setTaxFileNumber(tfn);
+        const tr = pick("taxResident");
+        if (tr !== undefined) setTaxResident(tr);
+        const tft = pick("taxFreeThreshold");
+        if (tft !== undefined) setTaxFreeThreshold(tft);
+        const hd = pick("helpDebt");
+        if (hd !== undefined) setHelpDebt(hd);
+        const ogd = pick("otherGovDebt");
+        if (ogd !== undefined) setOtherGovDebt(ogd);
+        const da =
+          (typeof t.declarationAgreed === "boolean" ? (t.declarationAgreed as boolean) : undefined) ??
+          (typeof d.declarationAgreed === "boolean" ? (d.declarationAgreed as boolean) : undefined);
+        if (da !== undefined) setDeclarationAgreed(da);
+        const sig = pick("signatureDataUrl");
+        if (sig !== undefined) setSignatureDataUrl(sig);
       } catch {
         // Silent — fall back to defaults so the form stays usable.
       }
@@ -126,7 +153,7 @@ export default function TfnDeclarationPage() {
           taxFreeThreshold,
           helpDebt,
           otherGovDebt,
-          declarationAgreed: true,
+          declarationAgreed,
           ...(signatureDataUrl && { signatureDataUrl }),
         },
         step: CURRENT_STEP,
