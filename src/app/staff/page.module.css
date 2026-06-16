@@ -384,3 +384,10 @@
   color: var(--color-fg-muted);
   line-height: 1.5;
 }
+
+.notifEmpty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+  padding: var(--space-2) 0;
+}

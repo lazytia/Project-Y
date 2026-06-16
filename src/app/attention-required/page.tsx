@@ -1,148 +1,140 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { collection, getDocs, type Timestamp } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
+import {
+  decideHolidayRequest,
+  decideAvailabilityRequest,
+  type Decision,
+} from "@/lib/manager-actions";
+import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
-/* ──────────────────────────────────────────────────────────────────────
- * Placeholder data — will be wired up to staff_onboarding queries
- * (holidayRequests / availabilityRequests / completedStep / visa expiry)
- * in a follow-up. Shape mirrors what the real Firestore reads will look
- * like so the swap is straightforward.
- * ──────────────────────────────────────────────────────────────────── */
+type DayAvailability =
+  | { kind: "available" }
+  | { kind: "unavailable" }
+  | { kind: "partial"; from: string; until: string };
 
-type ReqStatus = "pending";
-
-type HolidayItem = {
-  kind: "holiday";
+type StoredHolidayRequest = {
   id: string;
-  firstName: string;
-  lastName: string;
-  startISO: string;
-  endISO: string;
-  note?: string;
-  agoText: string;
-  status: ReqStatus;
+  startDate: Timestamp;
+  endDate: Timestamp;
+  reason: string;
+  status: "pending" | "approved" | "declined";
+  createdAt?: Timestamp;
 };
 
-type AvailabilityItem = {
-  kind: "availability";
+type StoredAvailabilityRequest = {
   id: string;
+  requested: Record<string, DayAvailability>;
+  reason: string | null;
+  effectiveDate?: Timestamp;
+  status: "pending" | "approved" | "declined";
+  createdAt?: Timestamp;
+};
+
+type StaffDoc = {
+  uid: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+  status?: string;
+  completedStep?: number;
+  startDate?: Timestamp;
+  documents?: { visaExpiry?: Timestamp };
+  holidayRequests?: StoredHolidayRequest[];
+  availabilityRequests?: StoredAvailabilityRequest[];
+};
+
+type ReqItemHoliday = {
+  kind: "holiday";
+  id: string;
+  staffUid: string;
   firstName: string;
   lastName: string;
-  effectiveISO: string;
-  note?: string;
-  agoText: string;
-  status: ReqStatus;
+  startDate: Date;
+  endDate: Date;
+  reason: string;
+  createdAt: Date | null;
+};
+
+type ReqItemAvail = {
+  kind: "availability";
+  id: string;
+  staffUid: string;
+  firstName: string;
+  lastName: string;
+  effectiveDate: Date | null;
+  reason: string;
+  createdAt: Date | null;
 };
 
 type OnboardingItem = {
-  kind: "onboarding";
   id: string;
+  staffUid: string;
   firstName: string;
   lastName: string;
-  startDateISO: string;
+  startDate: Date | null;
   state: "Submitted" | "In Progress";
-  agoText: string;
+  createdAt: Date | null;
 };
 
 type ComplianceItem = {
-  kind: "compliance";
   id: string;
+  staffUid: string;
   firstName: string;
   lastName: string;
-  reason: string; // e.g. "Visa Expiring Soon"
-  expiresISO: string;
-  note?: string;
-  agoText: string;
+  reason: string;
+  expiresAt: Date;
+  createdAt: Date | null;
 };
 
-const REQUESTS: (HolidayItem | AvailabilityItem)[] = [
-  {
-    kind: "holiday",
-    id: "h-1",
-    firstName: "Yuki",
-    lastName: "Tanaka",
-    startISO: "2026-06-18",
-    endISO: "2026-06-22",
-    note: "Family trip to Osaka.",
-    agoText: "2 days ago",
-    status: "pending",
-  },
-  {
-    kind: "availability",
-    id: "a-1",
-    firstName: "Sam",
-    lastName: "Lee",
-    effectiveISO: "2026-07-01",
-    note: "Changing availability to Tuesday off.",
-    agoText: "1 day ago",
-    status: "pending",
-  },
-  {
-    kind: "holiday",
-    id: "h-2",
-    firstName: "Hiyori",
-    lastName: "Sato",
-    startISO: "2026-07-05",
-    endISO: "2026-07-07",
-    note: "Visiting family.",
-    agoText: "3 days ago",
-    status: "pending",
-  },
-];
+function tsDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
+    try { return (v as Timestamp).toDate(); } catch { return null; }
+  }
+  return null;
+}
 
-const ONBOARDING: OnboardingItem[] = [
-  {
-    kind: "onboarding",
-    id: "o-1",
-    firstName: "Kenji",
-    lastName: "Watanabe",
-    startDateISO: "2026-06-15",
-    state: "Submitted",
-    agoText: "4 days ago",
-  },
-];
-
-const COMPLIANCE: ComplianceItem[] = [
-  {
-    kind: "compliance",
-    id: "c-1",
-    firstName: "Mei",
-    lastName: "Chen",
-    reason: "Visa Expiring Soon",
-    expiresISO: "2026-07-10",
-    note: "Working Holiday Visa (subclass 417)",
-    agoText: "5 days ago",
-  },
-];
+function nameOf(d: StaffDoc): { firstName: string; lastName: string } {
+  const first = (d.firstName ?? "").trim();
+  const last = (d.lastName ?? "").trim();
+  if (first || last) return { firstName: first || "—", lastName: last };
+  // Fall back to capitalised username when name fields aren't filled yet.
+  const u = (d.username ?? "").trim();
+  if (u) {
+    return { firstName: u.charAt(0).toUpperCase() + u.slice(1), lastName: "" };
+  }
+  return { firstName: d.uid.slice(0, 6), lastName: "" };
+}
 
 function initials(first: string, last: string): string {
-  return (first.charAt(0) + last.charAt(0)).toUpperCase();
+  const a = (first.charAt(0) || "?").toUpperCase();
+  const b = (last.charAt(0) || "").toUpperCase();
+  return (a + b) || "??";
 }
 
-function fmtShort(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-AU", {
+function fmtShort(d: Date): string {
+  return d.toLocaleDateString("en-AU", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
 
-function fmtRangeShort(startISO: string, endISO: string): string {
-  const [sy, sm, sd] = startISO.split("-").map(Number);
-  const [ey, em, ed] = endISO.split("-").map(Number);
-  const sameYear = sy === ey;
-  const sameMonth = sameYear && sm === em;
-  const right = new Date(ey, em - 1, ed).toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-  if (sameMonth) {
-    return `${sd} – ${right}`;
-  }
-  const left = new Date(sy, sm - 1, sd).toLocaleDateString("en-AU", {
+function fmtRangeShort(a: Date, b: Date): string {
+  const sameYear = a.getFullYear() === b.getFullYear();
+  const sameMonth = sameYear && a.getMonth() === b.getMonth();
+  const right = fmtShort(b);
+  if (sameMonth) return `${a.getDate()} – ${right}`;
+  const left = a.toLocaleDateString("en-AU", {
     day: "numeric",
     month: "short",
     year: sameYear ? undefined : "numeric",
@@ -150,15 +142,147 @@ function fmtRangeShort(startISO: string, endISO: string): string {
   return `${left} – ${right}`;
 }
 
-function daysInclusive(startISO: string, endISO: string): number {
-  const a = new Date(startISO);
-  const b = new Date(endISO);
+function daysInclusive(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
+}
+
+function fmtRelative(d: Date | null): string {
+  if (!d) return "";
+  const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  const days = Math.floor(diff / 86400);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+const VISA_EXPIRING_WINDOW_DAYS = 60;
+
+function isVisaExpiringSoon(exp: Date | null): boolean {
+  if (!exp) return false;
+  const diff = (exp.getTime() - Date.now()) / 86400000;
+  return diff <= VISA_EXPIRING_WINDOW_DAYS && diff >= -3;
 }
 
 export default function AttentionRequiredPage() {
   const router = useRouter();
-  const total = REQUESTS.length + ONBOARDING.length + COMPLIANCE.length;
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [staffDocs, setStaffDocs] = useState<StaffDoc[]>([]);
+  const [busy, setBusy] = useState<string | null>(null); // request id being decided
+
+  const load = useCallback(async () => {
+    const snap = await getDocs(collection(getDb(), "staff_onboarding"));
+    const docs: StaffDoc[] = snap.docs
+      .map((d) => ({ uid: d.id, ...(d.data() as Omit<StaffDoc, "uid">) }))
+      .filter((d) => d.role !== "owner");
+    setStaffDocs(docs);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try { await load(); } finally { setLoading(false); }
+    })();
+  }, [load]);
+
+  const { requests, onboarding, compliance } = useMemo(() => {
+    const requests: (ReqItemHoliday | ReqItemAvail)[] = [];
+    const onboarding: OnboardingItem[] = [];
+    const compliance: ComplianceItem[] = [];
+
+    for (const d of staffDocs) {
+      const { firstName, lastName } = nameOf(d);
+
+      for (const r of d.holidayRequests ?? []) {
+        if (r.status !== "pending") continue;
+        const start = tsDate(r.startDate);
+        const end = tsDate(r.endDate);
+        if (!start || !end) continue;
+        requests.push({
+          kind: "holiday",
+          id: r.id,
+          staffUid: d.uid,
+          firstName, lastName,
+          startDate: start,
+          endDate: end,
+          reason: r.reason ?? "",
+          createdAt: tsDate(r.createdAt),
+        });
+      }
+      for (const r of d.availabilityRequests ?? []) {
+        if (r.status !== "pending") continue;
+        requests.push({
+          kind: "availability",
+          id: r.id,
+          staffUid: d.uid,
+          firstName, lastName,
+          effectiveDate: tsDate(r.effectiveDate),
+          reason: r.reason ?? "",
+          createdAt: tsDate(r.createdAt),
+        });
+      }
+
+      // Onboarding: staff who have submitted (completedStep >= 7) but
+      // status hasn't been moved past "complete" yet, or who are still in
+      // progress. We surface "Submitted" specifically.
+      const completed = typeof d.completedStep === "number" ? d.completedStep : 0;
+      if (completed >= 7 && d.status === "complete") {
+        onboarding.push({
+          id: `ob_${d.uid}`,
+          staffUid: d.uid,
+          firstName, lastName,
+          startDate: tsDate(d.startDate),
+          state: "Submitted",
+          createdAt: tsDate(d.startDate),
+        });
+      }
+
+      // Compliance: visa expiring within the window.
+      const visaExp = tsDate(d.documents?.visaExpiry);
+      if (visaExp && isVisaExpiringSoon(visaExp)) {
+        compliance.push({
+          id: `cm_${d.uid}`,
+          staffUid: d.uid,
+          firstName, lastName,
+          reason: "Visa Expiring Soon",
+          expiresAt: visaExp,
+          createdAt: null,
+        });
+      }
+    }
+
+    // Newest first.
+    requests.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    onboarding.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+
+    return { requests, onboarding, compliance };
+  }, [staffDocs]);
+
+  const total = requests.length + onboarding.length + compliance.length;
+
+  async function decide(
+    kind: "holiday" | "availability",
+    staffUid: string,
+    requestId: string,
+    decision: Decision,
+  ) {
+    if (!user) return;
+    setBusy(requestId);
+    try {
+      if (kind === "holiday") {
+        await decideHolidayRequest(staffUid, user.uid, requestId, decision);
+      } else {
+        await decideAvailabilityRequest(staffUid, user.uid, requestId, decision);
+      }
+      await load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (loading) return <Splash />;
 
   return (
     <div className={styles.page}>
@@ -192,47 +316,67 @@ export default function AttentionRequiredPage() {
             </svg>
           </span>
           <p className={styles.sectionLabel}>REQUESTS</p>
-          <span className={styles.sectionCount}>{REQUESTS.length}</span>
+          <span className={styles.sectionCount}>{requests.length}</span>
         </div>
 
-        <ul className={styles.list}>
-          {REQUESTS.map((r) => (
-            <li key={r.id} className={styles.card}>
-              <div className={styles.cardHeader}>
-                <div className={styles.avatar} aria-hidden="true">
-                  {initials(r.firstName, r.lastName)}
+        {requests.length === 0 ? (
+          <p className={styles.empty}>No pending requests.</p>
+        ) : (
+          <ul className={styles.list}>
+            {requests.map((r) => (
+              <li key={r.id} className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <div className={styles.avatar} aria-hidden="true">
+                    {initials(r.firstName, r.lastName)}
+                  </div>
+                  <div className={styles.headBody}>
+                    <p className={styles.name}>{r.firstName} {r.lastName}</p>
+                    <p className={styles.kind}>
+                      {r.kind === "holiday" ? "Holiday Request" : "Availability Change"}
+                    </p>
+                    <p className={styles.meta}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      {r.kind === "holiday"
+                        ? `${fmtRangeShort(r.startDate, r.endDate)} (${daysInclusive(r.startDate, r.endDate)} days)`
+                        : r.effectiveDate
+                          ? `Effective from ${fmtShort(r.effectiveDate)}`
+                          : "Effective date not set"}
+                    </p>
+                  </div>
+                  <span className={styles.ago}>{fmtRelative(r.createdAt)}</span>
                 </div>
-                <div className={styles.headBody}>
-                  <p className={styles.name}>{r.firstName} {r.lastName}</p>
-                  <p className={styles.kind}>
-                    {r.kind === "holiday" ? "Holiday Request" : "Availability Change"}
+                {r.reason && (
+                  <p className={styles.note}>
+                    <span className={styles.noteLabel}>Note:</span> {r.reason}
                   </p>
-                  <p className={styles.meta}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    {r.kind === "holiday"
-                      ? `${fmtRangeShort(r.startISO, r.endISO)} (${daysInclusive(r.startISO, r.endISO)} days)`
-                      : `Effective from ${fmtShort(r.effectiveISO)}`}
-                  </p>
+                )}
+                <div className={styles.actionRow}>
+                  <button
+                    type="button"
+                    className={styles.btnDecline}
+                    disabled={busy === r.id}
+                    onClick={() => decide(r.kind, r.staffUid, r.id, "declined")}
+                  >
+                    {busy === r.id ? "…" : "Decline"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.btnApprove}
+                    disabled={busy === r.id}
+                    onClick={() => decide(r.kind, r.staffUid, r.id, "approved")}
+                  >
+                    {busy === r.id ? "…" : "Approve"}
+                  </button>
                 </div>
-                <span className={styles.ago}>{r.agoText}</span>
-              </div>
-              {r.note && (
-                <p className={styles.note}>
-                  <span className={styles.noteLabel}>Note:</span> {r.note}
-                </p>
-              )}
-              <div className={styles.actionRow}>
-                <button type="button" className={styles.btnDecline}>Decline</button>
-                <button type="button" className={styles.btnApprove}>Approve</button>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* ONBOARDING */}
@@ -247,38 +391,42 @@ export default function AttentionRequiredPage() {
             </svg>
           </span>
           <p className={styles.sectionLabel}>ONBOARDING</p>
-          <span className={styles.sectionCount}>{ONBOARDING.length}</span>
+          <span className={styles.sectionCount}>{onboarding.length}</span>
         </div>
 
-        <ul className={styles.list}>
-          {ONBOARDING.map((o) => (
-            <li key={o.id} className={styles.card}>
-              <div className={styles.cardHeader}>
-                <div className={styles.avatar} aria-hidden="true">
-                  {initials(o.firstName, o.lastName)}
+        {onboarding.length === 0 ? (
+          <p className={styles.empty}>No onboarding submissions waiting.</p>
+        ) : (
+          <ul className={styles.list}>
+            {onboarding.map((o) => (
+              <li key={o.id} className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <div className={styles.avatar} aria-hidden="true">
+                    {initials(o.firstName, o.lastName)}
+                  </div>
+                  <div className={styles.headBody}>
+                    <p className={styles.name}>{o.firstName} {o.lastName}</p>
+                    <p className={styles.kind}>New Onboarding</p>
+                    <p className={styles.meta}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      Start date: {o.startDate ? fmtShort(o.startDate) : "—"}
+                    </p>
+                  </div>
+                  <span className={styles.ago}>{fmtRelative(o.createdAt)}</span>
                 </div>
-                <div className={styles.headBody}>
-                  <p className={styles.name}>{o.firstName} {o.lastName}</p>
-                  <p className={styles.kind}>New Onboarding</p>
-                  <p className={styles.meta}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    Start date: {fmtShort(o.startDateISO)}
-                  </p>
-                </div>
-                <span className={styles.ago}>{o.agoText}</span>
-              </div>
-              <p className={styles.statusLine}>
-                <span className={styles.noteLabel}>Status:</span>{" "}
-                <span className={styles.statusPill}>{o.state}</span>
-              </p>
-            </li>
-          ))}
-        </ul>
+                <p className={styles.statusLine}>
+                  <span className={styles.noteLabel}>Status:</span>{" "}
+                  <span className={styles.statusPill}>{o.state}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* COMPLIANCE */}
@@ -294,42 +442,40 @@ export default function AttentionRequiredPage() {
             </svg>
           </span>
           <p className={styles.sectionLabel}>COMPLIANCE</p>
-          <span className={styles.sectionCount}>{COMPLIANCE.length}</span>
+          <span className={styles.sectionCount}>{compliance.length}</span>
         </div>
 
-        <ul className={styles.list}>
-          {COMPLIANCE.map((c) => (
-            <li key={c.id} className={styles.card}>
-              <div className={styles.cardHeader}>
-                <div className={styles.avatar} aria-hidden="true">
-                  {initials(c.firstName, c.lastName)}
+        {compliance.length === 0 ? (
+          <p className={styles.empty}>No compliance items.</p>
+        ) : (
+          <ul className={styles.list}>
+            {compliance.map((c) => (
+              <li key={c.id} className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <div className={styles.avatar} aria-hidden="true">
+                    {initials(c.firstName, c.lastName)}
+                  </div>
+                  <div className={styles.headBody}>
+                    <p className={styles.name}>{c.firstName} {c.lastName}</p>
+                    <p className={styles.kind}>{c.reason}</p>
+                    <p className={styles.meta}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      Expires: {fmtShort(c.expiresAt)}
+                    </p>
+                  </div>
                 </div>
-                <div className={styles.headBody}>
-                  <p className={styles.name}>{c.firstName} {c.lastName}</p>
-                  <p className={styles.kind}>{c.reason}</p>
-                  <p className={styles.meta}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    Expires: {fmtShort(c.expiresISO)}
-                  </p>
+                <div className={styles.actionRow}>
+                  <button type="button" className={styles.btnGhost}>Send Reminder</button>
                 </div>
-                <span className={styles.ago}>{c.agoText}</span>
-              </div>
-              {c.note && (
-                <p className={styles.note}>
-                  <span className={styles.noteLabel}>Note:</span> {c.note}
-                </p>
-              )}
-              <div className={styles.actionRow}>
-                <button type="button" className={styles.btnGhost}>Send Reminder</button>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <div className={styles.footerNote}>

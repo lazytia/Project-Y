@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { doc, getDoc, type Timestamp } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 import styles from "./page.module.css";
 
 /**
@@ -16,13 +19,21 @@ const NEXT_SHIFT = {
 
 const NEXT_PAY_DATE = new Date("2026-06-18T00:00:00+10:00");
 
-const NOTIFICATIONS = [
-  { id: 1, label: "Holiday request approved", ago: "2h ago", detail: "Your holiday request for 22 – 24 Jun has been approved by management." },
-  { id: 2, label: "New roster published", ago: "5h ago", detail: "The roster for the week of 15 – 21 Jun is now available in Schedule → Roster." },
-  { id: 3, label: "Payslip ready", ago: "2d ago", detail: "Your payslip for the week ending 8 Jun is now available in Payslips." },
-  { id: 4, label: "Shift swap requested", ago: "3d ago", detail: "Sarah has asked to swap her Saturday dinner shift with you. Approve or decline from the Roster." },
-  { id: 5, label: "Onboarding complete", ago: "1w ago", detail: "Welcome to YURICA! Your onboarding has been submitted and is currently being reviewed." },
-];
+type StoredNotification = {
+  id: string;
+  kind?: string;
+  title?: string;
+  detail?: string;
+  createdAt?: Timestamp;
+};
+
+type Notification = {
+  id: string;
+  label: string;
+  detail: string;
+  createdAt: Date | null;
+  ago: string;
+};
 
 function fmtShiftDate(d: Date): string {
   return d.toLocaleDateString("en-AU", {
@@ -32,8 +43,58 @@ function fmtShiftDate(d: Date): string {
   });
 }
 
+function tsToDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
+    try { return (v as Timestamp).toDate(); } catch { return null; }
+  }
+  return null;
+}
+
+function fmtRelative(d: Date | null): string {
+  if (!d) return "";
+  const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  const days = Math.floor(diff / 86400);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks}w ago`;
+}
+
 export default function StaffDashboardPage() {
+  const { user } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Fetch the signed-in user's notifications from staff_onboarding/{uid}.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        const data = snap.data() ?? {};
+        const arr = (data.notifications ?? []) as StoredNotification[];
+        const parsed: Notification[] = arr
+          .map((n) => {
+            const d = tsToDate(n.createdAt);
+            return {
+              id: n.id,
+              label: n.title ?? "Notification",
+              detail: n.detail ?? "",
+              createdAt: d,
+              ago: fmtRelative(d),
+            };
+          })
+          .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+        setNotifications(parsed);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [user]);
 
   // Lock body scroll while the modal is open.
   useEffect(() => {
@@ -52,7 +113,7 @@ export default function StaffDashboardPage() {
   }, [notifOpen]);
 
   // Show only the top 2 on the dashboard card; the rest live in the modal.
-  const preview = NOTIFICATIONS.slice(0, 2);
+  const preview = notifications.slice(0, 2);
 
   return (
     <div className={styles.page}>
@@ -80,23 +141,29 @@ export default function StaffDashboardPage() {
       <section className={styles.notifCard}>
         <div className={styles.notifHeader}>
           <p className={styles.notifTitle}>Notifications</p>
-          <button
-            type="button"
-            className={styles.notifLink}
-            onClick={() => setNotifOpen(true)}
-          >
-            View all <span aria-hidden="true">›</span>
-          </button>
+          {notifications.length > 0 && (
+            <button
+              type="button"
+              className={styles.notifLink}
+              onClick={() => setNotifOpen(true)}
+            >
+              View all <span aria-hidden="true">›</span>
+            </button>
+          )}
         </div>
-        <ul className={styles.notifList}>
-          {preview.map((n) => (
-            <li key={n.id} className={styles.notifItem}>
-              <span className={styles.notifDot} aria-hidden="true" />
-              <span className={styles.notifText}>{n.label}</span>
-              <span className={styles.notifAgo}>{n.ago}</span>
-            </li>
-          ))}
-        </ul>
+        {notifications.length === 0 ? (
+          <p className={styles.notifEmpty}>No notifications yet.</p>
+        ) : (
+          <ul className={styles.notifList}>
+            {preview.map((n) => (
+              <li key={n.id} className={styles.notifItem}>
+                <span className={styles.notifDot} aria-hidden="true" />
+                <span className={styles.notifText}>{n.label}</span>
+                <span className={styles.notifAgo}>{n.ago}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* Next Pay Date */}
@@ -172,7 +239,7 @@ export default function StaffDashboardPage() {
               </button>
             </div>
             <ul className={styles.modalList}>
-              {NOTIFICATIONS.map((n) => (
+              {notifications.map((n) => (
                 <li key={n.id} className={styles.modalItem}>
                   <span className={styles.modalDot} aria-hidden="true" />
                   <div className={styles.modalItemBody}>
