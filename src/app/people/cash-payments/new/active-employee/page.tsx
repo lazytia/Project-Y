@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -21,21 +21,57 @@ import { ACTIVE_DRAFT_KEY, type ActiveEmployeeDraft } from "./draft";
 type StaffMember = { uid: string; name: string; position: string };
 type PaymentType = ActiveEmployeeDraft["paymentType"];
 
-const PAYMENT_TYPES: { value: PaymentType; label: string; desc: string }[] = [
+type PaymentTypeDef = {
+  value: PaymentType;
+  label: string;
+  desc: React.ReactNode;
+  icon: React.ReactNode;
+};
+
+const PAYMENT_TYPES: PaymentTypeDef[] = [
   {
     value: "Payroll Adjustment",
     label: "Payroll Adjustment",
-    desc: "Adjustments for hours, rates, penalties, deductions, etc.",
+    desc: (
+      <>
+        Adjustments for hours, rates,{" "}
+        <s>penalties, deductions</s>, etc.
+      </>
+    ),
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+    ),
   },
   {
     value: "Advance Payment",
     label: "Advance Payment",
     desc: "Cash advance against upcoming wages.",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        <circle cx="12" cy="12" r="4"/>
+      </svg>
+    ),
   },
   {
     value: "Final Pay",
     label: "Final Pay",
-    desc: "Final payment including outstanding entitlements, wages.",
+    desc: (
+      <>
+        Final payment including outstanding{" "}
+        <s>entitlements</s>, wages.
+      </>
+    ),
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="5" y="3" width="14" height="18" rx="2"/>
+        <line x1="12" y1="8" x2="12" y2="16"/>
+        <path d="M14.5 10.5a2 2 0 0 0-2-2h-1a1.5 1.5 0 0 0 0 3h1a1.5 1.5 0 0 1 0 3h-1a2 2 0 0 1-2-2"/>
+      </svg>
+    ),
   },
 ];
 
@@ -83,14 +119,23 @@ export default function ActiveEmployeeDetailsPage() {
         const snap = await getDocs(
           query(collection(getDb(), "staff_onboarding"), where("status", "==", "active"))
         );
-        const list: StaffMember[] = snap.docs.map((doc) => {
-          const d = doc.data();
-          return {
-            uid: doc.id,
-            name: (d.fullName ?? d.name ?? doc.id) as string,
-            position: (d.position ?? "") as string,
-          };
-        });
+        const list: StaffMember[] = snap.docs
+          .map((doc) => {
+            const d = doc.data();
+            if (d.role === "owner") return null;
+            const f = ((d.firstName as string) ?? "").trim();
+            const l = ((d.lastName as string) ?? "").trim();
+            const name = f || l
+              ? `${f}${f && l ? " " : ""}${l}`
+              : ((d.username as string) ?? doc.id.slice(0, 6));
+            const role = (d.role as string) ?? "";
+            const position = role === "manager" ? "Manager"
+              : role === "chef" ? "Kitchen Staff"
+              : role ? role.charAt(0).toUpperCase() + role.slice(1)
+              : "Staff";
+            return { uid: doc.id, name, position };
+          })
+          .filter((x): x is StaffMember => x !== null);
         list.sort((a, b) => a.name.localeCompare(b.name));
         setStaff(list);
       } catch {
@@ -239,29 +284,32 @@ export default function ActiveEmployeeDetailsPage() {
         <h2 className={styles.sectionTitle}>
           2. Payment Type <span className={styles.requiredMark}>*</span>
         </h2>
-        <ul className={styles.radioList}>
-          {PAYMENT_TYPES.map((pt) => (
-            <li key={pt.value}>
-              <label
-                className={`${styles.radioRow} ${paymentType === pt.value ? styles.radioRowOn : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="paymentType"
-                  className={styles.radioInput}
-                  checked={paymentType === pt.value}
-                  onChange={() => setPaymentType(pt.value)}
-                />
-                <span
-                  className={`${styles.radioDot} ${paymentType === pt.value ? styles.radioDotOn : ""}`}
-                />
-                <div>
-                  <p className={styles.radioLabel}>{pt.label}</p>
-                  <p className={styles.radioDesc}>{pt.desc}</p>
-                </div>
-              </label>
-            </li>
-          ))}
+        <p className={styles.sectionHint}>Select the reason for this cash payment.</p>
+        <ul className={styles.ptList}>
+          {PAYMENT_TYPES.map((pt) => {
+            const on = paymentType === pt.value;
+            return (
+              <li key={pt.value}>
+                <label className={`${styles.ptRow} ${on ? styles.ptRowOn : ""}`}>
+                  <input
+                    type="radio"
+                    name="paymentType"
+                    className={styles.radioInput}
+                    checked={on}
+                    onChange={() => setPaymentType(pt.value)}
+                  />
+                  <span className={`${styles.ptDot} ${on ? styles.ptDotOn : ""}`} />
+                  <span className={`${styles.ptIcon} ${on ? styles.ptIconOn : ""}`}>
+                    {pt.icon}
+                  </span>
+                  <span className={styles.ptText}>
+                    <span className={styles.ptLabel}>{pt.label}</span>
+                    <span className={styles.ptDesc}>{pt.desc}</span>
+                  </span>
+                </label>
+              </li>
+            );
+          })}
         </ul>
       </section>
 
