@@ -355,6 +355,15 @@ export default function HrNotesPage() {
                         </span>
                       )}
                     </div>
+                    {m.lastKind ? (
+                      <span className={`${styles.empTypeIcon} ${kindClass(m.lastKind)}`} aria-hidden="true">
+                        {kindIcon(m.lastKind, 18)}
+                      </span>
+                    ) : (
+                      <span className={`${styles.empTypeIcon} ${styles.kindEmpty}`} aria-hidden="true">
+                        —
+                      </span>
+                    )}
                     <div className={styles.empMeta}>
                       <p className={styles.empCount}>
                         <strong>{m.notesCount}</strong> {m.notesCount === 1 ? "Note" : "Notes"}
@@ -368,15 +377,6 @@ export default function HrNotesPage() {
                         <p className={styles.empLast}>—</p>
                       )}
                     </div>
-                    {m.lastKind ? (
-                      <span className={`${styles.empTypeIcon} ${kindClass(m.lastKind)}`} aria-hidden="true">
-                        {kindIcon(m.lastKind, 18)}
-                      </span>
-                    ) : (
-                      <span className={`${styles.empTypeIcon} ${styles.kindEmpty}`} aria-hidden="true">
-                        —
-                      </span>
-                    )}
                     <span className={styles.chev} aria-hidden="true">›</span>
                   </button>
                 </li>

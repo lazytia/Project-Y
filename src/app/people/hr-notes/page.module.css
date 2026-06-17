@@ -352,7 +352,7 @@
 
 .empRow {
   display: grid;
-  grid-template-columns: 48px 1fr auto 44px auto;
+  grid-template-columns: 48px 1fr 44px auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -364,6 +364,10 @@
   text-align: left;
   width: 100%;
   transition: background 0.15s;
+}
+
+.empMeta {
+  justify-self: end;
 }
 
 .empList li:last-child .empRow { border-bottom: none; }
@@ -556,7 +560,7 @@
   }
   .timelineBody .chev { display: none; }
   .empRow {
-    grid-template-columns: 44px 1fr auto 36px;
+    grid-template-columns: 44px 1fr 36px auto;
     padding: var(--space-3);
   }
   .empRow > .chev { display: none; }
