@@ -278,7 +278,7 @@ export default function StaffDashboardPage() {
         </div>
         <div className={styles.payBody}>
           <p className={styles.payLabel}>Next Pay Date</p>
-          <p className={styles.payDate}>Every Thursday</p>
+          <p className={styles.payDate}>Every Friday</p>
         </div>
         <span className={styles.chevron} aria-hidden="true">›</span>
       </Link>
