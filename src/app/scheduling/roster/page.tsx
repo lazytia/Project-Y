@@ -800,28 +800,30 @@ export default function ManagerRosterPage() {
                 })}
               </div>
             </div>
-            <div className={styles.cardSubHead}>
-              <span className={styles.cardIcon}><NoteIcon /></span>
-              <p className={styles.cardTitle}>Notes</p>
-              {prevWeekDoc.notesAuthor && (
-                <span className={styles.notesMeta}>{prevWeekDoc.notesAuthor}</span>
-              )}
+            <div className={styles.prevNotesWrap}>
+              <div className={styles.cardSubHead}>
+                <span className={styles.cardIcon}><NoteIcon /></span>
+                <p className={styles.cardTitle}>Notes</p>
+                {prevWeekDoc.notesAuthor && (
+                  <span className={styles.notesMeta}>{prevWeekDoc.notesAuthor}</span>
+                )}
+              </div>
+              <ul className={styles.notesList}>
+                {prevWeekDays.map((d, i) => {
+                  const iso = isoDate(d);
+                  const value = prevWeekDoc.notes?.[iso] ?? "";
+                  return (
+                    <li key={iso} className={styles.noteRow}>
+                      <div className={styles.noteDayCol}>
+                        <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
+                        <span className={styles.noteDate}>{fmtMonDay(d)}</span>
+                      </div>
+                      <span className={styles.noteReadOnly}>{value}</span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-            <ul className={styles.notesList}>
-              {prevWeekDays.map((d, i) => {
-                const iso = isoDate(d);
-                const value = prevWeekDoc.notes?.[iso] ?? "";
-                return (
-                  <li key={iso} className={styles.noteRow}>
-                    <div className={styles.noteDayCol}>
-                      <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
-                      <span className={styles.noteDate}>{fmtMonDay(d)}</span>
-                    </div>
-                    <span className={styles.noteReadOnly}>{value}</span>
-                  </li>
-                );
-              })}
-            </ul>
           </div>
         )}
       </section>
