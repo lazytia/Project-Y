@@ -309,19 +309,33 @@ export default function HrNoteDetailPage({
               <h2 className={styles.contentTitle}>{label}</h2>
               {isPhotoField ? (
                 isImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={value}
-                    alt={label}
-                    style={{
-                      width: "100%",
-                      maxHeight: 320,
-                      objectFit: "cover",
-                      borderRadius: "var(--radius-md)",
-                      border: "1px solid var(--color-border)",
-                      display: "block",
-                    }}
-                  />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={value}
+                      alt={label}
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        img.style.display = "none";
+                        const fallback = img.nextElementSibling as HTMLElement | null;
+                        if (fallback) fallback.style.display = "block";
+                      }}
+                      style={{
+                        width: "100%",
+                        maxHeight: 320,
+                        objectFit: "cover",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--color-border)",
+                        display: "block",
+                      }}
+                    />
+                    <div
+                      className={styles.bodyBox}
+                      style={{ display: "none", color: "var(--color-fg-muted)", fontStyle: "italic" }}
+                    >
+                      Photo unavailable — re-attach via Edit.
+                    </div>
+                  </>
                 ) : (
                   <div
                     className={styles.bodyBox}

@@ -175,6 +175,46 @@ function todayISO(): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Resize an image file via canvas so the resulting data URL stays well
+ * inside Firestore's 1 MB per-document limit. Long side is capped at
+ * MAX_DIM and the JPEG quality is tuned to land under ~600 KB.
+ */
+async function fileToCompressedDataUrl(file: File): Promise<string> {
+  const MAX_DIM = 1280;
+  const QUALITY = 0.78;
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = reader.result;
+      if (typeof r === "string") resolve(r);
+      else reject(new Error("Could not read file."));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Read failed."));
+    reader.readAsDataURL(file);
+  });
+
+  const img: HTMLImageElement = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("Could not load image."));
+    i.src = dataUrl;
+  });
+
+  const ratio = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * ratio));
+  const h = Math.max(1, Math.round(img.height * ratio));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported.");
+  ctx.drawImage(img, 0, 0, w, h);
+
+  return canvas.toDataURL("image/jpeg", QUALITY);
+}
+
 function fmtDate(iso: string): string {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
@@ -273,8 +313,14 @@ export default function AddHrNoteCategoryPage({
 
   function setField(idx: number, v: string) {
     const next = [...fieldValues];
-    const max = cfg.fields[idx]?.maxLength ?? MAX_LEN;
-    next[idx] = v.slice(0, max);
+    const field = cfg.fields[idx];
+    // Photo fields hold a data URL — don't apply a character cap.
+    if (field?.kind === "photo") {
+      next[idx] = v;
+    } else {
+      const max = field?.maxLength ?? MAX_LEN;
+      next[idx] = v.slice(0, max);
+    }
     setFieldValues(next);
   }
 
@@ -468,16 +514,20 @@ export default function AddHrNoteCategoryPage({
                     type="file"
                     accept="image/*"
                     className={styles.hiddenFile}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      // Store as data URL so the detail page can render it.
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const result = reader.result;
-                        if (typeof result === "string") setField(idx, result);
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        // Compress so the data URL fits within Firestore's
+                        // 1 MB per-document limit.
+                        const compressed = await fileToCompressedDataUrl(file);
+                        setField(idx, compressed);
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : "Could not process the image.");
+                      } finally {
+                        // Reset so picking the same file again still fires.
+                        e.target.value = "";
+                      }
                     }}
                   />
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
