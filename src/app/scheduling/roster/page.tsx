@@ -801,7 +801,7 @@ export default function ManagerRosterPage() {
               </div>
             </div>
             <div className={styles.prevNotesWrap}>
-              <div className={styles.cardSubHead}>
+              <div className={styles.cardHead}>
                 <span className={styles.cardIcon}><NoteIcon /></span>
                 <p className={styles.cardTitle}>Notes</p>
                 {prevWeekDoc.notesAuthor && (
