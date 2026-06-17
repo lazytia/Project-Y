@@ -238,7 +238,11 @@ export default function ManagerRosterPage() {
   const [nextWeekDoc, setNextWeekDoc] = useState<RosterWeekDoc>({});
   const [prevWeekDoc, setPrevWeekDoc] = useState<RosterWeekDoc>({});
   const [modalCell, setModalCell] = useState<{ iso: string; meal: Meal; weekKey: string } | null>(null);
-  const [noteModal, setNoteModal] = useState<{ label: string; text: string } | null>(null);
+  const [noteModal, setNoteModal] = useState<{
+    label: string; text: string; iso: string; weekKey: "current" | "next" | "prev";
+  } | null>(null);
+  const [noteModalEditing, setNoteModalEditing] = useState(false);
+  const [noteModalDraft, setNoteModalDraft] = useState("");
   const [pendingStart, setPendingStart] = useState<string>("");
   const [savingShift, setSavingShift] = useState(false);
 
@@ -622,7 +626,9 @@ export default function ManagerRosterPage() {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (value) {
-                          setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value });
+                          setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value, iso, weekKey: "current" });
+                          setNoteModalEditing(false);
+                          setNoteModalDraft(value);
                         } else {
                           setEditingNote(iso);
                         }
@@ -745,7 +751,9 @@ export default function ManagerRosterPage() {
                       className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
                       onClick={() => {
                         if (value) {
-                          setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value });
+                          setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value, iso, weekKey: "next" });
+                          setNoteModalEditing(false);
+                          setNoteModalDraft(value);
                         } else {
                           setEditingNoteNext(iso);
                         }
@@ -836,7 +844,11 @@ export default function ManagerRosterPage() {
                         <button
                           type="button"
                           className={styles.noteBtn}
-                          onClick={() => setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value })}
+                          onClick={() => {
+                            setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value, iso, weekKey: "prev" });
+                            setNoteModalEditing(false);
+                            setNoteModalDraft(value);
+                          }}
                         >
                           {value}
                         </button>
@@ -960,18 +972,70 @@ export default function ManagerRosterPage() {
           role="dialog"
           aria-modal="true"
           aria-label="Note"
-          onClick={() => setNoteModal(null)}
+          onClick={() => { setNoteModal(null); setNoteModalEditing(false); }}
         >
           <div className={styles.noteModalBox} onClick={(e) => e.stopPropagation()}>
             <p className={styles.noteModalLabel}>{noteModal.label}</p>
-            <p className={styles.noteModalText}>{noteModal.text}</p>
-            <button
-              type="button"
-              className={styles.noteModalClose}
-              onClick={() => setNoteModal(null)}
-            >
-              Close
-            </button>
+
+            {noteModalEditing ? (
+              <textarea
+                autoFocus
+                className={styles.noteModalTextarea}
+                value={noteModalDraft}
+                onChange={(e) => setNoteModalDraft(e.target.value)}
+                rows={4}
+              />
+            ) : (
+              <p className={styles.noteModalText}>{noteModal.text}</p>
+            )}
+
+            <div className={styles.noteModalActions}>
+              {noteModal.weekKey !== "prev" && (
+                <>
+                  {noteModalEditing ? (
+                    <button
+                      type="button"
+                      className={`${styles.noteModalBtn} ${styles.noteModalBtnPrimary}`}
+                      onClick={async () => {
+                        const fn = noteModal.weekKey === "next" ? saveNextNote : saveNote;
+                        await fn(noteModal.iso, noteModalDraft);
+                        setNoteModal((prev) => prev ? { ...prev, text: noteModalDraft } : null);
+                        setNoteModalEditing(false);
+                      }}
+                    >
+                      Save
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`${styles.noteModalBtn} ${styles.noteModalBtnSecondary}`}
+                      onClick={() => setNoteModalEditing(true)}
+                    >
+                      Edit
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={`${styles.noteModalBtn} ${styles.noteModalBtnDanger}`}
+                    onClick={async () => {
+                      const fn = noteModal.weekKey === "next" ? saveNextNote : saveNote;
+                      await fn(noteModal.iso, "");
+                      setNoteModal(null);
+                      setNoteModalEditing(false);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className={`${styles.noteModalBtn} ${styles.noteModalBtnClose}`}
+                onClick={() => { setNoteModal(null); setNoteModalEditing(false); }}
+              >
+                {noteModalEditing ? "Cancel" : "Close"}
+              </button>
+            </div>
           </div>
         </div>
       )}

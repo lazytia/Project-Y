@@ -814,12 +814,29 @@
   word-break: break-word;
 }
 
-.noteModalClose {
-  align-self: flex-end;
-  margin-top: var(--space-1);
-  padding: 8px 20px;
-  background: var(--color-warm);
-  color: #fff;
+.noteModalTextarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--color-fg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.noteModalActions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.noteModalBtn {
+  padding: 8px 18px;
   border: none;
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
@@ -827,6 +844,11 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+.noteModalBtnPrimary  { background: var(--color-warm); color: #fff; }
+.noteModalBtnSecondary { background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border); }
+.noteModalBtnDanger   { background: transparent; color: #e53935; border: 1px solid #e53935; }
+.noteModalBtnClose    { background: var(--color-surface); color: var(--color-fg-muted); border: 1px solid var(--color-border); }
 
 /* ── Phone ── */
 @media (max-width: 520px) {
