@@ -125,10 +125,12 @@ function kindClass(kind: NoteKind): string {
 }
 
 function summaryOf(fields: Record<string, string>): string {
-  for (const v of Object.values(fields ?? {})) {
+  for (const [label, v] of Object.entries(fields ?? {})) {
     if (typeof v !== "string") continue;
     const t = v.trim();
     if (!t || t.startsWith("data:image/")) continue;
+    // Skip legacy photo-field filenames so they don't appear as the snippet.
+    if (/photo|attach/i.test(label)) continue;
     return t.length > 80 ? t.slice(0, 80) + "…" : t;
   }
   return "";
@@ -299,12 +301,36 @@ export default function HrNoteDetailPage({
       {/* Render each saved field */}
       <section className={styles.contentCard}>
         {Object.entries(note.fields ?? {}).map(([label, value], idx) => {
-          if (!value) return null;
+          const isPhotoField = /photo|attach/i.test(label);
           const isImage = typeof value === "string" && value.startsWith("data:image/");
+          if (!value && !isPhotoField) return null;
           return (
             <div key={label} style={idx > 0 ? { marginTop: "var(--space-5)" } : undefined}>
               <h2 className={styles.contentTitle}>{label}</h2>
-              {isImage ? (
+              {isPhotoField ? (
+                isImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={value}
+                    alt={label}
+                    style={{
+                      width: "100%",
+                      maxHeight: 320,
+                      objectFit: "cover",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--color-border)",
+                      display: "block",
+                    }}
+                  />
+                ) : (
+                  <div
+                    className={styles.bodyBox}
+                    style={{ color: "var(--color-fg-muted)", fontStyle: "italic" }}
+                  >
+                    {value ? "Photo unavailable — re-attach via Edit." : "No photo attached."}
+                  </div>
+                )
+              ) : isImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={value}

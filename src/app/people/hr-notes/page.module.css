@@ -476,6 +476,89 @@
   flex-shrink: 0;
 }
 
+.empChev {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-fg-muted);
+  transition: transform 0.18s;
+  margin-left: 4px;
+}
+
+.empChevOpen { transform: rotate(180deg); }
+
+.empRowOpen { background: var(--color-surface); }
+
+/* ── Expanded sub-notes ── */
+.subNoteList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.empList li:last-child .subNoteList { border-bottom: none; }
+
+.subNoteRow {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 10px var(--space-4) 10px calc(var(--space-4) + 8px);
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.subNoteRow:hover { background: var(--color-bg); }
+
+.subNoteIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.subNoteBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.subNoteKind {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.subNoteText {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.subNoteDate {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+}
+
 .chev {
   font-size: 22px;
   color: var(--color-fg-muted);

@@ -114,11 +114,13 @@ function fmtTime(d: Date | null): string {
 
 function pickBody(fields: Record<string, string>): string {
   // First non-empty field is what we show as the timeline body. Skip
-  // image data URLs (photo attachments) since they aren't readable text.
-  for (const v of Object.values(fields ?? {})) {
+  // image data URLs and legacy photo-field filenames so the snippet is
+  // always readable text.
+  for (const [label, v] of Object.entries(fields ?? {})) {
     if (typeof v !== "string") continue;
     const t = v.trim();
     if (!t || t.startsWith("data:image/")) continue;
+    if (/photo|attach/i.test(label)) continue;
     return t;
   }
   return "";
@@ -178,6 +180,7 @@ export default function HrNotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -251,6 +254,7 @@ export default function HrNotesPage() {
       const last = notesForMember[0];
       return {
         ...m,
+        notes: notesForMember,
         notesCount: notesForMember.length,
         lastKind: last?.kind,
         lastAt: last?.createdAt ?? null,
@@ -273,8 +277,9 @@ export default function HrNotesPage() {
     router.push("/people/hr-notes/add");
   }
 
-  function openMember(m: Member) {
-    alert(`${m.firstName} ${m.lastName} — notes detail page coming soon.`);
+  function toggleMember(id: string, hasNotes: boolean) {
+    if (!hasNotes) return;
+    setExpandedId((cur) => (cur === id ? null : id));
   }
 
   function openNote(n: Note) {
@@ -428,45 +433,84 @@ export default function HrNotesPage() {
             <p className={styles.empty}>No team members match.</p>
           ) : (
             <ul className={styles.empList}>
-              {byEmployee.map((m) => (
-                <li key={m.id}>
-                  <button type="button" className={styles.empRow} onClick={() => openMember(m)}>
-                    <div className={styles.empBody}>
-                      <p className={styles.empName}>{m.firstName} {m.lastName}</p>
-                      <p className={styles.empSub}>
-                        <span>{m.role}</span>
-                        {m.active && (
+              {byEmployee.map((m) => {
+                const isOpen = expandedId === m.id;
+                const hasNotes = m.notesCount > 0;
+                return (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      className={`${styles.empRow} ${isOpen ? styles.empRowOpen : ""}`}
+                      onClick={() => toggleMember(m.id, hasNotes)}
+                      aria-expanded={hasNotes ? isOpen : undefined}
+                      aria-controls={hasNotes ? `notes-${m.id}` : undefined}
+                    >
+                      <div className={styles.empBody}>
+                        <p className={styles.empName}>{m.firstName} {m.lastName}</p>
+                        <p className={styles.empSub}>
+                          <span>{m.role}</span>
+                          {m.active && (
+                            <>
+                              <span className={styles.dotSep} aria-hidden="true">·</span>
+                              <span className={styles.activeText}>
+                                <span className={styles.dotGreen} aria-hidden="true" />
+                                Active
+                              </span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <div className={styles.empMeta}>
+                        {hasNotes && m.lastKind ? (
                           <>
-                            <span className={styles.dotSep} aria-hidden="true">·</span>
-                            <span className={styles.activeText}>
-                              <span className={styles.dotGreen} aria-hidden="true" />
-                              Active
+                            <span className={`${styles.empTypeIcon} ${kindClass(m.lastKind)}`} aria-hidden="true">
+                              {kindIcon(m.lastKind, 14)}
                             </span>
+                            <div className={styles.empMetaText}>
+                              <p className={styles.notesCount}>
+                                <strong>{m.notesCount}</strong> {m.notesCount === 1 ? "note" : "notes"}
+                              </p>
+                              <p className={styles.lastDate}>{m.lastAt ? fmtDate(m.lastAt) : ""}</p>
+                            </div>
                           </>
+                        ) : (
+                          <p className={styles.noNotes}>No notes</p>
                         )}
-                      </p>
-                    </div>
-                    <div className={styles.empMeta}>
-                      {m.notesCount > 0 && m.lastKind ? (
-                        <>
-                          <span className={`${styles.empTypeIcon} ${kindClass(m.lastKind)}`} aria-hidden="true">
-                            {kindIcon(m.lastKind, 14)}
-                          </span>
-                          <div className={styles.empMetaText}>
-                            <p className={styles.notesCount}>
-                              <strong>{m.notesCount}</strong> {m.notesCount === 1 ? "note" : "notes"}
-                            </p>
-                            <p className={styles.lastDate}>{m.lastAt ? fmtDate(m.lastAt) : ""}</p>
-                          </div>
-                        </>
-                      ) : (
-                        <p className={styles.noNotes}>No notes</p>
+                      </div>
+                      {hasNotes && (
+                        <span className={`${styles.empChev} ${isOpen ? styles.empChevOpen : ""}`} aria-hidden="true">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </span>
                       )}
-                    </div>
-                    <span className={styles.chev} aria-hidden="true">›</span>
-                  </button>
-                </li>
-              ))}
+                    </button>
+
+                    {isOpen && hasNotes && (
+                      <ul id={`notes-${m.id}`} className={styles.subNoteList}>
+                        {m.notes.map((n) => (
+                          <li key={n.id}>
+                            <button
+                              type="button"
+                              className={styles.subNoteRow}
+                              onClick={() => openNote(n)}
+                            >
+                              <span className={`${styles.subNoteIcon} ${kindClass(n.kind)}`} aria-hidden="true">
+                                {kindIcon(n.kind, 14)}
+                              </span>
+                              <div className={styles.subNoteBody}>
+                                <p className={styles.subNoteKind}>{n.kind}</p>
+                                {n.body && <p className={styles.subNoteText}>{n.body}</p>}
+                              </div>
+                              <span className={styles.subNoteDate}>{fmtDate(n.createdAt)}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </>
