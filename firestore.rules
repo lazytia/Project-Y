@@ -35,6 +35,12 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // Cash payments: owner + manager only. Tracks every recorded
+    // cash payment to candidates or active employees.
+    match /cash_payments/{paymentId} {
+      allow read, write: if isOwner();
+    }
+
     // HR notes: manager-only. Each note records a Formal Warning,
     // Performance Review, Incident Report, or Other note for a staff
     // member. Staff never see this collection.
