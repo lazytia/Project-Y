@@ -302,7 +302,11 @@ export default function HrNoteDetailPage({
       <section className={styles.contentCard}>
         {Object.entries(note.fields ?? {}).map(([label, value], idx) => {
           const isPhotoField = /photo|attach/i.test(label);
-          const isImage = typeof value === "string" && value.startsWith("data:image/");
+          const isImage =
+            typeof value === "string" &&
+            (value.startsWith("data:image/") ||
+              value.startsWith("https://") ||
+              value.startsWith("http://"));
           if (!value && !isPhotoField) return null;
           return (
             <div key={label} style={idx > 0 ? { marginTop: "var(--space-5)" } : undefined}>

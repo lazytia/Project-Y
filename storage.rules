@@ -6,5 +6,14 @@ service firebase.storage {
     match /staff_onboarding/{uid}/{allPaths=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // HR note attachments — any signed-in user (owners/managers) can
+    // read or write. Cap uploads at 5 MB and image types only.
+    match /hr_notes/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches("image/.*");
+    }
   }
 }

@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
-import { getDb } from "@/lib/firebase";
+import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
+import { getDb, getStorage } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -176,13 +177,13 @@ function todayISO(): string {
 }
 
 /**
- * Resize an image file via canvas so the resulting data URL stays well
- * inside Firestore's 1 MB per-document limit. Long side is capped at
- * MAX_DIM and the JPEG quality is tuned to land under ~600 KB.
+ * Resize an image file via canvas before upload so the file stays
+ * reasonable and consistent in storage. Long side is capped at MAX_DIM
+ * and quality is tuned to ~0.85 JPEG.
  */
-async function fileToCompressedDataUrl(file: File): Promise<string> {
-  const MAX_DIM = 1280;
-  const QUALITY = 0.78;
+async function compressImageFile(file: File): Promise<Blob> {
+  const MAX_DIM = 1600;
+  const QUALITY = 0.85;
   const dataUrl: string = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -212,7 +213,27 @@ async function fileToCompressedDataUrl(file: File): Promise<string> {
   if (!ctx) throw new Error("Canvas not supported.");
   ctx.drawImage(img, 0, 0, w, h);
 
-  return canvas.toDataURL("image/jpeg", QUALITY);
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Could not encode image."))),
+      "image/jpeg",
+      QUALITY,
+    );
+  });
+}
+
+/**
+ * Upload a (compressed) image to Firebase Storage under hr_notes/ and
+ * return its public download URL. Stored in Firestore in place of the
+ * old inline data URL, so photos persist beyond Firestore's 1 MB cap.
+ */
+async function uploadHrNotePhoto(file: File, employeeUid: string): Promise<string> {
+  const blob = await compressImageFile(file);
+  const rand = Math.random().toString(36).slice(2, 10);
+  const path = `hr_notes/${employeeUid}/${Date.now()}_${rand}.jpg`;
+  const ref = storageRef(getStorage(), path);
+  await uploadBytes(ref, blob, { contentType: "image/jpeg" });
+  return await getDownloadURL(ref);
 }
 
 function fmtDate(iso: string): string {
@@ -516,14 +537,15 @@ export default function AddHrNoteCategoryPage({
                     className={styles.hiddenFile}
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
-                      if (!file) return;
+                      if (!file || !selected) return;
                       try {
-                        // Compress so the data URL fits within Firestore's
-                        // 1 MB per-document limit.
-                        const compressed = await fileToCompressedDataUrl(file);
-                        setField(idx, compressed);
+                        // Upload to Firebase Storage so the photo persists
+                        // beyond Firestore's 1 MB doc cap and is accessible
+                        // from any device.
+                        const url = await uploadHrNotePhoto(file, selected.id);
+                        setField(idx, url);
                       } catch (err) {
-                        alert(err instanceof Error ? err.message : "Could not process the image.");
+                        alert(err instanceof Error ? err.message : "Could not upload the image.");
                       } finally {
                         // Reset so picking the same file again still fires.
                         e.target.value = "";
@@ -536,21 +558,29 @@ export default function AddHrNoteCategoryPage({
                   </svg>
                   <span>{fieldValues[idx] ? "Change Photo" : "Add Photo"}</span>
                 </label>
-                {fieldValues[idx]?.startsWith("data:image/") && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={fieldValues[idx]}
-                    alt="Attached"
-                    style={{
-                      marginTop: "var(--space-2)",
-                      width: "100%",
-                      maxHeight: 280,
-                      objectFit: "cover",
-                      borderRadius: "var(--radius-md)",
-                      border: "1px solid var(--color-border)",
-                    }}
-                  />
-                )}
+                {(() => {
+                  const v = fieldValues[idx] ?? "";
+                  const isImg =
+                    v.startsWith("data:image/") ||
+                    v.startsWith("https://") ||
+                    v.startsWith("http://");
+                  if (!isImg) return null;
+                  return (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={v}
+                      alt="Attached"
+                      style={{
+                        marginTop: "var(--space-2)",
+                        width: "100%",
+                        maxHeight: 280,
+                        objectFit: "cover",
+                        borderRadius: "var(--radius-md)",
+                        border: "1px solid var(--color-border)",
+                      }}
+                    />
+                  );
+                })()}
               </>
             )}
           </section>
