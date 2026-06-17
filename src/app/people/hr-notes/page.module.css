@@ -351,8 +351,11 @@
 }
 
 .empRow {
+  /* Avatar · body · type-icon · meta (fixed) · chevron — fixed meta width
+     keeps every row's icon at the same x-position regardless of how long
+     the "Last: …" line is. */
   display: grid;
-  grid-template-columns: 48px 1fr 44px auto auto;
+  grid-template-columns: 48px 1fr 44px 160px auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -560,10 +563,13 @@
   }
   .timelineBody .chev { display: none; }
   .empRow {
-    grid-template-columns: 44px 1fr 36px auto;
+    /* Same fixed-meta trick on phone — keeps every type-icon at the same
+       x position regardless of whether the meta column reads "0 Notes / —"
+       or "1 Note / Last: Performance Review / 03 June 2026". */
+    grid-template-columns: 44px 1fr 36px 120px;
     padding: var(--space-3);
   }
   .empRow > .chev { display: none; }
   .empTypeIcon { width: 36px; height: 36px; }
-  .empMeta { min-width: 100px; }
+  .empMeta { min-width: 0; }
 }
