@@ -244,6 +244,30 @@
   font-weight: 600;
 }
 
+/* ── Search input ── */
+.searchInput {
+  margin-left: auto;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-fg);
+  outline: none;
+  width: 140px;
+  transition: border-color 0.15s;
+}
+
+.searchInput::placeholder {
+  color: var(--color-fg-muted);
+}
+
+.searchInput:focus {
+  border-color: var(--color-warm);
+}
+
 /* ── History badges ── */
 .historyBadge {
   flex-shrink: 0;

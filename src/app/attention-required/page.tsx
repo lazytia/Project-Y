@@ -249,6 +249,7 @@ export default function AttentionRequiredPage() {
   const [loading, setLoading] = useState(true);
   const [staffDocs, setStaffDocs] = useState<StaffDoc[]>([]);
   const [busy, setBusy] = useState<string | null>(null); // request id being decided
+  const [searchQuery, setSearchQuery] = useState("");
 
   function setFilter(next: Filter) {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
@@ -358,7 +359,13 @@ export default function AttentionRequiredPage() {
     (r) => (r.kind === "holiday" && showHoliday) || (r.kind === "availability" && showAvailability),
   );
   const visibleRequests = filteredRequests.filter((r) => r.status === "pending");
-  const historyRequests = filteredRequests.filter((r) => r.status !== "pending");
+  const historyRequestsAll = filteredRequests.filter((r) => r.status !== "pending");
+  const historyRequests = searchQuery.trim()
+    ? historyRequestsAll.filter((r) => {
+        const q = searchQuery.trim().toLowerCase();
+        return r.firstName.toLowerCase().includes(q) || r.lastName.toLowerCase().includes(q);
+      })
+    : historyRequestsAll;
   const visibleOnboarding = showOnboarding ? onboarding : [];
   const visibleCompliance = showCompliance ? compliance : [];
 
@@ -516,7 +523,7 @@ export default function AttentionRequiredPage() {
       )}
 
       {/* HISTORY */}
-      {(showHoliday || showAvailability) && historyRequests.length > 0 && (
+      {(showHoliday || showAvailability) && historyRequestsAll.length > 0 && (
       <section>
         <div className={styles.sectionHead}>
           <span className={styles.sectionIcon} aria-hidden="true">
@@ -527,8 +534,18 @@ export default function AttentionRequiredPage() {
           </span>
           <p className={styles.sectionLabel}>HISTORY</p>
           <span className={styles.sectionCount}>{historyRequests.length}</span>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search by name…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
 
+        {historyRequests.length === 0 ? (
+          <p className={styles.empty}>No results for &ldquo;{searchQuery.trim()}&rdquo;</p>
+        ) : (
         <ul className={styles.list}>
           {historyRequests.map((r) => (
             <li key={r.id} className={styles.card}>
@@ -582,6 +599,7 @@ export default function AttentionRequiredPage() {
             </li>
           ))}
         </ul>
+        )}
       </section>
       )}
 
