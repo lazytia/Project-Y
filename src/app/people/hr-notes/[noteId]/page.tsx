@@ -185,7 +185,7 @@ export default function HrNoteDetailPage({
 
   return (
     <div className={styles.page}>
-      {/* Black top bar */}
+      {/* Light top bar — back left, delete right */}
       <div className={styles.topbar}>
         <button
           type="button"
@@ -197,7 +197,7 @@ export default function HrNoteDetailPage({
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <p className={styles.topbarTitle}>HR Note Details</p>
+        <span />
         <button
           type="button"
           className={styles.iconBtn}

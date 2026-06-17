@@ -8,16 +8,15 @@
   gap: var(--space-4);
 }
 
-/* ── Top bar (black) ── */
+/* ── Top bar ── */
 .topbar {
   display: grid;
   grid-template-columns: 36px 1fr 36px;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: #111;
-  color: #fff;
-  margin: 0 calc(-1 * var(--space-5)) var(--space-4);
+  padding: var(--space-3) 0;
+  background: transparent;
+  color: var(--color-fg);
 }
 
 .iconBtn {
@@ -30,10 +29,10 @@
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  color: #fff;
+  color: var(--color-fg);
 }
 
-.iconBtn:hover { background: rgba(255, 255, 255, 0.1); }
+.iconBtn:hover { background: var(--color-surface); }
 
 .topbarTitle {
   margin: 0;
