@@ -64,14 +64,41 @@ type StaffDoc = {
   availabilityRequests?: StoredAvailabilityRequest[];
 };
 
+type Meal = "lunch" | "dinner";
+
+type ShiftAssignments = Record<string, string>; // staffUid → "HH:MM" start time
+
 type RosterWeekDoc = {
-  /** counts[ISO date]["lunch" | "dinner"] = number of staff rostered */
+  /** assignments[ISO date]["lunch" | "dinner"][uid] = "HH:MM" start time */
+  assignments?: Record<string, Record<Meal, ShiftAssignments>>;
+  /** counts[ISO date]["lunch" | "dinner"] = number of staff rostered (derived) */
   counts?: Record<string, { lunch?: number; dinner?: number }>;
   /** notes[ISO date] = single free-text note */
   notes?: Record<string, string>;
   notesAuthor?: string;
   notesUpdatedAt?: Timestamp;
 };
+
+const LUNCH_STARTS = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00"];
+const DINNER_STARTS = ["16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"];
+
+const STAFF_COLORS = [
+  "#e91e63", "#9c27b0", "#ff7043", "#26a69a", "#42a5f5",
+  "#ffb300", "#ec407a", "#26c6da", "#7e57c2", "#66bb6a",
+];
+
+function colorForUid(uid: string): string {
+  let h = 0;
+  for (let i = 0; i < uid.length; i += 1) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
+  return STAFF_COLORS[h % STAFF_COLORS.length];
+}
+
+function staffRoleLabel(role: string | undefined): string {
+  if (role === "manager") return "MANAGER";
+  if (role === "chef") return "CHEF";
+  if (role === "owner") return "OWNER";
+  return "STAFF";
+}
 
 type HolidayItem = {
   id: string;
@@ -96,9 +123,11 @@ type StaffAvailRow = {
   availability: Record<string, DayAvailability>;
 };
 
-const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-const DAY_LABELS_LONG = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const DAY_LABELS_LONG = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_LABELS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat"] as const;
+const DAYS_IN_WEEK = 6;
 
 /* ── helpers ── */
 
@@ -202,6 +231,9 @@ export default function ManagerRosterPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [showAvail, setShowAvail] = useState(false);
+  const [modalCell, setModalCell] = useState<{ iso: string; meal: Meal } | null>(null);
+  const [pendingStart, setPendingStart] = useState<string>("");
+  const [savingShift, setSavingShift] = useState(false);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -210,9 +242,9 @@ export default function ManagerRosterPage() {
   }, []);
   const weekStart = useMemo(() => startOfWeek(today), [today]);
   const weekStartISO = useMemo(() => isoDate(weekStart), [weekStart]);
-  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekEnd = useMemo(() => addDays(weekStart, DAYS_IN_WEEK - 1), [weekStart]);
   const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    () => Array.from({ length: DAYS_IN_WEEK }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   );
 
@@ -308,6 +340,58 @@ export default function ManagerRosterPage() {
     }
   }
 
+  async function saveAssignments(
+    iso: string,
+    meal: Meal,
+    next: ShiftAssignments,
+  ) {
+    setSavingShift(true);
+    try {
+      const allAssignments = { ...(weekDoc.assignments ?? {}) };
+      const dayAssignments = { ...(allAssignments[iso] ?? { lunch: {}, dinner: {} }) };
+      dayAssignments[meal] = next;
+      allAssignments[iso] = dayAssignments;
+
+      const counts = { ...(weekDoc.counts ?? {}) };
+      counts[iso] = {
+        ...(counts[iso] ?? {}),
+        lunch: Object.keys(dayAssignments.lunch ?? {}).length,
+        dinner: Object.keys(dayAssignments.dinner ?? {}).length,
+      };
+
+      await setDoc(
+        doc(getDb(), "rosters_published", weekStartISO),
+        { assignments: allAssignments, counts },
+        { merge: true },
+      );
+      setWeekDoc((prev) => ({ ...prev, assignments: allAssignments, counts }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save shift.");
+    } finally {
+      setSavingShift(false);
+    }
+  }
+
+  function assignedFor(iso: string, meal: Meal): ShiftAssignments {
+    return weekDoc.assignments?.[iso]?.[meal] ?? {};
+  }
+
+  async function assignStaff(uid: string, startTime: string) {
+    if (!modalCell) return;
+    const cur = assignedFor(modalCell.iso, modalCell.meal);
+    if (cur[uid] === startTime) return;
+    await saveAssignments(modalCell.iso, modalCell.meal, { ...cur, [uid]: startTime });
+  }
+
+  async function removeStaff(uid: string) {
+    if (!modalCell) return;
+    const cur = assignedFor(modalCell.iso, modalCell.meal);
+    if (!(uid in cur)) return;
+    const next = { ...cur };
+    delete next[uid];
+    await saveAssignments(modalCell.iso, modalCell.meal, next);
+  }
+
   async function saveNote(iso: string, text: string) {
     if (!user) return;
     const trimmed = text.trim();
@@ -374,11 +458,20 @@ export default function ManagerRosterPage() {
             <SunIcon /> Lunch
           </div>
           {weekDays.map((d, i) => {
-            const c = weekDoc.counts?.[isoDate(d)]?.lunch ?? 0;
+            const iso = isoDate(d);
+            const n = Object.keys(weekDoc.assignments?.[iso]?.lunch ?? {}).length;
             return (
-              <div key={i} className={styles.gridCell}>
-                <DotCount n={c} />
-              </div>
+              <button
+                key={i}
+                type="button"
+                className={styles.gridCell}
+                onClick={() => {
+                  setPendingStart(LUNCH_STARTS[2]);
+                  setModalCell({ iso, meal: "lunch" });
+                }}
+              >
+                <DotCount n={n} />
+              </button>
             );
           })}
         </div>
@@ -387,11 +480,20 @@ export default function ManagerRosterPage() {
             <MoonIcon /> Dinner
           </div>
           {weekDays.map((d, i) => {
-            const c = weekDoc.counts?.[isoDate(d)]?.dinner ?? 0;
+            const iso = isoDate(d);
+            const n = Object.keys(weekDoc.assignments?.[iso]?.dinner ?? {}).length;
             return (
-              <div key={i} className={styles.gridCell}>
-                <DotCount n={c} />
-              </div>
+              <button
+                key={i}
+                type="button"
+                className={styles.gridCell}
+                onClick={() => {
+                  setPendingStart(DINNER_STARTS[2]);
+                  setModalCell({ iso, meal: "dinner" });
+                }}
+              >
+                <DotCount n={n} />
+              </button>
             );
           })}
         </div>
@@ -553,6 +655,143 @@ export default function ManagerRosterPage() {
           </ul>
         )}
       </section>
+
+      {/* Day-meal assignment modal */}
+      {modalCell && (() => {
+        const cellDate = (() => {
+          const [y, m, d] = modalCell.iso.split("-").map(Number);
+          return new Date(y, m - 1, d);
+        })();
+        const dowIdx = (cellDate.getDay() + 6) % 7;
+        const longDow = DAY_LABELS_FULL[dowIdx] ?? DAY_LABELS_LONG[dowIdx];
+        const cur = assignedFor(modalCell.iso, modalCell.meal);
+        const assignedCount = Object.keys(cur).length;
+        const starts = modalCell.meal === "lunch" ? LUNCH_STARTS : DINNER_STARTS;
+        return (
+          <div
+            className={styles.modalBackdrop}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Assign shift"
+            onClick={() => setModalCell(null)}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <header className={styles.modalHead}>
+                <div className={styles.modalTitleWrap}>
+                  <h2 className={styles.modalTitle}>
+                    {longDow}, {fmtMonDay(cellDate)}
+                  </h2>
+                  <p className={styles.modalSub}>
+                    {modalCell.meal === "lunch" ? "Lunch" : "Dinner"}
+                  </p>
+                </div>
+                <span className={styles.modalCount}>{assignedCount} assigned</span>
+                <button
+                  type="button"
+                  className={styles.modalClose}
+                  onClick={() => setModalCell(null)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </header>
+
+              <section className={styles.modalSection}>
+                <p className={styles.modalSectionLabel}>START TIME</p>
+                <div className={styles.timePills}>
+                  {starts.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`${styles.timePill} ${pendingStart === t ? styles.timePillActive : ""}`}
+                      onClick={() => setPendingStart(t)}
+                    >
+                      {t} Start
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className={styles.modalSection}>
+                <p className={styles.modalSectionLabel}>TEMPORARY STAFF</p>
+                <div className={styles.tempRow}>
+                  <button
+                    type="button"
+                    className={`${styles.tempPill} ${styles.tempPillKitchen}`}
+                    onClick={() => assignStaff(`tr_kitchen_${Date.now()}`, pendingStart)}
+                  >
+                    + TR Kitchen Staff
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.tempPill} ${styles.tempPillHall}`}
+                    onClick={() => assignStaff(`tr_hall_${Date.now()}`, pendingStart)}
+                  >
+                    + TR Hall Staff
+                  </button>
+                </div>
+              </section>
+
+              <ul className={styles.staffList}>
+                {[
+                  ...staffDocs.map((d) => ({
+                    uid: d.uid,
+                    name: displayName(d),
+                    role: staffRoleLabel(d.role),
+                    isTemp: false,
+                  })),
+                  ...Object.keys(cur)
+                    .filter((u) => u.startsWith("tr_"))
+                    .map((u) => ({
+                      uid: u,
+                      name: u.startsWith("tr_kitchen_") ? "TR Kitchen Staff" : "TR Hall Staff",
+                      role: "TR",
+                      isTemp: true,
+                    })),
+                ].map((s) => {
+                  const assigned = cur[s.uid];
+                  return (
+                    <li key={s.uid} className={styles.staffRow}>
+                      <span className={styles.staffDot} style={{ background: colorForUid(s.uid) }} />
+                      <span className={styles.staffName}>{s.name}</span>
+                      <span className={styles.staffRole}>{s.role}</span>
+                      <button
+                        type="button"
+                        className={`${styles.staffStartBtn} ${assigned ? styles.staffStartBtnAssigned : ""}`}
+                        disabled={savingShift}
+                        onClick={() => assignStaff(s.uid, pendingStart)}
+                      >
+                        {assigned ? `${assigned} Start` : `+ ${pendingStart} Start`}
+                      </button>
+                      {(s.isTemp || assigned) && (
+                        <button
+                          type="button"
+                          className={styles.staffRemoveBtn}
+                          disabled={savingShift}
+                          onClick={() => removeStaff(s.uid)}
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <footer className={styles.modalFoot}>
+                <button
+                  type="button"
+                  className={styles.modalDoneBtn}
+                  onClick={() => setModalCell(null)}
+                >
+                  Done
+                </button>
+              </footer>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Availability Overview (collapsible) */}
       <section className={styles.card}>

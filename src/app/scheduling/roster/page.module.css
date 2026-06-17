@@ -102,7 +102,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  padding: 6px 0;
+  border-radius: 4px;
+  transition: background 0.12s;
 }
+
+.gridCell:hover { background: var(--color-surface); }
 
 .dotGrid {
   display: grid;
@@ -452,6 +462,260 @@
   background: rgba(245, 197, 24, 0.18);
   color: #b8870a;
 }
+
+/* ── Modal ── */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 20, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-5) var(--space-4);
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.modal {
+  width: 100%;
+  max-width: 460px;
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 2 * var(--space-5));
+  overflow: hidden;
+}
+
+.modalHead {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+}
+
+.modalTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.modalSub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.modalCount {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 12px;
+  background: var(--color-surface);
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.modalClose {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--color-fg-muted);
+}
+
+.modalClose:hover { background: var(--color-surface); }
+
+.modalSection {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.modalSectionLabel {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+}
+
+.timePills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.timePill {
+  height: 30px;
+  padding: 0 12px;
+  background: var(--color-surface);
+  border: 1px solid transparent;
+  border-radius: 99px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.timePill:hover { background: var(--color-border); }
+
+.timePillActive {
+  background: #111;
+  color: #fff;
+}
+
+.timePillActive:hover { background: #111; }
+
+.tempRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tempPill {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 99px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--color-bg);
+}
+
+.tempPillKitchen {
+  border: 1px solid var(--color-warm);
+  color: var(--color-warm);
+}
+
+.tempPillKitchen:hover { background: rgba(234, 88, 12, 0.06); }
+
+.tempPillHall {
+  border: 1px solid #7e57c2;
+  color: #7e57c2;
+}
+
+.tempPillHall:hover { background: rgba(126, 87, 194, 0.06); }
+
+.staffList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.staffRow {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 12px var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.staffList li:last-child .staffRow { border-bottom: none; }
+
+.staffDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.staffName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staffRole {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-fg-muted);
+}
+
+.staffStartBtn {
+  height: 28px;
+  padding: 0 10px;
+  background: var(--color-surface);
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.staffStartBtn:hover:not(:disabled) { background: var(--color-border); }
+.staffStartBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.staffStartBtnAssigned {
+  background: rgba(234, 88, 12, 0.12);
+  color: var(--color-warm);
+}
+
+.staffStartBtnAssigned:hover:not(:disabled) {
+  background: rgba(234, 88, 12, 0.18);
+}
+
+.staffRemoveBtn {
+  width: 26px;
+  height: 26px;
+  background: rgba(220, 80, 80, 0.10);
+  border: none;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: #c14545;
+  cursor: pointer;
+}
+
+.staffRemoveBtn:hover:not(:disabled) { background: rgba(220, 80, 80, 0.18); }
+.staffRemoveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.modalFoot {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-border);
+}
+
+.modalDoneBtn {
+  height: 36px;
+  padding: 0 18px;
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-warm);
+  cursor: pointer;
+}
+
+.modalDoneBtn:hover { opacity: 0.85; }
 
 /* ── Phone ── */
 @media (max-width: 520px) {
