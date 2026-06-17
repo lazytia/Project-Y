@@ -24,7 +24,7 @@ type PaymentType = ActiveEmployeeDraft["paymentType"];
 type PaymentTypeDef = {
   value: PaymentType;
   label: string;
-  desc: React.ReactNode;
+  desc: string;
   icon: React.ReactNode;
 };
 
@@ -32,12 +32,7 @@ const PAYMENT_TYPES: PaymentTypeDef[] = [
   {
     value: "Payroll Adjustment",
     label: "Payroll Adjustment",
-    desc: (
-      <>
-        Adjustments for hours, rates,{" "}
-        <s>penalties, deductions</s>, etc.
-      </>
-    ),
+    desc: "Adjustments for hours, rates, etc.",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -59,12 +54,7 @@ const PAYMENT_TYPES: PaymentTypeDef[] = [
   {
     value: "Final Pay",
     label: "Final Pay",
-    desc: (
-      <>
-        Final payment including outstanding{" "}
-        <s>entitlements</s>, wages.
-      </>
-    ),
+    desc: "Final payment including outstanding wages.",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="5" y="3" width="14" height="18" rx="2"/>
