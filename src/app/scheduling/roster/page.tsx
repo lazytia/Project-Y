@@ -579,11 +579,6 @@ export default function ManagerRosterPage() {
         >
           <span className={styles.cardIcon}><NoteIcon /></span>
           <p className={styles.cardTitle}>Notes</p>
-          {showNotes && (
-            <span className={styles.tapHint}>
-              <EditIcon /> Tap to edit
-            </span>
-          )}
           <span className={styles.notesMeta}>
             {notesAuthor}{notesUpdatedAt ? ` · ${fmtShort(notesUpdatedAt)}` : ""}
           </span>
@@ -701,15 +696,10 @@ export default function ManagerRosterPage() {
         >
           <span className={styles.cardIcon}><NoteIcon /></span>
           <p className={styles.cardTitle}>Notes</p>
-          {showNotesNext && (
-            <span className={styles.tapHint}><EditIcon /> Tap to edit</span>
-          )}
-          {nextWeekDoc.notesAuthor && (
-            <span className={styles.notesMeta}>
-              {nextWeekDoc.notesAuthor}
-              {(() => { const d = tsDate(nextWeekDoc.notesUpdatedAt); return d ? ` · ${fmtShort(d)}` : ""; })()}
-            </span>
-          )}
+          <span className={styles.notesMeta}>
+            {nextWeekDoc.notesAuthor ?? ""}
+            {(() => { const d = tsDate(nextWeekDoc.notesUpdatedAt); return d ? ` · ${fmtShort(d)}` : ""; })()}
+          </span>
           <span className={`${styles.chev} ${showNotesNext ? styles.chevOpen : ""}`}>▾</span>
         </button>
         {showNotesNext && (
@@ -823,9 +813,7 @@ export default function ManagerRosterPage() {
                       <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
                       <span className={styles.noteDate}>{fmtMonDay(d)}</span>
                     </div>
-                    <span className={`${styles.noteReadOnly} ${!value ? styles.notePlaceholder : ""}`}>
-                      {value || "No note"}
-                    </span>
+                    <span className={styles.noteReadOnly}>{value}</span>
                   </li>
                 );
               })}
