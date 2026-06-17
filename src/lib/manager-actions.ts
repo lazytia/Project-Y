@@ -66,6 +66,9 @@ async function decideRequest(
   const snap = await getDoc(ref);
   const data = snap.data() ?? {};
   const arr = (data[field] ?? []) as RawRequest[];
+  // Snapshot of the staff member's current availability so the detail
+  // page can show "before vs after" for availability-change decisions.
+  const currentAvailability = data.availability ?? {};
   let updated: RawRequest | null = null;
   const next = arr.map((r) => {
     if (r.id !== requestId) return r;
@@ -75,6 +78,9 @@ async function decideRequest(
       decidedAt: Timestamp.now(),
       decidedBy: managerUid,
     };
+    if (field === "availabilityRequests") {
+      updated.previousAvailability = currentAvailability;
+    }
     return updated;
   });
   if (!updated) {
@@ -119,6 +125,10 @@ function buildNotification(
   title: string;
   detail: string;
   createdAt: Timestamp;
+  /** Source request type — lets the detail page find the original. */
+  requestType: "holiday" | "availability";
+  /** Source request id within the staff doc. */
+  requestId: string;
 } {
   const id = `n_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   if (field === "holidayRequests") {
@@ -137,6 +147,8 @@ function buildNotification(
           ? `Your holiday request for ${range} has been approved by management.`
           : `Your holiday request for ${range} was declined. Please speak to your manager if you have questions.`,
       createdAt: Timestamp.now(),
+      requestType: "holiday",
+      requestId: req.id,
     };
   }
   // availability
@@ -157,6 +169,8 @@ function buildNotification(
         ? `Your availability change effective ${effText} has been approved.`
         : `Your availability change effective ${effText} was declined. Please speak to your manager if you have questions.`,
     createdAt: Timestamp.now(),
+    requestType: "availability",
+    requestId: req.id,
   };
 }
 

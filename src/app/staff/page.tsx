@@ -167,7 +167,9 @@ export default function StaffDashboardPage() {
             {preview.map((n) => (
               <li key={n.id} className={styles.notifItem}>
                 <span className={styles.notifDot} aria-hidden="true" />
-                <span className={styles.notifText}>{n.label}</span>
+                <Link href={`/staff/notifications/${n.id}`} className={styles.notifText}>
+                  {n.label}
+                </Link>
                 <span className={styles.notifAgo}>{n.ago}</span>
               </li>
             ))}
@@ -251,13 +253,17 @@ export default function StaffDashboardPage() {
               {notifications.map((n) => (
                 <li key={n.id} className={styles.modalItem}>
                   <span className={styles.modalDot} aria-hidden="true" />
-                  <div className={styles.modalItemBody}>
+                  <Link
+                    href={`/staff/notifications/${n.id}`}
+                    className={styles.modalItemBody}
+                    onClick={() => setNotifOpen(false)}
+                  >
                     <div className={styles.modalItemTopRow}>
                       <span className={styles.modalItemTitle}>{n.label}</span>
                       <span className={styles.modalItemAgo}>{n.ago}</span>
                     </div>
                     <p className={styles.modalItemDetail}>{n.detail}</p>
-                  </div>
+                  </Link>
                 </li>
               ))}
             </ul>
