@@ -122,9 +122,13 @@ function fmtTime(d: Date | null): string {
 }
 
 function pickBody(fields: Record<string, string>): string {
-  // First non-empty field is what we show as the timeline body.
+  // First non-empty field is what we show as the timeline body. Skip
+  // image data URLs (photo attachments) since they aren't readable text.
   for (const v of Object.values(fields ?? {})) {
-    if (typeof v === "string" && v.trim().length > 0) return v.trim();
+    if (typeof v !== "string") continue;
+    const t = v.trim();
+    if (!t || t.startsWith("data:image/")) continue;
+    return t;
   }
   return "";
 }

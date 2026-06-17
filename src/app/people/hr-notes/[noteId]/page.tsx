@@ -126,10 +126,10 @@ function kindClass(kind: NoteKind): string {
 
 function summaryOf(fields: Record<string, string>): string {
   for (const v of Object.values(fields ?? {})) {
-    if (typeof v === "string" && v.trim().length > 0) {
-      const t = v.trim();
-      return t.length > 80 ? t.slice(0, 80) + "…" : t;
-    }
+    if (typeof v !== "string") continue;
+    const t = v.trim();
+    if (!t || t.startsWith("data:image/")) continue;
+    return t.length > 80 ? t.slice(0, 80) + "…" : t;
   }
   return "";
 }
@@ -176,7 +176,8 @@ export default function HrNoteDetailPage({
   }
 
   function handleEdit() {
-    alert("Edit — coming soon.");
+    if (!note) return;
+    router.push(`/people/hr-notes/add/${note.category}?edit=${noteId}`);
   }
 
   function handleFollowUp() {
@@ -299,10 +300,27 @@ export default function HrNoteDetailPage({
       <section className={styles.contentCard}>
         {Object.entries(note.fields ?? {}).map(([label, value], idx) => {
           if (!value) return null;
+          const isImage = typeof value === "string" && value.startsWith("data:image/");
           return (
             <div key={label} style={idx > 0 ? { marginTop: "var(--space-5)" } : undefined}>
               <h2 className={styles.contentTitle}>{label}</h2>
-              <div className={styles.bodyBox}>{value}</div>
+              {isImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={value}
+                  alt={label}
+                  style={{
+                    width: "100%",
+                    maxHeight: 320,
+                    objectFit: "cover",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--color-border)",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                <div className={styles.bodyBox}>{value}</div>
+              )}
             </div>
           );
         })}

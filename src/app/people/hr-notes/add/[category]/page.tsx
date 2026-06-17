@@ -8,6 +8,7 @@ import {
   doc,
   getDoc,
   serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
@@ -198,14 +199,48 @@ export default function AddHrNoteCategoryPage({
   if (!(category in CATEGORY_CONFIG)) notFound();
   const cfg = CATEGORY_CONFIG[category as Category];
 
-  const employeeId = searchParams.get("employee") ?? "";
+  const employeeIdParam = searchParams.get("employee") ?? "";
+  const editNoteId = searchParams.get("edit") ?? "";
+  const isEdit = !!editNoteId;
   const [selected, setSelected] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
+  const [date, setDate] = useState(todayISO());
+  const [fieldValues, setFieldValues] = useState<string[]>(() =>
+    Array(cfg.fields.length).fill(""),
+  );
+  const [checked, setChecked] = useState<boolean[]>(() =>
+    Array(cfg.checkboxes.length).fill(false),
+  );
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!employeeId) { setLoading(false); return; }
     (async () => {
       try {
+        // Edit mode: hydrate from saved note, then employee
+        let employeeId = employeeIdParam;
+        if (isEdit) {
+          const noteSnap = await getDoc(doc(getDb(), "hr_notes", editNoteId));
+          if (noteSnap.exists()) {
+            const n = noteSnap.data() as {
+              employeeUid: string;
+              date?: string;
+              fields?: Record<string, string>;
+              checkboxes?: { label: string; checked: boolean }[];
+            };
+            employeeId = n.employeeUid;
+            if (n.date) setDate(n.date);
+            setFieldValues(
+              cfg.fields.map((f) => n.fields?.[f.label] ?? ""),
+            );
+            setChecked(
+              cfg.checkboxes.map((label) =>
+                n.checkboxes?.find((c) => c.label === label)?.checked ?? false,
+              ),
+            );
+          }
+        }
+
+        if (!employeeId) return;
         const snap = await getDoc(doc(getDb(), "staff_onboarding", employeeId));
         if (snap.exists()) {
           const d = snap.data() as StaffDoc;
@@ -223,16 +258,8 @@ export default function AddHrNoteCategoryPage({
         setLoading(false);
       }
     })();
-  }, [employeeId]);
-
-  const [date, setDate] = useState(todayISO());
-  const [fieldValues, setFieldValues] = useState<string[]>(() =>
-    Array(cfg.fields.length).fill(""),
-  );
-  const [checked, setChecked] = useState<boolean[]>(() =>
-    Array(cfg.checkboxes.length).fill(false),
-  );
-  const [saving, setSaving] = useState(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeIdParam, editNoteId, isEdit]);
 
   const canSubmit =
     !saving &&
@@ -276,21 +303,29 @@ export default function AddHrNoteCategoryPage({
         emailToUsername(user.email ?? "").charAt(0).toUpperCase() +
         emailToUsername(user.email ?? "").slice(1);
 
-      await addDoc(collection(getDb(), "hr_notes"), {
-        category,
-        kind: cfg.title,
-        employeeUid: selected.id,
-        employeeName: `${selected.firstName} ${selected.lastName}`.trim(),
-        employeeRole: selected.role,
-        date,
-        fields,
-        checkboxes,
-        addedByUid: user.uid,
-        addedByName,
-        createdAt: serverTimestamp(),
-      });
-
-      router.push("/people/hr-notes");
+      if (isEdit) {
+        await updateDoc(doc(getDb(), "hr_notes", editNoteId), {
+          date,
+          fields,
+          checkboxes,
+        });
+        router.push(`/people/hr-notes/${editNoteId}`);
+      } else {
+        await addDoc(collection(getDb(), "hr_notes"), {
+          category,
+          kind: cfg.title,
+          employeeUid: selected.id,
+          employeeName: `${selected.firstName} ${selected.lastName}`.trim(),
+          employeeRole: selected.role,
+          date,
+          fields,
+          checkboxes,
+          addedByUid: user.uid,
+          addedByName,
+          createdAt: serverTimestamp(),
+        });
+        router.push("/people/hr-notes");
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to save.");
       setSaving(false);
@@ -311,7 +346,7 @@ export default function AddHrNoteCategoryPage({
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => router.push("/people/hr-notes/add")}
+        onClick={() => router.push(isEdit ? `/people/hr-notes/${editNoteId}` : "/people/hr-notes/add")}
         aria-label="Back"
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -427,22 +462,46 @@ export default function AddHrNoteCategoryPage({
             )}
 
             {kind === "photo" && (
-              <label className={styles.photoBtn}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className={styles.hiddenFile}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setField(idx, file.name);
-                  }}
-                />
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-                <span>{fieldValues[idx] ? fieldValues[idx] : "Add Photo"}</span>
-              </label>
+              <>
+                <label className={styles.photoBtn}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className={styles.hiddenFile}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      // Store as data URL so the detail page can render it.
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const result = reader.result;
+                        if (typeof result === "string") setField(idx, result);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  <span>{fieldValues[idx] ? "Change Photo" : "Add Photo"}</span>
+                </label>
+                {fieldValues[idx]?.startsWith("data:image/") && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={fieldValues[idx]}
+                    alt="Attached"
+                    style={{
+                      marginTop: "var(--space-2)",
+                      width: "100%",
+                      maxHeight: 280,
+                      objectFit: "cover",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                  />
+                )}
+              </>
             )}
           </section>
         );
