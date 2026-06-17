@@ -224,12 +224,9 @@ export default function HrNoteDetailPage({
           {kindIcon(note.kind, 28)}
         </span>
         <div className={styles.heroBody}>
-          <div className={styles.heroHead}>
-            <h1 className={styles.heroTitle}>{note.kind}</h1>
-            <span className={styles.heroAddedBy}>Added by {note.addedByName}</span>
-          </div>
+          <h1 className={styles.heroTitle}>{note.kind}</h1>
+          <span className={styles.heroAddedBy}>Added by {note.addedByName}</span>
           <div className={styles.heroBottom}>
-            <p className={styles.heroSummary}>{summaryOf(note.fields ?? {})}</p>
             <span className={styles.heroDate}>
               {fmtDate(createdAt)} {fmtTime(createdAt)}
             </span>
