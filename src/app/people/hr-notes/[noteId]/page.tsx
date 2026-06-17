@@ -181,7 +181,7 @@ export default function HrNoteDetailPage({
   }
 
   function handleFollowUp() {
-    router.push("/people/hr-notes/add");
+    router.push("/people/hr-notes");
   }
 
   return (
