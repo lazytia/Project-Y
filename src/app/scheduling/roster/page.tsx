@@ -688,6 +688,10 @@ export default function ManagerRosterPage() {
             })}
           </div>
         </div>
+      </section>
+
+      {/* Next Week Notes */}
+      <section className={styles.card}>
         <button
           type="button"
           className={styles.cardHeadBtn}
@@ -731,7 +735,7 @@ export default function ManagerRosterPage() {
                     <button
                       type="button"
                       className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
-                      onClick={(e) => { e.stopPropagation(); setEditingNoteNext(iso); }}
+                      onClick={() => setEditingNoteNext(iso)}
                     >
                       {value || "Add a note…"}
                     </button>
