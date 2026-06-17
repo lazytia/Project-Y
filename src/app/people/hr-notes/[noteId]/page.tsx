@@ -1,137 +1,48 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter, notFound } from "next/navigation";
+import {
+  deleteDoc,
+  doc,
+  getDoc,
+  type Timestamp,
+} from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
+import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────
- * HR Note Details — read-only view of a saved note.
- *
- * Notes are still placeholder until the Add HR Note step 2 form writes
- * to Firestore. Look the note up by id from the in-memory list that
- * powers the Timeline view.
+ * HR Note Details — read-only view of a saved note loaded from the
+ * `hr_notes` Firestore collection.
  * ──────────────────────────────────────────────────────────────────── */
 
 type NoteKind = "Formal Warning" | "Performance Review" | "Incident Report" | "Other";
 
-type Note = {
-  id: string;
-  employeeName: string;
-  employeeRole: "Hall Staff" | "Kitchen Staff" | "Manager";
+type StoredCheckbox = { label: string; checked: boolean };
+
+type StoredNote = {
+  category: string;
   kind: NoteKind;
-  summary: string;
-  details: string;
-  actionTaken: string;
-  addedBy: string;
-  createdAtISO: string;
-  checkboxes: { label: string; checked: boolean }[];
+  employeeUid: string;
+  employeeName: string;
+  employeeRole?: string;
+  date: string;
+  fields: Record<string, string>;
+  checkboxes: StoredCheckbox[];
+  addedByUid: string;
+  addedByName: string;
+  createdAt?: Timestamp;
 };
 
-const NOTES: Note[] = [
-  {
-    id: "n1",
-    employeeName: "Yuki Tanaka",
-    employeeRole: "Kitchen Staff",
-    kind: "Formal Warning",
-    summary: "Repeated late arrival without prior notice.",
-    details: "Yuki arrived 25 minutes late on 12 Jun 2026 without prior notice.",
-    actionTaken: "Discussed attendance expectations and store policy. A formal warning was issued and Yuki was advised that further violations may result in disciplinary action.",
-    addedBy: "You (Store Manager)",
-    createdAtISO: "2026-06-12T10:15:00+10:00",
-    checkboxes: [
-      { label: "Discussed with employee",            checked: true },
-      { label: "Employee given opportunity to respond", checked: true },
-    ],
-  },
-  {
-    id: "n2",
-    employeeName: "Sam Lee",
-    employeeRole: "Hall Staff",
-    kind: "Performance Review",
-    summary: "Quarterly review completed.",
-    details: "Strong customer-service skills, consistent attendance, takes initiative during peak service hours.",
-    actionTaken: "Performance reviewed for Q2 2026. Goals for next quarter agreed: complete barista training and lead morning briefings twice a week.",
-    addedBy: "You (Store Manager)",
-    createdAtISO: "2026-06-03T14:30:00+10:00",
-    checkboxes: [
-      { label: "Goals discussed with employee",         checked: true },
-      { label: "Employee given opportunity to respond", checked: true },
-    ],
-  },
-  {
-    id: "n3",
-    employeeName: "Kenji Watanabe",
-    employeeRole: "Hall Staff",
-    kind: "Incident Report",
-    summary: "Customer complaint regarding service.",
-    details: "At 7:42 PM on 10 Apr 2026 a guest complained about being seated late and the food order being incorrect.",
-    actionTaken: "Apologised to guest, offered a complimentary dessert. Coached Kenji on prioritising order accuracy under pressure.",
-    addedBy: "Store Manager",
-    createdAtISO: "2026-04-10T09:45:00+10:00",
-    checkboxes: [
-      { label: "Reported to management",          checked: true },
-      { label: "Witnesses noted in the record", checked: true },
-    ],
-  },
-  {
-    id: "n4",
-    employeeName: "Mei Chen",
-    employeeRole: "Kitchen Staff",
-    kind: "Formal Warning",
-    summary: "Policy violation: Unauthorised absence.",
-    details: "Mei did not attend their scheduled shift on 01 Mar 2026 and did not notify management.",
-    actionTaken: "Formal warning issued. Reminded Mei of leave-request policy. Further unexcused absences may result in disciplinary action.",
-    addedBy: "You (Store Manager)",
-    createdAtISO: "2026-03-01T11:00:00+10:00",
-    checkboxes: [
-      { label: "Discussed with employee",            checked: true },
-      { label: "Employee given opportunity to respond", checked: true },
-    ],
-  },
-  {
-    id: "n5",
-    employeeName: "Taro Honda",
-    employeeRole: "Hall Staff",
-    kind: "Other",
-    summary: "Discussed availability change request.",
-    details: "Taro requested to change Tuesday availability to start at 5 PM instead of 11 AM due to a new university class.",
-    actionTaken: "Acknowledged request and will assess roster impact before approving from the next published roster.",
-    addedBy: "You (Store Manager)",
-    createdAtISO: "2026-02-14T15:20:00+10:00",
-    checkboxes: [
-      { label: "Discussed with employee", checked: true },
-    ],
-  },
-  {
-    id: "n6",
-    employeeName: "Yuki Tanaka",
-    employeeRole: "Kitchen Staff",
-    kind: "Other",
-    summary: "Initial onboarding chat.",
-    details: "Walked through kitchen workflow, food safety procedures, and uniform expectations.",
-    actionTaken: "Yuki confirmed understanding and was issued the staff handbook.",
-    addedBy: "Store Manager",
-    createdAtISO: "2026-02-02T13:00:00+10:00",
-    checkboxes: [
-      { label: "Discussed with employee", checked: true },
-    ],
-  },
-  {
-    id: "n7",
-    employeeName: "Taro Honda",
-    employeeRole: "Hall Staff",
-    kind: "Performance Review",
-    summary: "Mid-year review notes.",
-    details: "Strengths: dependable, mentors junior staff well. Areas for growth: speed during opening setup.",
-    actionTaken: "Set goal of completing opening setup within 35 minutes. Will review again in 3 months.",
-    addedBy: "You (Store Manager)",
-    createdAtISO: "2026-01-19T16:00:00+10:00",
-    checkboxes: [
-      { label: "Goals discussed with employee",         checked: true },
-      { label: "Employee given opportunity to respond", checked: true },
-    ],
-  },
-];
+function tsDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
+    try { return (v as Timestamp).toDate(); } catch { return null; }
+  }
+  return null;
+}
 
 function initials(name: string): string {
   const parts = name.split(" ").filter(Boolean);
@@ -140,8 +51,8 @@ function initials(name: string): string {
   return (a + b).toUpperCase();
 }
 
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
+function fmtDate(d: Date | null): string {
+  if (!d) return "";
   return d.toLocaleDateString("en-AU", {
     day: "numeric",
     month: "short",
@@ -149,12 +60,23 @@ function fmtDate(iso: string): string {
   });
 }
 
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
+function fmtTime(d: Date | null): string {
+  if (!d) return "";
   return d.toLocaleTimeString("en-AU", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
+  });
+}
+
+function fmtDateIso(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -202,6 +124,16 @@ function kindClass(kind: NoteKind): string {
   }
 }
 
+function summaryOf(fields: Record<string, string>): string {
+  for (const v of Object.values(fields ?? {})) {
+    if (typeof v === "string" && v.trim().length > 0) {
+      const t = v.trim();
+      return t.length > 80 ? t.slice(0, 80) + "…" : t;
+    }
+  }
+  return "";
+}
+
 export default function HrNoteDetailPage({
   params,
 }: {
@@ -209,12 +141,37 @@ export default function HrNoteDetailPage({
 }) {
   const router = useRouter();
   const { noteId } = use(params);
-  const note = NOTES.find((n) => n.id === noteId);
+  const [note, setNote] = useState<StoredNote | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "hr_notes", noteId));
+        if (snap.exists()) {
+          setNote(snap.data() as StoredNote);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [noteId]);
+
+  if (loading) return <Splash />;
   if (!note) notFound();
 
-  function handleDelete() {
-    if (confirm("Delete this HR note?")) {
+  const createdAt = tsDate(note.createdAt);
+
+  async function handleDelete() {
+    if (!confirm("Delete this HR note?")) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(getDb(), "hr_notes", noteId));
       router.push("/people/hr-notes");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete.");
+      setDeleting(false);
     }
   }
 
@@ -245,6 +202,7 @@ export default function HrNoteDetailPage({
           type="button"
           className={styles.iconBtn}
           onClick={handleDelete}
+          disabled={deleting}
           aria-label="Delete"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -265,12 +223,12 @@ export default function HrNoteDetailPage({
         <div className={styles.heroBody}>
           <div className={styles.heroHead}>
             <h1 className={styles.heroTitle}>{note.kind}</h1>
-            <span className={styles.heroAddedBy}>Added by {note.addedBy.replace(/ \(.*\)$/, "")}</span>
+            <span className={styles.heroAddedBy}>Added by {note.addedByName}</span>
           </div>
           <div className={styles.heroBottom}>
-            <p className={styles.heroSummary}>{note.summary}</p>
+            <p className={styles.heroSummary}>{summaryOf(note.fields ?? {})}</p>
             <span className={styles.heroDate}>
-              {fmtDate(note.createdAtISO)} {fmtTime(note.createdAtISO)}
+              {fmtDate(createdAt)} {fmtTime(createdAt)}
             </span>
           </div>
         </div>
@@ -283,7 +241,7 @@ export default function HrNoteDetailPage({
         </span>
         <div className={styles.empBody}>
           <p className={styles.empName}>{note.employeeName}</p>
-          <p className={styles.empRole}>{note.employeeRole}</p>
+          <p className={styles.empRole}>{note.employeeRole ?? "Staff"}</p>
           <p className={styles.empLocked}>
             Employee cannot be changed
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -309,7 +267,7 @@ export default function HrNoteDetailPage({
             </svg>
           </span>
           <span className={styles.metaLabel}>Date</span>
-          <span className={styles.metaValue}>{fmtDate(note.createdAtISO)}</span>
+          <span className={styles.metaValue}>{fmtDateIso(note.date)}</span>
         </div>
         <div className={styles.metaDivider} />
         <div className={styles.metaRow}>
@@ -320,7 +278,7 @@ export default function HrNoteDetailPage({
             </svg>
           </span>
           <span className={styles.metaLabel}>Time</span>
-          <span className={styles.metaValue}>{fmtTime(note.createdAtISO)}</span>
+          <span className={styles.metaValue}>{fmtTime(createdAt)}</span>
         </div>
         <div className={styles.metaDivider} />
         <div className={styles.metaRow}>
@@ -333,40 +291,38 @@ export default function HrNoteDetailPage({
             </svg>
           </span>
           <span className={styles.metaLabel}>Added by</span>
-          <span className={styles.metaValue}>{note.addedBy}</span>
+          <span className={styles.metaValue}>{note.addedByName}</span>
         </div>
       </section>
 
-      {/* Details + Action Taken */}
+      {/* Render each saved field */}
       <section className={styles.contentCard}>
-        <h2 className={styles.contentTitle}>Details</h2>
-        <p className={styles.contentHint}>
-          {note.kind === "Performance Review"
-            ? "Strengths and areas observed during this review."
-            : note.kind === "Incident Report"
-              ? "What happened, where and when."
-              : "Describe the issue and why this warning is being issued."}
-        </p>
-        <div className={styles.bodyBox}>{note.details}</div>
+        {Object.entries(note.fields ?? {}).map(([label, value], idx) => {
+          if (!value) return null;
+          return (
+            <div key={label} style={idx > 0 ? { marginTop: "var(--space-5)" } : undefined}>
+              <h2 className={styles.contentTitle}>{label}</h2>
+              <div className={styles.bodyBox}>{value}</div>
+            </div>
+          );
+        })}
 
-        <h2 className={styles.contentTitle} style={{ marginTop: "var(--space-5)" }}>Action Taken</h2>
-        <p className={styles.contentHint}>Describe what was discussed and any action taken.</p>
-        <div className={styles.bodyBox}>{note.actionTaken}</div>
-
-        <ul className={styles.checkList}>
-          {note.checkboxes.map((c) => (
-            <li key={c.label} className={styles.checkRow}>
-              <span className={`${styles.checkMark} ${c.checked ? styles.checkMarkOn : ""}`} aria-hidden="true">
-                {c.checked && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
-              </span>
-              <span className={styles.checkLabel}>{c.label}</span>
-            </li>
-          ))}
-        </ul>
+        {(note.checkboxes ?? []).length > 0 && (
+          <ul className={styles.checkList}>
+            {(note.checkboxes ?? []).map((c) => (
+              <li key={c.label} className={styles.checkRow}>
+                <span className={`${styles.checkMark} ${c.checked ? styles.checkMarkOn : ""}`} aria-hidden="true">
+                  {c.checked && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </span>
+                <span className={styles.checkLabel}>{c.label}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* Action buttons */}

@@ -1,57 +1,68 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  type Timestamp,
+} from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
+import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────
- * Placeholder HR notes. Real data will come from a Firestore subcollection
- * (staff_onboarding/{uid}/hr_notes/{id}) once the Add Note dialog is wired
- * up. Shape here mirrors what the dialog will write.
+ * HR notes live in the top-level Firestore collection `hr_notes`. Add
+ * Note step 2 writes to it; this page reads from it.
  * ──────────────────────────────────────────────────────────────────── */
 
 type NoteKind = "Formal Warning" | "Performance Review" | "Incident Report" | "Other";
+
+type StoredCheckbox = { label: string; checked: boolean };
+
+type StoredNote = {
+  id: string;
+  category: string;
+  kind: NoteKind;
+  employeeUid: string;
+  employeeName: string;
+  employeeRole?: string;
+  date: string;
+  fields: Record<string, string>;
+  checkboxes: StoredCheckbox[];
+  addedByUid: string;
+  addedByName: string;
+  createdAt?: Timestamp;
+};
 
 type Note = {
   id: string;
   employeeId: string;
   employeeName: string;
-  employeeRole: "Hall Staff" | "Kitchen Staff" | "Manager";
+  employeeRole: string;
   kind: NoteKind;
   body: string;
   addedBy: string;
-  /** ISO timestamp e.g. "2026-06-12T10:15:00+10:00" */
-  createdAtISO: string;
+  createdAt: Date | null;
+};
+
+type StaffDoc = {
+  uid: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
 };
 
 type Member = {
   id: string;
   firstName: string;
   lastName: string;
-  role: "Hall Staff" | "Kitchen Staff" | "Manager";
+  role: "Staff" | "Manager";
   active: boolean;
 };
-
-const MEMBERS: Member[] = [
-  { id: "yt", firstName: "Yuki",   lastName: "Tanaka",   role: "Kitchen Staff", active: true },
-  { id: "sl", firstName: "Sam",    lastName: "Lee",      role: "Hall Staff",    active: true },
-  { id: "hs", firstName: "Hiyori", lastName: "Sato",     role: "Kitchen Staff", active: true },
-  { id: "kw", firstName: "Kenji",  lastName: "Watanabe", role: "Hall Staff",    active: true },
-  { id: "mc", firstName: "Mei",    lastName: "Chen",     role: "Kitchen Staff", active: true },
-  { id: "th", firstName: "Taro",   lastName: "Honda",    role: "Hall Staff",    active: true },
-  { id: "ay", firstName: "Aya",    lastName: "Yamamoto", role: "Kitchen Staff", active: true },
-  { id: "rk", firstName: "Ryo",    lastName: "Kimura",   role: "Hall Staff",    active: true },
-];
-
-const NOTES: Note[] = [
-  { id: "n1", employeeId: "yt", employeeName: "Yuki Tanaka",   employeeRole: "Kitchen Staff", kind: "Formal Warning",    body: "Repeated late arrival without prior notice.", addedBy: "You",            createdAtISO: "2026-06-12T10:15:00+10:00" },
-  { id: "n2", employeeId: "sl", employeeName: "Sam Lee",       employeeRole: "Hall Staff",    kind: "Performance Review", body: "Quarterly review completed.",                addedBy: "You",            createdAtISO: "2026-06-03T14:30:00+10:00" },
-  { id: "n3", employeeId: "kw", employeeName: "Kenji Watanabe", employeeRole: "Hall Staff",    kind: "Incident Report",    body: "Customer complaint regarding service.",      addedBy: "Store Manager",  createdAtISO: "2026-04-10T09:45:00+10:00" },
-  { id: "n4", employeeId: "mc", employeeName: "Mei Chen",      employeeRole: "Kitchen Staff", kind: "Formal Warning",    body: "Policy violation: Unauthorised absence.",    addedBy: "You",            createdAtISO: "2026-03-01T11:00:00+10:00" },
-  { id: "n5", employeeId: "th", employeeName: "Taro Honda",    employeeRole: "Hall Staff",    kind: "Other",              body: "Discussed availability change request.",      addedBy: "You",            createdAtISO: "2026-02-14T15:20:00+10:00" },
-  { id: "n6", employeeId: "yt", employeeName: "Yuki Tanaka",   employeeRole: "Kitchen Staff", kind: "Other",              body: "Initial onboarding chat.",                   addedBy: "Store Manager",  createdAtISO: "2026-02-02T13:00:00+10:00" },
-  { id: "n7", employeeId: "th", employeeName: "Taro Honda",    employeeRole: "Hall Staff",    kind: "Performance Review", body: "Mid-year review notes.",                     addedBy: "You",            createdAtISO: "2026-01-19T16:00:00+10:00" },
-];
 
 type ViewMode = "timeline" | "byEmployee";
 type Sort = "az" | "za" | "mostNotes" | "recent";
@@ -65,12 +76,35 @@ const SORT_OPTIONS: { key: Sort; label: string }[] = [
 
 /* ── helpers ── */
 
+function tsDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
+    try { return (v as Timestamp).toDate(); } catch { return null; }
+  }
+  return null;
+}
+
+function displayName(d: StaffDoc): { firstName: string; lastName: string } {
+  const f = (d.firstName ?? "").trim();
+  const l = (d.lastName ?? "").trim();
+  if (f || l) return { firstName: f, lastName: l };
+  const u = (d.username ?? "").trim();
+  if (u) return { firstName: u.charAt(0).toUpperCase() + u.slice(1), lastName: "" };
+  return { firstName: d.uid.slice(0, 6), lastName: "" };
+}
+
 function initials(first: string, last: string): string {
   return ((first.charAt(0) || "?") + (last.charAt(0) || "")).toUpperCase();
 }
 
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
+function initialsFromName(name: string): string {
+  const parts = name.split(" ").filter(Boolean);
+  return ((parts[0]?.charAt(0) ?? "?") + (parts[1]?.charAt(0) ?? "")).toUpperCase();
+}
+
+function fmtDate(d: Date | null): string {
+  if (!d) return "";
   return d.toLocaleDateString("en-AU", {
     day: "2-digit",
     month: "short",
@@ -78,13 +112,21 @@ function fmtDate(iso: string): string {
   });
 }
 
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
+function fmtTime(d: Date | null): string {
+  if (!d) return "";
   return d.toLocaleTimeString("en-AU", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
   });
+}
+
+function pickBody(fields: Record<string, string>): string {
+  // First non-empty field is what we show as the timeline body.
+  for (const v of Object.values(fields ?? {})) {
+    if (typeof v === "string" && v.trim().length > 0) return v.trim();
+  }
+  return "";
 }
 
 function kindIcon(kind: NoteKind, size = 22): React.ReactElement {
@@ -134,14 +176,64 @@ function kindClass(kind: NoteKind): string {
 export default function HrNotesPage() {
   const router = useRouter();
   const [view, setView] = useState<ViewMode>("timeline");
-  const [query, setQuery] = useState("");
+  const [query_, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("az");
   const [sortOpen, setSortOpen] = useState(false);
 
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [notesSnap, staffSnap] = await Promise.all([
+          getDocs(query(collection(getDb(), "hr_notes"), orderBy("createdAt", "desc"))),
+          getDocs(collection(getDb(), "staff_onboarding")),
+        ]);
+
+        const parsedNotes: Note[] = notesSnap.docs.map((dSnap) => {
+          const d = { id: dSnap.id, ...(dSnap.data() as Omit<StoredNote, "id">) };
+          return {
+            id: d.id,
+            employeeId: d.employeeUid,
+            employeeName: d.employeeName,
+            employeeRole: d.employeeRole ?? "Staff",
+            kind: d.kind,
+            body: pickBody(d.fields ?? {}),
+            addedBy: d.addedByName,
+            createdAt: tsDate(d.createdAt),
+          };
+        });
+
+        const parsedMembers: Member[] = staffSnap.docs
+          .map((dSnap) => ({ uid: dSnap.id, ...(dSnap.data() as Omit<StaffDoc, "uid">) }))
+          .filter((d) => d.role !== "owner")
+          .map((d) => {
+            const { firstName, lastName } = displayName(d);
+            return {
+              id: d.uid,
+              firstName,
+              lastName,
+              role: d.role === "manager" ? "Manager" : "Staff",
+              active: true,
+            };
+          });
+
+        setNotes(parsedNotes);
+        setMembers(parsedMembers);
+      } catch {
+        /* keep empty */
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
   // ── Timeline: filter by query, sort by date desc ──
   const timeline = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = NOTES.filter((n) => {
+    const q = query_.trim().toLowerCase();
+    return notes.filter((n) => {
       if (!q) return true;
       return (
         n.employeeName.toLowerCase().includes(q) ||
@@ -149,26 +241,24 @@ export default function HrNotesPage() {
         n.body.toLowerCase().includes(q)
       );
     });
-    list.sort((a, b) => b.createdAtISO.localeCompare(a.createdAtISO));
-    return list;
-  }, [query]);
+  }, [notes, query_]);
 
   // ── By Employee: each member + their last note ──
   const byEmployee = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const rows = MEMBERS.filter((m) => {
+    const q = query_.trim().toLowerCase();
+    const rows = members.filter((m) => {
       if (!q) return true;
       return `${m.firstName} ${m.lastName}`.toLowerCase().includes(q);
     }).map((m) => {
-      const notesForMember = NOTES
+      const notesForMember = notes
         .filter((n) => n.employeeId === m.id)
-        .sort((a, b) => b.createdAtISO.localeCompare(a.createdAtISO));
+        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
       const last = notesForMember[0];
       return {
         ...m,
         notesCount: notesForMember.length,
         lastKind: last?.kind,
-        lastISO: last?.createdAtISO,
+        lastAt: last?.createdAt ?? null,
       };
     });
     rows.sort((a, b) => {
@@ -178,23 +268,25 @@ export default function HrNotesPage() {
         case "mostNotes":
           return (b.notesCount - a.notesCount) || a.firstName.localeCompare(b.firstName);
         case "recent":
-          return (b.lastISO ?? "").localeCompare(a.lastISO ?? "");
+          return (b.lastAt?.getTime() ?? 0) - (a.lastAt?.getTime() ?? 0);
       }
     });
     return rows;
-  }, [query, sort]);
+  }, [members, notes, query_, sort]);
 
   function handleAddNote() {
     router.push("/people/hr-notes/add");
   }
 
-  function openMember(name: string) {
-    alert(`${name} — notes detail page coming soon.`);
+  function openMember(m: Member) {
+    alert(`${m.firstName} ${m.lastName} — notes detail page coming soon.`);
   }
 
   function openNote(n: Note) {
-    alert(`${n.employeeName} — ${n.kind}\n\n${n.body}\n\nAdded by ${n.addedBy}.`);
+    router.push(`/people/hr-notes/${n.id}`);
   }
+
+  if (loading) return <Splash />;
 
   return (
     <div className={styles.page}>
@@ -203,7 +295,6 @@ export default function HrNotesPage() {
         <p className={styles.subtitle}>Manager only. Important records only.</p>
       </header>
 
-      {/* View mode toggle */}
       <div className={styles.viewToggle} role="tablist">
         <button
           type="button"
@@ -225,7 +316,6 @@ export default function HrNotesPage() {
         </button>
       </div>
 
-      {/* Search + Add Note */}
       <div className={styles.toolbar}>
         <div className={styles.searchWrap}>
           <svg className={styles.searchIcon} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -236,7 +326,7 @@ export default function HrNotesPage() {
             type="text"
             className={styles.searchInput}
             placeholder={view === "timeline" ? "Search employee or note…" : "Search employee…"}
-            value={query}
+            value={query_}
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
             spellCheck={false}
@@ -251,12 +341,15 @@ export default function HrNotesPage() {
         </button>
       </div>
 
-      {/* Timeline view */}
       {view === "timeline" && (
         <>
           <p className={styles.sectionLabel}>TIMELINE</p>
           {timeline.length === 0 ? (
-            <p className={styles.empty}>No notes match.</p>
+            <p className={styles.empty}>
+              {notes.length === 0
+                ? "No notes yet. Tap Add Note to record one."
+                : "No notes match the search."}
+            </p>
           ) : (
             <ol className={styles.timelineList}>
               {timeline.map((n) => (
@@ -265,8 +358,8 @@ export default function HrNotesPage() {
                     <span className={styles.timelineDot} aria-hidden="true" />
                   </div>
                   <div className={styles.timelineDateCol}>
-                    <p className={styles.timelineDate}>{fmtDate(n.createdAtISO)}</p>
-                    <p className={styles.timelineTime}>{fmtTime(n.createdAtISO)}</p>
+                    <p className={styles.timelineDate}>{fmtDate(n.createdAt)}</p>
+                    <p className={styles.timelineTime}>{fmtTime(n.createdAt)}</p>
                   </div>
                   <button
                     type="button"
@@ -282,7 +375,7 @@ export default function HrNotesPage() {
                         <span className={styles.timelineAddedBy}>Added by {n.addedBy}</span>
                       </div>
                       <p className={styles.timelineKind}>{n.kind}</p>
-                      <p className={styles.timelineNote}>{n.body}</p>
+                      {n.body && <p className={styles.timelineNote}>{n.body}</p>}
                     </div>
                     <span className={styles.chev} aria-hidden="true">›</span>
                   </button>
@@ -293,7 +386,6 @@ export default function HrNotesPage() {
         </>
       )}
 
-      {/* By Employee view */}
       {view === "byEmployee" && (
         <>
           <div className={styles.byEmployeeHeader}>
@@ -335,21 +427,19 @@ export default function HrNotesPage() {
             </div>
           </div>
 
-          {byEmployee.length === 0 ? (
+          {members.length === 0 ? (
+            <p className={styles.empty}>No staff registered yet. Create one from People → Staff +.</p>
+          ) : byEmployee.length === 0 ? (
             <p className={styles.empty}>No team members match.</p>
           ) : (
             <ul className={styles.empList}>
               {byEmployee.map((m) => (
                 <li key={m.id}>
-                  <button
-                    type="button"
-                    className={styles.empRow}
-                    onClick={() => openMember(`${m.firstName} ${m.lastName}`)}
-                  >
+                  <button type="button" className={styles.empRow} onClick={() => openMember(m)}>
                     <div className={styles.avatar} aria-hidden="true">{initials(m.firstName, m.lastName)}</div>
                     <div className={styles.empBody}>
-                      <p className={styles.empName}>{m.firstName} {m.lastName}</p>
-                      <p className={styles.empRole}>{m.role}</p>
+                      <p className={styles.name}>{m.firstName} {m.lastName}</p>
+                      <p className={styles.roleLine}>{m.role}</p>
                       {m.active && (
                         <span className={styles.activeBadge}>
                           <span className={styles.dotGreen} aria-hidden="true" />
@@ -367,16 +457,16 @@ export default function HrNotesPage() {
                       </span>
                     )}
                     <div className={styles.empMeta}>
-                      <p className={styles.empCount}>
+                      <p className={styles.notesCount}>
                         <strong>{m.notesCount}</strong> {m.notesCount === 1 ? "Note" : "Notes"}
                       </p>
-                      {m.notesCount > 0 && m.lastKind && m.lastISO ? (
+                      {m.notesCount > 0 && m.lastKind && m.lastAt ? (
                         <>
-                          <p className={styles.empLast}>Last: {m.lastKind}</p>
-                          <p className={styles.empDate}>{fmtDate(m.lastISO)}</p>
+                          <p className={styles.lastLabel}>Last: {m.lastKind}</p>
+                          <p className={styles.lastDate}>{fmtDate(m.lastAt)}</p>
                         </>
                       ) : (
-                        <p className={styles.empLast}>—</p>
+                        <p className={styles.lastLabel}>—</p>
                       )}
                     </div>
                     <span className={styles.chev} aria-hidden="true">›</span>
@@ -388,7 +478,6 @@ export default function HrNotesPage() {
         </>
       )}
 
-      {/* Footer note */}
       <div className={styles.footerNote}>
         <span className={styles.footerIcon} aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
