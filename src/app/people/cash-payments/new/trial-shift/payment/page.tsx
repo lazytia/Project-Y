@@ -74,7 +74,8 @@ export default function TrialShiftPaymentStepPage() {
     }
   }, [authLoading, allowed, router]);
 
-  // Step 2 state
+  // Step 2 sub-steps: 1 = Payment Details, 2 = Declaration & Signature
+  const [subStep, setSubStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<"Cash">("Cash");
   const [notes, setNotes] = useState("");
 
@@ -206,13 +207,22 @@ export default function TrialShiftPaymentStepPage() {
   if (authLoading || !hydrated) return <Splash />;
   if (!allowed || !draft) return null;
 
+  const checkMark = (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <button
           type="button"
           className={styles.iconBtn}
-          onClick={() => router.push("/people/cash-payments/new/trial-shift")}
+          onClick={() => {
+            if (subStep === 2) setSubStep(1);
+            else router.push("/people/cash-payments/new/trial-shift");
+          }}
           aria-label="Back"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -223,126 +233,143 @@ export default function TrialShiftPaymentStepPage() {
         <span />
       </header>
 
-      {/* Stepper */}
+      {/* Stepper — 3 steps */}
       <div className={styles.stepper}>
         <div className={`${styles.step} ${styles.stepDone}`}>
-          <span className={styles.stepBubble}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </span>
+          <span className={styles.stepBubble}>{checkMark}</span>
           <span className={styles.stepLabel}>Details</span>
         </div>
         <span className={styles.stepLine} />
-        <div className={`${styles.step} ${styles.stepActive}`}>
-          <span className={styles.stepBubble}>2</span>
-          <span className={styles.stepLabel}>Payment &amp; Signature</span>
+        <div className={`${styles.step} ${subStep === 1 ? styles.stepActive : styles.stepDone}`}>
+          <span className={styles.stepBubble}>{subStep === 1 ? "2" : checkMark}</span>
+          <span className={styles.stepLabel}>Payment</span>
+        </div>
+        <span className={styles.stepLine} />
+        <div className={`${styles.step} ${subStep === 2 ? styles.stepActive : ""}`}>
+          <span className={styles.stepBubble}>3</span>
+          <span className={styles.stepLabel}>Signature</span>
         </div>
       </div>
 
-      {/* 5. Payment Details */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>5. Payment Details</h2>
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>
-            Payment Method <span className={styles.requiredMark}>*</span>
-          </label>
-          <select
-            className={styles.input}
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value as "Cash")}
+      {subStep === 1 && (
+        <>
+          {/* 5. Payment Details */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>5. Payment Details</h2>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel}>
+                Payment Method <span className={styles.requiredMark}>*</span>
+              </label>
+              <select
+                className={styles.input}
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as "Cash")}
+              >
+                <option value="Cash">Cash</option>
+              </select>
+            </div>
+
+            <div className={styles.amountCard}>
+              <p className={styles.amountLabel}>Amount Paid <span className={styles.requiredMark}>*</span></p>
+              <p className={styles.amountValue}>{fmtCurrency(draft.totalAmount)}</p>
+              <div className={styles.amountIcon} aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="3" width="14" height="18" rx="2" />
+                  <line x1="12" y1="8" x2="12" y2="16" />
+                  <path d="M14.5 10.5a2 2 0 0 0-2-2h-1a1.5 1.5 0 0 0 0 3h1a1.5 1.5 0 0 1 0 3h-1a2 2 0 0 1-2-2" />
+                </svg>
+              </div>
+              <p className={styles.amountFoot}>Cash payment given on</p>
+              <p className={styles.amountDate}>{fmtIsoLong(draft.date)}</p>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.fieldLabel}>
+                Notes <span className={styles.optionalMark}>(Optional)</span>
+              </label>
+              <textarea
+                className={styles.textarea}
+                placeholder="e.g. Trial shift for Hall Staff position."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={4}
+                maxLength={500}
+              />
+            </div>
+          </section>
+
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            onClick={() => setSubStep(2)}
           >
-            <option value="Cash">Cash</option>
-          </select>
-        </div>
+            Next
+          </button>
+        </>
+      )}
 
-        <div className={styles.amountCard}>
-          <p className={styles.amountLabel}>Amount Paid <span className={styles.requiredMark}>*</span></p>
-          <p className={styles.amountValue}>{fmtCurrency(draft.totalAmount)}</p>
-          <div className={styles.amountIcon} aria-hidden="true">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="5" y="3" width="14" height="18" rx="2" />
-              <line x1="12" y1="8" x2="12" y2="16" />
-              <path d="M14.5 10.5a2 2 0 0 0-2-2h-1a1.5 1.5 0 0 0 0 3h1a1.5 1.5 0 0 1 0 3h-1a2 2 0 0 1-2-2" />
+      {subStep === 2 && (
+        <>
+          {/* 6. Declaration & Signature */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>
+              6. Declaration &amp; Signature <span className={styles.essential}>Essential</span>
+            </h2>
+            <div className={styles.declaration}>
+              <span className={styles.declarationIcon} aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <polyline points="9 12 11 14 15 10" />
+                </svg>
+              </span>
+              <p className={styles.declarationTitle}>Declaration</p>
+              <p className={styles.declarationBody}>
+                I confirm that I have received <strong>{fmtCurrency(draft.totalAmount)}</strong> cash
+                payment for my trial shift at <strong>YURICA Japanese Kitchen</strong> on{" "}
+                <strong>{fmtIsoLong(draft.date)}</strong>.
+              </p>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.fieldLabel}>
+                Signature <span className={styles.requiredMark}>*</span>
+              </label>
+              <div className={styles.signatureWrap}>
+                <canvas
+                  ref={sigCanvasRef}
+                  className={styles.signatureCanvas}
+                  onPointerDown={onSigDown}
+                  onPointerMove={onSigMove}
+                  onPointerUp={onSigUp}
+                  onPointerCancel={onSigUp}
+                />
+                {!hasSignature && (
+                  <span className={styles.signaturePlaceholder}>Please sign here</span>
+                )}
+                <button type="button" className={styles.clearBtn} onClick={clearSignature}>
+                  Clear
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            disabled={!hasSignature || saving}
+            onClick={handleConfirm}
+          >
+            {saving ? "Saving…" : "Confirm Payment"}
+          </button>
+          <p className={styles.lockHint}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-          </div>
-          <p className={styles.amountFoot}>Cash payment given on</p>
-          <p className={styles.amountDate}>{fmtIsoLong(draft.date)}</p>
-        </div>
-
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>
-            Notes <span className={styles.optionalMark}>(Optional)</span>
-          </label>
-          <textarea
-            className={styles.textarea}
-            placeholder="e.g. Trial shift for Hall Staff position."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            maxLength={500}
-          />
-        </div>
-      </section>
-
-      {/* 6. Declaration & Signature */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>
-          6. Declaration &amp; Signature <span className={styles.essential}>Essential</span>
-        </h2>
-        <div className={styles.declaration}>
-          <span className={styles.declarationIcon} aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <polyline points="9 12 11 14 15 10" />
-            </svg>
-          </span>
-          <p className={styles.declarationTitle}>Declaration</p>
-          <p className={styles.declarationBody}>
-            I confirm that I have received <strong>{fmtCurrency(draft.totalAmount)}</strong> cash
-            payment for my trial shift at <strong>YURICA Japanese Kitchen</strong> on{" "}
-            <strong>{fmtIsoLong(draft.date)}</strong>.
+            Once saved, this record cannot be edited.
           </p>
-        </div>
-
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>
-            Signature <span className={styles.requiredMark}>*</span>
-          </label>
-          <div className={styles.signatureWrap}>
-            <canvas
-              ref={sigCanvasRef}
-              className={styles.signatureCanvas}
-              onPointerDown={onSigDown}
-              onPointerMove={onSigMove}
-              onPointerUp={onSigUp}
-              onPointerCancel={onSigUp}
-            />
-            {!hasSignature && (
-              <span className={styles.signaturePlaceholder}>Please sign here</span>
-            )}
-            <button type="button" className={styles.clearBtn} onClick={clearSignature}>
-              Clear
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <button
-        type="button"
-        className={styles.primaryBtn}
-        disabled={!hasSignature || saving}
-        onClick={handleConfirm}
-      >
-        {saving ? "Saving…" : "Confirm Payment"}
-      </button>
-      <p className={styles.lockHint}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2" />
-          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-        Once saved, this record cannot be edited.
-      </p>
+        </>
+      )}
     </div>
   );
 }
