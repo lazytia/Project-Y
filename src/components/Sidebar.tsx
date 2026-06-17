@@ -102,8 +102,6 @@ export default function Sidebar({ open, onClose }: Props) {
       label: "Scheduling",
       children: [
         { label: "Roster", href: "/scheduling/roster" },
-        { label: "Holiday Requests", href: "/scheduling/holiday-requests" },
-        { label: "Availability Requests", href: "/scheduling/availability-requests" },
         { label: "Roster Insights", href: "/scheduling/insights" },
       ],
     },
