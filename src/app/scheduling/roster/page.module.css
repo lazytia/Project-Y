@@ -469,7 +469,7 @@
   inset: 0;
   background: rgba(15, 15, 20, 0.45);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: var(--space-5) var(--space-4);
   z-index: 1000;
