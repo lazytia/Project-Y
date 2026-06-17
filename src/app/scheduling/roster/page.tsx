@@ -232,6 +232,7 @@ export default function ManagerRosterPage() {
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [editingNoteNext, setEditingNoteNext] = useState<string | null>(null);
   const [showNotes, setShowNotes] = useState(true);
+  const [showNotesNext, setShowNotesNext] = useState(true);
   const [showAvail, setShowAvail] = useState(false);
   const [showPrevWeek, setShowPrevWeek] = useState(false);
   const [nextWeekDoc, setNextWeekDoc] = useState<RosterWeekDoc>({});
@@ -692,54 +693,64 @@ export default function ManagerRosterPage() {
             })}
           </div>
         </div>
-        <div className={styles.cardSubHead}>
+        <button
+          type="button"
+          className={styles.cardHeadBtn}
+          onClick={() => setShowNotesNext((s) => !s)}
+          aria-expanded={showNotesNext}
+        >
           <span className={styles.cardIcon}><NoteIcon /></span>
           <p className={styles.cardTitle}>Notes</p>
-          <span className={styles.tapHint}><EditIcon /> Tap to edit</span>
+          {showNotesNext && (
+            <span className={styles.tapHint}><EditIcon /> Tap to edit</span>
+          )}
           {nextWeekDoc.notesAuthor && (
             <span className={styles.notesMeta}>
               {nextWeekDoc.notesAuthor}
               {(() => { const d = tsDate(nextWeekDoc.notesUpdatedAt); return d ? ` · ${fmtShort(d)}` : ""; })()}
             </span>
           )}
-        </div>
-        <ul className={styles.notesList}>
-          {nextWeekDays.map((d, i) => {
-            const iso = isoDate(d);
-            const value = nextWeekDoc.notes?.[iso] ?? "";
-            const editing = editingNoteNext === iso;
-            return (
-              <li key={iso} className={styles.noteRow}>
-                <div className={styles.noteDayCol}>
-                  <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
-                  <span className={styles.noteDate}>{fmtMonDay(d)}</span>
-                </div>
-                {editing ? (
-                  <input
-                    autoFocus
-                    type="text"
-                    className={styles.noteInput}
-                    defaultValue={value}
-                    placeholder="Add a note…"
-                    onBlur={(e) => saveNextNote(iso, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur();
-                      if (e.key === "Escape") setEditingNoteNext(null);
-                    }}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
-                    onClick={() => setEditingNoteNext(iso)}
-                  >
-                    {value || "Add a note…"}
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+          <span className={`${styles.chev} ${showNotesNext ? styles.chevOpen : ""}`}>▾</span>
+        </button>
+        {showNotesNext && (
+          <ul className={styles.notesList}>
+            {nextWeekDays.map((d, i) => {
+              const iso = isoDate(d);
+              const value = nextWeekDoc.notes?.[iso] ?? "";
+              const editing = editingNoteNext === iso;
+              return (
+                <li key={iso} className={styles.noteRow}>
+                  <div className={styles.noteDayCol}>
+                    <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
+                    <span className={styles.noteDate}>{fmtMonDay(d)}</span>
+                  </div>
+                  {editing ? (
+                    <input
+                      autoFocus
+                      type="text"
+                      className={styles.noteInput}
+                      defaultValue={value}
+                      placeholder="Add a note…"
+                      onBlur={(e) => saveNextNote(iso, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                        if (e.key === "Escape") setEditingNoteNext(null);
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
+                      onClick={(e) => { e.stopPropagation(); setEditingNoteNext(iso); }}
+                    >
+                      {value || "Add a note…"}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       {/* Previous Week (accordion) */}
@@ -795,33 +806,30 @@ export default function ManagerRosterPage() {
                 })}
               </div>
             </div>
-            {prevWeekDays.some((d) => prevWeekDoc.notes?.[isoDate(d)]) && (
-              <>
-                <div className={styles.cardSubHead}>
-                  <span className={styles.cardIcon}><NoteIcon /></span>
-                  <p className={styles.cardTitle}>Notes</p>
-                  {prevWeekDoc.notesAuthor && (
-                    <span className={styles.notesMeta}>{prevWeekDoc.notesAuthor}</span>
-                  )}
-                </div>
-                <ul className={styles.notesList}>
-                  {prevWeekDays.map((d, i) => {
-                    const iso = isoDate(d);
-                    const value = prevWeekDoc.notes?.[iso];
-                    if (!value) return null;
-                    return (
-                      <li key={iso} className={styles.noteRow}>
-                        <div className={styles.noteDayCol}>
-                          <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
-                          <span className={styles.noteDate}>{fmtMonDay(d)}</span>
-                        </div>
-                        <span className={styles.noteReadOnly}>{value}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            )}
+            <div className={styles.cardSubHead}>
+              <span className={styles.cardIcon}><NoteIcon /></span>
+              <p className={styles.cardTitle}>Notes</p>
+              {prevWeekDoc.notesAuthor && (
+                <span className={styles.notesMeta}>{prevWeekDoc.notesAuthor}</span>
+              )}
+            </div>
+            <ul className={styles.notesList}>
+              {prevWeekDays.map((d, i) => {
+                const iso = isoDate(d);
+                const value = prevWeekDoc.notes?.[iso] ?? "";
+                return (
+                  <li key={iso} className={styles.noteRow}>
+                    <div className={styles.noteDayCol}>
+                      <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
+                      <span className={styles.noteDate}>{fmtMonDay(d)}</span>
+                    </div>
+                    <span className={`${styles.noteReadOnly} ${!value ? styles.notePlaceholder : ""}`}>
+                      {value || "No note"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
       </section>
