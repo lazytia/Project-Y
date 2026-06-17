@@ -1,0 +1,467 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 720px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Week strip grid ── */
+.grid {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.gridHeadRow,
+.gridRow {
+  display: grid;
+  grid-template-columns: 92px repeat(7, 1fr);
+  align-items: center;
+}
+
+.gridHeadRow {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.gridHeadCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.dowLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+}
+
+.dayNum {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.dayNumToday {
+  background: #111;
+  color: #fff;
+}
+
+.gridRow {
+  border-top: 1px solid var(--color-border);
+  padding: 10px 0;
+}
+
+.rowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--space-3);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.rowLabel svg { color: var(--color-fg); }
+
+.gridCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dotGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 6px);
+  grid-auto-rows: 6px;
+  gap: 3px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  background: #111;
+  border-radius: 50%;
+}
+
+.dash {
+  color: var(--color-border);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ── Cards (shared shell) ── */
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.cardHead,
+.cardHeadBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  flex-wrap: wrap;
+}
+
+.cardHeadBtn {
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: left;
+}
+
+.cardIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-fg);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-fg);
+  flex: 0 0 auto;
+}
+
+.countPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  background: rgba(234, 88, 12, 0.12);
+  color: var(--color-warm);
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tapHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-surface);
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.notesMeta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.viewAll {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-warm);
+  text-decoration: none;
+}
+
+.viewAll:hover { text-decoration: underline; }
+
+.tapToExpand {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.chev { transition: transform 0.15s; }
+.chevOpen { transform: rotate(180deg); }
+
+/* ── Notes list ── */
+.notesList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.noteRow {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.notesList li:last-child .noteRow { border-bottom: none; }
+
+.noteDayCol {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.noteDay {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.noteDate {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.noteDayToday,
+.noteDateToday {
+  color: var(--color-warm);
+}
+
+.noteBtn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.notePlaceholder { color: var(--color-fg-muted); }
+
+.noteInput {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  outline: none;
+}
+
+/* ── Request rows ── */
+.reqList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.reqRow {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reqList li:last-child .reqRow { border-bottom: none; }
+
+.reqDot {
+  width: 8px;
+  height: 8px;
+  background: var(--color-warm);
+  border-radius: 50%;
+}
+
+.reqBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reqTitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg);
+}
+
+.reqMeta { color: var(--color-fg-muted); }
+
+.reqStaff {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.reqActions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.btnApproveSm,
+.btnDeclineSm {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+}
+
+.btnApproveSm {
+  border: 1px solid var(--color-warm);
+  color: var(--color-warm);
+}
+
+.btnApproveSm:hover:not(:disabled) {
+  background: rgba(234, 88, 12, 0.08);
+}
+
+.btnDeclineSm {
+  border: 1px solid var(--color-border);
+  color: var(--color-fg);
+}
+
+.btnDeclineSm:hover:not(:disabled) {
+  background: var(--color-surface);
+}
+
+.btnApproveSm:disabled,
+.btnDeclineSm:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.empty {
+  margin: 0;
+  padding: 14px var(--space-4);
+  border-top: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  text-align: center;
+}
+
+/* ── Availability overview ── */
+.availList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.availRow {
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.availList li:last-child .availRow { border-bottom: none; }
+
+.availName {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.availDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.availCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.availDayLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+}
+
+.availPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  width: 100%;
+  text-align: center;
+}
+
+.availPillYes {
+  background: rgba(34, 139, 95, 0.10);
+  color: #228b5f;
+}
+
+.availPillNo {
+  background: rgba(220, 80, 80, 0.10);
+  color: #c14545;
+}
+
+.availPillPartial {
+  background: rgba(245, 197, 24, 0.18);
+  color: #b8870a;
+}
+
+/* ── Phone ── */
+@media (max-width: 520px) {
+  .gridHeadRow,
+  .gridRow {
+    grid-template-columns: 76px repeat(7, 1fr);
+  }
+  .rowLabel { font-size: 12px; gap: 6px; padding: 0 var(--space-2); }
+  .noteRow { grid-template-columns: 90px 1fr; }
+  .reqActions { flex-direction: column; gap: 4px; }
+  .availDays { gap: 2px; }
+  .availPill { font-size: 9px; padding: 2px 4px; }
+}

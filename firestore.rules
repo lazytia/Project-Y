@@ -27,6 +27,14 @@ service cloud.firestore {
         || (request.auth != null && request.auth.uid == uid);
     }
 
+    // Published rosters: weekly docs keyed by Monday ISO date. Manager
+    // notes and per-day shift counts live here. Staff need read access
+    // so the staff roster page can display the same data.
+    match /rosters_published/{weekStartISO} {
+      allow read: if request.auth != null;
+      allow write: if isOwner();
+    }
+
     // HR notes: manager-only. Each note records a Formal Warning,
     // Performance Review, Incident Report, or Other note for a staff
     // member. Staff never see this collection.
