@@ -886,47 +886,51 @@ export default function ManagerRosterPage() {
                 })}
               </div>
             </div>
-            <div className={styles.prevNotesWrap}>
-              <div className={styles.cardHead}>
-                <span className={styles.cardIcon}><NoteIcon /></span>
-                <p className={styles.cardTitle}>Notes</p>
-                {prevWeekDoc.notesAuthor && (
-                  <span className={styles.notesMeta}>{prevWeekDoc.notesAuthor}</span>
-                )}
-              </div>
-              <ul className={styles.notesList}>
-                {prevWeekDays.map((d, i) => {
-                  const iso = isoDate(d);
-                  const value = prevWeekDoc.notes?.[iso] ?? "";
-                  return (
-                    <li key={iso} className={styles.noteRow}>
-                      <div className={styles.noteDayCol}>
-                        <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
-                        <span className={styles.noteDate}>{fmtMonDay(d)}</span>
-                      </div>
-                      {value ? (
-                        <button
-                          type="button"
-                          className={styles.noteBtn}
-                          onClick={() => {
-                            setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value, iso, weekKey: "prev" });
-                            setNoteModalEditing(false);
-                            setNoteModalDraft(value);
-                          }}
-                        >
-                          {value}
-                        </button>
-                      ) : (
-                        <span className={styles.noteReadOnly} />
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
           </div>
         )}
       </section>
+
+      {/* Previous Week Notes (separate card, visible when prev week is expanded) */}
+      {showPrevWeek && (
+        <section className={styles.card}>
+          <div className={styles.cardHead}>
+            <span className={styles.cardIcon}><NoteIcon /></span>
+            <p className={styles.cardTitle}>Notes</p>
+            {prevWeekDoc.notesAuthor && (
+              <span className={styles.notesMeta}>{prevWeekDoc.notesAuthor}</span>
+            )}
+          </div>
+          <ul className={styles.notesList}>
+            {prevWeekDays.map((d, i) => {
+              const iso = isoDate(d);
+              const value = prevWeekDoc.notes?.[iso] ?? "";
+              return (
+                <li key={iso} className={styles.noteRow}>
+                  <div className={styles.noteDayCol}>
+                    <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
+                    <span className={styles.noteDate}>{fmtMonDay(d)}</span>
+                  </div>
+                  {value ? (
+                    <button
+                      type="button"
+                      className={styles.noteBtn}
+                      onClick={() => {
+                        setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value, iso, weekKey: "prev" });
+                        setNoteModalEditing(false);
+                        setNoteModalDraft(value);
+                      }}
+                    >
+                      {value}
+                    </button>
+                  ) : (
+                    <span className={styles.noteReadOnly} />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* Holiday Requests */}
       <section className={styles.card}>
