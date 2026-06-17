@@ -244,6 +244,26 @@
   font-weight: 600;
 }
 
+/* ── History badges ── */
+.historyBadge {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.historyApproved {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.historyDeclined {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
 /* ── Action row ── */
 .actionRow {
   display: flex;
