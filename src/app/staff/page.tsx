@@ -202,6 +202,17 @@ export default function StaffDashboardPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [notifOpen]);
 
+  // Next Friday pay date
+  const nextPayDate = useMemo(() => {
+    const d = new Date();
+    const dow = d.getDay(); // 0=Sun
+    const daysUntilFri = (5 - dow + 7) % 7 || 7; // if today is Fri, show next Fri
+    const fri = new Date(d);
+    fri.setDate(d.getDate() + daysUntilFri);
+    fri.setHours(0, 0, 0, 0);
+    return fri;
+  }, []);
+
   // Show only the top 2 on the dashboard card; the rest live in the modal.
   const preview = notifications.slice(0, 2);
 
@@ -278,7 +289,7 @@ export default function StaffDashboardPage() {
         </div>
         <div className={styles.payBody}>
           <p className={styles.payLabel}>Next Pay Date</p>
-          <p className={styles.payDate}>Every Friday</p>
+          <p className={styles.payDate}>{fmtShiftDate(nextPayDate)}</p>
         </div>
         <span className={styles.chevron} aria-hidden="true">›</span>
       </Link>
