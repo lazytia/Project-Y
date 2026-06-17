@@ -745,12 +745,46 @@ export default function ManagerRosterPage() {
 
               <ul className={styles.staffList}>
                 {(() => {
+                  // Build a warning map: uid → reason string (holiday / unavailable)
+                  const cellDayKey = DAY_KEYS[dowIdx] as string | undefined;
+                  const warningMap = new Map<string, string>();
+                  for (const d of staffDocs) {
+                    // 1. Approved holiday covering this date
+                    for (const r of d.holidayRequests ?? []) {
+                      if (r.status !== "approved") continue;
+                      const s = tsDate(r.startDate);
+                      const e = tsDate(r.endDate);
+                      if (s && e) {
+                        const sDay = new Date(s); sDay.setHours(0, 0, 0, 0);
+                        const eDay = new Date(e); eDay.setHours(23, 59, 59, 999);
+                        if (cellDate >= sDay && cellDate <= eDay) {
+                          warningMap.set(d.uid, "On holiday");
+                          break;
+                        }
+                      }
+                    }
+                    if (warningMap.has(d.uid) || !cellDayKey) continue;
+                    // 2. Current availability says unavailable for this weekday
+                    // Check base availability, then override with latest approved change
+                    let avail = d.availability?.[cellDayKey] as DayAvailability | undefined;
+                    const approvedChanges = (d.availabilityRequests ?? [])
+                      .filter((r) => r.status === "approved" && r.requested?.[cellDayKey]);
+                    if (approvedChanges.length > 0) {
+                      // Latest approved change wins
+                      avail = approvedChanges[approvedChanges.length - 1].requested?.[cellDayKey];
+                    }
+                    if (avail?.kind === "unavailable") {
+                      warningMap.set(d.uid, "Unavailable this day");
+                    }
+                  }
+
                   const real = staffDocs
                     .map((d) => ({
                       uid: d.uid,
                       name: displayName(d),
                       role: staffRoleLabel(d.role),
                       isTemp: false,
+                      warning: warningMap.get(d.uid) ?? null,
                     }))
                     .sort((a, b) => a.name.localeCompare(b.name));
                   const temp = Object.keys(cur)
@@ -760,14 +794,24 @@ export default function ManagerRosterPage() {
                       name: u.startsWith("tr_kitchen_") ? "TR Kitchen Staff" : "TR Hall Staff",
                       role: "TR",
                       isTemp: true,
+                      warning: null as string | null,
                     }));
                   return [...real, ...temp];
                 })().map((s) => {
                   const assigned = cur[s.uid];
                   return (
-                    <li key={s.uid} className={styles.staffRow}>
+                    <li key={s.uid} className={`${styles.staffRow} ${s.warning ? styles.staffRowWarn : ""}`}>
                       <span className={styles.staffDot} style={{ background: colorForUid(s.uid) }} />
-                      <span className={styles.staffName}>{s.name}</span>
+                      <span className={styles.staffName}>
+                        {s.name}
+                        {s.warning && (
+                          <span className={styles.warnBadge} title={s.warning} aria-label={s.warning}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+                            </svg>
+                          </span>
+                        )}
+                      </span>
                       <span className={styles.staffRole}>{s.role}</span>
                       <button
                         type="button"
