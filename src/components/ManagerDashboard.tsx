@@ -2,22 +2,52 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { collection, getDocs, type Timestamp } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import styles from "./ManagerDashboard.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────
- * Placeholder counts — will be wired up to real Firestore queries (and
- * the Square / system_yurica integrations the owner dashboard already
- * uses) in a follow-up. The shape and order match the design.
+ * Placeholder counts for non-people sections — wired up to real data
+ * in a follow-up. The Attention Required tiles already read from
+ * Firestore (staff_onboarding).
  * ──────────────────────────────────────────────────────────────────── */
 
-const ATTENTION = {
-  holidayRequests: 2,
-  availabilityChanges: 1,
-  newOnboarding: 1,
-  visaExpiring: 1,
+type AttentionCounts = {
+  holidayRequests: number;
+  availabilityChanges: number;
+  newOnboarding: number;
+  visaExpiring: number;
 };
+
+type StoredRequest = { status?: string };
+
+type StaffDoc = {
+  role?: string;
+  status?: string;
+  completedStep?: number;
+  documents?: { visaExpiry?: Timestamp };
+  holidayRequests?: StoredRequest[];
+  availabilityRequests?: StoredRequest[];
+};
+
+const VISA_EXPIRING_WINDOW_DAYS = 60;
+
+function tsDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
+    try { return (v as Timestamp).toDate(); } catch { return null; }
+  }
+  return null;
+}
+
+function isVisaExpiringSoon(exp: Date | null): boolean {
+  if (!exp) return false;
+  const diff = (exp.getTime() - Date.now()) / 86400000;
+  return diff <= VISA_EXPIRING_WINDOW_DAYS && diff >= -3;
+}
 
 const TODAY_OPS = {
   reservationsPax: 34,
@@ -64,16 +94,50 @@ function firstNameFromUsername(username: string): string {
 export default function ManagerDashboard() {
   const { user } = useAuth();
   const [firstName, setFirstName] = useState<string>("");
+  const [attention, setAttention] = useState<AttentionCounts>({
+    holidayRequests: 0,
+    availabilityChanges: 0,
+    newOnboarding: 0,
+    visaExpiring: 0,
+  });
 
   useEffect(() => {
     setFirstName(firstNameFromUsername(emailToUsername(user?.email)));
   }, [user]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(collection(getDb(), "staff_onboarding"));
+        let holidayRequests = 0;
+        let availabilityChanges = 0;
+        let newOnboarding = 0;
+        let visaExpiring = 0;
+        for (const d of snap.docs) {
+          const data = d.data() as StaffDoc;
+          if (data.role === "owner") continue;
+          for (const r of data.holidayRequests ?? []) {
+            if (r.status === "pending") holidayRequests += 1;
+          }
+          for (const r of data.availabilityRequests ?? []) {
+            if (r.status === "pending") availabilityChanges += 1;
+          }
+          const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
+          if (completed >= 7 && data.status === "complete") newOnboarding += 1;
+          if (isVisaExpiringSoon(tsDate(data.documents?.visaExpiry))) visaExpiring += 1;
+        }
+        setAttention({ holidayRequests, availabilityChanges, newOnboarding, visaExpiring });
+      } catch {
+        /* keep zero counts on failure */
+      }
+    })();
+  }, []);
+
   const attentionTotal =
-    ATTENTION.holidayRequests +
-    ATTENTION.availabilityChanges +
-    ATTENTION.newOnboarding +
-    ATTENTION.visaExpiring;
+    attention.holidayRequests +
+    attention.availabilityChanges +
+    attention.newOnboarding +
+    attention.visaExpiring;
 
   const greeting = greetingForNow();
   const team = TODAYS_TEAM.kitchen + TODAYS_TEAM.hall;
@@ -103,7 +167,7 @@ export default function ManagerDashboard() {
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-            <p className={styles.attentionValue}>{ATTENTION.holidayRequests}</p>
+            <p className={styles.attentionValue}>{attention.holidayRequests}</p>
             <p className={styles.attentionLabel}>Holiday<br />Requests</p>
           </Link>
 
@@ -113,7 +177,7 @@ export default function ManagerDashboard() {
               <circle cx="9" cy="7" r="4" />
               <circle cx="19" cy="8" r="3" />
             </svg>
-            <p className={styles.attentionValue}>{ATTENTION.availabilityChanges}</p>
+            <p className={styles.attentionValue}>{attention.availabilityChanges}</p>
             <p className={styles.attentionLabel}>Availability<br />Change</p>
           </Link>
 
@@ -124,7 +188,7 @@ export default function ManagerDashboard() {
               <line x1="20" y1="8" x2="20" y2="14" />
               <line x1="23" y1="11" x2="17" y2="11" />
             </svg>
-            <p className={styles.attentionValue}>{ATTENTION.newOnboarding}</p>
+            <p className={styles.attentionValue}>{attention.newOnboarding}</p>
             <p className={styles.attentionLabel}>New<br />Onboarding</p>
           </Link>
 
@@ -136,7 +200,7 @@ export default function ManagerDashboard() {
               <line x1="14" y1="9" x2="18" y2="9" />
               <line x1="14" y1="13" x2="18" y2="13" />
             </svg>
-            <p className={styles.attentionValue}>{ATTENTION.visaExpiring}</p>
+            <p className={styles.attentionValue}>{attention.visaExpiring}</p>
             <p className={styles.attentionLabel}>Visa Expiring<br />Soon</p>
           </Link>
         </div>

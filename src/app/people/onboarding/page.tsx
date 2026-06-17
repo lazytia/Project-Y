@@ -177,60 +177,6 @@ export default function ManagerOnboardingPage() {
   );
   const activeCount = useMemo(() => rows?.length ?? 0, [rows]);
 
-  async function handleRemind(row: StaffOnboarding) {
-    if (!user) return;
-    try {
-      // The click itself is a user gesture, so iOS will surface the
-      // permission prompt now if the owner hasn't been asked yet. We register
-      // the owner's own token (best-effort) so that another owner can later
-      // send THIS owner a test reminder.
-      try { await registerFcmToken(user.uid); } catch { /* best-effort */ }
-
-      // Send only to the card owner. aa (test staff) → only aa's tokens.
-      // Yuri (other owner) → only Yuri's tokens. The clicker no longer
-      // receives a copy by default.
-      const res = await fetch("/api/staff/remind", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uids: [row.uid] }),
-      });
-      const data = await res.json().catch(() => ({}));
-      // Surface the per-token diagnostic in the console so we can see WHY
-      // a particular device isn't getting the push (stale token, throttled,
-      // …) without trawling App Hosting logs.
-      // eslint-disable-next-line no-console
-      console.log("[remind]", data);
-      if (!res.ok) {
-        alert(`Reminder failed: ${data.error ?? res.status}`);
-        return;
-      }
-      if (data.delivered > 0) {
-        const tail = Array.isArray(data.perToken)
-          ? data.perToken
-              .map((t: { success: boolean; tokenTail: string; error: string | null }) =>
-                t.success ? `✓${t.tokenTail}` : `✗${t.tokenTail}(${t.error ?? "?"})`,
-              )
-              .join("  ")
-          : "";
-          alert(`Reminder: ${data.delivered}/${data.delivered + (data.failed ?? 0)} ok\n${tail}`);
-      } else {
-        const tail = Array.isArray(data.perToken)
-          ? data.perToken
-              .map((t: { success: boolean; tokenTail: string; error: string | null }) =>
-                t.success ? `✓${t.tokenTail}` : `✗${t.tokenTail}(${t.error ?? "?"})`,
-              )
-              .join("\n")
-          : "";
-        alert(
-          data.reason
-            ? `${data.reason}\n${tail}`
-            : `No device delivered.\n${tail || "Open the app and allow notifications first."}`,
-        );
-      }
-    } catch (err) {
-      alert(`Reminder failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
 
   if (authLoading || !allowed) {
     return <Splash />;
@@ -288,21 +234,13 @@ export default function ManagerOnboardingPage() {
                   <p className={styles.statusReady}>Ready for approval</p>
                 )}
               </div>
-              <div className={styles.cardAction}>
-                {pending ? (
+              {pending && (
+                <div className={styles.cardAction}>
                   <span className={styles.pendingPill} aria-label="Pending approval">
                     <ClockIcon />
                   </span>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.remindBtn}
-                    onClick={() => handleRemind(row)}
-                  >
-                    Remind
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
             </li>
           );
         })}
