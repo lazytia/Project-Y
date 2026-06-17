@@ -21,7 +21,7 @@ type StoredNotification = {
   title?: string;
   detail?: string;
   createdAt?: Timestamp;
-  requestType?: "holiday" | "availability";
+  requestType?: "holiday" | "availability" | "roster";
   requestId?: string;
   // Holiday fields stored inline for reliability (fallback if request lookup fails)
   startDate?: Timestamp;
@@ -30,6 +30,9 @@ type StoredNotification = {
   effectiveDate?: Timestamp;
   requested?: Record<string, DayAvailability>;
   previousAvailability?: Record<string, DayAvailability>;
+  // Roster-published fields stored inline
+  weekStartISO?: string;
+  shifts?: Array<{ iso: string; meal: "lunch" | "dinner"; start: string }>;
 };
 
 type HolidayRequest = {
@@ -248,6 +251,98 @@ export default function NotificationDetailPage({
   const status: Status = kind.endsWith("approved") ? "approved" : "declined";
   const isHoliday = kind.startsWith("holiday");
   const isAvailability = kind.startsWith("availability");
+  const isRoster = kind.startsWith("roster");
+
+  if (isRoster) {
+    const shifts = (notification.shifts ?? [])
+      .map((s) => {
+        const [y, m, d] = s.iso.split("-").map(Number);
+        return { ...s, date: new Date(y, m - 1, d) };
+      })
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    const publishedAt = tsDate(notification.createdAt);
+
+    return (
+      <div className={styles.page}>
+        <button
+          type="button"
+          className={styles.backBtn}
+          onClick={() => router.push("/staff")}
+          aria-label="Back"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        </button>
+
+        <header className={styles.hero}>
+          <span className={styles.heroIcon} aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <span className={`${styles.heroBadge} ${styles.heroBadgeOk}`} aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </span>
+          </span>
+          <div className={styles.heroBody}>
+            <p className={`${styles.heroPill} ${styles.heroPillOk}`}>
+              <span className={styles.heroPillDot} aria-hidden="true" />
+              Published
+            </p>
+            <h1 className={styles.heroTitle}>Roster Published</h1>
+            <p className={styles.heroSub}>
+              {shifts.length > 0
+                ? "Here are your shifts for the week."
+                : "You have no shifts rostered this week."}
+            </p>
+          </div>
+        </header>
+
+        <section className={styles.card}>
+          <Row icon={<CalIcon />} label="Published on" value={fmtDateTime(publishedAt)} />
+          <Divider />
+          <div className={styles.row}>
+            <span className={styles.rowIcon}><CaseIcon /></span>
+            <div className={styles.rowBody}>
+              <p className={styles.rowLabel}>Your Shifts</p>
+              {shifts.length === 0 ? (
+                <p className={styles.rowValue}>—</p>
+              ) : (
+                <ul className={styles.dateList}>
+                  {shifts.map((s, i) => (
+                    <li key={i} className={styles.dateRow}>
+                      <span className={styles.dateValue}>
+                        {s.date.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
+                        {" · "}
+                        {s.meal === "lunch" ? "Lunch" : "Dinner"}
+                      </span>
+                      <span className={styles.dateDow}>{fmtTime12h(s.start)} start</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          <Divider />
+          <Row icon={<PersonIcon />} label="Published by" value="YURICA Management" />
+        </section>
+
+        <button
+          type="button"
+          className={styles.doneBtn}
+          onClick={() => router.push("/staff/schedule/roster")}
+        >
+          View Roster
+        </button>
+      </div>
+    );
+  }
 
   const decidedAt =
     tsDate(holiday?.decidedAt) ??

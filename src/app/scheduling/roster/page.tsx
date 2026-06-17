@@ -7,7 +7,9 @@ import { useAuth } from "@/components/AuthProvider";
 import {
   decideHolidayRequest,
   decideAvailabilityRequest,
+  publishStaffRoster,
   type Decision,
+  type PublishShift,
 } from "@/lib/manager-actions";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -245,6 +247,7 @@ export default function ManagerRosterPage() {
   const [noteModalDraft, setNoteModalDraft] = useState("");
   const [pendingStart, setPendingStart] = useState<string>("");
   const [savingShift, setSavingShift] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -500,6 +503,57 @@ export default function ManagerRosterPage() {
     }
   }
 
+  async function publishWeek() {
+    if (publishing) return;
+    const rangeLabel = fmtRange(weekStart, weekEnd);
+
+    // Build each staff member's shift list for the current week from the
+    // assignments grid. Temporary (tr_*) slots aren't real accounts, so skip.
+    const byStaff = new Map<string, PublishShift[]>();
+    for (const d of weekDays) {
+      const iso = isoDate(d);
+      for (const meal of ["lunch", "dinner"] as Meal[]) {
+        const assigned = weekDoc.assignments?.[iso]?.[meal] ?? {};
+        for (const [uid, start] of Object.entries(assigned)) {
+          if (uid.startsWith("tr_")) continue;
+          const list = byStaff.get(uid) ?? [];
+          list.push({ iso, meal, start });
+          byStaff.set(uid, list);
+        }
+      }
+    }
+
+    const recipients = staffDocs.filter((s) => s.role !== "owner");
+    const total = recipients.length;
+    const withShifts = recipients.filter((s) => (byStaff.get(s.uid)?.length ?? 0) > 0).length;
+
+    const ok = window.confirm(
+      `Publish the roster for ${rangeLabel}?\n\n` +
+        `${withShifts} of ${total} staff will be notified of their shifts.`,
+    );
+    if (!ok) return;
+
+    setPublishing(true);
+    try {
+      await Promise.all(
+        recipients.map((s) =>
+          publishStaffRoster(s.uid, weekStartISO, rangeLabel, byStaff.get(s.uid) ?? []),
+        ),
+      );
+      // Stamp the week doc so the staff side can show when it was published.
+      await setDoc(
+        doc(getDb(), "rosters_published", weekStartISO),
+        { publishedAt: new Date() },
+        { merge: true },
+      );
+      alert(`Roster published. ${total} staff notified.`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to publish roster.");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   if (loading) return <Splash />;
 
   const notesAuthor = weekDoc.notesAuthor ?? "";
@@ -508,8 +562,18 @@ export default function ManagerRosterPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Roster</h1>
-        <p className={styles.subtitle}>{fmtRange(weekStart, weekEnd)}</p>
+        <div className={styles.headerText}>
+          <h1 className={styles.title}>Roster</h1>
+          <p className={styles.subtitle}>{fmtRange(weekStart, weekEnd)}</p>
+        </div>
+        <button
+          type="button"
+          className={styles.publishBtn}
+          onClick={publishWeek}
+          disabled={publishing}
+        >
+          {publishing ? "Publishing…" : "Publish"}
+        </button>
       </header>
 
       {/* Week strip with Lunch / Dinner rows */}

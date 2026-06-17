@@ -188,6 +188,69 @@ function buildNotification(
   };
 }
 
+export type PublishShift = {
+  /** ISO date (YYYY-MM-DD) of the shift. */
+  iso: string;
+  meal: "lunch" | "dinner";
+  /** "HH:MM" 24h start time. */
+  start: string;
+};
+
+/**
+ * Publish one staff member's week: writes their shift list under
+ * roster.{weekStartISO} on their staff_onboarding doc and appends a
+ * notification so they're told their work dates. Best-effort FCM push,
+ * same as decideRequest.
+ */
+export async function publishStaffRoster(
+  staffUid: string,
+  weekStartISO: string,
+  weekRangeLabel: string,
+  shifts: PublishShift[],
+): Promise<void> {
+  const ref = doc(getDb(), "staff_onboarding", staffUid);
+  const id = `n_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const count = shifts.length;
+  const notification = {
+    id,
+    kind: "roster-published",
+    title: "Roster published",
+    detail:
+      count > 0
+        ? `Your roster for ${weekRangeLabel} is ready — ${count} shift${count === 1 ? "" : "s"} this week.`
+        : `The roster for ${weekRangeLabel} has been published. You have no shifts this week.`,
+    createdAt: Timestamp.now(),
+    requestType: "roster",
+    weekStartISO,
+    shifts,
+  };
+
+  await updateDoc(ref, {
+    [`roster.${weekStartISO}`]: {
+      weekStartISO,
+      publishedAt: Timestamp.now(),
+      shifts,
+    },
+    notifications: arrayUnion(notification),
+    updatedAt: serverTimestamp(),
+  });
+
+  try {
+    void fetch("/api/staff/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uid: staffUid,
+        title: notification.title,
+        body: notification.detail,
+        url: "/staff/schedule/roster",
+      }),
+    });
+  } catch {
+    /* swallow — push is best-effort */
+  }
+}
+
 export function decideHolidayRequest(
   staffUid: string,
   managerUid: string,

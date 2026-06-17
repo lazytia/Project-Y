@@ -11,9 +11,35 @@
 /* ── Header ── */
 .header {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.headerText {
+  display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
+
+.publishBtn {
+  flex: 0 0 auto;
+  height: 38px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 99px;
+  background: var(--color-warm);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.12s, background 0.12s;
+}
+
+.publishBtn:hover:not(:disabled) { opacity: 0.9; }
+.publishBtn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .title {
   margin: 0;
