@@ -27,6 +27,13 @@ service cloud.firestore {
         || (request.auth != null && request.auth.uid == uid);
     }
 
+    // HR notes: manager-only. Each note records a Formal Warning,
+    // Performance Review, Incident Report, or Other note for a staff
+    // member. Staff never see this collection.
+    match /hr_notes/{noteId} {
+      allow read, write: if isOwner();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

@@ -1,0 +1,342 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 520px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.backBtn {
+  align-self: flex-start;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--color-fg);
+}
+
+.backBtn:hover { background: var(--color-surface); }
+
+/* ── Heading with hero icon ── */
+.heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.heroIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.iconWarning  { background: rgba(234, 88, 12, 0.12); color: var(--color-warm); }
+.iconReview   { background: rgba(245, 197, 24, 0.18); color: #b8870a; }
+.iconIncident { background: rgba(220, 80, 80, 0.12); color: #c14545; }
+.iconOther    { background: rgba(120, 120, 128, 0.16); color: var(--color-fg); }
+
+.headingText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Section ── */
+.sectionTitle {
+  margin: var(--space-2) 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.sectionSub {
+  margin: 4px 0 var(--space-2);
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Locked employee card ── */
+.empCard {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.empAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.empBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.empName {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.empRole {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+}
+
+.empLocked {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Date input ── */
+.dateWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: var(--space-2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-4);
+  gap: var(--space-3);
+  height: 56px;
+}
+
+.dateIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+}
+
+.dateInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 16px;
+  color: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dateDisplay {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+/* The calendar icon mirror on the right side */
+.dateWrap::after {
+  content: "";
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>");
+}
+
+/* ── Textarea + char counter ── */
+.textareaWrap {
+  position: relative;
+}
+
+.textarea {
+  width: 100%;
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + 20px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--color-fg);
+  resize: vertical;
+  outline: none;
+  line-height: 1.55;
+  min-height: 120px;
+  transition: border-color 0.15s;
+}
+
+.textarea:focus { border-color: var(--color-warm); }
+.textarea::placeholder { color: var(--color-fg-muted); }
+
+.counter {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-3);
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  pointer-events: none;
+}
+
+/* ── Checkboxes ── */
+.checkList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.checkbox {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--color-warm);
+  cursor: pointer;
+}
+
+.checkLabel {
+  font-size: 14px;
+  color: var(--color-fg);
+}
+
+/* ── Submit button ── */
+.submitBtn {
+  margin-top: var(--space-3);
+  height: 56px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-warm);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.submitBtn:hover:not(:disabled) { opacity: 0.92; }
+.submitBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Optional label ── */
+.optional {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  margin-left: 6px;
+}
+
+/* ── Short text input (e.g. Witness) ── */
+.shortInput {
+  width: 100%;
+  height: 56px;
+  padding: 0 var(--space-4);
+  padding-right: 80px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  color: var(--color-fg);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.shortInput:focus { border-color: var(--color-warm); }
+.shortInput::placeholder { color: var(--color-fg-muted); }
+
+/* ── Time input ── */
+.timeWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-4);
+  gap: var(--space-3);
+  height: 56px;
+}
+
+.timeIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+}
+
+.timeInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-fg);
+  outline: none;
+}
+
+/* ── Photo upload button ── */
+.photoBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 56px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-fg);
+  transition: border-color 0.15s;
+}
+
+.photoBtn:hover { border-color: var(--color-warm); }
+
+.hiddenFile { display: none; }

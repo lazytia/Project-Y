@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -131,6 +132,7 @@ function kindClass(kind: NoteKind): string {
 }
 
 export default function HrNotesPage() {
+  const router = useRouter();
   const [view, setView] = useState<ViewMode>("timeline");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("az");
@@ -183,7 +185,7 @@ export default function HrNotesPage() {
   }, [query, sort]);
 
   function handleAddNote() {
-    alert("Add Note — coming soon.\n\nA dialog to pick the employee and note type will land here.");
+    router.push("/people/hr-notes/add");
   }
 
   function openMember(name: string) {
