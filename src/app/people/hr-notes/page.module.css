@@ -356,10 +356,10 @@
 
 .empRow {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: start;
+  grid-template-columns: 1fr auto;
+  align-items: center;
   gap: var(--space-3);
-  padding: 10px var(--space-4);
+  padding: 22px var(--space-4) 10px;
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--color-border);
@@ -368,6 +368,7 @@
   text-align: left;
   width: 100%;
   transition: background 0.15s;
+  position: relative;
 }
 
 .empList li:last-child .empRow { border-bottom: none; }
@@ -482,9 +483,9 @@
   justify-content: center;
   color: var(--color-fg-muted);
   transition: transform 0.18s;
-  margin-left: 4px;
-  align-self: start;
-  margin-top: 2px;
+  position: absolute;
+  top: 4px;
+  right: var(--space-4);
 }
 
 .empChevOpen { transform: rotate(180deg); }
@@ -660,8 +661,9 @@
   .timelineBody .chev { display: none; }
   .empRow {
     grid-template-columns: 1fr auto;
-    padding: 10px var(--space-3);
+    padding: 22px var(--space-3) 10px;
     gap: var(--space-2);
   }
+  .empChev { right: var(--space-3); }
   .empRow > .chev { display: none; }
 }
