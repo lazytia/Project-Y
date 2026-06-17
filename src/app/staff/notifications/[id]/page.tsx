@@ -204,12 +204,36 @@ export default function NotificationDetailPage({
         const n = arr.find((x) => x.id === id) ?? null;
         setNotification(n);
 
-        if (n?.requestType === "holiday" && n.requestId) {
+        const kind = n?.kind ?? "";
+        const isHol = kind.startsWith("holiday");
+        const isAv = kind.startsWith("availability");
+        const notifMs = tsDate(n?.createdAt)?.getTime() ?? 0;
+
+        if (isHol) {
           const list = (data.holidayRequests ?? []) as HolidayRequest[];
-          setHoliday(list.find((r) => r.id === n.requestId) ?? null);
-        } else if (n?.requestType === "availability" && n.requestId) {
+          // Primary: match by requestId; fallback: match by decidedAt ≈ notification.createdAt
+          const found =
+            (n?.requestId ? list.find((r) => r.id === n.requestId) : null) ??
+            (notifMs
+              ? list.find((r) => {
+                  const dec = tsDate(r.decidedAt)?.getTime();
+                  return dec !== undefined && Math.abs(dec - notifMs) < 10_000;
+                })
+              : null) ??
+            null;
+          setHoliday(found);
+        } else if (isAv) {
           const list = (data.availabilityRequests ?? []) as AvailabilityRequest[];
-          setAvailability(list.find((r) => r.id === n.requestId) ?? null);
+          const found =
+            (n?.requestId ? list.find((r) => r.id === n.requestId) : null) ??
+            (notifMs
+              ? list.find((r) => {
+                  const dec = tsDate(r.decidedAt)?.getTime();
+                  return dec !== undefined && Math.abs(dec - notifMs) < 10_000;
+                })
+              : null) ??
+            null;
+          setAvailability(found);
         }
       } finally {
         setLoading(false);
