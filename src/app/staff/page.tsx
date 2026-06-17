@@ -126,7 +126,8 @@ function findNextShift(
   }
 
   candidates.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-  return candidates.find((c) => c.startDate.getTime() >= now.getTime()) ?? candidates[0] ?? null;
+  // Only show future shifts — never fall back to past ones
+  return candidates.find((c) => c.startDate.getTime() >= now.getTime()) ?? null;
 }
 
 /* ── page ── */
