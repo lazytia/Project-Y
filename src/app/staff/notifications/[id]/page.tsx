@@ -62,8 +62,13 @@ const DAY_FULL: Record<typeof DAY_KEYS[number], string> = {
 function tsDate(v: unknown): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
-  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
-    try { return (v as Timestamp).toDate(); } catch { return null; }
+  if (typeof v === "object" && v !== null) {
+    if (typeof (v as { toDate?: unknown }).toDate === "function") {
+      try { return (v as Timestamp).toDate(); } catch { return null; }
+    }
+    // plain {seconds, nanoseconds} — Firestore Timestamp serialised to JSON
+    const o = v as { seconds?: unknown; nanoseconds?: unknown };
+    if (typeof o.seconds === "number") return new Date(o.seconds * 1000);
   }
   return null;
 }
@@ -237,16 +242,33 @@ export default function NotificationDetailPage({
   })();
 
   // Availability-specific
+  const effDate = tsDate(availability?.effectiveDate);
+  // Collect all requested days so we always have something to show.
+  const requestedDays: Array<{ key: string; label: string; prev: DayAvailability | undefined; next: DayAvailability | undefined }> = [];
+  if (availability?.requested) {
+    for (const k of DAY_KEYS) {
+      const next = availability.requested[k];
+      if (!next) continue;
+      const prev = availability.previousAvailability?.[k];
+      // Only include days that actually changed (or all if no prev data)
+      const changed = !prev || JSON.stringify(next) !== JSON.stringify(prev);
+      if (changed) {
+        requestedDays.push({ key: k, label: DAY_FULL[k as typeof DAY_KEYS[number]], prev, next });
+      }
+    }
+    // Fallback: if nothing changed (shouldn't happen), show all
+    if (requestedDays.length === 0) {
+      for (const k of DAY_KEYS) {
+        const next = availability.requested[k];
+        if (next) requestedDays.push({ key: k, label: DAY_FULL[k as typeof DAY_KEYS[number]], prev: undefined, next });
+      }
+    }
+  }
+  // Fallback: first changed day label (for Date row when effectiveDate missing)
   const dayKey = isAvailability
     ? findChangedDay(availability?.requested, availability?.previousAvailability)
     : null;
   const dayLabel = dayKey ? DAY_FULL[dayKey] : null;
-  const prevA = dayKey ? availability?.previousAvailability?.[dayKey] : undefined;
-  const nextA = dayKey ? availability?.requested?.[dayKey] : undefined;
-  const effDate = tsDate(availability?.effectiveDate);
-  const prevLabel = availabilityLabel(prevA);
-  const nextLabel = availabilityLabel(nextA);
-  const typeLabel = changeType(prevA, nextA);
 
   const notes = (holiday?.reason || availability?.reason || "").trim();
 
@@ -347,42 +369,49 @@ export default function NotificationDetailPage({
           <>
             <Row
               icon={<CalIcon />}
-              label="Date"
+              label="Effective Date"
               value={effDate ? fmtLongDate(effDate) : dayLabel ?? "—"}
             />
             <Divider />
-            <Row
-              icon={<ClockIcon />}
-              label="Change Type"
-              value={typeLabel}
-            />
-            <Divider />
-            <div className={styles.row}>
-              <span className={`${styles.rowIcon} ${styles.rowIconWarm}`}>
-                <ClockIcon />
-              </span>
-              <div className={styles.rowBody}>
-                <p className={styles.rowLabel}>Previous Availability</p>
-                <p className={styles.rowValue}>{prevLabel.primary}</p>
-                {prevLabel.secondary && (
-                  <p className={styles.rowSub}>{prevLabel.secondary}</p>
-                )}
-              </div>
-            </div>
-            <p className={styles.arrowDown} aria-hidden="true">↓</p>
-            <div className={styles.row}>
-              <span className={`${styles.rowIcon} ${styles.rowIconWarm}`}>
-                <ClockIcon />
-              </span>
-              <div className={styles.rowBody}>
-                <p className={styles.rowLabel}>{status === "approved" ? "Approved Availability" : "Requested Availability"}</p>
-                <p className={`${styles.rowValue} ${styles.rowValueWarm}`}>{nextLabel.primary}</p>
-                {nextLabel.secondary && (
-                  <p className={`${styles.rowSub} ${styles.rowSubWarm}`}>{nextLabel.secondary}</p>
-                )}
-              </div>
-            </div>
-            <Divider />
+            {requestedDays.length > 0 ? (
+              requestedDays.map(({ key, label, prev, next }) => {
+                const prevLabel = availabilityLabel(prev);
+                const nextLabel = availabilityLabel(next);
+                return (
+                  <div key={key}>
+                    <div className={styles.row}>
+                      <span className={styles.rowIcon}><ClockIcon /></span>
+                      <div className={styles.rowBody}>
+                        <p className={styles.rowLabel}>{label}</p>
+                        {prev ? (
+                          <p className={styles.rowValue}>
+                            <span className={styles.strikethrough}>{prevLabel.primary}</span>
+                            {" → "}
+                            <span className={`${styles.rowValueWarm}`}>{nextLabel.primary}</span>
+                            {nextLabel.secondary && (
+                              <span className={styles.rowSub}> ({nextLabel.secondary})</span>
+                            )}
+                          </p>
+                        ) : (
+                          <p className={`${styles.rowValue} ${styles.rowValueWarm}`}>
+                            {nextLabel.primary}
+                            {nextLabel.secondary && (
+                              <span className={styles.rowSub}> ({nextLabel.secondary})</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Divider />
+                  </div>
+                );
+              })
+            ) : (
+              <>
+                <Row icon={<ClockIcon />} label="Availability Change" value="—" />
+                <Divider />
+              </>
+            )}
           </>
         )}
 

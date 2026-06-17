@@ -166,6 +166,7 @@ export default function AvailabilityChangePage() {
           availabilityRequests: arrayUnion({
             id,
             requested: proposed,
+            previousAvailability: current,
             reason: reason.trim() || null,
             effectiveDate: Timestamp.fromDate(effectiveDate),
             status: "pending",

@@ -168,6 +168,12 @@
 
 .rowSubWarm { color: var(--color-warm); }
 
+.strikethrough {
+  text-decoration: line-through;
+  opacity: 0.5;
+  font-weight: 600;
+}
+
 .divider {
   height: 1px;
   background: var(--color-border);
