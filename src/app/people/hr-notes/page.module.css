@@ -357,7 +357,7 @@
 .empRow {
   display: grid;
   grid-template-columns: 1fr auto auto;
-  align-items: center;
+  align-items: start;
   gap: var(--space-3);
   padding: 10px var(--space-4);
   background: transparent;
@@ -483,6 +483,8 @@
   color: var(--color-fg-muted);
   transition: transform 0.18s;
   margin-left: 4px;
+  align-self: start;
+  margin-top: 2px;
 }
 
 .empChevOpen { transform: rotate(180deg); }
