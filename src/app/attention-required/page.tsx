@@ -443,7 +443,7 @@ export default function AttentionRequiredPage() {
           </span>
           <p className={styles.sectionLabel}>REQUESTS</p>
           <span className={styles.sectionCount}>{visibleRequests.length}</span>
-          <span className={styles.viewAll}>View all</span>
+          
         </div>
 
         {visibleRequests.length === 0 ? (
@@ -617,7 +617,7 @@ export default function AttentionRequiredPage() {
           </span>
           <p className={styles.sectionLabel}>ONBOARDING</p>
           <span className={styles.sectionCount}>{visibleOnboarding.length}</span>
-          <span className={styles.viewAll}>View all</span>
+          
         </div>
 
         {visibleOnboarding.length === 0 ? (
@@ -671,7 +671,7 @@ export default function AttentionRequiredPage() {
           </span>
           <p className={styles.sectionLabel}>COMPLIANCE</p>
           <span className={styles.sectionCount}>{visibleCompliance.length}</span>
-          <span className={styles.viewAll}>View all</span>
+          
         </div>
 
         {visibleCompliance.length === 0 ? (
