@@ -149,43 +149,52 @@ export default function StaffDashboardPage() {
   const nextWeekISO = useMemo(() => isoDate(addDays(startOfWeek(today), 7)), [today]);
 
   // Load roster + notifications from staff_onboarding/{uid}
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!user) return;
-    (async () => {
-      try {
-        const ref = doc(getDb(), "staff_onboarding", user.uid);
-        const snap = await getDoc(ref);
-        const data = snap.data() ?? {};
+    try {
+      const ref = doc(getDb(), "staff_onboarding", user.uid);
+      const snap = await getDoc(ref);
+      const data = snap.data() ?? {};
 
-        // Roster — check this week + next week
-        const thisRoster = (data.roster?.[thisWeekISO] ?? null) as RosterDoc | null;
-        const nextRoster = (data.roster?.[nextWeekISO] ?? null) as RosterDoc | null;
-        setNextShift(findNextShift(thisRoster, nextRoster));
-        setShiftLoaded(true);
+      // Roster — check this week + next week
+      const thisRoster = (data.roster?.[thisWeekISO] ?? null) as RosterDoc | null;
+      const nextRoster = (data.roster?.[nextWeekISO] ?? null) as RosterDoc | null;
+      setNextShift(findNextShift(thisRoster, nextRoster));
+      setShiftLoaded(true);
 
-        // Notifications
-        const arr = (data.notifications ?? []) as StoredNotification[];
-        const parsed: Notification[] = arr
-          .map((n) => {
-            const d = tsToDate(n.createdAt);
-            return {
-              id: n.id,
-              label: n.title ?? "Notification",
-              detail: n.detail ?? "",
-              createdAt: d,
-              ago: fmtRelative(d),
-            };
-          })
-          .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
-        setNotifications(parsed);
+      // Notifications
+      const arr = (data.notifications ?? []) as StoredNotification[];
+      const parsed: Notification[] = arr
+        .map((n) => {
+          const d = tsToDate(n.createdAt);
+          return {
+            id: n.id,
+            label: n.title ?? "Notification",
+            detail: n.detail ?? "",
+            createdAt: d,
+            ago: fmtRelative(d),
+          };
+        })
+        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+      setNotifications(parsed);
 
-        // Best-effort: mark notifications as read.
-        await setDoc(ref, { notificationsReadAt: serverTimestamp() }, { merge: true }).catch(() => {});
-      } catch {
-        setShiftLoaded(true);
-      }
-    })();
+      // Best-effort: mark notifications as read.
+      await setDoc(ref, { notificationsReadAt: serverTimestamp() }, { merge: true }).catch(() => {});
+    } catch {
+      setShiftLoaded(true);
+    }
   }, [user, thisWeekISO, nextWeekISO]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Re-fetch data when the app becomes visible (e.g. after tapping a push notification)
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") loadData();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadData]);
 
   // Lock body scroll while the modal is open.
   useEffect(() => {

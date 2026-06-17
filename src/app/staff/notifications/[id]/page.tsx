@@ -576,7 +576,7 @@ export default function NotificationDetailPage({
             {status !== "approved"
               ? "Speak to your manager if you have questions about this decision."
               : isHoliday
-                ? "Your leave has been added to the roster. You can view your upcoming shifts in the roster section."
+                ? "Your holiday has been added to the roster. You can view your upcoming shifts in the roster section."
                 : "Your availability has been updated. This will be reflected in the roster."}
           </p>
         </div>
