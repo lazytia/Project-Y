@@ -230,8 +230,12 @@ export default function ManagerRosterPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<string | null>(null);
+  const [editingNoteNext, setEditingNoteNext] = useState<string | null>(null);
   const [showAvail, setShowAvail] = useState(false);
-  const [modalCell, setModalCell] = useState<{ iso: string; meal: Meal } | null>(null);
+  const [showPrevWeek, setShowPrevWeek] = useState(false);
+  const [nextWeekDoc, setNextWeekDoc] = useState<RosterWeekDoc>({});
+  const [prevWeekDoc, setPrevWeekDoc] = useState<RosterWeekDoc>({});
+  const [modalCell, setModalCell] = useState<{ iso: string; meal: Meal; weekKey: string } | null>(null);
   const [pendingStart, setPendingStart] = useState<string>("");
   const [savingShift, setSavingShift] = useState(false);
 
@@ -246,6 +250,22 @@ export default function ManagerRosterPage() {
   const weekDays = useMemo(
     () => Array.from({ length: DAYS_IN_WEEK }, (_, i) => addDays(weekStart, i)),
     [weekStart],
+  );
+
+  const nextWeekStart = useMemo(() => addDays(weekStart, 7), [weekStart]);
+  const nextWeekStartISO = useMemo(() => isoDate(nextWeekStart), [nextWeekStart]);
+  const nextWeekEnd = useMemo(() => addDays(nextWeekStart, DAYS_IN_WEEK - 1), [nextWeekStart]);
+  const nextWeekDays = useMemo(
+    () => Array.from({ length: DAYS_IN_WEEK }, (_, i) => addDays(nextWeekStart, i)),
+    [nextWeekStart],
+  );
+
+  const prevWeekStart = useMemo(() => addDays(weekStart, -7), [weekStart]);
+  const prevWeekStartISO = useMemo(() => isoDate(prevWeekStart), [prevWeekStart]);
+  const prevWeekEnd = useMemo(() => addDays(prevWeekStart, DAYS_IN_WEEK - 1), [prevWeekStart]);
+  const prevWeekDays = useMemo(
+    () => Array.from({ length: DAYS_IN_WEEK }, (_, i) => addDays(prevWeekStart, i)),
+    [prevWeekStart],
   );
 
   const load = useCallback(async () => {
@@ -265,12 +285,18 @@ export default function ManagerRosterPage() {
       const weekSnap = await getDocs(collection(getDb(), "rosters_published"));
       const match = weekSnap.docs.find((d) => d.id === weekStartISO);
       setWeekDoc((match?.data() as RosterWeekDoc) ?? {});
+      const matchNext = weekSnap.docs.find((d) => d.id === nextWeekStartISO);
+      setNextWeekDoc((matchNext?.data() as RosterWeekDoc) ?? {});
+      const matchPrev = weekSnap.docs.find((d) => d.id === prevWeekStartISO);
+      setPrevWeekDoc((matchPrev?.data() as RosterWeekDoc) ?? {});
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("[roster] week doc load failed", err);
       setWeekDoc({});
+      setNextWeekDoc({});
+      setPrevWeekDoc({});
     }
-  }, [weekStartISO]);
+  }, [weekStartISO, nextWeekStartISO, prevWeekStartISO]);
 
   useEffect(() => {
     (async () => {
@@ -352,18 +378,23 @@ export default function ManagerRosterPage() {
   }
 
   async function saveAssignments(
+    weekKey: string,
     iso: string,
     meal: Meal,
     next: ShiftAssignments,
   ) {
+    const isNext = weekKey === nextWeekStartISO;
+    const currentDoc = isNext ? nextWeekDoc : weekDoc;
+    const setCurrentDoc = isNext ? setNextWeekDoc : setWeekDoc;
+
     setSavingShift(true);
     try {
-      const allAssignments = { ...(weekDoc.assignments ?? {}) };
+      const allAssignments = { ...(currentDoc.assignments ?? {}) };
       const dayAssignments = { ...(allAssignments[iso] ?? { lunch: {}, dinner: {} }) };
       dayAssignments[meal] = next;
       allAssignments[iso] = dayAssignments;
 
-      const counts = { ...(weekDoc.counts ?? {}) };
+      const counts = { ...(currentDoc.counts ?? {}) };
       counts[iso] = {
         ...(counts[iso] ?? {}),
         lunch: Object.keys(dayAssignments.lunch ?? {}).length,
@@ -371,11 +402,11 @@ export default function ManagerRosterPage() {
       };
 
       await setDoc(
-        doc(getDb(), "rosters_published", weekStartISO),
+        doc(getDb(), "rosters_published", weekKey),
         { assignments: allAssignments, counts },
         { merge: true },
       );
-      setWeekDoc((prev) => ({ ...prev, assignments: allAssignments, counts }));
+      setCurrentDoc((prev) => ({ ...prev, assignments: allAssignments, counts }));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to save shift.");
     } finally {
@@ -383,24 +414,50 @@ export default function ManagerRosterPage() {
     }
   }
 
-  function assignedFor(iso: string, meal: Meal): ShiftAssignments {
-    return weekDoc.assignments?.[iso]?.[meal] ?? {};
+  function assignedFor(iso: string, meal: Meal, weekKey: string): ShiftAssignments {
+    const d = weekKey === nextWeekStartISO ? nextWeekDoc : weekDoc;
+    return d.assignments?.[iso]?.[meal] ?? {};
   }
 
   async function assignStaff(uid: string, startTime: string) {
     if (!modalCell) return;
-    const cur = assignedFor(modalCell.iso, modalCell.meal);
+    const cur = assignedFor(modalCell.iso, modalCell.meal, modalCell.weekKey);
     if (cur[uid] === startTime) return;
-    await saveAssignments(modalCell.iso, modalCell.meal, { ...cur, [uid]: startTime });
+    await saveAssignments(modalCell.weekKey, modalCell.iso, modalCell.meal, { ...cur, [uid]: startTime });
   }
 
   async function removeStaff(uid: string) {
     if (!modalCell) return;
-    const cur = assignedFor(modalCell.iso, modalCell.meal);
+    const cur = assignedFor(modalCell.iso, modalCell.meal, modalCell.weekKey);
     if (!(uid in cur)) return;
     const next = { ...cur };
     delete next[uid];
-    await saveAssignments(modalCell.iso, modalCell.meal, next);
+    await saveAssignments(modalCell.weekKey, modalCell.iso, modalCell.meal, next);
+  }
+
+  async function saveNextNote(iso: string, text: string) {
+    if (!user) return;
+    const trimmed = text.trim();
+    const nextNotes = { ...(nextWeekDoc.notes ?? {}) };
+    if (trimmed) nextNotes[iso] = trimmed;
+    else delete nextNotes[iso];
+
+    const authorName =
+      emailToUsername(user.email ?? "").charAt(0).toUpperCase() +
+      emailToUsername(user.email ?? "").slice(1);
+
+    try {
+      await setDoc(
+        doc(getDb(), "rosters_published", nextWeekStartISO),
+        { notes: nextNotes, notesAuthor: authorName, notesUpdatedAt: new Date() },
+        { merge: true },
+      );
+      setNextWeekDoc((prev) => ({ ...prev, notes: nextNotes, notesAuthor: authorName }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save note.");
+    } finally {
+      setEditingNoteNext(null);
+    }
   }
 
   async function saveNote(iso: string, text: string) {
@@ -478,7 +535,7 @@ export default function ManagerRosterPage() {
                 className={styles.gridCell}
                 onClick={() => {
                   setPendingStart(LUNCH_STARTS[2]);
-                  setModalCell({ iso, meal: "lunch" });
+                  setModalCell({ iso, meal: "lunch", weekKey: weekStartISO });
                 }}
               >
                 <DotCount n={n} />
@@ -500,7 +557,7 @@ export default function ManagerRosterPage() {
                 className={styles.gridCell}
                 onClick={() => {
                   setPendingStart(DINNER_STARTS[2]);
-                  setModalCell({ iso, meal: "dinner" });
+                  setModalCell({ iso, meal: "dinner", weekKey: weekStartISO });
                 }}
               >
                 <DotCount n={n} />
@@ -564,6 +621,198 @@ export default function ManagerRosterPage() {
             );
           })}
         </ul>
+      </section>
+
+      {/* Next Week Roster */}
+      <section className={styles.card}>
+        <div className={styles.cardHead}>
+          <span className={styles.cardIcon}><CalIcon /></span>
+          <p className={styles.cardTitle}>Next Week</p>
+          <p className={styles.cardSubtitle}>{fmtRange(nextWeekStart, nextWeekEnd)}</p>
+        </div>
+        <div className={styles.cardGrid}>
+          <div className={styles.gridHeadRow}>
+            <span />
+            {nextWeekDays.map((d, i) => (
+              <div key={i} className={styles.gridHeadCol}>
+                <span className={styles.dowLabel}>{DAY_LABELS[i]}</span>
+                <span className={styles.dayNum}>{d.getDate()}</span>
+              </div>
+            ))}
+          </div>
+          <div className={styles.gridRow}>
+            <div className={styles.rowLabel}><SunIcon /> Lunch</div>
+            {nextWeekDays.map((d, i) => {
+              const iso = isoDate(d);
+              const n = Object.keys(nextWeekDoc.assignments?.[iso]?.lunch ?? {}).length;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={styles.gridCell}
+                  onClick={() => {
+                    setPendingStart(LUNCH_STARTS[2]);
+                    setModalCell({ iso, meal: "lunch", weekKey: nextWeekStartISO });
+                  }}
+                >
+                  <DotCount n={n} />
+                </button>
+              );
+            })}
+          </div>
+          <div className={styles.gridRow}>
+            <div className={styles.rowLabel}><MoonIcon /> Dinner</div>
+            {nextWeekDays.map((d, i) => {
+              const iso = isoDate(d);
+              const n = Object.keys(nextWeekDoc.assignments?.[iso]?.dinner ?? {}).length;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={styles.gridCell}
+                  onClick={() => {
+                    setPendingStart(DINNER_STARTS[2]);
+                    setModalCell({ iso, meal: "dinner", weekKey: nextWeekStartISO });
+                  }}
+                >
+                  <DotCount n={n} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className={styles.cardSubHead}>
+          <span className={styles.cardIcon}><NoteIcon /></span>
+          <p className={styles.cardTitle}>Notes</p>
+          <span className={styles.tapHint}><EditIcon /> Tap to edit</span>
+          {nextWeekDoc.notesAuthor && (
+            <span className={styles.notesMeta}>
+              {nextWeekDoc.notesAuthor}
+              {(() => { const d = tsDate(nextWeekDoc.notesUpdatedAt); return d ? ` · ${fmtShort(d)}` : ""; })()}
+            </span>
+          )}
+        </div>
+        <ul className={styles.notesList}>
+          {nextWeekDays.map((d, i) => {
+            const iso = isoDate(d);
+            const value = nextWeekDoc.notes?.[iso] ?? "";
+            const editing = editingNoteNext === iso;
+            return (
+              <li key={iso} className={styles.noteRow}>
+                <div className={styles.noteDayCol}>
+                  <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
+                  <span className={styles.noteDate}>{fmtMonDay(d)}</span>
+                </div>
+                {editing ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    className={styles.noteInput}
+                    defaultValue={value}
+                    placeholder="Add a note…"
+                    onBlur={(e) => saveNextNote(iso, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                      if (e.key === "Escape") setEditingNoteNext(null);
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
+                    onClick={() => setEditingNoteNext(iso)}
+                  >
+                    {value || "Add a note…"}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {/* Previous Week (accordion) */}
+      <section className={styles.card}>
+        <button
+          type="button"
+          className={styles.cardHeadBtn}
+          onClick={() => setShowPrevWeek((s) => !s)}
+          aria-expanded={showPrevWeek}
+        >
+          <span className={styles.cardIcon}><CalIcon /></span>
+          <p className={styles.cardTitle}>Previous Week</p>
+          <p className={styles.cardSubtitle}>{fmtRange(prevWeekStart, prevWeekEnd)}</p>
+          <span className={styles.tapToExpand}>
+            {showPrevWeek ? "Collapse" : "Expand"}
+            <span className={`${styles.chev} ${showPrevWeek ? styles.chevOpen : ""}`}>▾</span>
+          </span>
+        </button>
+        {showPrevWeek && (
+          <div>
+            <div className={styles.cardGrid}>
+              <div className={styles.gridHeadRow}>
+                <span />
+                {prevWeekDays.map((d, i) => (
+                  <div key={i} className={styles.gridHeadCol}>
+                    <span className={styles.dowLabel}>{DAY_LABELS[i]}</span>
+                    <span className={styles.dayNum}>{d.getDate()}</span>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.gridRow}>
+                <div className={styles.rowLabel}><SunIcon /> Lunch</div>
+                {prevWeekDays.map((d, i) => {
+                  const iso = isoDate(d);
+                  const n = Object.keys(prevWeekDoc.assignments?.[iso]?.lunch ?? {}).length;
+                  return (
+                    <div key={i} className={styles.gridCellReadOnly}>
+                      <DotCount n={n} />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className={styles.gridRow}>
+                <div className={styles.rowLabel}><MoonIcon /> Dinner</div>
+                {prevWeekDays.map((d, i) => {
+                  const iso = isoDate(d);
+                  const n = Object.keys(prevWeekDoc.assignments?.[iso]?.dinner ?? {}).length;
+                  return (
+                    <div key={i} className={styles.gridCellReadOnly}>
+                      <DotCount n={n} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {prevWeekDays.some((d) => prevWeekDoc.notes?.[isoDate(d)]) && (
+              <>
+                <div className={styles.cardSubHead}>
+                  <span className={styles.cardIcon}><NoteIcon /></span>
+                  <p className={styles.cardTitle}>Notes</p>
+                  {prevWeekDoc.notesAuthor && (
+                    <span className={styles.notesMeta}>{prevWeekDoc.notesAuthor}</span>
+                  )}
+                </div>
+                <ul className={styles.notesList}>
+                  {prevWeekDays.map((d, i) => {
+                    const iso = isoDate(d);
+                    const value = prevWeekDoc.notes?.[iso];
+                    if (!value) return null;
+                    return (
+                      <li key={iso} className={styles.noteRow}>
+                        <div className={styles.noteDayCol}>
+                          <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
+                          <span className={styles.noteDate}>{fmtMonDay(d)}</span>
+                        </div>
+                        <span className={styles.noteReadOnly}>{value}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Holiday Requests */}
@@ -675,7 +924,7 @@ export default function ManagerRosterPage() {
         })();
         const dowIdx = (cellDate.getDay() + 6) % 7;
         const longDow = DAY_LABELS_FULL[dowIdx] ?? DAY_LABELS_LONG[dowIdx];
-        const cur = assignedFor(modalCell.iso, modalCell.meal);
+        const cur = assignedFor(modalCell.iso, modalCell.meal, modalCell.weekKey);
         const assignedCount = Object.keys(cur).length;
         const starts = modalCell.meal === "lunch" ? LUNCH_STARTS : DINNER_STARTS;
         return (

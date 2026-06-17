@@ -732,6 +732,48 @@
 
 .modalDoneBtn:hover { opacity: 0.85; }
 
+/* ── Card subtitle (date range) ── */
+.cardSubtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Grid nested inside a card (no own border/radius) ── */
+.cardGrid {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+/* ── Sub-section header inside a card (Notes within Next/Prev week) ── */
+.cardSubHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.cardSubHead + .notesList {
+  border-top: none;
+}
+
+/* ── Read-only grid cell (no hover, no cursor pointer) ── */
+.gridCellReadOnly {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+}
+
+/* ── Read-only note text ── */
+.noteReadOnly {
+  font-size: 13px;
+  color: var(--color-fg);
+}
+
 /* ── Phone ── */
 @media (max-width: 520px) {
   .gridHeadRow,
