@@ -1,23 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import styles from "./page.module.css";
 
-/**
- * Placeholder shifts / pay date until the real backend is wired up.
- * Hardcoded so the layout reads naturally during design review.
- */
-const NEXT_SHIFT = {
-  date: new Date("2026-06-15T11:00:00+10:00"),
-  shift: "Lunch",
-  startTime: "11:00 AM",
-};
+/* ── types ── */
 
-const NEXT_PAY_DATE = new Date("2026-06-18T00:00:00+10:00");
+type StoredShift = { iso: string; meal: "lunch" | "dinner"; start: string };
+
+type RosterDoc = {
+  weekStartISO: string;
+  publishedAt?: Timestamp;
+  shifts: StoredShift[];
+};
 
 type StoredNotification = {
   id: string;
@@ -35,12 +33,56 @@ type Notification = {
   ago: string;
 };
 
+type NextShiftInfo = {
+  date: Date;
+  meal: "lunch" | "dinner";
+  startTime: string;
+  startDate: Date;
+};
+
+/* ── helpers ── */
+
+function startOfWeek(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  const dow = (x.getDay() + 6) % 7; // 0=Mon
+  x.setDate(x.getDate() - dow);
+  return x;
+}
+
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function isoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function fmtShiftDate(d: Date): string {
   return d.toLocaleDateString("en-AU", {
     weekday: "short",
     day: "numeric",
     month: "short",
   });
+}
+
+function fmtTime12h(t: string): string {
+  if (!/^\d{1,2}:\d{2}$/.test(t)) return t;
+  const [hStr, mStr] = t.split(":");
+  let h = parseInt(hStr, 10);
+  const period = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${mStr} ${period}`;
+}
+
+function mealLabel(m: "lunch" | "dinner"): string {
+  return m === "lunch" ? "Lunch" : "Dinner";
 }
 
 function tsToDate(v: unknown): Date | null {
@@ -64,14 +106,48 @@ function fmtRelative(d: Date | null): string {
   return `${weeks}w ago`;
 }
 
+/** Find the nearest upcoming shift across this week and next week rosters. */
+function findNextShift(
+  thisWeekRoster: RosterDoc | null,
+  nextWeekRoster: RosterDoc | null,
+): NextShiftInfo | null {
+  const now = new Date();
+  const candidates: NextShiftInfo[] = [];
+
+  for (const roster of [thisWeekRoster, nextWeekRoster]) {
+    if (!roster) continue;
+    for (const s of roster.shifts) {
+      const [y, m, d] = s.iso.split("-").map(Number);
+      const [hh, mm] = s.start.split(":").map(Number);
+      const date = new Date(y, m - 1, d, 0, 0, 0, 0);
+      const startDate = new Date(y, m - 1, d, hh, mm, 0, 0);
+      candidates.push({ date, meal: s.meal, startTime: s.start, startDate });
+    }
+  }
+
+  candidates.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  return candidates.find((c) => c.startDate.getTime() >= now.getTime()) ?? candidates[0] ?? null;
+}
+
+/* ── page ── */
+
 export default function StaffDashboardPage() {
   const { user } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [nextShift, setNextShift] = useState<NextShiftInfo | null>(null);
+  const [shiftLoaded, setShiftLoaded] = useState(false);
 
-  // Fetch the signed-in user's notifications from staff_onboarding/{uid}
-  // AND stamp notificationsReadAt so the top-bar bell dot clears once they
-  // open the Home page.
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const thisWeekISO = useMemo(() => isoDate(startOfWeek(today)), [today]);
+  const nextWeekISO = useMemo(() => isoDate(addDays(startOfWeek(today), 7)), [today]);
+
+  // Load roster + notifications from staff_onboarding/{uid}
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -79,6 +155,14 @@ export default function StaffDashboardPage() {
         const ref = doc(getDb(), "staff_onboarding", user.uid);
         const snap = await getDoc(ref);
         const data = snap.data() ?? {};
+
+        // Roster — check this week + next week
+        const thisRoster = (data.roster?.[thisWeekISO] ?? null) as RosterDoc | null;
+        const nextRoster = (data.roster?.[nextWeekISO] ?? null) as RosterDoc | null;
+        setNextShift(findNextShift(thisRoster, nextRoster));
+        setShiftLoaded(true);
+
+        // Notifications
         const arr = (data.notifications ?? []) as StoredNotification[];
         const parsed: Notification[] = arr
           .map((n) => {
@@ -93,17 +177,14 @@ export default function StaffDashboardPage() {
           })
           .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
         setNotifications(parsed);
+
         // Best-effort: mark notifications as read.
-        await setDoc(
-          ref,
-          { notificationsReadAt: serverTimestamp() },
-          { merge: true },
-        ).catch(() => {});
+        await setDoc(ref, { notificationsReadAt: serverTimestamp() }, { merge: true }).catch(() => {});
       } catch {
-        /* ignore */
+        setShiftLoaded(true);
       }
     })();
-  }, [user]);
+  }, [user, thisWeekISO, nextWeekISO]);
 
   // Lock body scroll while the modal is open.
   useEffect(() => {
@@ -138,10 +219,18 @@ export default function StaffDashboardPage() {
         </div>
         <div className={styles.shiftBody}>
           <p className={styles.shiftLabel}>Next Shift</p>
-          <p className={styles.shiftDate}>{fmtShiftDate(NEXT_SHIFT.date)}</p>
-          <p className={styles.shiftTime}>
-            {NEXT_SHIFT.startTime} - {NEXT_SHIFT.shift}
-          </p>
+          {!shiftLoaded ? (
+            <p className={styles.shiftDate}>Loading…</p>
+          ) : nextShift ? (
+            <>
+              <p className={styles.shiftDate}>{fmtShiftDate(nextShift.date)}</p>
+              <p className={styles.shiftTime}>
+                {fmtTime12h(nextShift.startTime)} - {mealLabel(nextShift.meal)}
+              </p>
+            </>
+          ) : (
+            <p className={styles.shiftDate}>No upcoming shifts</p>
+          )}
         </div>
         <span className={styles.chevron} aria-hidden="true">›</span>
       </Link>
@@ -189,7 +278,7 @@ export default function StaffDashboardPage() {
         </div>
         <div className={styles.payBody}>
           <p className={styles.payLabel}>Next Pay Date</p>
-          <p className={styles.payDate}>{fmtShiftDate(NEXT_PAY_DATE)}</p>
+          <p className={styles.payDate}>Every Thursday</p>
         </div>
         <span className={styles.chevron} aria-hidden="true">›</span>
       </Link>
