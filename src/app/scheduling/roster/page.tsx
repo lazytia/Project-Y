@@ -231,6 +231,7 @@ export default function ManagerRosterPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [editingNoteNext, setEditingNoteNext] = useState<string | null>(null);
+  const [showNotes, setShowNotes] = useState(true);
   const [showAvail, setShowAvail] = useState(false);
   const [showPrevWeek, setShowPrevWeek] = useState(false);
   const [nextWeekDoc, setNextWeekDoc] = useState<RosterWeekDoc>({});
@@ -569,58 +570,68 @@ export default function ManagerRosterPage() {
 
       {/* Notes */}
       <section className={styles.card}>
-        <div className={styles.cardHead}>
+        <button
+          type="button"
+          className={styles.cardHeadBtn}
+          onClick={() => setShowNotes((s) => !s)}
+          aria-expanded={showNotes}
+        >
           <span className={styles.cardIcon}><NoteIcon /></span>
           <p className={styles.cardTitle}>Notes</p>
-          <span className={styles.tapHint}>
-            <EditIcon /> Tap to edit
-          </span>
+          {showNotes && (
+            <span className={styles.tapHint}>
+              <EditIcon /> Tap to edit
+            </span>
+          )}
           <span className={styles.notesMeta}>
             {notesAuthor}{notesUpdatedAt ? ` · ${fmtShort(notesUpdatedAt)}` : ""}
           </span>
-        </div>
-        <ul className={styles.notesList}>
-          {weekDays.map((d, i) => {
-            const iso = isoDate(d);
-            const isToday = isSameDay(d, today);
-            const value = weekDoc.notes?.[iso] ?? "";
-            const editing = editingNote === iso;
-            return (
-              <li key={iso} className={styles.noteRow}>
-                <div className={styles.noteDayCol}>
-                  <span className={`${styles.noteDay} ${isToday ? styles.noteDayToday : ""}`}>
-                    {DAY_LABELS_LONG[i]}
-                  </span>
-                  <span className={`${styles.noteDate} ${isToday ? styles.noteDateToday : ""}`}>
-                    {fmtMonDay(d)}
-                  </span>
-                </div>
-                {editing ? (
-                  <input
-                    autoFocus
-                    type="text"
-                    className={styles.noteInput}
-                    defaultValue={value}
-                    placeholder="Add a note…"
-                    onBlur={(e) => saveNote(iso, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur();
-                      if (e.key === "Escape") setEditingNote(null);
-                    }}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
-                    onClick={() => setEditingNote(iso)}
-                  >
-                    {value || "Add a note…"}
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+          <span className={`${styles.chev} ${showNotes ? styles.chevOpen : ""}`}>▾</span>
+        </button>
+        {showNotes && (
+          <ul className={styles.notesList}>
+            {weekDays.map((d, i) => {
+              const iso = isoDate(d);
+              const isToday = isSameDay(d, today);
+              const value = weekDoc.notes?.[iso] ?? "";
+              const editing = editingNote === iso;
+              return (
+                <li key={iso} className={styles.noteRow}>
+                  <div className={styles.noteDayCol}>
+                    <span className={`${styles.noteDay} ${isToday ? styles.noteDayToday : ""}`}>
+                      {DAY_LABELS_LONG[i]}
+                    </span>
+                    <span className={`${styles.noteDate} ${isToday ? styles.noteDateToday : ""}`}>
+                      {fmtMonDay(d)}
+                    </span>
+                  </div>
+                  {editing ? (
+                    <input
+                      autoFocus
+                      type="text"
+                      className={styles.noteInput}
+                      defaultValue={value}
+                      placeholder="Add a note…"
+                      onBlur={(e) => saveNote(iso, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                        if (e.key === "Escape") setEditingNote(null);
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
+                      onClick={(e) => { e.stopPropagation(); setEditingNote(iso); }}
+                    >
+                      {value || "Add a note…"}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       {/* Next Week Roster */}
