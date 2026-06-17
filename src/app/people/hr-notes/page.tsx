@@ -460,6 +460,15 @@ export default function HrNotesPage() {
                           )}
                         </p>
                       </div>
+                      {hasNotes ? (
+                        <span className={`${styles.empChev} ${isOpen ? styles.empChevOpen : ""}`} aria-hidden="true">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span />
+                      )}
                       <div className={styles.empMeta}>
                         {hasNotes && m.lastKind ? (
                           <>
@@ -477,13 +486,6 @@ export default function HrNotesPage() {
                           <p className={styles.noNotes}>No notes</p>
                         )}
                       </div>
-                      {hasNotes && (
-                        <span className={`${styles.empChev} ${isOpen ? styles.empChevOpen : ""}`} aria-hidden="true">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="6 9 12 15 18 9" />
-                          </svg>
-                        </span>
-                      )}
                     </button>
 
                     {isOpen && hasNotes && (
