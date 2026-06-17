@@ -205,7 +205,7 @@
 }
 
 .textarea:focus { border-color: var(--color-warm); }
-.textarea::placeholder { color: var(--color-fg-muted); }
+.textarea::placeholder { color: var(--color-fg-muted); opacity: 0.45; }
 
 .counter {
   position: absolute;
@@ -289,7 +289,7 @@
 }
 
 .shortInput:focus { border-color: var(--color-warm); }
-.shortInput::placeholder { color: var(--color-fg-muted); }
+.shortInput::placeholder { color: var(--color-fg-muted); opacity: 0.45; }
 
 /* ── Time input ── */
 .timeWrap {
