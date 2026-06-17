@@ -1,18 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { collection, getDocs, type Timestamp } from "firebase/firestore";
+import { useEffect, useState, useCallback } from "react";
+import { collection, doc, getDocs, getDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import styles from "./ManagerDashboard.module.css";
-
-/* ──────────────────────────────────────────────────────────────────────
- * Placeholder counts for non-people sections — wired up to real data
- * in a follow-up. The Attention Required tiles already read from
- * Firestore (staff_onboarding).
- * ──────────────────────────────────────────────────────────────────── */
 
 type AttentionCounts = {
   holidayRequests: number;
@@ -34,6 +28,25 @@ type StaffDoc = {
 
 const VISA_EXPIRING_WINDOW_DAYS = 60;
 
+/** day-of-week daily sales targets (0=Sun … 6=Sat) */
+const DAILY_TARGETS: Record<number, number> = {
+  0: 0, 1: 3_800, 2: 5_200, 3: 5_500, 4: 6_500, 5: 6_000, 6: 3_000,
+};
+
+const SYDNEY_TZ = "Australia/Sydney";
+
+function sydneyTodayKey(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
+}
+
+function isoDateToMonday(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dow = (dt.getUTCDay() + 6) % 7; // Mon=0
+  dt.setUTCDate(dt.getUTCDate() - dow);
+  return dt.toISOString().slice(0, 10);
+}
+
 function tsDate(v: unknown): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
@@ -48,26 +61,6 @@ function isVisaExpiringSoon(exp: Date | null): boolean {
   const diff = (exp.getTime() - Date.now()) / 86400000;
   return diff <= VISA_EXPIRING_WINDOW_DAYS && diff >= -3;
 }
-
-const TODAY_OPS = {
-  reservationsPax: 34,
-  cateringOrders: 3,
-};
-
-const SALES = {
-  today: 4250,
-  target: 6000,
-};
-
-const PEAK_HOUR = {
-  range: "12:00 PM – 1:30 PM",
-  reservations: 18,
-};
-
-const TODAYS_TEAM = {
-  kitchen: 5,
-  hall: 7,
-};
 
 function fmtCurrency(n: number): string {
   return new Intl.NumberFormat("en-AU", {
@@ -95,52 +88,112 @@ export default function ManagerDashboard() {
   const { user } = useAuth();
   const [firstName, setFirstName] = useState<string>("");
   const [attention, setAttention] = useState<AttentionCounts>({
-    holidayRequests: 0,
-    availabilityChanges: 0,
-    newOnboarding: 0,
-    visaExpiring: 0,
+    holidayRequests: 0, availabilityChanges: 0, newOnboarding: 0, visaExpiring: 0,
   });
+
+  // Square / system_yurica live data
+  const [todaySales, setTodaySales] = useState<number | null>(null);
+  const [peakHour, setPeakHour] = useState<string | null>(null);
+  const [peakHourOrders, setPeakHourOrders] = useState<number | null>(null);
+  const [totalPax, setTotalPax] = useState<number | null>(null);
+  const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
+  const [hallStaff, setHallStaff] = useState<number | null>(null);
+
+  const todayKey = sydneyTodayKey();
+  const todayDow = (() => {
+    const [y, m, d] = todayKey.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+  })();
+  const dailyTarget = DAILY_TARGETS[todayDow] ?? 0;
 
   useEffect(() => {
     setFirstName(firstNameFromUsername(emailToUsername(user?.email)));
   }, [user]);
 
+  // Attention Required counts
   useEffect(() => {
     (async () => {
       try {
         const snap = await getDocs(collection(getDb(), "staff_onboarding"));
-        let holidayRequests = 0;
-        let availabilityChanges = 0;
-        let newOnboarding = 0;
-        let visaExpiring = 0;
+        let holidayRequests = 0, availabilityChanges = 0, newOnboarding = 0, visaExpiring = 0;
         for (const d of snap.docs) {
           const data = d.data() as StaffDoc;
           if (data.role === "owner") continue;
-          for (const r of data.holidayRequests ?? []) {
-            if (r.status === "pending") holidayRequests += 1;
-          }
-          for (const r of data.availabilityRequests ?? []) {
-            if (r.status === "pending") availabilityChanges += 1;
-          }
+          for (const r of data.holidayRequests ?? []) if (r.status === "pending") holidayRequests++;
+          for (const r of data.availabilityRequests ?? []) if (r.status === "pending") availabilityChanges++;
           const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
-          if (completed >= 7 && data.status === "complete") newOnboarding += 1;
-          if (isVisaExpiringSoon(tsDate(data.documents?.visaExpiry))) visaExpiring += 1;
+          if (completed >= 7 && data.status === "complete") newOnboarding++;
+          if (isVisaExpiringSoon(tsDate(data.documents?.visaExpiry))) visaExpiring++;
         }
         setAttention({ holidayRequests, availabilityChanges, newOnboarding, visaExpiring });
-      } catch {
-        /* keep zero counts on failure */
-      }
+      } catch { /* keep zeros */ }
     })();
   }, []);
 
+  // Square + system_yurica + roster
+  const fetchLiveData = useCallback(async () => {
+    // Square today-stats
+    try {
+      const res = await fetch(`/api/square/today-stats?date=${todayKey}`);
+      if (res.ok) {
+        const d = await res.json();
+        setTodaySales(d.todaySales ?? null);
+        setPeakHour(d.peakHour ?? null);
+        setPeakHourOrders(d.peakHourOrders ?? null);
+      }
+    } catch { /* ignore */ }
+
+    // system_yurica pax counts
+    try {
+      const res = await fetch(`/api/system-yurica/today-counts?date=${todayKey}`);
+      if (res.ok) {
+        const d = await res.json();
+        const pax = (d.lunchPax ?? 0) + (d.dinnerPax ?? 0);
+        setTotalPax(pax);
+      }
+    } catch { /* ignore */ }
+
+    // Roster: count kitchen / hall from today's rosters_published doc
+    try {
+      const weekKey = isoDateToMonday(todayKey);
+      const rSnap = await getDoc(doc(getDb(), "rosters_published", weekKey));
+      if (rSnap.exists()) {
+        const rData = rSnap.data() as {
+          assignments?: Record<string, Record<string, Record<string, string>>>;
+        };
+        const dayAssign = rData.assignments?.[todayKey] ?? {};
+        const allUids = new Set<string>();
+        for (const meal of Object.values(dayAssign)) {
+          for (const uid of Object.keys(meal)) allUids.add(uid);
+        }
+        // Fetch staff roles to split kitchen vs hall
+        const staffSnap = await getDocs(collection(getDb(), "staff_onboarding"));
+        const roleMap = new Map<string, string>();
+        for (const sd of staffSnap.docs) roleMap.set(sd.id, (sd.data().role as string) ?? "staff");
+        let kitchen = 0, hall = 0;
+        for (const uid of allUids) {
+          const role = roleMap.get(uid) ?? "staff";
+          if (role === "chef" || role === "kitchen") kitchen++;
+          else hall++;
+        }
+        setKitchenStaff(kitchen);
+        setHallStaff(hall);
+      }
+    } catch { /* ignore */ }
+  }, [todayKey]);
+
+  useEffect(() => {
+    fetchLiveData();
+    const id = setInterval(fetchLiveData, 60_000);
+    return () => clearInterval(id);
+  }, [fetchLiveData]);
+
   const attentionTotal =
-    attention.holidayRequests +
-    attention.availabilityChanges +
-    attention.newOnboarding +
-    attention.visaExpiring;
+    attention.holidayRequests + attention.availabilityChanges +
+    attention.newOnboarding + attention.visaExpiring;
 
   const greeting = greetingForNow();
-  const team = TODAYS_TEAM.kitchen + TODAYS_TEAM.hall;
+  const team = (kitchenStaff ?? 0) + (hallStaff ?? 0);
 
   return (
     <div className={styles.page}>
@@ -218,8 +271,8 @@ export default function ManagerDashboard() {
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
             <p className={styles.opsValue}>
-              {TODAY_OPS.reservationsPax}
-              <span className={styles.opsUnit}> Pax</span>
+              {totalPax ?? "—"}
+              {totalPax !== null && <span className={styles.opsUnit}> Pax</span>}
             </p>
             <p className={styles.opsLabel}>Reservations</p>
           </Link>
@@ -231,7 +284,7 @@ export default function ManagerDashboard() {
               <circle cx="12" cy="6" r="1.6" />
               <line x1="12" y1="7.6" x2="12" y2="9" />
             </svg>
-            <p className={styles.opsValue}>{TODAY_OPS.cateringOrders}</p>
+            <p className={styles.opsValue}>—</p>
             <p className={styles.opsLabel}>Catering Orders</p>
           </Link>
         </div>
@@ -243,12 +296,14 @@ export default function ManagerDashboard() {
         <div className={styles.salesCard}>
           <div className={styles.salesBlock}>
             <p className={styles.salesLabel}>Today Sales</p>
-            <p className={styles.salesValue}>{fmtCurrency(SALES.today)}</p>
+            <p className={styles.salesValue}>
+              {todaySales === null ? "—" : fmtCurrency(todaySales)}
+            </p>
           </div>
           <div className={styles.salesDivider} />
           <div className={styles.salesBlock}>
             <p className={styles.salesLabel}>Target Sales</p>
-            <p className={styles.salesValue}>{fmtCurrency(SALES.target)}</p>
+            <p className={styles.salesValue}>{fmtCurrency(dailyTarget)}</p>
           </div>
         </div>
       </section>
@@ -264,8 +319,10 @@ export default function ManagerDashboard() {
             </svg>
           </span>
           <div className={styles.peakBody}>
-            <p className={styles.peakRange}>{PEAK_HOUR.range}</p>
-            <p className={styles.peakSub}>{PEAK_HOUR.reservations} Reservations</p>
+            <p className={styles.peakRange}>{peakHour ?? "—"}</p>
+            <p className={styles.peakSub}>
+              {peakHourOrders !== null && peakHourOrders > 0 ? `${peakHourOrders} orders` : "—"}
+            </p>
           </div>
         </div>
       </section>
@@ -281,7 +338,7 @@ export default function ManagerDashboard() {
                 <line x1="6" y1="15" x2="18" y2="15" />
                 <line x1="7" y1="19" x2="17" y2="19" />
               </svg>
-              <p className={styles.teamValue}>{TODAYS_TEAM.kitchen}</p>
+              <p className={styles.teamValue}>{kitchenStaff ?? "—"}</p>
               <p className={styles.teamLabel}>Kitchen</p>
             </div>
             <div className={styles.teamDivider} />
@@ -292,7 +349,7 @@ export default function ManagerDashboard() {
                 <path d="M19 21v-2a5 5 0 0 0-4-4.9" />
                 <path d="M10 12l2 2 2-2" />
               </svg>
-              <p className={styles.teamValue}>{TODAYS_TEAM.hall}</p>
+              <p className={styles.teamValue}>{hallStaff ?? "—"}</p>
               <p className={styles.teamLabel}>Hall</p>
             </div>
           </div>
