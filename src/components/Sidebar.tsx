@@ -28,6 +28,7 @@ const NAV: NavGroup[] = [
       { label: "Onboarding", href: "/people/onboarding", ownerOnly: true },
       { label: "Active Staff", href: "/people/active-staff" },
       { label: "HR Notes", href: "/people/hr-notes" },
+      { label: "Cash Payments", href: "/people/cash-payments", ownerOnly: true },
     ],
   },
   {
@@ -95,6 +96,7 @@ export default function Sidebar({ open, onClose }: Props) {
         { label: "Onboarding", href: "/people/onboarding" },
         { label: "Active Staff", href: "/people/active-staff" },
         { label: "HR Notes", href: "/people/hr-notes" },
+        { label: "Cash Payments", href: "/people/cash-payments" },
       ],
     },
     {
