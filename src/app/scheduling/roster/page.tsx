@@ -249,16 +249,27 @@ export default function ManagerRosterPage() {
   );
 
   const load = useCallback(async () => {
-    const [staffSnap, weekSnap] = await Promise.all([
-      getDocs(collection(getDb(), "staff_onboarding")),
-      getDocs(collection(getDb(), "rosters_published")),
-    ]);
-    const docs: StaffDoc[] = staffSnap.docs
-      .map((d) => ({ uid: d.id, ...(d.data() as Omit<StaffDoc, "uid">) }))
-      .filter((d) => d.role !== "owner");
-    setStaffDocs(docs);
-    const match = weekSnap.docs.find((d) => d.id === weekStartISO);
-    setWeekDoc((match?.data() as RosterWeekDoc) ?? {});
+    // Load each collection independently so a missing-permission error
+    // on one doesn't blank the whole page.
+    try {
+      const staffSnap = await getDocs(collection(getDb(), "staff_onboarding"));
+      const docs: StaffDoc[] = staffSnap.docs
+        .map((d) => ({ uid: d.id, ...(d.data() as Omit<StaffDoc, "uid">) }))
+        .filter((d) => d.role !== "owner");
+      setStaffDocs(docs);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[roster] staff load failed", err);
+    }
+    try {
+      const weekSnap = await getDocs(collection(getDb(), "rosters_published"));
+      const match = weekSnap.docs.find((d) => d.id === weekStartISO);
+      setWeekDoc((match?.data() as RosterWeekDoc) ?? {});
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[roster] week doc load failed", err);
+      setWeekDoc({});
+    }
   }, [weekStartISO]);
 
   useEffect(() => {
@@ -733,22 +744,25 @@ export default function ManagerRosterPage() {
               </section>
 
               <ul className={styles.staffList}>
-                {[
-                  ...staffDocs.map((d) => ({
-                    uid: d.uid,
-                    name: displayName(d),
-                    role: staffRoleLabel(d.role),
-                    isTemp: false,
-                  })),
-                  ...Object.keys(cur)
+                {(() => {
+                  const real = staffDocs
+                    .map((d) => ({
+                      uid: d.uid,
+                      name: displayName(d),
+                      role: staffRoleLabel(d.role),
+                      isTemp: false,
+                    }))
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                  const temp = Object.keys(cur)
                     .filter((u) => u.startsWith("tr_"))
                     .map((u) => ({
                       uid: u,
                       name: u.startsWith("tr_kitchen_") ? "TR Kitchen Staff" : "TR Hall Staff",
                       role: "TR",
                       isTemp: true,
-                    })),
-                ].map((s) => {
+                    }));
+                  return [...real, ...temp];
+                })().map((s) => {
                   const assigned = cur[s.uid];
                   return (
                     <li key={s.uid} className={styles.staffRow}>
