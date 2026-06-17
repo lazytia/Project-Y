@@ -94,15 +94,6 @@ function displayName(d: StaffDoc): { firstName: string; lastName: string } {
   return { firstName: d.uid.slice(0, 6), lastName: "" };
 }
 
-function initials(first: string, last: string): string {
-  return ((first.charAt(0) || "?") + (last.charAt(0) || "")).toUpperCase();
-}
-
-function initialsFromName(name: string): string {
-  const parts = name.split(" ").filter(Boolean);
-  return ((parts[0]?.charAt(0) ?? "?") + (parts[1]?.charAt(0) ?? "")).toUpperCase();
-}
-
 function fmtDate(d: Date | null): string {
   if (!d) return "";
   return d.toLocaleDateString("en-AU", {
@@ -440,37 +431,36 @@ export default function HrNotesPage() {
               {byEmployee.map((m) => (
                 <li key={m.id}>
                   <button type="button" className={styles.empRow} onClick={() => openMember(m)}>
-                    <div className={styles.avatar} aria-hidden="true">{initials(m.firstName, m.lastName)}</div>
                     <div className={styles.empBody}>
-                      <p className={styles.name}>{m.firstName} {m.lastName}</p>
-                      <p className={styles.roleLine}>{m.role}</p>
-                      {m.active && (
-                        <span className={styles.activeBadge}>
-                          <span className={styles.dotGreen} aria-hidden="true" />
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    {m.lastKind ? (
-                      <span className={`${styles.empTypeIcon} ${kindClass(m.lastKind)}`} aria-hidden="true">
-                        {kindIcon(m.lastKind, 18)}
-                      </span>
-                    ) : (
-                      <span className={`${styles.empTypeIcon} ${styles.kindEmpty}`} aria-hidden="true">
-                        —
-                      </span>
-                    )}
-                    <div className={styles.empMeta}>
-                      <p className={styles.notesCount}>
-                        <strong>{m.notesCount}</strong> {m.notesCount === 1 ? "Note" : "Notes"}
+                      <p className={styles.empName}>{m.firstName} {m.lastName}</p>
+                      <p className={styles.empSub}>
+                        <span>{m.role}</span>
+                        {m.active && (
+                          <>
+                            <span className={styles.dotSep} aria-hidden="true">·</span>
+                            <span className={styles.activeText}>
+                              <span className={styles.dotGreen} aria-hidden="true" />
+                              Active
+                            </span>
+                          </>
+                        )}
                       </p>
-                      {m.notesCount > 0 && m.lastKind && m.lastAt ? (
+                    </div>
+                    <div className={styles.empMeta}>
+                      {m.notesCount > 0 && m.lastKind ? (
                         <>
-                          <p className={styles.lastLabel}>Last: {m.lastKind}</p>
-                          <p className={styles.lastDate}>{fmtDate(m.lastAt)}</p>
+                          <span className={`${styles.empTypeIcon} ${kindClass(m.lastKind)}`} aria-hidden="true">
+                            {kindIcon(m.lastKind, 14)}
+                          </span>
+                          <div className={styles.empMetaText}>
+                            <p className={styles.notesCount}>
+                              <strong>{m.notesCount}</strong> {m.notesCount === 1 ? "note" : "notes"}
+                            </p>
+                            <p className={styles.lastDate}>{m.lastAt ? fmtDate(m.lastAt) : ""}</p>
+                          </div>
                         </>
                       ) : (
-                        <p className={styles.lastLabel}>—</p>
+                        <p className={styles.noNotes}>No notes</p>
                       )}
                     </div>
                     <span className={styles.chev} aria-hidden="true">›</span>
