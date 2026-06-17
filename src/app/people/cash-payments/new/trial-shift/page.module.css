@@ -2,7 +2,7 @@
   font-family: var(--font-sans);
   max-width: 520px;
   margin: 0;
-  padding: var(--space-4) var(--space-5) var(--space-7);
+  padding: var(--space-4) var(--space-5) 120px;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
