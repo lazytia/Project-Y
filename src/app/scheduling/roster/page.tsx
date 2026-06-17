@@ -238,6 +238,7 @@ export default function ManagerRosterPage() {
   const [nextWeekDoc, setNextWeekDoc] = useState<RosterWeekDoc>({});
   const [prevWeekDoc, setPrevWeekDoc] = useState<RosterWeekDoc>({});
   const [modalCell, setModalCell] = useState<{ iso: string; meal: Meal; weekKey: string } | null>(null);
+  const [noteModal, setNoteModal] = useState<{ label: string; text: string } | null>(null);
   const [pendingStart, setPendingStart] = useState<string>("");
   const [savingShift, setSavingShift] = useState(false);
 
@@ -618,7 +619,14 @@ export default function ManagerRosterPage() {
                     <button
                       type="button"
                       className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
-                      onClick={(e) => { e.stopPropagation(); setEditingNote(iso); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (value) {
+                          setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value });
+                        } else {
+                          setEditingNote(iso);
+                        }
+                      }}
                     >
                       {value || "Add a note…"}
                     </button>
@@ -735,7 +743,13 @@ export default function ManagerRosterPage() {
                     <button
                       type="button"
                       className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
-                      onClick={() => setEditingNoteNext(iso)}
+                      onClick={() => {
+                        if (value) {
+                          setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value });
+                        } else {
+                          setEditingNoteNext(iso);
+                        }
+                      }}
                     >
                       {value || "Add a note…"}
                     </button>
@@ -818,7 +832,17 @@ export default function ManagerRosterPage() {
                         <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
                         <span className={styles.noteDate}>{fmtMonDay(d)}</span>
                       </div>
-                      <span className={styles.noteReadOnly}>{value}</span>
+                      {value ? (
+                        <button
+                          type="button"
+                          className={styles.noteBtn}
+                          onClick={() => setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value })}
+                        >
+                          {value}
+                        </button>
+                      ) : (
+                        <span className={styles.noteReadOnly} />
+                      )}
                     </li>
                   );
                 })}
@@ -928,6 +952,29 @@ export default function ManagerRosterPage() {
           </ul>
         )}
       </section>
+
+      {/* Note full-text modal */}
+      {noteModal && (
+        <div
+          className={styles.modalBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Note"
+          onClick={() => setNoteModal(null)}
+        >
+          <div className={styles.noteModalBox} onClick={(e) => e.stopPropagation()}>
+            <p className={styles.noteModalLabel}>{noteModal.label}</p>
+            <p className={styles.noteModalText}>{noteModal.text}</p>
+            <button
+              type="button"
+              className={styles.noteModalClose}
+              onClick={() => setNoteModal(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Day-meal assignment modal */}
       {modalCell && (() => {

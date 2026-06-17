@@ -783,6 +783,51 @@
   color: var(--color-fg);
 }
 
+/* ── Note full-text modal ── */
+.noteModalBox {
+  background: var(--color-bg);
+  border-radius: var(--radius-xl, 20px);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  width: min(88vw, 360px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.noteModalLabel {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.noteModalText {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-fg);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.noteModalClose {
+  align-self: flex-end;
+  margin-top: var(--space-1);
+  padding: 8px 20px;
+  background: var(--color-warm);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* ── Phone ── */
 @media (max-width: 520px) {
   .gridHeadRow,
