@@ -129,6 +129,14 @@ function buildNotification(
   requestType: "holiday" | "availability";
   /** Source request id within the staff doc. */
   requestId: string;
+  // Holiday fields stored inline so the detail page never needs to look up
+  // the original request (the array find can fail if the id drifts).
+  startDate?: Timestamp | null;
+  endDate?: Timestamp | null;
+  // Availability fields stored inline for the same reason.
+  effectiveDate?: Timestamp | null;
+  requested?: Record<string, unknown> | null;
+  previousAvailability?: Record<string, unknown> | null;
 } {
   const id = `n_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   if (field === "holidayRequests") {
@@ -149,6 +157,8 @@ function buildNotification(
       createdAt: Timestamp.now(),
       requestType: "holiday",
       requestId: req.id,
+      startDate: req.startDate ?? null,
+      endDate: req.endDate ?? null,
     };
   }
   // availability
@@ -171,6 +181,10 @@ function buildNotification(
     createdAt: Timestamp.now(),
     requestType: "availability",
     requestId: req.id,
+    effectiveDate: req.effectiveDate ?? null,
+    requested: (req.requested as Record<string, unknown> | undefined) ?? null,
+    previousAvailability:
+      (req.previousAvailability as Record<string, unknown> | undefined) ?? null,
   };
 }
 

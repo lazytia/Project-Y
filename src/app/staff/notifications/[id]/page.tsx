@@ -23,6 +23,13 @@ type StoredNotification = {
   createdAt?: Timestamp;
   requestType?: "holiday" | "availability";
   requestId?: string;
+  // Holiday fields stored inline for reliability (fallback if request lookup fails)
+  startDate?: Timestamp;
+  endDate?: Timestamp;
+  // Availability fields stored inline for reliability
+  effectiveDate?: Timestamp;
+  requested?: Record<string, DayAvailability>;
+  previousAvailability?: Record<string, DayAvailability>;
 };
 
 type HolidayRequest = {
@@ -233,23 +240,33 @@ export default function NotificationDetailPage({
       : "Your availability change request was declined.";
 
   // Holiday-specific
+  // Prefer inline fields stored on the notification; fall back to the linked request.
   const holidayDates = (() => {
     if (!isHoliday) return [] as Date[];
-    const start = tsDate(holiday?.startDate);
-    const end = tsDate(holiday?.endDate);
+    const start = tsDate(notification.startDate) ?? tsDate(holiday?.startDate);
+    const end = tsDate(notification.endDate) ?? tsDate(holiday?.endDate);
     if (!start || !end) return [];
     return eachDay(start, end);
   })();
 
   // Availability-specific
-  const effDate = tsDate(availability?.effectiveDate);
+  // Prefer inline fields stored on the notification; fall back to the linked request.
+  const effDate =
+    tsDate(notification.effectiveDate) ?? tsDate(availability?.effectiveDate);
+  const requestedMap =
+    availability?.requested ?? notification.requested ?? undefined;
+  const previousMap =
+    availability?.previousAvailability ??
+    notification.previousAvailability ??
+    undefined;
+
   // Collect all requested days so we always have something to show.
   const requestedDays: Array<{ key: string; label: string; prev: DayAvailability | undefined; next: DayAvailability | undefined }> = [];
-  if (availability?.requested) {
+  if (requestedMap) {
     for (const k of DAY_KEYS) {
-      const next = availability.requested[k];
+      const next = requestedMap[k];
       if (!next) continue;
-      const prev = availability.previousAvailability?.[k];
+      const prev = previousMap?.[k];
       // Only include days that actually changed (or all if no prev data)
       const changed = !prev || JSON.stringify(next) !== JSON.stringify(prev);
       if (changed) {
@@ -259,18 +276,18 @@ export default function NotificationDetailPage({
     // Fallback: if nothing changed (shouldn't happen), show all
     if (requestedDays.length === 0) {
       for (const k of DAY_KEYS) {
-        const next = availability.requested[k];
+        const next = requestedMap[k];
         if (next) requestedDays.push({ key: k, label: DAY_FULL[k as typeof DAY_KEYS[number]], prev: undefined, next });
       }
     }
   }
   // Fallback: first changed day label (for Date row when effectiveDate missing)
   const dayKey = isAvailability
-    ? findChangedDay(availability?.requested, availability?.previousAvailability)
+    ? findChangedDay(requestedMap, previousMap)
     : null;
   const dayLabel = dayKey ? DAY_FULL[dayKey] : null;
 
-  const notes = (holiday?.reason || availability?.reason || "").trim();
+  const notes = ((holiday?.reason ?? availability?.reason) || "").trim();
 
   return (
     <div className={styles.page}>
