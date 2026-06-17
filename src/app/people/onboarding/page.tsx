@@ -19,6 +19,7 @@ type StaffOnboarding = {
   username?: string;
   email?: string;
   role?: string;
+  status?: string;
   startDate?: Date | null;
   completedStep?: number;
   step?: number;
@@ -146,6 +147,7 @@ export default function ManagerOnboardingPage() {
             preferredName: raw.preferredName as string | undefined,
             email: raw.email as string | undefined,
             role: raw.role as string | undefined,
+            status: raw.status as string | undefined,
             startDate: tsToDate(raw.startDate),
             completedStep: raw.completedStep as number | undefined,
             step: raw.step as number | undefined,
@@ -156,7 +158,8 @@ export default function ManagerOnboardingPage() {
         });
         if (cancelled) return;
         // Owners might have a doc here (for FCM tokens) — keep those out of the staff list.
-        const staffOnly = data.filter((r) => r.role !== "owner");
+        // Fully-onboarded staff (status === "active") have moved on; hide them too.
+        const staffOnly = data.filter((r) => r.role !== "owner" && r.status !== "active");
         // Sort by start date ascending (soonest first), unknowns last.
         staffOnly.sort((a, b) => {
           const at = a.startDate?.getTime() ?? Infinity;
