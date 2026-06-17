@@ -96,7 +96,7 @@ export default function ManagerDashboard() {
           <Link href="/attention-required" className={styles.sectionChev} aria-label="View all">›</Link>
         </div>
         <div className={styles.attentionCard}>
-          <Link href="/scheduling/holiday-requests" className={styles.attentionCell}>
+          <Link href="/attention-required?filter=holiday" className={styles.attentionCell}>
             <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <line x1="16" y1="2" x2="16" y2="6" />
@@ -107,7 +107,7 @@ export default function ManagerDashboard() {
             <p className={styles.attentionLabel}>Holiday<br />Requests</p>
           </Link>
 
-          <Link href="/scheduling/availability-requests" className={styles.attentionCell}>
+          <Link href="/attention-required?filter=availability" className={styles.attentionCell}>
             <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
@@ -117,7 +117,7 @@ export default function ManagerDashboard() {
             <p className={styles.attentionLabel}>Availability<br />Change</p>
           </Link>
 
-          <Link href="/people/onboarding" className={styles.attentionCell}>
+          <Link href="/attention-required?filter=onboarding" className={styles.attentionCell}>
             <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
               <circle cx="8.5" cy="7" r="4" />
@@ -128,7 +128,7 @@ export default function ManagerDashboard() {
             <p className={styles.attentionLabel}>New<br />Onboarding</p>
           </Link>
 
-          <Link href="/people/active-staff" className={styles.attentionCell}>
+          <Link href="/attention-required?filter=compliance" className={styles.attentionCell}>
             <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="16" rx="2" />
               <circle cx="9" cy="11" r="2.2" />

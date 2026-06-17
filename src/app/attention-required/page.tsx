@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { collection, getDocs, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
@@ -222,12 +222,39 @@ function isVisaExpiringSoon(exp: Date | null): boolean {
   return diff <= VISA_EXPIRING_WINDOW_DAYS && diff >= -3;
 }
 
+type Filter = "all" | "holiday" | "availability" | "onboarding" | "compliance";
+
+const FILTER_LABEL: Record<Filter, string> = {
+  all: "All",
+  holiday: "Holiday Requests",
+  availability: "Availability Change",
+  onboarding: "New Onboarding",
+  compliance: "Visa Expiring Soon",
+};
+
+function parseFilter(v: string | null): Filter {
+  if (v === "holiday" || v === "availability" || v === "onboarding" || v === "compliance") {
+    return v;
+  }
+  return "all";
+}
+
 export default function AttentionRequiredPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const filter = parseFilter(searchParams.get("filter"));
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [staffDocs, setStaffDocs] = useState<StaffDoc[]>([]);
   const [busy, setBusy] = useState<string | null>(null); // request id being decided
+
+  function setFilter(next: Filter) {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    if (next === "all") params.delete("filter");
+    else params.set("filter", next);
+    const qs = params.toString();
+    router.replace(qs ? `/attention-required?${qs}` : "/attention-required");
+  }
 
   const load = useCallback(async () => {
     const snap = await getDocs(collection(getDb(), "staff_onboarding"));
@@ -319,6 +346,18 @@ export default function AttentionRequiredPage() {
 
   const total = requests.length + onboarding.length + compliance.length;
 
+  // Filter-derived visibility flags. The "requests" section is split into
+  // two virtual filters (holiday / availability) by the chip row.
+  const showHoliday = filter === "all" || filter === "holiday";
+  const showAvailability = filter === "all" || filter === "availability";
+  const showOnboarding = filter === "all" || filter === "onboarding";
+  const showCompliance = filter === "all" || filter === "compliance";
+  const visibleRequests = requests.filter(
+    (r) => (r.kind === "holiday" && showHoliday) || (r.kind === "availability" && showAvailability),
+  );
+  const visibleOnboarding = showOnboarding ? onboarding : [];
+  const visibleCompliance = showCompliance ? compliance : [];
+
   async function decide(
     kind: "holiday" | "availability",
     staffUid: string,
@@ -363,7 +402,24 @@ export default function AttentionRequiredPage() {
         <p className={styles.subtitle}>Review and take action on pending items</p>
       </header>
 
+      {/* Filter chips */}
+      <div className={styles.filterRow} role="tablist" aria-label="Filter">
+        {(["all", "holiday", "availability", "onboarding", "compliance"] as Filter[]).map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={filter === k}
+            className={`${styles.filterChip} ${filter === k ? styles.filterChipActive : ""}`}
+            onClick={() => setFilter(k)}
+          >
+            {FILTER_LABEL[k]}
+          </button>
+        ))}
+      </div>
+
       {/* REQUESTS */}
+      {(showHoliday || showAvailability) && (
       <section>
         <div className={styles.sectionHead}>
           <span className={styles.sectionIcon} aria-hidden="true">
@@ -375,15 +431,15 @@ export default function AttentionRequiredPage() {
             </svg>
           </span>
           <p className={styles.sectionLabel}>REQUESTS</p>
-          <span className={styles.sectionCount}>{requests.length}</span>
+          <span className={styles.sectionCount}>{visibleRequests.length}</span>
           <span className={styles.viewAll}>View all</span>
         </div>
 
-        {requests.length === 0 ? (
+        {visibleRequests.length === 0 ? (
           <p className={styles.empty}>No pending requests.</p>
         ) : (
           <ul className={styles.list}>
-            {requests.map((r) => (
+            {visibleRequests.map((r) => (
               <li key={r.id} className={styles.card}>
                 <div className={styles.cardHeader}>
                   <div className={styles.avatar} aria-hidden="true">
@@ -453,8 +509,10 @@ export default function AttentionRequiredPage() {
           </ul>
         )}
       </section>
+      )}
 
       {/* ONBOARDING */}
+      {showOnboarding && (
       <section>
         <div className={styles.sectionHead}>
           <span className={styles.sectionIcon} aria-hidden="true">
@@ -466,15 +524,15 @@ export default function AttentionRequiredPage() {
             </svg>
           </span>
           <p className={styles.sectionLabel}>ONBOARDING</p>
-          <span className={styles.sectionCount}>{onboarding.length}</span>
+          <span className={styles.sectionCount}>{visibleOnboarding.length}</span>
           <span className={styles.viewAll}>View all</span>
         </div>
 
-        {onboarding.length === 0 ? (
+        {visibleOnboarding.length === 0 ? (
           <p className={styles.empty}>No onboarding submissions waiting.</p>
         ) : (
           <ul className={styles.list}>
-            {onboarding.map((o) => (
+            {visibleOnboarding.map((o) => (
               <li key={o.id} className={styles.card}>
                 <div className={styles.cardHeader}>
                   <div className={styles.avatar} aria-hidden="true">
@@ -504,8 +562,10 @@ export default function AttentionRequiredPage() {
           </ul>
         )}
       </section>
+      )}
 
       {/* COMPLIANCE */}
+      {showCompliance && (
       <section>
         <div className={styles.sectionHead}>
           <span className={styles.sectionIcon} aria-hidden="true">
@@ -518,15 +578,15 @@ export default function AttentionRequiredPage() {
             </svg>
           </span>
           <p className={styles.sectionLabel}>COMPLIANCE</p>
-          <span className={styles.sectionCount}>{compliance.length}</span>
+          <span className={styles.sectionCount}>{visibleCompliance.length}</span>
           <span className={styles.viewAll}>View all</span>
         </div>
 
-        {compliance.length === 0 ? (
+        {visibleCompliance.length === 0 ? (
           <p className={styles.empty}>No compliance items.</p>
         ) : (
           <ul className={styles.list}>
-            {compliance.map((c) => (
+            {visibleCompliance.map((c) => (
               <li key={c.id} className={styles.card}>
                 <div className={styles.cardHeader}>
                   <div className={styles.avatar} aria-hidden="true">
@@ -554,6 +614,7 @@ export default function AttentionRequiredPage() {
           </ul>
         )}
       </section>
+      )}
 
       <div className={styles.footerNote}>
         <span className={styles.footerIcon} aria-hidden="true">

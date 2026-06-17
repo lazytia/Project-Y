@@ -24,6 +24,38 @@
 
 .backBtn:hover { background: var(--color-surface); }
 
+/* ── Filter chips ── */
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterChip {
+  height: 32px;
+  padding: 0 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.filterChip:hover { border-color: var(--color-warm); color: var(--color-fg); }
+
+.filterChipActive {
+  background: var(--color-warm);
+  border-color: var(--color-warm);
+  color: #fff;
+}
+
+.filterChipActive:hover { color: #fff; }
+
 .heading {
   display: flex;
   flex-direction: column;
