@@ -26,7 +26,6 @@ const NAV: NavGroup[] = [
     children: [
       { label: "Staff +", href: "/people/add-staff", ownerOnly: true },
       { label: "Onboarding", href: "/people/onboarding", ownerOnly: true },
-      { label: "Active Staff", href: "/people/active-staff" },
       { label: "HR Notes", href: "/people/hr-notes" },
       { label: "Cash Payments", href: "/people/cash-payments" },
       { label: "Notice Given", href: "/people/notice-given" },
@@ -95,14 +94,13 @@ export default function Sidebar({ open, onClose }: Props) {
       label: "People",
       children: [
         { label: "Onboarding", href: "/people/onboarding" },
-        { label: "Active Staff", href: "/people/active-staff" },
-        { label: "HR Notes", href: "/people/hr-notes" },
-        { label: "Cash Payments", href: "/people/cash-payments" },
-        { label: "Notice Given", href: "/people/notice-given" },
-      ],
-    },
-    {
-      icon: "📅",
+      { label: "HR Notes", href: "/people/hr-notes" },
+      { label: "Cash Payments", href: "/people/cash-payments" },
+      { label: "Notice Given", href: "/people/notice-given" },
+    ],
+  },
+  {
+    icon: "📅",
       label: "Scheduling",
       children: [
         { label: "Roster", href: "/scheduling/roster" },
