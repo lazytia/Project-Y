@@ -160,6 +160,22 @@
   font-weight: 600;
 }
 
+/* Notes-row cell content: faint pencil (no note) vs warm pencil (note) */
+.notePencilFaint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-fg-muted);
+  opacity: 0.35;
+}
+
+.noteFilled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-warm);
+}
+
 /* ── Cards (shared shell) ── */
 .card {
   background: var(--color-bg);

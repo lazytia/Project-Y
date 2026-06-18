@@ -636,76 +636,50 @@ export default function ManagerRosterPage() {
             );
           })}
         </div>
-      </section>
-
-      {/* Notes */}
-      <section className={styles.card}>
-        <button
-          type="button"
-          className={`${styles.cardHeadBtn} ${styles.cardHeadThin}`}
-          onClick={() => setShowNotes((s) => !s)}
-          aria-expanded={showNotes}
-        >
-          <span className={styles.cardIcon}><NoteIcon /></span>
-          <p className={styles.cardTitle}>Notes</p>
-          <span className={styles.notesMeta}>
-            {notesAuthor}{notesUpdatedAt ? ` · ${fmtShort(notesUpdatedAt)}` : ""}
-          </span>
-          <span className={`${styles.chev} ${showNotes ? styles.chevOpen : ""}`}>▾</span>
-        </button>
-        {showNotes && (
-          <ul className={styles.notesList}>
-            {weekDays.map((d, i) => {
-              const iso = isoDate(d);
-              const isToday = isSameDay(d, today);
-              const value = weekDoc.notes?.[iso] ?? "";
-              const editing = editingNote === iso;
-              return (
-                <li key={iso} className={styles.noteRow}>
-                  <div className={styles.noteDayCol}>
-                    <span className={`${styles.noteDay} ${isToday ? styles.noteDayToday : ""}`}>
-                      {DAY_LABELS_LONG[i]}
-                    </span>
-                    <span className={`${styles.noteDate} ${isToday ? styles.noteDateToday : ""}`}>
-                      {fmtMonDay(d)}
-                    </span>
-                  </div>
-                  {editing ? (
-                    <input
-                      autoFocus
-                      type="text"
-                      className={styles.noteInput}
-                      defaultValue={value}
-                      placeholder="Add a note…"
-                      onBlur={(e) => saveNote(iso, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.currentTarget.blur();
-                        if (e.key === "Escape") setEditingNote(null);
-                      }}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (value) {
-                          setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value, iso, weekKey: "current" });
-                          setNoteModalEditing(false);
-                          setNoteModalDraft(value);
-                        } else {
-                          setEditingNote(iso);
-                        }
-                      }}
-                    >
-                      {value || "Add a note…"}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        {/* Notes row — each cell opens an edit modal for that day's note */}
+        <div className={styles.gridRow}>
+          <div className={styles.rowLabel}>
+            <NoteIcon /> Notes
+          </div>
+          {weekDays.map((d, i) => {
+            const iso = isoDate(d);
+            const value = weekDoc.notes?.[iso] ?? "";
+            return (
+              <button
+                key={i}
+                type="button"
+                className={styles.gridCell}
+                onClick={() => {
+                  setNoteModal({
+                    label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`,
+                    text: value,
+                    iso,
+                    weekKey: "current",
+                  });
+                  setNoteModalEditing(!value);
+                  setNoteModalDraft(value);
+                }}
+                aria-label={value ? `Edit note for ${DAY_LABELS_LONG[i]}` : `Add note for ${DAY_LABELS_LONG[i]}`}
+              >
+                {value ? (
+                  <span className={styles.noteFilled} aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                  </span>
+                ) : (
+                  <span className={styles.notePencilFaint} aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       {/* Next Week Roster */}
@@ -765,72 +739,45 @@ export default function ManagerRosterPage() {
               );
             })}
           </div>
-        </div>
-      </section>
-
-      {/* Next Week Notes */}
-      <section className={styles.card}>
-        <button
-          type="button"
-          className={`${styles.cardHeadBtn} ${styles.cardHeadThin}`}
-          onClick={() => setShowNotesNext((s) => !s)}
-          aria-expanded={showNotesNext}
-        >
-          <span className={styles.cardIcon}><NoteIcon /></span>
-          <p className={styles.cardTitle}>Notes</p>
-          <span className={styles.notesMeta}>
-            {nextWeekDoc.notesAuthor ?? ""}
-            {(() => { const d = tsDate(nextWeekDoc.notesUpdatedAt); return d ? ` · ${fmtShort(d)}` : ""; })()}
-          </span>
-          <span className={`${styles.chev} ${showNotesNext ? styles.chevOpen : ""}`}>▾</span>
-        </button>
-        {showNotesNext && (
-          <ul className={styles.notesList}>
+          {/* Notes row */}
+          <div className={styles.gridRow}>
+            <div className={styles.rowLabel}>
+              <NoteIcon /> Notes
+            </div>
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
               const value = nextWeekDoc.notes?.[iso] ?? "";
-              const editing = editingNoteNext === iso;
               return (
-                <li key={iso} className={styles.noteRow}>
-                  <div className={styles.noteDayCol}>
-                    <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
-                    <span className={styles.noteDate}>{fmtMonDay(d)}</span>
-                  </div>
-                  {editing ? (
-                    <input
-                      autoFocus
-                      type="text"
-                      className={styles.noteInput}
-                      defaultValue={value}
-                      placeholder="Add a note…"
-                      onBlur={(e) => saveNextNote(iso, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.currentTarget.blur();
-                        if (e.key === "Escape") setEditingNoteNext(null);
-                      }}
-                    />
+                <button
+                  key={i}
+                  type="button"
+                  className={styles.gridCell}
+                  onClick={() => {
+                    setNoteModal({
+                      label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`,
+                      text: value,
+                      iso,
+                      weekKey: "next",
+                    });
+                    setNoteModalEditing(!value);
+                    setNoteModalDraft(value);
+                  }}
+                  aria-label={value ? `Edit note for ${DAY_LABELS_LONG[i]}` : `Add note for ${DAY_LABELS_LONG[i]}`}
+                >
+                  {value ? (
+                    <span className={styles.noteFilled} aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="12" r="5" />
+                      </svg>
+                    </span>
                   ) : (
-                    <button
-                      type="button"
-                      className={`${styles.noteBtn} ${value ? "" : styles.notePlaceholder}`}
-                      onClick={() => {
-                        if (value) {
-                          setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value, iso, weekKey: "next" });
-                          setNoteModalEditing(false);
-                          setNoteModalDraft(value);
-                        } else {
-                          setEditingNoteNext(iso);
-                        }
-                      }}
-                    >
-                      {value || "Add a note…"}
-                    </button>
+                    <span className={styles.notePlus} aria-hidden="true">+</span>
                   )}
-                </li>
+                </button>
               );
             })}
-          </ul>
-        )}
+          </div>
+        </div>
       </section>
 
       {/* Previous Week (accordion) */}
