@@ -48,6 +48,12 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // Notice Given: records employees who have submitted resignation notice.
+    // Owner-only read/write.
+    match /notice_given/{noticeId} {
+      allow read, write: if isOwner();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;
