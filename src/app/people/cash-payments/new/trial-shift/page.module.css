@@ -148,13 +148,13 @@
 .input,
 .textarea {
   width: 100%;
-  padding: 0 12px;
-  height: 44px;
+  padding: 0 14px;
+  height: 52px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--color-fg);
   outline: none;
   transition: border-color 0.15s;

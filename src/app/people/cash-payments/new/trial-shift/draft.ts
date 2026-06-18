@@ -5,7 +5,7 @@
  */
 
 export const ID_TYPES = ["Driver Licence", "Passport", "Photo Card", "Other"] as const;
-export const POSITIONS = ["Hall Staff", "Kitchen Staff", "Barista", "Other"] as const;
+export const POSITIONS = ["Hall Staff", "Kitchen Staff", "Other"] as const;
 
 export type IdType = typeof ID_TYPES[number];
 export type Position = typeof POSITIONS[number];
