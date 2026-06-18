@@ -27,10 +27,18 @@ type StoredPayment = {
   reason?: string;       // "Trial Shift" | "Payroll Adjustment" | "Reimbursement" | "Advance Payment" | etc.
   recipientName?: string;
   recipientUid?: string | null;
+  recipientPosition?: string;
+  paymentType?: string;
+  paymentMethod?: string;
   amount?: number;
+  notes?: string | null;
   signed?: boolean;
+  signatureUrl?: string;
+  idPhotoUrl?: string;
+  receiptPhotoUrl?: string;
   paidAt?: Timestamp;
   createdAt?: Timestamp;
+  createdByName?: string;
 };
 
 type Payment = {
@@ -38,9 +46,18 @@ type Payment = {
   type: "trial-shift" | "active-employee";
   reason: string;
   recipientName: string;
+  recipientPosition: string;
+  paymentType: string;
+  paymentMethod: string;
   amount: number;
+  notes: string;
   signed: boolean;
+  signatureUrl: string;
+  idPhotoUrl: string;
+  receiptPhotoUrl: string;
   paidAt: Date | null;
+  createdAt: Date | null;
+  createdByName: string;
 };
 
 function tsDate(v: unknown): Date | null {
@@ -87,6 +104,11 @@ export default function CashPaymentsPage() {
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = useMemo(
+    () => payments.find((p) => p.id === selectedId) ?? null,
+    [payments, selectedId],
+  );
 
   useEffect(() => {
     if (authLoading) return;
@@ -106,9 +128,18 @@ export default function CashPaymentsPage() {
             type: data.type ?? "active-employee",
             reason: data.reason ?? "Cash Payment",
             recipientName: data.recipientName ?? "Unknown",
+            recipientPosition: data.recipientPosition ?? "",
+            paymentType: data.paymentType ?? data.reason ?? "",
+            paymentMethod: data.paymentMethod ?? "Cash",
             amount: typeof data.amount === "number" ? data.amount : 0,
+            notes: typeof data.notes === "string" ? data.notes : "",
             signed: !!data.signed,
+            signatureUrl: data.signatureUrl ?? "",
+            idPhotoUrl: data.idPhotoUrl ?? "",
+            receiptPhotoUrl: data.receiptPhotoUrl ?? "",
             paidAt: tsDate(data.paidAt) ?? tsDate(data.createdAt),
+            createdAt: tsDate(data.createdAt),
+            createdByName: data.createdByName ?? "",
           };
         });
         setPayments(list);
@@ -215,7 +246,7 @@ export default function CashPaymentsPage() {
                 <button
                   type="button"
                   className={styles.row}
-                  onClick={() => router.push(`/people/cash-payments/${p.id}`)}
+                  onClick={() => setSelectedId(p.id)}
                 >
                   <span className={styles.avatar} aria-hidden="true">
                     {initials(p.recipientName)}
@@ -255,6 +286,205 @@ export default function CashPaymentsPage() {
           </ul>
         )}
       </section>
+
+      {/* Detail modal */}
+      {selected && (
+        <div
+          className={styles.modalBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cash payment details"
+          onClick={() => setSelectedId(null)}
+        >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className={styles.modalClose}
+              onClick={() => setSelectedId(null)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+
+            {/* Hero — amount, type, paid date */}
+            <header className={styles.detailHero}>
+              <p className={styles.detailAmount}>{fmtCurrency(selected.amount)}</p>
+              <p className={styles.detailKind}>
+                {selected.paymentType || selected.reason}
+              </p>
+              <p className={styles.detailDate}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                {selected.paidAt
+                  ? selected.paidAt.toLocaleString("en-AU", {
+                      day: "numeric", month: "short", year: "numeric",
+                      hour: "numeric", minute: "2-digit", hour12: true,
+                    })
+                  : "—"}
+              </p>
+            </header>
+
+            {/* Payment Details */}
+            <section className={styles.detailCard}>
+              <h3 className={styles.detailCardTitle}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="4" y="3" width="16" height="18" rx="2" />
+                  <line x1="8" y1="8" x2="16" y2="8" />
+                  <line x1="8" y1="12" x2="16" y2="12" />
+                  <line x1="8" y1="16" x2="13" y2="16" />
+                </svg>
+                Payment Details
+              </h3>
+              <dl className={styles.detailTable}>
+                <div className={styles.detailRow}>
+                  <dt>Amount</dt>
+                  <dd className={styles.detailRowWarm}>{fmtCurrency(selected.amount)}</dd>
+                </div>
+                <div className={styles.detailRow}>
+                  <dt>Type</dt>
+                  <dd>{selected.paymentType || selected.reason}</dd>
+                </div>
+                <div className={styles.detailRow}>
+                  <dt>Paid By</dt>
+                  <dd>{selected.createdByName || "—"}</dd>
+                </div>
+                <div className={styles.detailRow}>
+                  <dt>Method</dt>
+                  <dd>{selected.paymentMethod || "Cash"}</dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* Reason / Notes */}
+            {selected.notes && (
+              <section className={styles.detailCard}>
+                <h3 className={styles.detailCardTitle}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  Reason
+                </h3>
+                <p className={styles.detailNotesBox}>{selected.notes}</p>
+              </section>
+            )}
+
+            {/* Employee Confirmation — inline signature image */}
+            <section>
+              <h3 className={styles.detailCardTitle}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
+                </svg>
+                Employee Confirmation
+              </h3>
+              <div className={`${styles.confirmCard} ${selected.signed ? styles.confirmCardOk : ""}`}>
+                <div className={styles.confirmHeadRow}>
+                  <span className={styles.confirmCheck} aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="9 12 11 14 15 10" />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className={styles.confirmLabel}>{selected.signed ? "Signed" : "Not Signed"}</p>
+                    {selected.signed && selected.createdAt && (
+                      <p className={styles.confirmSub}>
+                        {selected.createdAt.toLocaleString("en-AU", {
+                          day: "numeric", month: "short", year: "numeric",
+                          hour: "numeric", minute: "2-digit", hour12: true,
+                        })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {selected.signatureUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selected.signatureUrl}
+                    alt="Signature"
+                    className={styles.signatureImg}
+                  />
+                ) : selected.signed ? (
+                  <p className={styles.signatureMissing}>Signature image not available.</p>
+                ) : null}
+              </div>
+            </section>
+
+            {/* Attachments */}
+            <section>
+              <h3 className={styles.detailCardTitle}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10.5 18a2 2 0 0 1-3-3l8-8" />
+                </svg>
+                Attachments
+              </h3>
+              {selected.idPhotoUrl || selected.receiptPhotoUrl ? (
+                <div className={styles.attachGrid}>
+                  {selected.idPhotoUrl && (
+                    <a
+                      href={selected.idPhotoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={styles.attachCard}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={selected.idPhotoUrl} alt="ID" className={styles.attachImg} />
+                      <p className={styles.attachLabel}>ID Photo</p>
+                    </a>
+                  )}
+                  {selected.receiptPhotoUrl && (
+                    <a
+                      href={selected.receiptPhotoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={styles.attachCard}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={selected.receiptPhotoUrl} alt="Receipt" className={styles.attachImg} />
+                      <p className={styles.attachLabel}>Receipt Photo</p>
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.attachEmpty}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                  <div>
+                    <p className={styles.attachEmptyTitle}>Receipt Photo (Optional)</p>
+                    <p className={styles.attachEmptySub}>No attachment</p>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <div className={styles.lockBanner}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <div>
+                <p className={styles.lockTitle}>This record is securely stored and cannot be edited.</p>
+                {selected.createdAt && (
+                  <p className={styles.lockSub}>
+                    Created on {selected.createdAt.toLocaleString("en-AU", {
+                      day: "numeric", month: "short", year: "numeric",
+                      hour: "numeric", minute: "2-digit", hour12: true,
+                    })}{selected.createdByName ? ` by ${selected.createdByName}` : ""}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
