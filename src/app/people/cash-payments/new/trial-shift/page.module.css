@@ -260,7 +260,7 @@
   gap: var(--space-3);
 }
 
-.gridTwo > * { min-width: 0; }
+.gridTwo > * { min-width: 0; overflow: hidden; }
 
 /* ── Total ── */
 .totalBox {
@@ -504,6 +504,6 @@
 }
 
 /* ── Phone ── */
-@media (max-width: 360px) {
+@media (max-width: 480px) {
   .gridTwo { grid-template-columns: 1fr; }
 }
