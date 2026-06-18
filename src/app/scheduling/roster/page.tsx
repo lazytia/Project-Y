@@ -642,7 +642,7 @@ export default function ManagerRosterPage() {
       <section className={styles.card}>
         <button
           type="button"
-          className={styles.cardHeadBtn}
+          className={`${styles.cardHeadBtn} ${styles.cardHeadThin}`}
           onClick={() => setShowNotes((s) => !s)}
           aria-expanded={showNotes}
         >
@@ -772,7 +772,7 @@ export default function ManagerRosterPage() {
       <section className={styles.card}>
         <button
           type="button"
-          className={styles.cardHeadBtn}
+          className={`${styles.cardHeadBtn} ${styles.cardHeadThin}`}
           onClick={() => setShowNotesNext((s) => !s)}
           aria-expanded={showNotesNext}
         >

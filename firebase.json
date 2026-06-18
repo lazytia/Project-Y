@@ -1,4 +1,4 @@
-﻿{
+{
   "firestore": [
     {
       "database": "project-y",
@@ -10,5 +10,17 @@
       "bucket": "project-y-d04dc.firebasestorage.app",
       "rules": "storage.rules"
     }
-  ]
+  ],
+  "apphosting": {
+    "backendId": "project-y",
+    "rootDir": "/",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "functions"
+    ],
+    "alwaysDeployFromSource": true
+  }
 }

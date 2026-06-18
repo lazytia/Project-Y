@@ -177,6 +177,21 @@
   flex-wrap: wrap;
 }
 
+/* Thin variant for Notes — slim single-line header */
+.cardHeadThin {
+  padding: 8px var(--space-4);
+  flex-wrap: nowrap;
+  font-size: 13px;
+}
+
+.cardHeadThin .cardTitle {
+  font-size: 13px;
+}
+
+.cardHeadThin .notesMeta {
+  font-size: 11px;
+}
+
 .cardHeadBtn {
   width: 100%;
   background: transparent;
