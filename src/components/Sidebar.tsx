@@ -29,6 +29,7 @@ const NAV: NavGroup[] = [
       { label: "Active Staff", href: "/people/active-staff" },
       { label: "HR Notes", href: "/people/hr-notes" },
       { label: "Cash Payments", href: "/people/cash-payments" },
+      { label: "Notice Given", href: "/people/notice-given" },
     ],
   },
   {
@@ -97,6 +98,7 @@ export default function Sidebar({ open, onClose }: Props) {
         { label: "Active Staff", href: "/people/active-staff" },
         { label: "HR Notes", href: "/people/hr-notes" },
         { label: "Cash Payments", href: "/people/cash-payments" },
+        { label: "Notice Given", href: "/people/notice-given" },
       ],
     },
     {
