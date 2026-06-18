@@ -766,12 +766,18 @@ export default function ManagerRosterPage() {
                 >
                   {value ? (
                     <span className={styles.noteFilled} aria-hidden="true">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                        <circle cx="12" cy="12" r="5" />
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                       </svg>
                     </span>
                   ) : (
-                    <span className={styles.notePlus} aria-hidden="true">+</span>
+                    <span className={styles.notePencilFaint} aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                      </svg>
+                    </span>
                   )}
                 </button>
               );
@@ -832,52 +838,55 @@ export default function ManagerRosterPage() {
                   );
                 })}
               </div>
+              {/* Notes row — read-only view for previous week */}
+              <div className={styles.gridRow}>
+                <div className={styles.rowLabel}><NoteIcon /> Notes</div>
+                {prevWeekDays.map((d, i) => {
+                  const iso = isoDate(d);
+                  const value = prevWeekDoc.notes?.[iso] ?? "";
+                  if (!value) {
+                    return (
+                      <div key={i} className={styles.gridCellReadOnly}>
+                        <span className={styles.notePencilFaint} aria-hidden="true">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                          </svg>
+                        </span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={styles.gridCell}
+                      onClick={() => {
+                        setNoteModal({
+                          label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`,
+                          text: value,
+                          iso,
+                          weekKey: "prev",
+                        });
+                        setNoteModalEditing(false);
+                        setNoteModalDraft(value);
+                      }}
+                      aria-label={`View note for ${DAY_LABELS_LONG[i]}`}
+                    >
+                      <span className={styles.noteFilled} aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
       </section>
-
-      {/* Previous Week Notes (separate card, visible when prev week is expanded) */}
-      {showPrevWeek && (
-        <section className={styles.card}>
-          <div className={styles.cardHead}>
-            <span className={styles.cardIcon}><NoteIcon /></span>
-            <p className={styles.cardTitle}>Notes</p>
-            {prevWeekDoc.notesAuthor && (
-              <span className={styles.notesMeta}>{prevWeekDoc.notesAuthor}</span>
-            )}
-          </div>
-          <ul className={styles.notesList}>
-            {prevWeekDays.map((d, i) => {
-              const iso = isoDate(d);
-              const value = prevWeekDoc.notes?.[iso] ?? "";
-              return (
-                <li key={iso} className={styles.noteRow}>
-                  <div className={styles.noteDayCol}>
-                    <span className={styles.noteDay}>{DAY_LABELS_LONG[i]}</span>
-                    <span className={styles.noteDate}>{fmtMonDay(d)}</span>
-                  </div>
-                  {value ? (
-                    <button
-                      type="button"
-                      className={styles.noteBtn}
-                      onClick={() => {
-                        setNoteModal({ label: `${DAY_LABELS_LONG[i]}, ${fmtMonDay(d)}`, text: value, iso, weekKey: "prev" });
-                        setNoteModalEditing(false);
-                        setNoteModalDraft(value);
-                      }}
-                    >
-                      {value}
-                    </button>
-                  ) : (
-                    <span className={styles.noteReadOnly} />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
 
       {/* Holiday Requests */}
       <section className={styles.card}>
@@ -1318,10 +1327,12 @@ function MoonIcon() {
   );
 }
 function NoteIcon() {
+  // Pencil glyph — matches the per-day cell icons so the Notes row reads
+  // as one consistent visual.
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
     </svg>
   );
 }
