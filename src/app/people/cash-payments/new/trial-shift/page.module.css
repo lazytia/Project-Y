@@ -260,6 +260,8 @@
   gap: var(--space-3);
 }
 
+.gridTwo > * { min-width: 0; }
+
 /* ── Total ── */
 .totalBox {
   margin-top: var(--space-2);
