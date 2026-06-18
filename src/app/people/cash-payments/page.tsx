@@ -248,9 +248,6 @@ export default function CashPaymentsPage() {
                   className={styles.row}
                   onClick={() => setSelectedId(p.id)}
                 >
-                  <span className={styles.avatar} aria-hidden="true">
-                    {initials(p.recipientName)}
-                  </span>
                   <div className={styles.rowBody}>
                     <p className={styles.rowName}>{p.recipientName}</p>
                     <p className={styles.rowReason}>{p.reason}</p>

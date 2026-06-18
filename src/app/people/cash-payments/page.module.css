@@ -165,7 +165,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 40px 1fr auto 12px;
+  grid-template-columns: 1fr auto 12px;
   align-items: center;
   gap: var(--space-3);
   width: 100%;

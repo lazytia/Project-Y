@@ -400,7 +400,6 @@ export default function ActiveEmployeeDetailsPage() {
                   setPickerOpen(false);
                 }}
               >
-                <div className={styles.pickerAvatar}>{initials(s.name)}</div>
                 <div>
                   <p className={styles.pickerName}>{s.name}</p>
                   <p className={styles.pickerPos}>{s.position}</p>
