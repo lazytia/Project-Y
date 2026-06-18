@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
@@ -106,9 +106,10 @@ export default function ActiveEmployeeDetailsPage() {
     if (!allowed) return;
     const load = async () => {
       try {
-        const snap = await getDocs(
-          query(collection(getDb(), "staff_onboarding"), where("status", "==", "active"))
-        );
+        // Show every non-owner staff record. The "Active Employee" cash
+        // payment form is meant for anyone currently working, not just
+        // those whose Firestore status field has been flipped to "active".
+        const snap = await getDocs(collection(getDb(), "staff_onboarding"));
         const list: StaffMember[] = snap.docs
           .map((doc) => {
             const d = doc.data();
