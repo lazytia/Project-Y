@@ -119,7 +119,7 @@ export default function CashPaymentsPage() {
     (async () => {
       try {
         const snap = await getDocs(
-          query(collection(getDb(), "cash_payments"), orderBy("paidAt", "desc")),
+          query(collection(getDb(), "cash_payments"), orderBy("createdAt", "desc")),
         );
         const list: Payment[] = snap.docs.map((d) => {
           const data = d.data() as StoredPayment;
