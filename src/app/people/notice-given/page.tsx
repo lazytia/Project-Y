@@ -237,7 +237,7 @@ export default function NoticeGivenPage() {
             const isOverdue = diff !== null && diff < 0;
             return (
               <li key={n.id}>
-                <button type="button" className={styles.card}>
+                <button type="button" className={styles.card} onClick={() => router.push(`/people/notice-given/${n.id}`)}>
                   <div className={styles.cardTop}>
                     <div className={styles.avatar}>{initials(n.employeeName)}</div>
                     <div className={styles.cardBody}>
