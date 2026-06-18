@@ -561,8 +561,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: var(--space-5) var(--space-4) 96px;
-  z-index: 200;
+  padding: 88px var(--space-4) 96px;
+  z-index: 600;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
