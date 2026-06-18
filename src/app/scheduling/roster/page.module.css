@@ -141,10 +141,13 @@
 .gridCell:hover { background: var(--color-surface); }
 
 .dotGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 6px);
-  grid-auto-rows: 6px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
   gap: 3px;
+  max-width: 15px;
+  margin: 0 auto;
 }
 
 .dot {
