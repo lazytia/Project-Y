@@ -63,9 +63,6 @@ export default function ActiveEmployeePaymentPage() {
     }
   }, [authLoading, allowed, router]);
 
-  // Payroll inclusion
-  const [payrollIncluded, setPayrollIncluded] = useState<"yes" | "no">("no");
-
   // Signature canvas
   const sigCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const sigDrawing = useRef(false);
@@ -164,7 +161,6 @@ export default function ActiveEmployeePaymentPage() {
         amount: draft.amount,
         reason: draft.reason,
         paymentDate: draft.paymentDate,
-        payrollIncluded: payrollIncluded === "yes",
         paymentMethod: "Cash",
         signatureUrl,
         signed: true,
@@ -225,35 +221,6 @@ export default function ActiveEmployeePaymentPage() {
           <span className={styles.stepLabel}>Payment &amp; Signature</span>
         </div>
       </div>
-
-      {/* 6. Payroll Included? */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>6. Payroll Included?</h2>
-        <ul className={styles.radioList}>
-          {([
-            { v: "yes" as const, label: "Yes, included in payroll" },
-            { v: "no" as const, label: "No, not included" },
-          ]).map((opt) => (
-            <li key={opt.v}>
-              <label
-                className={`${styles.radioRow} ${payrollIncluded === opt.v ? styles.radioRowOn : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="payrollIncluded"
-                  className={styles.radioInput}
-                  checked={payrollIncluded === opt.v}
-                  onChange={() => setPayrollIncluded(opt.v)}
-                />
-                <span
-                  className={`${styles.radioDot} ${payrollIncluded === opt.v ? styles.radioDotOn : ""}`}
-                />
-                <span className={styles.radioLabel}>{opt.label}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       {/* Recorded By */}
       <section className={styles.section}>
