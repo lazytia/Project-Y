@@ -1,8 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { adminAuth } from "@/lib/firebase-admin";
+import { Timestamp } from "firebase-admin/firestore";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { setCategoryPresence } from "@/lib/sold-out-square";
+import { squareClient } from "@/lib/square";
+import { SOLD_OUT_CATEGORIES } from "@/lib/sold-out-square";
 
 /**
  * POST /api/menu/set-sold-out
@@ -52,6 +55,36 @@ export async function POST(req: NextRequest) {
 
   try {
     const updated = await setCategoryPresence(categoryId, !soldOut);
+
+    // Diagnostic snapshot: re-fetch one item in the affected category
+    // straight after the upsert so we can confirm Square actually
+    // accepted the presence flip. Logs into Firestore where we can
+    // inspect it without grepping Cloud Run.
+    try {
+      const cfg = SOLD_OUT_CATEGORIES.find((c) => c.id === categoryId);
+      let sample: Record<string, unknown> | null = null;
+      if (cfg) {
+        const page = await squareClient.catalog.list({ types: "ITEM" });
+        for await (const obj of page) {
+          const o = obj as { type?: string; itemData?: { name?: string } };
+          if (o.type === "ITEM" && cfg.match.test(o.itemData?.name ?? "")) {
+            sample = JSON.parse(
+              JSON.stringify(o, (_k, v) => (typeof v === "bigint" ? v.toString() : v)),
+            );
+            break;
+          }
+        }
+      }
+      await adminDb().collection("debug_sold_out").doc(categoryId).set({
+        at: Timestamp.now(),
+        requestedSoldOut: soldOut,
+        itemsUpdated: updated,
+        sampleItemAfterUpsert: sample,
+      });
+    } catch (diagErr) {
+      console.error("[set-sold-out] diag snapshot failed:", diagErr);
+    }
+
     return NextResponse.json({ ok: true, categoryId, soldOut, itemsUpdated: updated });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to update Square.";
