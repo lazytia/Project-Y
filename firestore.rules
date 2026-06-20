@@ -35,6 +35,13 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // Weekly Square gross sales — written by the Square sync job
+    // (server) every cron tick. Read by the Insights dashboard.
+    match /sales_weekly/{weekStartISO} {
+      allow read: if request.auth != null;
+      allow write: if isOwner();
+    }
+
     // Weekly payroll totals — written by the Xero sync job (server)
     // or by an owner via a manual entry form, read by the Insights
     // dashboard. Documents are keyed by the Monday ISO date of the

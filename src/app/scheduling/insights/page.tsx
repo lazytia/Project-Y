@@ -65,6 +65,18 @@ type WeeklyPayroll = {
   source?: "xero" | "manual";
 };
 
+/**
+ * sales_weekly/{weekStartISO} — populated by the Square sync job. Stores
+ * the Square Web "Gross Sales" total (line item gross sales minus
+ * refunds) so Insights can show real sales and Payroll %.
+ */
+type WeeklySales = {
+  weekStartISO?: string;
+  grossSales?: number;
+  currency?: string;
+  source?: "square" | "manual";
+};
+
 type WeekStats = {
   weekStartISO: string;
   totalShifts: number;
@@ -151,6 +163,7 @@ export default function InsightsPage() {
 
   const [docs, setDocs] = useState<Record<string, WeekDoc>>({});
   const [payroll, setPayroll] = useState<Record<string, WeeklyPayroll>>({});
+  const [salesMap, setSalesMap] = useState<Record<string, WeeklySales>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -174,6 +187,15 @@ export default function InsightsPage() {
         const map: Record<string, WeeklyPayroll> = {};
         for (const d of snap.docs) map[d.id] = d.data() as WeeklyPayroll;
         setPayroll(map);
+      } catch {
+        /* keep empty */
+      }
+      try {
+        // Pulled from Square by the sync job (gross sales for the week).
+        const snap = await getDocs(collection(getDb(), "sales_weekly"));
+        const map: Record<string, WeeklySales> = {};
+        for (const d of snap.docs) map[d.id] = d.data() as WeeklySales;
+        setSalesMap(map);
       } catch {
         /* keep empty */
       }
@@ -249,9 +271,11 @@ export default function InsightsPage() {
   const rosterPlanned = currentWeek.estimatedCost; // planned always from roster estimate
   const variance = payrollCost - rosterPlanned;
 
-  // Sales — no source yet. Use a global config doc later; for now, "—".
-  const sales = 0;
+  // Square Gross Sales for this and the previous week.
+  const sales = salesMap[isoDate(currentWeekStart)]?.grossSales ?? 0;
+  const prevSales = salesMap[isoDate(prevWeekStart)]?.grossSales ?? 0;
   const hasSales = sales > 0;
+  const salesVsLast = prevSales > 0 ? ((sales - prevSales) / prevSales) * 100 : 0;
   const payrollPct = hasSales ? (payrollCost / sales) * 100 : 0;
   const prevPayrollPct = hasSales ? (prevPayrollCost / sales) * 100 : 0;
   const overTarget = hasSales && payrollPct > TARGET_PAYROLL_PCT;
@@ -382,7 +406,11 @@ export default function InsightsPage() {
           <p className={styles.snapshotLabel}>SALES</p>
           <p className={styles.snapshotValue}>{hasSales ? fmtCurrency(sales) : "—"}</p>
           <p className={styles.snapshotMeta}>
-            {hasSales ? "vs last week" : "Not connected"}
+            {hasSales
+              ? prevSales > 0
+                ? `${salesVsLast >= 0 ? "+" : ""}${fmtPct(salesVsLast)} vs last week`
+                : "Gross sales (Square)"
+              : "Not connected"}
           </p>
         </div>
         <div className={styles.snapshotDivider} />
