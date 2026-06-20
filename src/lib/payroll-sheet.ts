@@ -15,6 +15,7 @@
  *     service account that has Viewer access to the sheet. (Share the
  *     sheet with that service account's email.)
  */
+import { existsSync } from "node:fs";
 import { google } from "googleapis";
 
 const DEFAULT_SHEET_ID = "14HlHX24fN8GcryjIaBRvjZtmAGuQK7dElAcV4JXr1Qk";
@@ -59,8 +60,21 @@ function authClient() {
       scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
     });
   }
+  // If GOOGLE_APPLICATION_CREDENTIALS points at a stale path that no
+  // longer exists (very common on dev machines), drop it so the SDK
+  // can fall back to gcloud user ADC.
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (credPath && !existsSync(credPath)) {
+    delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  }
   return new google.auth.GoogleAuth({
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    // Without an explicit quota project, gcloud user ADC tokens are
+    // rejected with 401 because Sheets API requires a billable project.
+    projectId:
+      process.env.GCLOUD_PROJECT ??
+      process.env.GOOGLE_CLOUD_PROJECT ??
+      "project-y-d04dc",
   });
 }
 
@@ -114,17 +128,29 @@ export async function fetchWeeklyPayrollTotals(): Promise<Record<string, WeeklyP
     }
     if (totalIncSuperCol === -1) continue;
 
-    // Walk down until we find a row whose first cell is "Total".
+    // Walk down until we find the "Total" row. "Total" may live in the
+    // first or second cell depending on whether the sheet uses an empty
+    // leading column, so check the first few cells.
     let totalRow: unknown[] | null = null;
     for (let j = colHeaderIdx + 1; j < rows.length; j += 1) {
       const r = rows[j] ?? [];
-      const first = r[0];
-      if (typeof first === "string" && /^\s*total\s*$/i.test(first)) {
-        totalRow = r;
-        break;
+      let isTotal = false;
+      for (let k = 0; k < Math.min(3, r.length); k += 1) {
+        const cell = r[k];
+        if (typeof cell === "string" && /^\s*total\s*:?\s*$/i.test(cell)) {
+          isTotal = true;
+          break;
+        }
       }
-      // Bail out if we run into the next "Pay History (" header
-      if (typeof first === "string" && HEADER_RE.test(first)) break;
+      if (isTotal) { totalRow = r; break; }
+      // Bail out if we run into the next "Pay History (" header before
+      // finding a Total row.
+      for (const cell of r) {
+        if (typeof cell === "string" && HEADER_RE.test(cell)) {
+          j = rows.length; // stop outer loop
+          break;
+        }
+      }
     }
     if (!totalRow) continue;
 
