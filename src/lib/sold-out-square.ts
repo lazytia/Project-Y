@@ -1,14 +1,26 @@
 /**
  * Shared helpers for syncing the Daily Sold Out state to Square.
  *
- * Strategy: flip the ITEM's location presence so the Square Dashboard
- * Manage Inventory pill shows Unavailable and POS + Online Ordering
- * hide the item. We deliberately do NOT touch each variation's
- * locationOverrides[].soldOut — when the parent item is removed from
- * a location, Square rejects variation overrides that still reference
- * that location ("ITEM_VARIATION is enabled at location X, but the
- * referenced object of type ITEM is not"), so the two signals are
- * mutually exclusive.
+ * Strategy: Square's "Sold out" state (the Manage Inventory "Status" pill,
+ * the POS sold-out badge, and the Online Ordering "unavailable" flag) is a
+ * COMPUTED, read-only field on each ITEM_VARIATION location override. You
+ * cannot set `soldOut` directly — Square derives it as
+ *   soldOut = (trackInventory === true && availableQuantity <= 0)
+ *
+ * So to mark a category sold out we, per active location:
+ *   1. keep the ITEM present (so the variation override is legal), and
+ *   2. set the variation's locationOverride.trackInventory = true, and
+ *   3. push the physical inventory count to 0 (best-effort safety net so the
+ *      item is sold out even if it currently has positive stock).
+ *
+ * To restore, we set trackInventory = false, which makes Square treat the
+ * item as always available regardless of the (irrelevant) stock count.
+ *
+ * NOTE: We deliberately do NOT flip presentAtAllLocations to hide the item.
+ * Removing location presence makes the item vanish entirely but leaves the
+ * Manage Inventory pill reading "Available", which is not what the owner
+ * sees/expects. The trackInventory approach is the same one the Square POS
+ * "Mark as sold out" button uses.
  */
 import { squareClient } from "@/lib/square";
 
@@ -62,6 +74,18 @@ async function listAllCatalog(): Promise<CatalogObject[]> {
   return out;
 }
 
+// Cache the active location IDs for the lifetime of the module instance.
+let cachedActiveLocationIds: string[] | null = null;
+async function getActiveLocationIds(): Promise<string[]> {
+  if (cachedActiveLocationIds) return cachedActiveLocationIds;
+  const resp = await squareClient.locations.list();
+  const ids = (resp.locations ?? [])
+    .filter((l) => l.status === "ACTIVE" && typeof l.id === "string")
+    .map((l) => l.id as string);
+  cachedActiveLocationIds = ids;
+  return ids;
+}
+
 function itemsInCategory(all: CatalogObject[], cfg: CategoryDef): CatalogObject[] {
   const cats = all.filter((o) => o.type === "CATEGORY");
   const items = all.filter((o) => o.type === "ITEM");
@@ -82,41 +106,85 @@ function itemsInCategory(all: CatalogObject[], cfg: CategoryDef): CatalogObject[
 
 type UpsertObject = Parameters<typeof squareClient.catalog.object.upsert>[0]["object"];
 
+/**
+ * Force the available stock of a variation to 0 at every active location so
+ * that (with trackInventory on) Square computes soldOut = true. Best-effort:
+ * a failure here must not abort the sold-out flip, because the catalog-level
+ * trackInventory change already sells out items that sit at qty 0.
+ */
+async function zeroInventory(variationIds: string[], locationIds: string[]): Promise<void> {
+  if (variationIds.length === 0 || locationIds.length === 0) return;
+  const occurredAt = new Date().toISOString();
+  const changes = [];
+  for (const catalogObjectId of variationIds) {
+    for (const locationId of locationIds) {
+      changes.push({
+        type: "PHYSICAL_COUNT" as const,
+        physicalCount: {
+          catalogObjectId,
+          locationId,
+          state: "IN_STOCK" as const,
+          quantity: "0",
+          occurredAt,
+        },
+      });
+    }
+  }
+  try {
+    await squareClient.inventory.batchCreateChanges({
+      idempotencyKey: `sold-out-zero-${Date.now()}`,
+      changes,
+    });
+  } catch (err) {
+    console.error("[sold-out] zeroInventory failed (non-fatal):", err);
+  }
+}
+
 async function applyToCategory(
   cfg: CategoryDef,
   all: CatalogObject[],
   available: boolean,
+  activeLocationIds: string[],
 ): Promise<number> {
   const items = itemsInCategory(all, cfg);
   let updated = 0;
+  const soldOutVariationIds: string[] = [];
+
   for (const it of items) {
     if (!it.id) continue;
 
-    // Upsert the item AND its variations together in a single call so
-    // Square sees consistent presence flags. Updating them in separate
-    // calls trips "ITEM_VARIATION is enabled at unit X, but the
-    // referenced object of type ITEM is not" because Square validates
-    // the tree mid-flight.
-    const variations = (it.itemData?.variations ?? []).map((v) => ({
-      ...(v as Record<string, unknown>),
-      type: "ITEM_VARIATION",
-      id: v.id,
-      version: typeof v.version === "number" ? BigInt(v.version) : v.version,
-      presentAtAllLocations: available,
-      presentAtLocationIds: [],
-      absentAtLocationIds: [],
-      itemVariationData: {
-        ...(v.itemVariationData ?? {}),
-        locationOverrides: [],
-      },
+    // Build location overrides that flip trackInventory for every active
+    // location. trackInventory:true + qty<=0 => Square computes soldOut:true.
+    // trackInventory:false => item is always available regardless of stock.
+    const overrides = activeLocationIds.map((locationId) => ({
+      locationId,
+      trackInventory: !available,
     }));
+
+    const variations = (it.itemData?.variations ?? []).map((v) => {
+      if (!available && v.id) soldOutVariationIds.push(v.id);
+      return {
+        ...(v as Record<string, unknown>),
+        type: "ITEM_VARIATION",
+        id: v.id,
+        version: typeof v.version === "number" ? BigInt(v.version) : v.version,
+        // Keep the variation present so the override is legal.
+        presentAtAllLocations: true,
+        presentAtLocationIds: [],
+        absentAtLocationIds: [],
+        itemVariationData: {
+          ...(v.itemVariationData ?? {}),
+          locationOverrides: overrides,
+        },
+      };
+    });
 
     const nextItem = {
       ...(it as Record<string, unknown>),
       type: "ITEM",
       id: it.id,
       version: typeof it.version === "number" ? BigInt(it.version) : it.version,
-      presentAtAllLocations: available,
+      presentAtAllLocations: true,
       presentAtLocationIds: [],
       absentAtLocationIds: [],
       itemData: {
@@ -124,42 +192,34 @@ async function applyToCategory(
         variations,
       },
     } as UpsertObject;
-    console.log("[sold-out] UPSERT REQUEST", JSON.stringify({
-      itemId: it.id,
-      available,
-      presentAtAllLocations: (nextItem as { presentAtAllLocations?: boolean }).presentAtAllLocations,
-      presentAtLocationIds: (nextItem as { presentAtLocationIds?: string[] }).presentAtLocationIds,
-      absentAtLocationIds: (nextItem as { absentAtLocationIds?: string[] }).absentAtLocationIds,
-      variationCount: variations.length,
-    }));
-    const upsertResp = await squareClient.catalog.object.upsert({
+
+    await squareClient.catalog.object.upsert({
       idempotencyKey: `sold-out-${cfg.id}-${available ? "in" : "out"}-${it.id}-${Date.now()}`,
       object: nextItem,
     });
-    const respObj = (upsertResp as { catalogObject?: Record<string, unknown> }).catalogObject;
-    console.log("[sold-out] UPSERT RESPONSE", JSON.stringify({
-      itemId: it.id,
-      presentAtAllLocations: respObj?.presentAtAllLocations,
-      presentAtLocationIds: respObj?.presentAtLocationIds,
-      absentAtLocationIds: respObj?.absentAtLocationIds,
-    }, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
     updated += 1;
   }
+
+  // When marking sold out, make the result deterministic by zeroing stock.
+  if (!available) {
+    await zeroInventory(soldOutVariationIds, activeLocationIds);
+  }
+
   return updated;
 }
 
 export async function setCategoryPresence(categoryId: string, available: boolean): Promise<number> {
   const cfg = SOLD_OUT_CATEGORIES.find((c) => c.id === categoryId);
   if (!cfg) throw new Error(`Unknown sold-out category: ${categoryId}`);
-  const all = await listAllCatalog();
-  return applyToCategory(cfg, all, available);
+  const [all, activeLocationIds] = await Promise.all([listAllCatalog(), getActiveLocationIds()]);
+  return applyToCategory(cfg, all, available, activeLocationIds);
 }
 
 export async function restoreAllCategories(): Promise<{ category: string; restored: number }[]> {
-  const all = await listAllCatalog();
+  const [all, activeLocationIds] = await Promise.all([listAllCatalog(), getActiveLocationIds()]);
   const result: { category: string; restored: number }[] = [];
   for (const cfg of SOLD_OUT_CATEGORIES) {
-    const restored = await applyToCategory(cfg, all, true);
+    const restored = await applyToCategory(cfg, all, true, activeLocationIds);
     result.push({ category: cfg.id, restored });
   }
   return result;
