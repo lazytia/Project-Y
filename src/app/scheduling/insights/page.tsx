@@ -254,7 +254,7 @@ export default function InsightsPage() {
   }, []);
   const todayWeekStart = useMemo(() => startOfWeekMon(today), [today]);
 
-  const [selectedWeekISO, setSelectedWeekISO] = useState<string>(() => isoDate(startOfWeekMon(new Date())));
+  const [selectedWeekISO, setSelectedWeekISO] = useState<string>(() => isoDate(addDays(startOfWeekMon(new Date()), -7)));
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -266,15 +266,18 @@ export default function InsightsPage() {
   }, [selectedWeekISO, todayWeekStart]);
   const prevWeekStart = useMemo(() => addDays(currentWeekStart, -7), [currentWeekStart]);
 
-  // Build the list of weeks the manager can pick — every week that has
-  // an entry in rosters_published, plus the current week as a fallback.
+  // Build the list of weeks — past weeks only (up to the week before this week).
+  // Future weeks and current week are excluded.
   const weekOptions = useMemo(() => {
-    const set = new Set<string>(Object.keys(docs));
-    set.add(isoDate(todayWeekStart));
-    // Also include the 8 most recent weeks for navigation.
-    for (let i = 0; i < 8; i += 1) set.add(isoDate(addDays(todayWeekStart, -7 * i)));
-    return Array.from(set)
-      .sort((a, b) => (a < b ? 1 : -1));
+    const prevWeekISO = isoDate(addDays(todayWeekStart, -7));
+    const set = new Set<string>();
+    // Include all rosters_published entries that are before this week.
+    for (const iso of Object.keys(docs)) {
+      if (iso <= prevWeekISO) set.add(iso);
+    }
+    // Always include the last 8 weeks for navigation.
+    for (let i = 1; i <= 8; i += 1) set.add(isoDate(addDays(todayWeekStart, -7 * i)));
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
   }, [docs, todayWeekStart]);
 
   // Aggregations
@@ -515,7 +518,7 @@ export default function InsightsPage() {
                   const start = new Date(y, m - 1, d);
                   const end = addDays(start, 5);
                   const isCurrent = iso === selectedWeekISO;
-                  const isThisWeek = iso === isoDate(todayWeekStart);
+                  const isLastWeek = iso === isoDate(addDays(todayWeekStart, -7));
                   return (
                     <li key={iso}>
                       <button
@@ -529,7 +532,7 @@ export default function InsightsPage() {
                         }}
                       >
                         <span>{fmtRange(start, end)}</span>
-                        {isThisWeek && <span className={styles.weekOptionBadge}>This week</span>}
+                        {isLastWeek && <span className={styles.weekOptionBadge}>Last week</span>}
                       </button>
                     </li>
                   );
