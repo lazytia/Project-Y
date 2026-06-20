@@ -1,42 +1,74 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  collection,
+  getDocs,
+  type Timestamp,
+} from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
+import { isOwner } from "@/lib/permissions";
+import { ROUTES } from "@/lib/routes";
+import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────
  * Roster Insight — owner/manager analytics dashboard.
  *
- * Hardcoded values for now (matching the design); the shape is what the
- * real Firestore aggregations will fill in once the roster publish flow
- * and Square sales pipeline land.
+ * All numbers come from the rosters_published Firestore collection
+ * (assignments per day per meal). We don't yet have the Square sales
+ * pipeline or a per-staff payroll table, so:
+ *
+ *   - PAYROLL COST is estimated as (#shifts × shift hours × est. rate).
+ *   - ROSTER COST (planned) is the same estimate (we only store one
+ *     assignments map per day for now).
+ *   - SALES + PAYROLL % require sales data; until that's wired, they
+ *     show "—" with no comparison.
+ *
+ * Tune the constants below once the real data sources land.
  * ──────────────────────────────────────────────────────────────────── */
 
 const TARGET_PAYROLL_PCT = 25;
+const EST_HOURLY_RATE = 25;
+const LUNCH_HOURS = 4;
+const DINNER_HOURS = 5;
+const TREND_WEEKS = 4; // current + previous 3
 
-const WEEK_LABEL = "9 Jun – 15 Jun";
-const PREV_WEEK_LABEL = "2 Jun – 8 Jun";
+type Meal = "lunch" | "dinner";
 
-const SALES_TOTAL = 30240;
-const SALES_VS_LAST = -2.4; // %
-
-const PAYROLL_COST = 8240;
-const PAYROLL_COST_VS_LAST = 3.1; // %
-
-const ROSTER_PLANNED = 7600;
-
-const HIGHEST_COST_DAY = {
-  day: "Friday",
-  sales: 6420,
-  payroll: 1920,
+type WeekDoc = {
+  assignments?: Record<string, Record<Meal, Record<string, string>>>;
 };
 
-const TREND: { week: string; date: string; pct: number }[] = [
-  { week: "W1", date: "19 May", pct: 29.4 },
-  { week: "W2", date: "26 May", pct: 27.8 },
-  { week: "W3", date: "2 Jun", pct: 26.9 },
-  { week: "W4", date: "9 Jun", pct: 27.2 },
-];
+type WeekStats = {
+  weekStartISO: string;
+  totalShifts: number;
+  estimatedCost: number;
+  byDay: Record<string, { shifts: number; cost: number }>;
+};
+
+function startOfWeekMon(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  const day = (x.getDay() + 6) % 7; // Mon = 0
+  x.setDate(x.getDate() - day);
+  return x;
+}
+
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function isoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function fmtCurrency(n: number): string {
   return new Intl.NumberFormat("en-AU", {
@@ -50,42 +82,147 @@ function fmtPct(n: number, digits = 1): string {
   return `${n.toFixed(digits)}%`;
 }
 
+function fmtRange(a: Date, b: Date): string {
+  const sameMonth = a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
+  if (sameMonth) return `${a.getDate()} – ${b.toLocaleDateString("en-AU", opts)}`;
+  return `${a.toLocaleDateString("en-AU", opts)} – ${b.toLocaleDateString("en-AU", opts)}`;
+}
+
+function fmtDayLong(d: Date): string {
+  return d.toLocaleDateString("en-AU", { weekday: "long" });
+}
+
+function fmtWeekShortDate(d: Date): string {
+  return d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+}
+
+function aggregateWeek(weekStart: Date, doc: WeekDoc | undefined): WeekStats {
+  const stats: WeekStats = {
+    weekStartISO: isoDate(weekStart),
+    totalShifts: 0,
+    estimatedCost: 0,
+    byDay: {},
+  };
+  for (let i = 0; i < 7; i += 1) {
+    const d = addDays(weekStart, i);
+    const iso = isoDate(d);
+    const lunchKeys = Object.keys(doc?.assignments?.[iso]?.lunch ?? {});
+    const dinnerKeys = Object.keys(doc?.assignments?.[iso]?.dinner ?? {});
+    const lunchShifts = lunchKeys.length;
+    const dinnerShifts = dinnerKeys.length;
+    const cost =
+      lunchShifts * LUNCH_HOURS * EST_HOURLY_RATE +
+      dinnerShifts * DINNER_HOURS * EST_HOURLY_RATE;
+    stats.byDay[iso] = { shifts: lunchShifts + dinnerShifts, cost };
+    stats.totalShifts += lunchShifts + dinnerShifts;
+    stats.estimatedCost += cost;
+  }
+  return stats;
+}
+
 export default function InsightsPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const allowed = isOwner(user);
 
-  // Derived numbers
-  const payrollPct = useMemo(
-    () => (SALES_TOTAL > 0 ? (PAYROLL_COST / SALES_TOTAL) * 100 : 0),
-    [],
+  const [docs, setDocs] = useState<Record<string, WeekDoc>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!allowed) {
+      router.replace(ROUTES.home);
+      return;
+    }
+    (async () => {
+      try {
+        const snap = await getDocs(collection(getDb(), "rosters_published"));
+        const map: Record<string, WeekDoc> = {};
+        for (const d of snap.docs) map[d.id] = d.data() as WeekDoc;
+        setDocs(map);
+      } catch {
+        /* keep empty */
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [authLoading, allowed, router]);
+
+  // Week anchors
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+  const currentWeekStart = useMemo(() => startOfWeekMon(today), [today]);
+  const prevWeekStart = useMemo(() => addDays(currentWeekStart, -7), [currentWeekStart]);
+
+  // Aggregations
+  const currentWeek = useMemo(
+    () => aggregateWeek(currentWeekStart, docs[isoDate(currentWeekStart)]),
+    [currentWeekStart, docs],
   );
-  const rosterPctOfSales = useMemo(
-    () => (SALES_TOTAL > 0 ? (ROSTER_PLANNED / SALES_TOTAL) * 100 : 0),
-    [],
-  );
-  const variance = PAYROLL_COST - ROSTER_PLANNED;
-  const variancePctOfSales = useMemo(
-    () => (SALES_TOTAL > 0 ? (variance / SALES_TOTAL) * 100 : 0),
-    [variance],
+  const prevWeek = useMemo(
+    () => aggregateWeek(prevWeekStart, docs[isoDate(prevWeekStart)]),
+    [prevWeekStart, docs],
   );
 
-  const overTarget = payrollPct > TARGET_PAYROLL_PCT;
+  // Trend (last TREND_WEEKS including current)
+  const trend = useMemo(() => {
+    const out: WeekStats[] = [];
+    for (let i = TREND_WEEKS - 1; i >= 0; i -= 1) {
+      const start = addDays(currentWeekStart, -7 * i);
+      out.push(aggregateWeek(start, docs[isoDate(start)]));
+    }
+    return out;
+  }, [currentWeekStart, docs]);
 
-  const highestDayPct = useMemo(
-    () => (HIGHEST_COST_DAY.sales > 0
-      ? (HIGHEST_COST_DAY.payroll / HIGHEST_COST_DAY.sales) * 100
-      : 0),
-    [],
-  );
-  const weeklyAvgPct = useMemo(
-    () => TREND.reduce((s, t) => s + t.pct, 0) / TREND.length,
-    [],
-  );
-  const highestDayVsAvg = highestDayPct - weeklyAvgPct;
+  // Derived
+  const payrollCost = currentWeek.estimatedCost;
+  const prevPayrollCost = prevWeek.estimatedCost;
+  const rosterPlanned = payrollCost; // same source for now
+  const variance = payrollCost - rosterPlanned;
 
-  // SVG trend chart geometry
-  const chart = useMemo(() => buildTrendChart(TREND, TARGET_PAYROLL_PCT), []);
+  // Sales — no source yet. Use a global config doc later; for now, "—".
+  const sales = 0;
+  const hasSales = sales > 0;
+  const payrollPct = hasSales ? (payrollCost / sales) * 100 : 0;
+  const prevPayrollPct = hasSales ? (prevPayrollCost / sales) * 100 : 0;
+  const overTarget = hasSales && payrollPct > TARGET_PAYROLL_PCT;
 
-  const [weekOpen, setWeekOpen] = useState(false);
+  // Highest cost day
+  const highestDay = useMemo(() => {
+    let best: { iso: string; date: Date; cost: number; shifts: number } | null = null;
+    for (let i = 0; i < 7; i += 1) {
+      const d = addDays(currentWeekStart, i);
+      const iso = isoDate(d);
+      const day = currentWeek.byDay[iso];
+      if (!day) continue;
+      if (!best || day.cost > best.cost) {
+        best = { iso, date: d, cost: day.cost, shifts: day.shifts };
+      }
+    }
+    return best;
+  }, [currentWeek, currentWeekStart]);
+
+  // Trend chart geometry — show payroll cost trend (estimated)
+  const chart = useMemo(() => buildTrendChart(trend), [trend]);
+
+  // Comparison labels
+  const compareSales = prevPayrollCost > 0
+    ? ((payrollCost - prevPayrollCost) / prevPayrollCost) * 100
+    : 0;
+
+  // SALES delta vs last week — we don't have sales yet
+  // PAYROLL COST delta
+  const payrollVsLast = compareSales;
+
+  const weekEnd = useMemo(() => addDays(currentWeekStart, 5), [currentWeekStart]); // Mon→Sat
+  const prevWeekEnd = useMemo(() => addDays(prevWeekStart, 5), [prevWeekStart]);
+
+  if (authLoading || loading) return <Splash />;
+  if (!allowed) return null;
 
   return (
     <div className={styles.page}>
@@ -112,62 +249,57 @@ export default function InsightsPage() {
       </header>
 
       <div className={styles.weekRow}>
-        <button
-          type="button"
-          className={styles.weekPill}
-          onClick={() => setWeekOpen((s) => !s)}
-        >
-          <span>{WEEK_LABEL}</span>
-          <span className={`${styles.weekChev} ${weekOpen ? styles.weekChevOpen : ""}`}>▾</span>
-        </button>
-        <p className={styles.weekCompare}>Compared to {PREV_WEEK_LABEL}</p>
+        <span className={styles.weekPill}>
+          <span>{fmtRange(currentWeekStart, weekEnd)}</span>
+          <span className={styles.weekChev}>▾</span>
+        </span>
+        <p className={styles.weekCompare}>Compared to {fmtRange(prevWeekStart, prevWeekEnd)}</p>
       </div>
 
       {/* Snapshot card */}
       <section className={styles.snapshot}>
         <div className={styles.snapshotCol}>
           <p className={styles.snapshotLabel}>SALES</p>
-          <p className={styles.snapshotValue}>{fmtCurrency(SALES_TOTAL)}</p>
+          <p className={styles.snapshotValue}>{hasSales ? fmtCurrency(sales) : "—"}</p>
           <p className={styles.snapshotMeta}>
-            {SALES_VS_LAST >= 0 ? "+" : ""}{fmtPct(SALES_VS_LAST)} vs last week
+            {hasSales ? "vs last week" : "Not connected"}
           </p>
         </div>
         <div className={styles.snapshotDivider} />
         <div className={styles.snapshotCol}>
           <p className={styles.snapshotLabel}>PAYROLL %</p>
           <p className={`${styles.snapshotValue} ${overTarget ? styles.snapshotValueDanger : styles.snapshotValueWarm}`}>
-            {fmtPct(payrollPct)}
+            {hasSales ? fmtPct(payrollPct) : "—"}
           </p>
-          <span className={`${styles.targetPill} ${overTarget ? styles.targetPillDanger : styles.targetPillOk}`}>
-            {overTarget ? (
-              <>
-                <span className={styles.targetIcon} aria-hidden="true">
+          {hasSales ? (
+            <span className={`${styles.targetPill} ${overTarget ? styles.targetPillDanger : styles.targetPillOk}`}>
+              <span className={styles.targetIcon} aria-hidden="true">
+                {overTarget ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="6" y1="6" x2="18" y2="18" />
                     <line x1="18" y1="6" x2="6" y2="18" />
                   </svg>
-                </span>
-                Over Target
-              </>
-            ) : (
-              <>
-                <span className={styles.targetIcon} aria-hidden="true">
+                ) : (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                </span>
-                Under Target
-              </>
-            )}
-          </span>
+                )}
+              </span>
+              {overTarget ? "Over Target" : "Under Target"}
+            </span>
+          ) : (
+            <span className={styles.snapshotMeta}>Needs sales data</span>
+          )}
           <p className={styles.snapshotTargetLine}>Target {fmtPct(TARGET_PAYROLL_PCT)}</p>
         </div>
         <div className={styles.snapshotDivider} />
         <div className={styles.snapshotCol}>
           <p className={styles.snapshotLabel}>PAYROLL COST</p>
-          <p className={styles.snapshotValue}>{fmtCurrency(PAYROLL_COST)}</p>
+          <p className={styles.snapshotValue}>{fmtCurrency(payrollCost)}</p>
           <p className={styles.snapshotMeta}>
-            {PAYROLL_COST_VS_LAST >= 0 ? "+" : ""}{fmtPct(PAYROLL_COST_VS_LAST)} vs last week
+            {prevPayrollCost > 0
+              ? `${payrollVsLast >= 0 ? "+" : ""}${fmtPct(payrollVsLast)} vs last week`
+              : "Estimated"}
           </p>
         </div>
       </section>
@@ -178,14 +310,14 @@ export default function InsightsPage() {
         <div className={styles.pvaGrid}>
           <div className={styles.pvaCol}>
             <p className={styles.pvaLabel}>ROSTER COST (PLANNED)</p>
-            <p className={styles.pvaValue}>{fmtCurrency(ROSTER_PLANNED)}</p>
-            <p className={styles.pvaMeta}>{fmtPct(rosterPctOfSales)} of sales</p>
+            <p className={styles.pvaValue}>{fmtCurrency(rosterPlanned)}</p>
+            <p className={styles.pvaMeta}>{hasSales ? `${fmtPct((rosterPlanned / sales) * 100)} of sales` : "Estimated"}</p>
           </div>
           <span className={styles.pvaOp} aria-hidden="true">−</span>
           <div className={styles.pvaCol}>
             <p className={styles.pvaLabel}>PAYROLL COST (ACTUAL)</p>
-            <p className={`${styles.pvaValue} ${styles.pvaValueWarm}`}>{fmtCurrency(PAYROLL_COST)}</p>
-            <p className={styles.pvaMeta}>{fmtPct(payrollPct)} of sales</p>
+            <p className={`${styles.pvaValue} ${styles.pvaValueWarm}`}>{fmtCurrency(payrollCost)}</p>
+            <p className={styles.pvaMeta}>{hasSales ? `${fmtPct(payrollPct)} of sales` : "Estimated"}</p>
           </div>
           <span className={styles.pvaOp} aria-hidden="true">=</span>
           <div className={styles.pvaCol}>
@@ -194,7 +326,7 @@ export default function InsightsPage() {
               {variance >= 0 ? "+" : "−"}{fmtCurrency(Math.abs(variance))}
             </p>
             <p className={styles.pvaMeta}>
-              {variancePctOfSales >= 0 ? "+" : ""}{fmtPct(variancePctOfSales)} of sales
+              {hasSales ? `${variance >= 0 ? "+" : ""}${fmtPct((variance / sales) * 100)} of sales` : "vs roster plan"}
             </p>
           </div>
         </div>
@@ -204,72 +336,66 @@ export default function InsightsPage() {
       <section className={styles.twoCol}>
         <div className={`${styles.card} ${styles.trendCard}`}>
           <p className={styles.cardTitle}>
-            LABOUR TREND <span className={styles.cardTitleSub}>(PAYROLL %)</span>
+            LABOUR TREND <span className={styles.cardTitleSub}>(EST. COST)</span>
           </p>
-          <svg className={styles.trendSvg} viewBox={`0 0 ${chart.width} ${chart.height}`} preserveAspectRatio="none">
-            {/* Y-axis labels */}
-            {chart.yLabels.map((y) => (
-              <text key={y.value} x={chart.padLeft - 6} y={y.y + 3} className={styles.trendAxis} textAnchor="end">
-                {y.value}%
-              </text>
-            ))}
-            {/* Target dashed line */}
-            <line
-              x1={chart.padLeft}
-              x2={chart.width - chart.padRight}
-              y1={chart.targetY}
-              y2={chart.targetY}
-              className={styles.trendTarget}
-              strokeDasharray="4 4"
-            />
-            <text x={chart.width - chart.padRight - 2} y={chart.targetY - 6} className={styles.trendAxisRight} textAnchor="end">
-              Target
-            </text>
-            <text x={chart.width - chart.padRight - 2} y={chart.targetY + 12} className={styles.trendAxisRight} textAnchor="end">
-              {fmtPct(TARGET_PAYROLL_PCT, 1)}
-            </text>
-            {/* Line */}
-            <path d={chart.linePath} className={styles.trendLine} />
-            {/* Points + value labels */}
-            {chart.points.map((p, i) => (
-              <g key={i}>
-                <circle cx={p.x} cy={p.y} r={3.5} className={styles.trendDot} />
-                <text x={p.x + 10} y={p.y - 6} className={styles.trendValue}>{p.pct}%</text>
-              </g>
-            ))}
-            {/* X labels */}
-            {chart.points.map((p, i) => (
-              <g key={`x-${i}`}>
-                <text x={p.x} y={chart.height - 14} className={i === chart.points.length - 1 ? styles.trendXLast : styles.trendX} textAnchor="middle">
-                  {TREND[i].week}
+          {chart.points.every((p) => p.value === 0) ? (
+            <p className={styles.emptyChart}>No roster data for the last {TREND_WEEKS} weeks.</p>
+          ) : (
+            <svg className={styles.trendSvg} viewBox={`0 0 ${chart.width} ${chart.height}`} preserveAspectRatio="none">
+              {chart.yLabels.map((y) => (
+                <text key={y.value} x={chart.padLeft - 6} y={y.y + 3} className={styles.trendAxis} textAnchor="end">
+                  {fmtCurrency(y.value)}
                 </text>
-                <text x={p.x} y={chart.height - 2} className={i === chart.points.length - 1 ? styles.trendXLast : styles.trendX} textAnchor="middle">
-                  {TREND[i].date}
-                </text>
-              </g>
-            ))}
-          </svg>
+              ))}
+              <path d={chart.linePath} className={styles.trendLine} />
+              {chart.points.map((p, i) => (
+                <g key={i}>
+                  <circle cx={p.x} cy={p.y} r={3.5} className={styles.trendDot} />
+                  <text x={p.x + 10} y={p.y - 6} className={styles.trendValue}>
+                    {fmtCurrency(p.value)}
+                  </text>
+                </g>
+              ))}
+              {chart.points.map((p, i) => {
+                const start = addDays(currentWeekStart, -7 * (TREND_WEEKS - 1 - i));
+                const label = `W${i + 1}`;
+                const date = fmtWeekShortDate(start);
+                const isLast = i === chart.points.length - 1;
+                return (
+                  <g key={`x-${i}`}>
+                    <text x={p.x} y={chart.height - 14} className={isLast ? styles.trendXLast : styles.trendX} textAnchor="middle">{label}</text>
+                    <text x={p.x} y={chart.height - 2} className={isLast ? styles.trendXLast : styles.trendX} textAnchor="middle">{date}</text>
+                  </g>
+                );
+              })}
+            </svg>
+          )}
         </div>
 
         <div className={`${styles.card} ${styles.highCard}`}>
           <p className={styles.cardTitle}>HIGHEST COST DAY</p>
-          <p className={styles.highDay}>{HIGHEST_COST_DAY.day}</p>
-          <div className={styles.highRow}>
-            <p className={styles.highLabel}>SALES</p>
-            <p className={styles.highValue}>{fmtCurrency(HIGHEST_COST_DAY.sales)}</p>
-          </div>
-          <div className={styles.highRow}>
-            <p className={styles.highLabel}>PAYROLL</p>
-            <p className={styles.highValue}>{fmtCurrency(HIGHEST_COST_DAY.payroll)}</p>
-          </div>
-          <div className={styles.highDivider} />
-          <p className={styles.highLabel}>PAYROLL %</p>
-          <p className={`${styles.highPct} ${highestDayPct > TARGET_PAYROLL_PCT ? styles.highPctDanger : styles.highPctWarm}`}>
-            {fmtPct(highestDayPct)}
-          </p>
-          <p className={`${styles.highVsAvg} ${highestDayVsAvg > 0 ? styles.highVsAvgDanger : styles.highVsAvgWarm}`}>
-            {highestDayVsAvg >= 0 ? "+" : ""}{fmtPct(highestDayVsAvg)} vs weekly avg
-          </p>
+          {highestDay ? (
+            <>
+              <p className={styles.highDay}>{fmtDayLong(highestDay.date)}</p>
+              <div className={styles.highRow}>
+                <p className={styles.highLabel}>SHIFTS</p>
+                <p className={styles.highValue}>{highestDay.shifts}</p>
+              </div>
+              <div className={styles.highRow}>
+                <p className={styles.highLabel}>EST. PAYROLL</p>
+                <p className={styles.highValue}>{fmtCurrency(highestDay.cost)}</p>
+              </div>
+              <div className={styles.highDivider} />
+              <p className={styles.highLabel}>SHARE OF WEEK</p>
+              <p className={`${styles.highPct} ${currentWeek.estimatedCost > 0 && (highestDay.cost / currentWeek.estimatedCost) > 0.3 ? styles.highPctDanger : styles.highPctWarm}`}>
+                {currentWeek.estimatedCost > 0
+                  ? fmtPct((highestDay.cost / currentWeek.estimatedCost) * 100)
+                  : "—"}
+              </p>
+            </>
+          ) : (
+            <p className={styles.emptyChart}>No shifts rostered yet this week.</p>
+          )}
         </div>
       </section>
 
@@ -285,14 +411,23 @@ export default function InsightsPage() {
         </p>
         <ul className={styles.insightList}>
           <li>
-            Payroll % was {overTarget ? "above" : "below"} target at {fmtPct(payrollPct)} (target {fmtPct(TARGET_PAYROLL_PCT)}).
+            Estimated payroll for the week: {fmtCurrency(payrollCost)} across {currentWeek.totalShifts} shifts.
           </li>
-          <li>
-            {HIGHEST_COST_DAY.day} labour cost was higher than usual due to overtime.
-          </li>
-          <li>
-            Roster variance {variance >= 0 ? "increased" : "decreased"} by {fmtCurrency(Math.abs(variance))} compared to planned.
-          </li>
+          {prevPayrollCost > 0 && (
+            <li>
+              Estimated payroll {payrollVsLast >= 0 ? "increased" : "decreased"} by {fmtPct(Math.abs(payrollVsLast))} vs last week.
+            </li>
+          )}
+          {highestDay && (
+            <li>
+              {fmtDayLong(highestDay.date)} is currently the busiest day ({highestDay.shifts} shifts).
+            </li>
+          )}
+          {!hasSales && (
+            <li className={styles.insightMuted}>
+              Sales integration not connected — Payroll % and target comparison will activate once sales data is wired.
+            </li>
+          )}
         </ul>
       </section>
     </div>
@@ -302,8 +437,7 @@ export default function InsightsPage() {
 /* ── Trend chart geometry helper ── */
 
 function buildTrendChart(
-  data: { pct: number }[],
-  target: number,
+  data: WeekStats[],
 ): {
   width: number;
   height: number;
@@ -312,31 +446,35 @@ function buildTrendChart(
   padTop: number;
   padBottom: number;
   yLabels: { value: number; y: number }[];
-  targetY: number;
   linePath: string;
-  points: { x: number; y: number; pct: number }[];
+  points: { x: number; y: number; value: number }[];
 } {
   const width = 360;
   const height = 220;
-  const padLeft = 36;
-  const padRight = 60;
+  const padLeft = 56;
+  const padRight = 32;
   const padTop = 16;
   const padBottom = 38;
-  const yMin = 22;
-  const yMax = 30;
-  const yLabels = [30, 28, 26, 25, 22].map((v) => ({
-    value: v,
-    y: padTop + ((yMax - v) / (yMax - yMin)) * (height - padTop - padBottom),
-  }));
-  const targetY = padTop + ((yMax - target) / (yMax - yMin)) * (height - padTop - padBottom);
+  const values = data.map((w) => w.estimatedCost);
+  const maxRaw = Math.max(...values, 1);
+  const yMax = Math.ceil(maxRaw / 1000) * 1000 || 1000;
+  const yMin = 0;
+  const tickStep = Math.max(1000, Math.round(yMax / 4 / 1000) * 1000);
+  const yLabels: { value: number; y: number }[] = [];
+  for (let v = yMax; v >= yMin; v -= tickStep) {
+    yLabels.push({
+      value: v,
+      y: padTop + ((yMax - v) / (yMax - yMin)) * (height - padTop - padBottom),
+    });
+  }
   const xSpan = width - padLeft - padRight;
   const points = data.map((d, i) => ({
     x: padLeft + (data.length === 1 ? xSpan / 2 : (i / (data.length - 1)) * xSpan),
-    y: padTop + ((yMax - d.pct) / (yMax - yMin)) * (height - padTop - padBottom),
-    pct: d.pct,
+    y: padTop + ((yMax - d.estimatedCost) / (yMax - yMin)) * (height - padTop - padBottom),
+    value: d.estimatedCost,
   }));
   const linePath = points
     .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
     .join(" ");
-  return { width, height, padLeft, padRight, padTop, padBottom, yLabels, targetY, linePath, points };
+  return { width, height, padLeft, padRight, padTop, padBottom, yLabels, linePath, points };
 }
