@@ -42,6 +42,7 @@ function FishIcon() {
 }
 
 function SquidIcon() {
+  // Bullet-shaped mantle on top, two eyes, eight tentacles below.
   return (
     <svg
       width="26"
@@ -49,14 +50,25 @@ function SquidIcon() {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="1.4"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M12 3c-3 0-5 2-5 5v5c0 2 1 3 2 4l1 3m2-12c0 0 0 8 0 12m2-12c0 0 0 8 0 12m-6-5c0 0-1 2-2 2m10-2c0 0 1 2 2 2" />
-      <ellipse cx="12" cy="8" rx="5" ry="4" />
-      <circle cx="10" cy="7" r="0.8" fill="currentColor" stroke="none" />
-      <circle cx="14" cy="7" r="0.8" fill="currentColor" stroke="none" />
+      {/* Mantle (bullet shape) */}
+      <path d="M12 2.5c-3.4 0-5.5 2.5-5.5 5.5v4c0 1.8 1 2.8 2 3.4h7c1-.6 2-1.6 2-3.4V8c0-3-2.1-5.5-5.5-5.5z" />
+      {/* Fins */}
+      <path d="M6.5 9c-1.5 0.4-2.5 1.4-2.5 2.6 0 0.7 0.5 1.2 1 1.4" />
+      <path d="M17.5 9c1.5 0.4 2.5 1.4 2.5 2.6 0 0.7-0.5 1.2-1 1.4" />
+      {/* Eyes */}
+      <circle cx="9.8" cy="8.2" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="14.2" cy="8.2" r="0.8" fill="currentColor" stroke="none" />
+      {/* Tentacles */}
+      <path d="M8 15.5c-0.3 1.3-1.2 2.5-2 3.5" />
+      <path d="M9.5 15.7c-0.2 1.5-0.5 3-1 4.3" />
+      <path d="M11 15.8c-0.1 1.7-0.1 3.3 0.2 4.7" />
+      <path d="M13 15.8c0.1 1.7 0.1 3.3-0.2 4.7" />
+      <path d="M14.5 15.7c0.2 1.5 0.5 3 1 4.3" />
+      <path d="M16 15.5c0.3 1.3 1.2 2.5 2 3.5" />
     </svg>
   );
 }
