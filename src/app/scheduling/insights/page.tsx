@@ -298,19 +298,32 @@ export default function InsightsPage() {
   }, [currentWeek, currentWeekStart]);
 
   // Trend chart geometry — actual payroll when synced from Xero,
-  // estimated from roster otherwise. Mark each point's source so the
-  // chart can render them differently.
+  // estimated from roster otherwise. For each week we also compute
+  // payroll % (payroll / sales × 100) so the chart can plot the same
+  // metric the snapshot card highlights.
   const trendWithActuals = useMemo(
     () =>
       trend.map((w) => {
         const [y, m, d] = w.weekStartISO.split("-").map(Number);
         const start = new Date(y, m - 1, d);
         const resolved = actualOrEstimate(start, w.estimatedCost);
-        return { ...w, displayCost: resolved.value, isActual: resolved.isActual };
+        const weekSales = salesMap[w.weekStartISO]?.grossSales ?? 0;
+        const pct = weekSales > 0 ? (resolved.value / weekSales) * 100 : null;
+        return {
+          ...w,
+          displayCost: resolved.value,
+          isActual: resolved.isActual,
+          pct,
+          sales: weekSales,
+        };
       }),
-    [trend, payroll], // eslint-disable-line react-hooks/exhaustive-deps
+    [trend, payroll, salesMap], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const chart = useMemo(() => buildTrendChart(trendWithActuals), [trendWithActuals]);
+  const trendHasPct = trendWithActuals.some((w) => w.pct !== null);
+  const chart = useMemo(
+    () => buildTrendChart(trendWithActuals, trendHasPct, TARGET_PAYROLL_PCT),
+    [trendWithActuals, trendHasPct],
+  );
 
   // Comparison labels
   const compareSales = prevPayrollCost > 0
@@ -373,15 +386,35 @@ export default function InsightsPage() {
           </svg>
         </button>
         <h1 className={styles.title}>Roster Insight</h1>
-        <button type="button" className={styles.iconBtn} aria-label="Pick date range">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
+        <button
+          type="button"
+          className={styles.iconBtn}
+          onClick={handleRefresh}
+          disabled={refreshing}
+          aria-label="Refresh from Square / Xero"
+          title="Refresh from Square / Xero"
+        >
+          {refreshing ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" strokeDasharray="36 36" strokeDashoffset="0">
+                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite" />
+              </circle>
+            </svg>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          )}
         </button>
       </header>
+
+      {refreshError && (
+        <p style={{ fontSize: 12, color: "#c14545", textAlign: "center", margin: 0 }}>
+          {refreshError}
+        </p>
+      )}
 
       <div className={styles.weekRow}>
         <div className={styles.weekPickerWrap}>
@@ -528,7 +561,11 @@ export default function InsightsPage() {
         <div className={`${styles.card} ${styles.trendCard}`}>
           <p className={styles.cardTitle}>
             LABOUR TREND <span className={styles.cardTitleSub}>
-              ({trendWithActuals.some((w) => w.isActual) ? "ACTUAL · XERO" : "EST. COST"})
+              ({chart.pctMode
+                ? "PAYROLL %"
+                : trendWithActuals.some((w) => w.isActual)
+                  ? "ACTUAL · XERO"
+                  : "EST. COST"})
             </span>
           </p>
           {chart.points.every((p) => p.value === 0) ? (
@@ -537,14 +574,18 @@ export default function InsightsPage() {
             <svg className={styles.trendSvg} viewBox={`0 0 ${chart.width} ${chart.height}`} preserveAspectRatio="none">
               {chart.yLabels.map((y) => (
                 <text key={y.value} x={chart.padLeft - 6} y={y.y + 3} className={styles.trendAxis} textAnchor="end">
-                  {fmtCurrency(y.value)}
+                  {chart.pctMode ? `${y.value}%` : fmtCurrency(y.value)}
                 </text>
               ))}
               <path d={chart.linePath} className={styles.trendLine} />
               {chart.points.map((p, i) => {
+                if (p.y === null || p.value === null) return null;
                 const isLast = i === chart.points.length - 1;
                 // Anchor the last label to the right of its point so the
-                // dollar value can't spill past the chart edge.
+                // value label can't spill past the chart edge.
+                const label = chart.pctMode
+                  ? `${p.value.toFixed(1)}%`
+                  : fmtCurrency(p.value);
                 return (
                   <g key={i}>
                     <circle cx={p.x} cy={p.y} r={3.5} className={styles.trendDot} />
@@ -554,11 +595,38 @@ export default function InsightsPage() {
                       textAnchor={isLast ? "end" : "start"}
                       className={styles.trendValue}
                     >
-                      {fmtCurrency(p.value)}
+                      {label}
                     </text>
                   </g>
                 );
               })}
+              {chart.targetY !== null && (
+                <>
+                  <line
+                    x1={chart.padLeft}
+                    x2={chart.width - chart.padRight}
+                    y1={chart.targetY}
+                    y2={chart.targetY}
+                    stroke="var(--color-border)"
+                    strokeDasharray="4 4"
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={chart.width - chart.padRight + 4}
+                    y={chart.targetY - 2}
+                    className={styles.trendAxis}
+                  >
+                    Target
+                  </text>
+                  <text
+                    x={chart.width - chart.padRight + 4}
+                    y={chart.targetY + 12}
+                    className={styles.trendAxis}
+                  >
+                    {TARGET_PAYROLL_PCT.toFixed(1)}%
+                  </text>
+                </>
+              )}
               {chart.points.map((p, i) => {
                 const start = addDays(currentWeekStart, -7 * (TREND_WEEKS - 1 - i));
                 const label = `W${i + 1}`;
@@ -644,7 +712,9 @@ export default function InsightsPage() {
 /* ── Trend chart geometry helper ── */
 
 function buildTrendChart(
-  data: (WeekStats & { displayCost?: number; isActual?: boolean })[],
+  data: (WeekStats & { displayCost?: number; isActual?: boolean; pct?: number | null })[],
+  pctMode: boolean,
+  targetPct: number,
 ): {
   width: number;
   height: number;
@@ -652,9 +722,11 @@ function buildTrendChart(
   padRight: number;
   padTop: number;
   padBottom: number;
-  yLabels: { value: number; y: number }[];
+  yLabels: { value: number; y: number; isTarget?: boolean }[];
   linePath: string;
-  points: { x: number; y: number; value: number; isActual: boolean }[];
+  points: { x: number; y: number | null; value: number | null; isActual: boolean }[];
+  pctMode: boolean;
+  targetY: number | null;
 } {
   const width = 360;
   const height = 220;
@@ -662,19 +734,78 @@ function buildTrendChart(
   const padRight = 72;
   const padTop = 16;
   const padBottom = 38;
+  const xSpan = width - padLeft - padRight;
+
+  if (pctMode) {
+    const pctValues = data.map((w) => w.pct ?? 0).filter((v) => v > 0);
+    const maxRaw = Math.max(...pctValues, targetPct + 5);
+    const minRaw = Math.min(...pctValues, targetPct - 3);
+    const yMax = Math.ceil(maxRaw / 2) * 2;
+    const yMin = Math.max(0, Math.floor(minRaw / 2) * 2);
+    const tickStep = Math.max(2, Math.round((yMax - yMin) / 4 / 2) * 2);
+    const yLabels: { value: number; y: number; isTarget?: boolean }[] = [];
+    for (let v = yMax; v >= yMin; v -= tickStep) {
+      yLabels.push({
+        value: v,
+        y: padTop + ((yMax - v) / (yMax - yMin)) * (height - padTop - padBottom),
+      });
+    }
+    // Inject the target line as an extra label if it isn't already present.
+    if (!yLabels.some((l) => l.value === targetPct)) {
+      yLabels.push({
+        value: targetPct,
+        y: padTop + ((yMax - targetPct) / (yMax - yMin)) * (height - padTop - padBottom),
+        isTarget: true,
+      });
+    } else {
+      const t = yLabels.find((l) => l.value === targetPct);
+      if (t) t.isTarget = true;
+    }
+    const targetY = padTop + ((yMax - targetPct) / (yMax - yMin)) * (height - padTop - padBottom);
+
+    const points = data.map((d, i) => {
+      if (d.pct === null || d.pct === undefined || d.pct <= 0) {
+        return {
+          x: padLeft + (data.length === 1 ? xSpan / 2 : (i / (data.length - 1)) * xSpan),
+          y: null,
+          value: null,
+          isActual: !!d.isActual,
+        };
+      }
+      return {
+        x: padLeft + (data.length === 1 ? xSpan / 2 : (i / (data.length - 1)) * xSpan),
+        y: padTop + ((yMax - d.pct) / (yMax - yMin)) * (height - padTop - padBottom),
+        value: d.pct,
+        isActual: !!d.isActual,
+      };
+    });
+    // Build a path that breaks when a point is missing.
+    let linePath = "";
+    let drawingFromStart = true;
+    for (const p of points) {
+      if (p.y === null) {
+        drawingFromStart = true;
+        continue;
+      }
+      linePath += `${drawingFromStart ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)} `;
+      drawingFromStart = false;
+    }
+    return { width, height, padLeft, padRight, padTop, padBottom, yLabels, linePath: linePath.trim(), points, pctMode: true, targetY };
+  }
+
+  // Fallback: estimated cost chart (used until a week has Square sales).
   const values = data.map((w) => w.displayCost ?? w.estimatedCost);
   const maxRaw = Math.max(...values, 1);
   const yMax = Math.ceil(maxRaw / 1000) * 1000 || 1000;
   const yMin = 0;
   const tickStep = Math.max(1000, Math.round(yMax / 4 / 1000) * 1000);
-  const yLabels: { value: number; y: number }[] = [];
+  const yLabels: { value: number; y: number; isTarget?: boolean }[] = [];
   for (let v = yMax; v >= yMin; v -= tickStep) {
     yLabels.push({
       value: v,
       y: padTop + ((yMax - v) / (yMax - yMin)) * (height - padTop - padBottom),
     });
   }
-  const xSpan = width - padLeft - padRight;
   const points = data.map((d, i) => {
     const v = d.displayCost ?? d.estimatedCost;
     return {
@@ -685,7 +816,7 @@ function buildTrendChart(
     };
   });
   const linePath = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y!.toFixed(1)}`)
     .join(" ");
-  return { width, height, padLeft, padRight, padTop, padBottom, yLabels, linePath, points };
+  return { width, height, padLeft, padRight, padTop, padBottom, yLabels, linePath, points, pctMode: false, targetY: null };
 }
