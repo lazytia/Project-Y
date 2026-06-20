@@ -127,9 +127,33 @@
   gap: 6px;
   flex-shrink: 0;
   background: none;
-  border: none;
-  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  min-height: 44px;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: rgba(193, 69, 69, 0.15);
+  touch-action: manipulation;
+}
+
+.statusWrap:hover {
+  background: var(--color-surface);
+}
+
+.statusWrap:active {
+  background: var(--color-surface);
+  border-color: var(--color-warm);
+}
+
+.statusWrap:focus-visible {
+  outline: 2px solid var(--color-warm);
+  outline-offset: 2px;
+}
+
+.statusWrap:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 .statusDot {
@@ -160,11 +184,22 @@
   transition: transform 0.2s;
   display: flex;
   align-items: center;
+  justify-content: center;
   background: none;
   border: none;
-  padding: 4px;
+  padding: 0;
   margin: 0;
+  min-width: 36px;
+  min-height: 44px;
   cursor: pointer;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+
+.chevron:focus-visible {
+  outline: 2px solid var(--color-warm);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .chevronOpen {
