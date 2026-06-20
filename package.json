@@ -11,11 +11,11 @@
   "dependencies": {
     "firebase": "^11.0.2",
     "firebase-admin": "^14.0.0",
+    "googleapis": "^173.0.0",
     "next": "^15.5.7",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "square": "^44.2.0",
-    "xero-node": "^18.0.0"
+    "square": "^44.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

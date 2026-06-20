@@ -3,7 +3,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
-import { authedXeroClient } from "@/lib/xero";
+import { fetchWeeklyPayrollTotals } from "@/lib/payroll-sheet";
 import {
   fetchOrders,
   getSalesDayRange,
@@ -19,13 +19,13 @@ import {
  *
  * On-demand sync for the selected work week. Pulls:
  *   - Square Gross Sales for Mon → Sun of the week
- *   - Xero PayRun (gross + super) whose payment date falls in or just
- *     after the week
+ *   - Pay History "Total Inc Super" from the Google Sheet whose row
+ *     matches the selected week
  * and stores both in Firestore so the Insights dashboard can show the
  * actual % vs the 25% target.
  *
  * Cron-style sync (no owner session) still runs through /api/square/sync
- * and /api/xero/sync with the shared secret tokens.
+ * and /api/payroll/sync with the shared secret tokens.
  * ──────────────────────────────────────────────────────────────────── */
 
 const ORDER_STATES = ["OPEN", "COMPLETED"];
@@ -107,55 +107,36 @@ async function syncSquareWeek(mondayKey: string): Promise<{ grossSales: number; 
   return { grossSales, days: daysIncluded };
 }
 
-function inRange(d: Date, start: Date, end: Date): boolean {
-  return d.getTime() >= start.getTime() && d.getTime() <= end.getTime();
-}
+// Cache the Sheet read for a single POST so all 4 trend weeks share one
+// API call instead of pulling the whole spreadsheet four times.
+let cachedTotals: Record<string, { totalIncSuper: number }> | null = null;
 
-async function syncXeroWeek(weekStart: Date): Promise<{ gross: number; super: number; payRunID: string | null } | null> {
-  let auth: { client: Awaited<ReturnType<typeof authedXeroClient>>["client"]; tenantId: string };
-  try {
-    auth = await authedXeroClient();
-  } catch {
-    return null; // Xero not connected yet — skip silently
+async function syncPayrollWeekFromSheet(
+  weekStart: Date,
+): Promise<{ gross: number; super: number } | null> {
+  if (!cachedTotals) {
+    try {
+      cachedTotals = await fetchWeeklyPayrollTotals();
+    } catch (err) {
+      // Don't kill the whole request if the Sheet read fails.
+      throw err;
+    }
   }
-  const { client, tenantId } = auth;
-  const list = await client.payrollAUApi.getPayRuns(tenantId);
-  const runs = list.body?.payRuns ?? [];
-  // Pay run is paid on or shortly after the work week. Match on payment
-  // date within [weekStart, weekStart + 13 days] (Mon of next-next week).
-  const windowEnd = addDays(weekStart, 13);
-  let bestMatch: { gross: number; super: number; payRunID: string | null } | null = null;
-  for (const r of runs) {
-    const payDateStr = r.paymentDate ?? r.payRunPeriodEndDate;
-    if (!payDateStr) continue;
-    const m = /\/Date\((\d+)/.exec(String(payDateStr));
-    const payDate = m ? new Date(parseInt(m[1], 10)) : new Date(String(payDateStr));
-    if (!inRange(payDate, weekStart, windowEnd)) continue;
-    const detail = await client.payrollAUApi.getPayRun(tenantId, r.payRunID ?? "");
-    const full = detail.body?.payRuns?.[0];
-    if (!full) continue;
-    const gross = Number(full.wages ?? 0);
-    const superCost = Number(
-      (full as unknown as { super?: number; _super?: number }).super ??
-        (full as unknown as { _super?: number })._super ??
-        0,
-    );
-    bestMatch = { gross, super: superCost, payRunID: r.payRunID ?? null };
-    await adminDb().collection("payroll_weekly").doc(isoOf(weekStart)).set(
-      {
-        weekStartISO: isoOf(weekStart),
-        payDate: Timestamp.fromDate(payDate),
-        gross,
-        super: superCost,
-        source: "xero",
-        payRunID: r.payRunID ?? null,
-        syncedAt: Timestamp.now(),
-      },
-      { merge: true },
-    );
-    break;
-  }
-  return bestMatch;
+  const key = isoOf(weekStart);
+  const row = cachedTotals[key];
+  if (!row) return null;
+  await adminDb().collection("payroll_weekly").doc(key).set(
+    {
+      weekStartISO: key,
+      gross: row.totalIncSuper,
+      super: 0,
+      totalIncSuper: row.totalIncSuper,
+      source: "google-sheet",
+      syncedAt: Timestamp.now(),
+    },
+    { merge: true },
+  );
+  return { gross: row.totalIncSuper, super: 0 };
 }
 
 export async function POST(req: NextRequest) {
@@ -204,26 +185,28 @@ export async function POST(req: NextRequest) {
     out.square = { grossSales: selected.grossSales, days: selected.days, perWeek: sqResults };
   }
 
-  const xeResults: { iso: string; gross: number; super: number }[] = [];
-  let xeError: string | null = null;
-  let anyXero = false;
+  // Reset the cache so this POST does exactly one Sheet fetch.
+  cachedTotals = null;
+  const payResults: { iso: string; gross: number; super: number }[] = [];
+  let payError: string | null = null;
+  let anyPay = false;
   for (const w of weeksToSync) {
     try {
-      const r = await syncXeroWeek(w.date);
+      const r = await syncPayrollWeekFromSheet(w.date);
       if (r) {
-        xeResults.push({ iso: w.iso, gross: r.gross, super: r.super });
-        anyXero = true;
+        payResults.push({ iso: w.iso, gross: r.gross, super: r.super });
+        anyPay = true;
       }
     } catch (err) {
-      xeError = err instanceof Error ? err.message : "Xero sync failed.";
+      payError = err instanceof Error ? err.message : "Payroll sync failed.";
       break;
     }
   }
-  if (xeError) {
-    out.xero = { error: xeError };
-  } else if (anyXero) {
-    const selected = xeResults.find((r) => r.iso === mondayKey) ?? xeResults[0];
-    out.xero = { gross: selected.gross, super: selected.super, payRunID: null, perWeek: xeResults };
+  if (payError) {
+    out.xero = { error: payError };
+  } else if (anyPay) {
+    const selected = payResults.find((r) => r.iso === mondayKey) ?? payResults[0];
+    out.xero = { gross: selected.gross, super: selected.super, payRunID: null, perWeek: payResults };
   } else {
     out.xero = null;
   }
