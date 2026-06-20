@@ -113,7 +113,7 @@
 
 .snapshotValue {
   margin: 0;
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
@@ -247,7 +247,7 @@
 }
 
 @media (max-width: 640px) {
-  .snapshotValue { font-size: 22px; }
+  .snapshotValue { font-size: 18px; }
   .pvaGrid { grid-template-columns: 1fr; }
   .pvaOp { display: none; }
   .twoCol { grid-template-columns: 1fr; }
