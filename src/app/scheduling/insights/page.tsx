@@ -372,11 +372,12 @@ export default function InsightsPage() {
       const rosterCost = day?.cost ?? 0;
       const shifts = day?.shifts ?? 0;
       const dailySales = dailySalesMap[iso]?.grossSales ?? 0;
-      if (rosterCost === 0 && shifts === 0 && dailySales === 0) continue;
       totalRosterCost += rosterCost;
       totalDailySales += dailySales;
       days.push({ iso, date: d, rosterCost, shifts, dailySales });
     }
+    // Always show a card — pick by whichever metric has signal, even
+    // if it's only weekly data we can prorate.
     if (days.length === 0) return null;
 
     // Pick the winner by whichever metric we have signal for.

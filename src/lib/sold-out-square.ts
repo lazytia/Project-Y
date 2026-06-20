@@ -1,14 +1,16 @@
 /**
  * Shared helpers for syncing the Daily Sold Out state to Square.
  *
- * Strategy (both at once, so dashboard + POS reflect the change):
- *  1. Flip the ITEM's `presentAtAllLocations` flag → drives the
- *     Available/Unavailable Status pill in Square Dashboard's
- *     "Manage inventory" section.
- *  2. Flip each ITEM_VARIATION's per-location `soldOut` override →
- *     drives the red "Sold Out" badge on POS + Online Ordering.
+ * Strategy: flip the ITEM's location presence so the Square Dashboard
+ * Manage Inventory pill shows Unavailable and POS + Online Ordering
+ * hide the item. We deliberately do NOT touch each variation's
+ * locationOverrides[].soldOut — when the parent item is removed from
+ * a location, Square rejects variation overrides that still reference
+ * that location ("ITEM_VARIATION is enabled at location X, but the
+ * referenced object of type ITEM is not"), so the two signals are
+ * mutually exclusive.
  */
-import { squareClient, squareEnv } from "@/lib/square";
+import { squareClient } from "@/lib/square";
 
 export type CategoryDef = {
   id: string;
@@ -22,26 +24,6 @@ export const SOLD_OUT_CATEGORIES: CategoryDef[] = [
   { id: "tuna", match: /\btuna\b/i },
 ];
 
-type LocationOverride = {
-  locationId?: string;
-  soldOut?: boolean;
-  soldOutValidUntil?: string;
-  [k: string]: unknown;
-};
-
-type Variation = {
-  id?: string;
-  type?: string;
-  version?: number | bigint;
-  itemVariationData?: {
-    name?: string;
-    itemId?: string;
-    locationOverrides?: LocationOverride[];
-    [k: string]: unknown;
-  };
-  [k: string]: unknown;
-};
-
 type CatalogObject = {
   id?: string;
   type?: string;
@@ -52,7 +34,6 @@ type CatalogObject = {
     name?: string;
     categories?: { id?: string }[];
     categoryId?: string;
-    variations?: Variation[];
   };
   [k: string]: unknown;
 };
@@ -64,23 +45,6 @@ async function listAllCatalog(): Promise<CatalogObject[]> {
     out.push(obj as CatalogObject);
   }
   return out;
-}
-
-let cachedLocationIds: string[] | null = null;
-async function listLocationIds(): Promise<string[]> {
-  if (cachedLocationIds) return cachedLocationIds;
-  const ids = new Set<string>();
-  if (squareEnv.locationId) ids.add(squareEnv.locationId);
-  if (squareEnv.platterLocationId) ids.add(squareEnv.platterLocationId);
-  try {
-    const resp = await squareClient.locations.list();
-    const list = (resp as { locations?: { id?: string }[] }).locations ?? [];
-    for (const loc of list) if (loc.id) ids.add(loc.id);
-  } catch {
-    // fall back to env-derived ids only
-  }
-  cachedLocationIds = Array.from(ids);
-  return cachedLocationIds;
 }
 
 function itemsInCategory(all: CatalogObject[], cfg: CategoryDef): CatalogObject[] {
@@ -103,49 +67,21 @@ function itemsInCategory(all: CatalogObject[], cfg: CategoryDef): CatalogObject[
 
 type UpsertObject = Parameters<typeof squareClient.catalog.object.upsert>[0]["object"];
 
-function withSoldOut(
-  v: Variation,
-  locationIds: string[],
-  soldOut: boolean,
-): Variation {
-  const existing = v.itemVariationData?.locationOverrides ?? [];
-  const byId = new Map<string, LocationOverride>();
-  for (const o of existing) if (o.locationId) byId.set(o.locationId, { ...o });
-  for (const id of locationIds) {
-    const cur = byId.get(id) ?? { locationId: id };
-    cur.soldOut = soldOut;
-    byId.set(id, cur);
-  }
-  return {
-    ...v,
-    type: "ITEM_VARIATION",
-    version: typeof v.version === "number" ? BigInt(v.version) : v.version,
-    itemVariationData: {
-      ...(v.itemVariationData ?? {}),
-      locationOverrides: Array.from(byId.values()),
-    },
-  };
-}
-
 async function applyToCategory(
   cfg: CategoryDef,
   all: CatalogObject[],
-  locationIds: string[],
   available: boolean,
 ): Promise<number> {
   const items = itemsInCategory(all, cfg);
   let updated = 0;
   for (const it of items) {
     if (!it.id) continue;
-    const stamp = Date.now();
-
-    // 1. Flip the Manage Inventory Status pill.
-    //    Unavailable everywhere: present_at_all_locations=false +
-    //    present_at_location_ids=[] (the item is present at no locations).
-    //    Available everywhere: present_at_all_locations=true +
-    //    present_at_location_ids=[] + absent_at_location_ids=[].
-    //    Spread the existing item first, then overwrite the three flags
-    //    explicitly so stale values from the catalog don't leak through.
+    // Unavailable everywhere: present_at_all_locations=false +
+    // present_at_location_ids=[] (the item is present at no locations).
+    // Available everywhere: present_at_all_locations=true +
+    // both lists empty.
+    // Spread the existing item first, then overwrite the three flags
+    // explicitly so stale values from the catalog don't leak through.
     const nextItem = {
       ...(it as Record<string, unknown>),
       type: "ITEM",
@@ -156,23 +92,10 @@ async function applyToCategory(
       absentAtLocationIds: [],
     } as UpsertObject;
     await squareClient.catalog.object.upsert({
-      idempotencyKey: `sold-out-item-${cfg.id}-${available ? "in" : "out"}-${it.id}-${stamp}`,
+      idempotencyKey: `sold-out-${cfg.id}-${available ? "in" : "out"}-${it.id}-${Date.now()}`,
       object: nextItem,
     });
     updated += 1;
-
-    // 2. Flip each variation's per-location soldOut override
-    //    (drives the red Sold Out badge on POS + Online Ordering).
-    const variations = it.itemData?.variations ?? [];
-    for (const v of variations) {
-      if (!v.id) continue;
-      const nextVar = withSoldOut(v, locationIds, !available);
-      await squareClient.catalog.object.upsert({
-        idempotencyKey: `sold-out-var-${cfg.id}-${available ? "in" : "out"}-${v.id}-${stamp}`,
-        object: nextVar as UpsertObject,
-      });
-      updated += 1;
-    }
   }
   return updated;
 }
@@ -180,18 +103,15 @@ async function applyToCategory(
 export async function setCategoryPresence(categoryId: string, available: boolean): Promise<number> {
   const cfg = SOLD_OUT_CATEGORIES.find((c) => c.id === categoryId);
   if (!cfg) throw new Error(`Unknown sold-out category: ${categoryId}`);
-  const [all, locationIds] = await Promise.all([listAllCatalog(), listLocationIds()]);
-  if (locationIds.length === 0) {
-    throw new Error("No Square locations resolved — cannot toggle sold-out.");
-  }
-  return applyToCategory(cfg, all, locationIds, available);
+  const all = await listAllCatalog();
+  return applyToCategory(cfg, all, available);
 }
 
 export async function restoreAllCategories(): Promise<{ category: string; restored: number }[]> {
-  const [all, locationIds] = await Promise.all([listAllCatalog(), listLocationIds()]);
+  const all = await listAllCatalog();
   const result: { category: string; restored: number }[] = [];
   for (const cfg of SOLD_OUT_CATEGORIES) {
-    const restored = await applyToCategory(cfg, all, locationIds, true);
+    const restored = await applyToCategory(cfg, all, true);
     result.push({ category: cfg.id, restored });
   }
   return result;
