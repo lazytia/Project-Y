@@ -2,23 +2,37 @@
 
 import { useEffect, useState } from "react";
 import { getDb } from "@/lib/firebase";
-import {
-  collection,
-  doc,
-  getDocs,
-  onSnapshot,
-  setDoc,
-  orderBy,
-  query,
-} from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import styles from "./page.module.css";
 
 type Category = {
   id: string;
   name: string;
   items: string[];
-  order: number;
 };
+
+const CATEGORIES: Category[] = [
+  {
+    id: "squid",
+    name: "SQUID",
+    items: ["Squid Karaage", "Squid Sashimi", "Squid Salad"],
+  },
+  {
+    id: "snapper",
+    name: "SNAPPER",
+    items: ["Snapper Aburi", "Snapper Sashimi", "Snapper Sushi", "Spicy Snapper Tataki"],
+  },
+  {
+    id: "trevally",
+    name: "TREVALLY",
+    items: ["Trevally Aburi", "Trevally Sashimi", "Trevally Sushi", "Spicy Trevally Tataki"],
+  },
+  {
+    id: "tuna",
+    name: "TUNA",
+    items: ["Tuna Aburi", "Tuna Sashimi", "Tuna Sushi", "Spicy Tuna Tataki"],
+  },
+];
 
 function FishIcon() {
   return (
@@ -59,20 +73,8 @@ function ChevronIcon() {
 export default function DailySoldOutPage() {
   const today = new Date().toLocaleDateString("en-CA");
 
-  const [categories, setCategories] = useState<Category[]>([]);
   const [soldOutIds, setSoldOutIds] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const db = getDb();
-    getDocs(query(collection(db, "sold_out_categories"), orderBy("order"))).then(
-      (snap) => {
-        setCategories(
-          snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Category, "id">) }))
-        );
-      }
-    );
-  }, []);
 
   useEffect(() => {
     const db = getDb();
@@ -118,97 +120,91 @@ export default function DailySoldOutPage() {
         </p>
       </div>
 
-      {categories.length === 0 ? (
-        <p className={styles.empty}>No categories configured.</p>
-      ) : (
-        <ul className={styles.list}>
-          {categories.map((cat) => {
-            const isSoldOut = soldOutIds.includes(cat.id);
-            const isOpen = expanded.has(cat.id);
-            return (
-              <li key={cat.id} className={styles.categoryCard}>
+      <ul className={styles.list}>
+        {CATEGORIES.map((cat) => {
+          const isSoldOut = soldOutIds.includes(cat.id);
+          const isOpen = expanded.has(cat.id);
+          return (
+            <li key={cat.id} className={styles.categoryCard}>
+              <div
+                className={styles.categoryRow}
+                onClick={() => toggleExpanded(cat.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === "Enter" && toggleExpanded(cat.id)}
+              >
                 <div
-                  className={styles.categoryRow}
-                  onClick={() => toggleExpanded(cat.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && toggleExpanded(cat.id)}
+                  className={`${styles.categoryIcon} ${isSoldOut ? styles.categoryIconSoldOut : ""}`}
                 >
-                  <div
-                    className={`${styles.categoryIcon} ${isSoldOut ? styles.categoryIconSoldOut : ""}`}
-                  >
-                    <FishIcon />
-                  </div>
-
-                  <div className={styles.categoryInfo}>
-                    <div
-                      className={`${styles.categoryName} ${isSoldOut ? styles.categoryNameSoldOut : ""}`}
-                    >
-                      {cat.name}
-                    </div>
-                    <div
-                      className={`${styles.categoryCount} ${isSoldOut ? styles.categoryCountSoldOut : ""}`}
-                    >
-                      {cat.items.length} item{cat.items.length !== 1 ? "s" : ""}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className={styles.statusWrap}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSoldOut(cat.id);
-                    }}
-                    aria-label={
-                      isSoldOut
-                        ? `Mark ${cat.name} as available`
-                        : `Mark ${cat.name} as sold out`
-                    }
-                  >
-                    <div
-                      className={`${styles.statusDot} ${isSoldOut ? styles.statusDotSoldOut : ""}`}
-                    />
-                    <span
-                      className={`${styles.statusLabel} ${isSoldOut ? styles.statusLabelSoldOut : ""}`}
-                    >
-                      {isSoldOut ? "SOLD OUT TODAY" : "AVAILABLE"}
-                    </span>
-                  </button>
-
-                  <span
-                    className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ""}`}
-                  >
-                    <ChevronIcon />
-                  </span>
+                  <FishIcon />
                 </div>
 
-                {isOpen && cat.items.length > 0 && (
-                  <ul className={styles.itemList}>
-                    {cat.items.map((item) => (
-                      <li key={item} className={styles.item}>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                <div className={styles.categoryInfo}>
+                  <div
+                    className={`${styles.categoryName} ${isSoldOut ? styles.categoryNameSoldOut : ""}`}
+                  >
+                    {cat.name}
+                  </div>
+                  <div
+                    className={`${styles.categoryCount} ${isSoldOut ? styles.categoryCountSoldOut : ""}`}
+                  >
+                    {cat.items.length} item{cat.items.length !== 1 ? "s" : ""}
+                  </div>
+                </div>
 
-      {categories.length > 0 && (
-        <div className={styles.summary}>
-          <div className={styles.summaryBadge}>{soldOutCount}</div>
-          <div className={styles.summaryTitle}>
-            {soldOutCount === 1
-              ? "ONE ITEM CATEGORY SOLD OUT UNTIL TONIGHT"
-              : `${soldOutCount === 0 ? "NO" : soldOutCount} CATEGORIES SOLD OUT UNTIL TONIGHT`}
-          </div>
-          <div className={styles.summaryReset}>Resets tomorrow automatically.</div>
+                <button
+                  type="button"
+                  className={styles.statusWrap}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleSoldOut(cat.id);
+                  }}
+                  aria-label={
+                    isSoldOut
+                      ? `Mark ${cat.name} as available`
+                      : `Mark ${cat.name} as sold out`
+                  }
+                >
+                  <div
+                    className={`${styles.statusDot} ${isSoldOut ? styles.statusDotSoldOut : ""}`}
+                  />
+                  <span
+                    className={`${styles.statusLabel} ${isSoldOut ? styles.statusLabelSoldOut : ""}`}
+                  >
+                    {isSoldOut ? "SOLD OUT TODAY" : "AVAILABLE"}
+                  </span>
+                </button>
+
+                <span
+                  className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ""}`}
+                >
+                  <ChevronIcon />
+                </span>
+              </div>
+
+              {isOpen && cat.items.length > 0 && (
+                <ul className={styles.itemList}>
+                  {cat.items.map((item) => (
+                    <li key={item} className={styles.item}>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className={styles.summary}>
+        <div className={styles.summaryBadge}>{soldOutCount}</div>
+        <div className={styles.summaryTitle}>
+          {soldOutCount === 1
+            ? "ONE ITEM CATEGORY SOLD OUT UNTIL TONIGHT"
+            : `${soldOutCount === 0 ? "NO" : soldOutCount} CATEGORIES SOLD OUT UNTIL TONIGHT`}
         </div>
-      )}
+        <div className={styles.summaryReset}>Resets tomorrow automatically.</div>
+      </div>
     </div>
   );
 }
