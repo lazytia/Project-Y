@@ -30,6 +30,7 @@ type CatalogObject = {
     categories?: { id?: string }[];
     categoryId?: string;
   };
+  [k: string]: unknown;
 };
 
 /** Pull every ITEM + CATEGORY from the Square catalog. */
@@ -78,11 +79,12 @@ export async function setCategoryPresence(categoryId: string, available: boolean
     await squareClient.catalog.object.upsert({
       idempotencyKey,
       object: {
+        ...(it as Record<string, unknown>),
         type: "ITEM",
         id: it.id,
         version: typeof it.version === "number" ? BigInt(it.version) : it.version,
         presentAtAllLocations: available,
-      },
+      } as Parameters<typeof squareClient.catalog.object.upsert>[0]["object"],
     });
     updated += 1;
   }
@@ -106,11 +108,12 @@ export async function restoreAllCategories(): Promise<{ category: string; restor
       await squareClient.catalog.object.upsert({
         idempotencyKey,
         object: {
+          ...(it as Record<string, unknown>),
           type: "ITEM",
           id: it.id,
           version: typeof it.version === "number" ? BigInt(it.version) : it.version,
           presentAtAllLocations: true,
-        },
+        } as Parameters<typeof squareClient.catalog.object.upsert>[0]["object"],
       });
       restored += 1;
     }
