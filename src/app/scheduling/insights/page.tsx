@@ -38,6 +38,8 @@ const TREND_WEEKS = 4; // current + previous 3
 
 type Meal = "lunch" | "dinner";
 
+type StaffRate = { weekRate: number; satRate: number };
+
 type WeekDoc = {
   assignments?: Record<string, Record<Meal, Record<string, string>>>;
 };
@@ -132,7 +134,7 @@ function fmtWeekShortDate(d: Date): string {
   return d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
-function aggregateWeek(weekStart: Date, doc: WeekDoc | undefined): WeekStats {
+function aggregateWeek(weekStart: Date, doc: WeekDoc | undefined, rates: Record<string, StaffRate>): WeekStats {
   const stats: WeekStats = {
     weekStartISO: isoDate(weekStart),
     totalShifts: 0,
@@ -142,16 +144,25 @@ function aggregateWeek(weekStart: Date, doc: WeekDoc | undefined): WeekStats {
   for (let i = 0; i < 7; i += 1) {
     const d = addDays(weekStart, i);
     const iso = isoDate(d);
-    const lunchKeys = Object.keys(doc?.assignments?.[iso]?.lunch ?? {});
-    const dinnerKeys = Object.keys(doc?.assignments?.[iso]?.dinner ?? {});
-    const lunchShifts = lunchKeys.length;
-    const dinnerShifts = dinnerKeys.length;
-    const cost =
-      lunchShifts * LUNCH_HOURS * EST_HOURLY_RATE +
-      dinnerShifts * DINNER_HOURS * EST_HOURLY_RATE;
-    stats.byDay[iso] = { shifts: lunchShifts + dinnerShifts, cost };
-    stats.totalShifts += lunchShifts + dinnerShifts;
-    stats.estimatedCost += cost;
+    const lunchUids = Object.keys(doc?.assignments?.[iso]?.lunch ?? {});
+    const dinnerUids = Object.keys(doc?.assignments?.[iso]?.dinner ?? {});
+    const isSaturday = d.getDay() === 6;
+
+    let dayCost = 0;
+    for (const uid of lunchUids) {
+      const weekRate = rates[uid]?.weekRate ?? EST_HOURLY_RATE;
+      const actualRate = isSaturday ? (rates[uid]?.satRate ?? weekRate) : weekRate;
+      dayCost += LUNCH_HOURS * actualRate;
+    }
+    for (const uid of dinnerUids) {
+      const weekRate = rates[uid]?.weekRate ?? EST_HOURLY_RATE;
+      const actualRate = isSaturday ? (rates[uid]?.satRate ?? weekRate) : weekRate;
+      dayCost += DINNER_HOURS * actualRate;
+    }
+
+    stats.byDay[iso] = { shifts: lunchUids.length + dinnerUids.length, cost: dayCost };
+    stats.totalShifts += lunchUids.length + dinnerUids.length;
+    stats.estimatedCost += dayCost;
   }
   return stats;
 }
@@ -164,6 +175,7 @@ export default function InsightsPage() {
   const [docs, setDocs] = useState<Record<string, WeekDoc>>({});
   const [payroll, setPayroll] = useState<Record<string, WeeklyPayroll>>({});
   const [salesMap, setSalesMap] = useState<Record<string, WeeklySales>>({});
+  const [staffRates, setStaffRates] = useState<Record<string, StaffRate>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -196,6 +208,27 @@ export default function InsightsPage() {
         const map: Record<string, WeeklySales> = {};
         for (const d of snap.docs) map[d.id] = d.data() as WeeklySales;
         setSalesMap(map);
+      } catch {
+        /* keep empty */
+      }
+      try {
+        const snap = await getDocs(collection(getDb(), "staff_onboarding"));
+        const map: Record<string, StaffRate> = {};
+        for (const d of snap.docs) {
+          const data = d.data() as Record<string, unknown>;
+          const weekRate =
+            (typeof data.weekRate === "number" ? data.weekRate : undefined) ??
+            (typeof data.weeklyRate === "number" ? data.weeklyRate : undefined) ??
+            (typeof data.hourlyRate === "number" ? data.hourlyRate : undefined) ??
+            (typeof data.baseRate === "number" ? data.baseRate : undefined) ??
+            EST_HOURLY_RATE;
+          const satRate =
+            (typeof data.satRate === "number" ? data.satRate : undefined) ??
+            (typeof data.saturdayRate === "number" ? data.saturdayRate : undefined) ??
+            weekRate;
+          map[d.id] = { weekRate, satRate };
+        }
+        setStaffRates(map);
       } catch {
         /* keep empty */
       }
@@ -236,12 +269,12 @@ export default function InsightsPage() {
 
   // Aggregations
   const currentWeek = useMemo(
-    () => aggregateWeek(currentWeekStart, docs[isoDate(currentWeekStart)]),
-    [currentWeekStart, docs],
+    () => aggregateWeek(currentWeekStart, docs[isoDate(currentWeekStart)], staffRates),
+    [currentWeekStart, docs, staffRates],
   );
   const prevWeek = useMemo(
-    () => aggregateWeek(prevWeekStart, docs[isoDate(prevWeekStart)]),
-    [prevWeekStart, docs],
+    () => aggregateWeek(prevWeekStart, docs[isoDate(prevWeekStart)], staffRates),
+    [prevWeekStart, docs, staffRates],
   );
 
   // Trend (last TREND_WEEKS including current)
@@ -249,10 +282,10 @@ export default function InsightsPage() {
     const out: WeekStats[] = [];
     for (let i = TREND_WEEKS - 1; i >= 0; i -= 1) {
       const start = addDays(currentWeekStart, -7 * i);
-      out.push(aggregateWeek(start, docs[isoDate(start)]));
+      out.push(aggregateWeek(start, docs[isoDate(start)], staffRates));
     }
     return out;
-  }, [currentWeekStart, docs]);
+  }, [currentWeekStart, docs, staffRates]);
 
   // Resolve actual payroll (gross + super) from payroll_weekly when
   // it's been synced; otherwise fall back to the roster estimate.
