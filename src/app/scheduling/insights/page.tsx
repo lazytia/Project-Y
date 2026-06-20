@@ -35,10 +35,10 @@ const EST_HOURLY_RATE = 25;
 const LUNCH_END_H = 14;   // 2:00 pm
 const DINNER_END_H = 21;  // 9:00 pm
 
-function shiftHours(startTime: string, endHour: number): number {
-  if (!startTime) return 0;
+function shiftHours(startTime: string, endHour: number, fallbackHours: number): number {
+  if (!startTime) return fallbackHours;
   const [h, m] = startTime.split(":").map(Number);
-  if (isNaN(h)) return 0;
+  if (isNaN(h) || h > 23) return fallbackHours; // old data stored staff name, not time
   return Math.max(0, endHour - h - (m ?? 0) / 60);
 }
 const TREND_WEEKS = 4; // current + previous 3
@@ -159,13 +159,13 @@ function aggregateWeek(weekStart: Date, doc: WeekDoc | undefined, rates: Record<
     for (const [uid, startTime] of Object.entries(lunchMap)) {
       const weekRate = rates[uid]?.weekRate ?? EST_HOURLY_RATE;
       const actualRate = isSaturday ? (rates[uid]?.satRate ?? weekRate) : weekRate;
-      const hours = shiftHours(startTime as string, LUNCH_END_H);
+      const hours = shiftHours(startTime as string, LUNCH_END_H, 4);
       dayCost += hours * actualRate;
     }
     for (const [uid, startTime] of Object.entries(dinnerMap)) {
       const weekRate = rates[uid]?.weekRate ?? EST_HOURLY_RATE;
       const actualRate = isSaturday ? (rates[uid]?.satRate ?? weekRate) : weekRate;
-      const hours = shiftHours(startTime as string, DINNER_END_H);
+      const hours = shiftHours(startTime as string, DINNER_END_H, 5);
       dayCost += hours * actualRate;
     }
 
@@ -726,9 +726,7 @@ export default function InsightsPage() {
               <p className={styles.highDay}>{fmtDayLong(highestDay.date)}</p>
               <div className={styles.highRow}>
                 <p className={styles.highLabel}>Sales $</p>
-                <p className={styles.highValue}>
-                  {hasSales ? fmtCurrency(sales / 6) : "—"}
-                </p>
+                <p className={styles.highValue}>—</p>
               </div>
               <div className={styles.highRow}>
                 <p className={styles.highLabel}>Payroll $</p>
