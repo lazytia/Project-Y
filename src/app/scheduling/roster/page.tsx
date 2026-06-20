@@ -241,6 +241,10 @@ export default function ManagerRosterPage() {
   const [prevWeekDoc, setPrevWeekDoc] = useState<RosterWeekDoc>({});
   const [modalCell, setModalCell] = useState<{ iso: string; meal: Meal; weekKey: string } | null>(null);
   const [warnSectionOpen, setWarnSectionOpen] = useState(true);
+  const [confirmAssign, setConfirmAssign] = useState<{
+    uid: string; name: string; startTime: string;
+    warnType: "holiday" | "unavailability"; cellDate: Date;
+  } | null>(null);
   const [noteModal, setNoteModal] = useState<{
     label: string; text: string; iso: string; weekKey: "current" | "next" | "prev";
   } | null>(null);
@@ -1230,7 +1234,18 @@ export default function ManagerRosterPage() {
                           type="button"
                           className={`${styles.staffStartBtn} ${assigned ? styles.staffStartBtnAssigned : ""}`}
                           disabled={savingShift}
-                          onClick={() => assignStaff(s.uid, pendingStart)}
+                          onClick={() => {
+                            if (s.warning) {
+                              setConfirmAssign({
+                                uid: s.uid, name: s.name,
+                                startTime: pendingStart,
+                                warnType: s.warning.type,
+                                cellDate,
+                              });
+                            } else {
+                              assignStaff(s.uid, pendingStart);
+                            }
+                          }}
                         >
                           {assigned ? `${assigned} Start` : `+ ${pendingStart} Start`}
                         </button>
@@ -1300,6 +1315,45 @@ export default function ManagerRosterPage() {
                   Done
                 </button>
               </footer>
+
+              {/* Confirm-assign overlay */}
+              {confirmAssign && (
+                <div className={styles.confirmOverlay} onClick={() => setConfirmAssign(null)}>
+                  <div className={styles.confirmCard} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.confirmIconWrap}>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+                      </svg>
+                    </div>
+                    <h3 className={styles.confirmTitle}>
+                      {confirmAssign.warnType === "holiday" ? "Holiday Approved" : "Unavailability Approved"}
+                    </h3>
+                    <p className={styles.confirmBody}>
+                      {confirmAssign.name} has approved {confirmAssign.warnType === "holiday" ? "holiday" : "unavailability"} on {DAY_LABELS_FULL[(confirmAssign.cellDate.getDay() + 6) % 7] ?? ""}, {fmtMonDay(confirmAssign.cellDate)}.
+                    </p>
+                    <p className={styles.confirmBody}>Do you want to assign this shift anyway?</p>
+                    <div className={styles.confirmBtns}>
+                      <button
+                        type="button"
+                        className={styles.confirmCancelBtn}
+                        onClick={() => setConfirmAssign(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.confirmProceedBtn}
+                        onClick={() => {
+                          assignStaff(confirmAssign.uid, confirmAssign.startTime);
+                          setConfirmAssign(null);
+                        }}
+                      >
+                        Assign Anyway
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );

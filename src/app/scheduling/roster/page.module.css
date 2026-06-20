@@ -546,6 +546,7 @@
   flex-direction: column;
   max-height: calc(100vh - 2 * var(--space-5));
   overflow: hidden;
+  position: relative;
 }
 
 .modalHead {
@@ -1013,3 +1014,89 @@
   .availDays { gap: 2px; }
   .availPill { font-size: 9px; padding: 2px 4px; }
 }
+
+/* ── Confirm-assign overlay ── */
+.confirmOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  z-index: 10;
+}
+
+.confirmCard {
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+  max-width: 300px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.confirmIconWrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-warm);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+  margin: 0;
+}
+
+.confirmBody {
+  font-size: 14px;
+  color: var(--color-fg-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.confirmBtns {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  width: 100%;
+}
+
+.confirmCancelBtn {
+  flex: 1;
+  height: 44px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.confirmProceedBtn {
+  flex: 1;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-warm);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+.confirmProceedBtn:hover { opacity: 0.9; }
