@@ -337,6 +337,25 @@ export default function InsightsPage() {
   const weekEnd = useMemo(() => addDays(currentWeekStart, 5), [currentWeekStart]); // Mon→Sat
   const prevWeekEnd = useMemo(() => addDays(prevWeekStart, 5), [prevWeekStart]);
 
+  // Auto-sync when the page first loads (and when the manager picks
+  // a different week). Runs in the background — the existing
+  // Firestore-read pass renders any stale data immediately so the
+  // page never blocks on Square / Xero round-trips.
+  const autoSyncedFor = useState<Set<string>>(() => new Set())[0];
+  useEffect(() => {
+    if (authLoading || loading || !user || !allowed) return;
+    if (refreshing) return;
+    if (autoSyncedFor.has(selectedWeekISO)) return;
+    autoSyncedFor.add(selectedWeekISO);
+    // Defer to the next tick so the initial Splash → page render
+    // finishes before we kick off the heavier sync call.
+    const id = setTimeout(() => {
+      void handleRefresh();
+    }, 50);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, loading, user, allowed, selectedWeekISO]);
+
   async function handleRefresh() {
     if (refreshing || !user) return;
     setRefreshing(true);
