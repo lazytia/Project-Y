@@ -12,15 +12,32 @@ import { getAuth } from "firebase-admin/auth";
  * `GOOGLE_APPLICATION_CREDENTIALS` to a service-account JSON if you need
  * to hit the admin APIs while developing.
  */
+function resolveProjectId(): string | undefined {
+  return (
+    process.env.GCLOUD_PROJECT ??
+    process.env.GOOGLE_CLOUD_PROJECT ??
+    process.env.FIREBASE_PROJECT_ID ??
+    // Fallback to the production project so verifyIdToken can match the
+    // public keys for tokens minted by the Firebase Auth web SDK.
+    "project-y-d04dc"
+  );
+}
+
 function ensureApp() {
   if (getApps().length > 0) return getApps()[0];
   // FIREBASE_SERVICE_ACCOUNT_JSON allows overriding with an explicit credential
   // (used for local dev). Otherwise fall back to ADC.
   const inlineCred = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
   if (inlineCred) {
-    return initializeApp({ credential: cert(JSON.parse(inlineCred)) });
+    return initializeApp({
+      credential: cert(JSON.parse(inlineCred)),
+      projectId: resolveProjectId(),
+    });
   }
-  return initializeApp({ credential: applicationDefault() });
+  return initializeApp({
+    credential: applicationDefault(),
+    projectId: resolveProjectId(),
+  });
 }
 
 export function adminMessaging() {

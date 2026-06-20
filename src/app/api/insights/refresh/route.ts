@@ -34,16 +34,23 @@ async function verifyOwner(req: NextRequest): Promise<{ ok: true } | { ok: false
   const header = req.headers.get("authorization") ?? "";
   const idToken = header.replace(/^Bearer\s+/i, "");
   if (!idToken) return { ok: false, status: 401, error: "Missing bearer token." };
+  let decoded;
   try {
-    const decoded = await adminAuth().verifyIdToken(idToken);
-    const username = emailToUsername(decoded.email).toLowerCase();
-    if (!OWNER_USERNAMES.has(username)) {
-      return { ok: false, status: 403, error: "Forbidden — owner only." };
-    }
-    return { ok: true };
-  } catch {
-    return { ok: false, status: 401, error: "Invalid bearer token." };
+    decoded = await adminAuth().verifyIdToken(idToken);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return { ok: false, status: 401, error: `Token verification failed: ${detail}` };
   }
+  const email = decoded.email ?? "";
+  const username = emailToUsername(email).toLowerCase();
+  if (!OWNER_USERNAMES.has(username)) {
+    return {
+      ok: false,
+      status: 403,
+      error: `Forbidden — owner only (signed in as "${email || decoded.uid}").`,
+    };
+  }
+  return { ok: true };
 }
 
 function parseIso(s: string): Date | null {

@@ -730,8 +730,8 @@ function buildTrendChart(
 } {
   const width = 360;
   const height = 220;
-  const padLeft = 56;
-  const padRight = 72;
+  const padLeft = 48;
+  const padRight = 56;
   const padTop = 16;
   const padBottom = 38;
   const xSpan = width - padLeft - padRight;
