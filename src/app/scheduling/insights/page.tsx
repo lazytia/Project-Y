@@ -662,9 +662,6 @@ export default function InsightsPage() {
               ? `${payrollVsLast >= 0 ? "+" : ""}${fmtPct(payrollVsLast)} vs last week`
               : payrollIsActual ? "Actual incl. super" : "Estimated"}
           </p>
-          {payrollIsActual && (
-            <span className={styles.sourcePill}>From Xero</span>
-          )}
         </div>
       </section>
 
@@ -680,7 +677,7 @@ export default function InsightsPage() {
           <span className={styles.pvaOp} aria-hidden="true">−</span>
           <div className={styles.pvaCol}>
             <p className={styles.pvaLabel}>
-              PAYROLL COST (ACTUAL){payrollIsActual && <span className={styles.pvaSource}> · Xero</span>}
+              PAYROLL COST (ACTUAL)
             </p>
             <p className={`${styles.pvaValue} ${styles.pvaValueWarm}`}>{fmtCurrency(payrollCost)}</p>
             <p className={styles.pvaMeta}>
