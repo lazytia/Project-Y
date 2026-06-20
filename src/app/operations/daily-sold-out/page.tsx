@@ -8,36 +8,19 @@ import styles from "./page.module.css";
 type Category = {
   id: string;
   name: string;
+  subName?: string;
   items: string[];
   icon: "squid" | "fish";
 };
 
-const CATEGORIES: Category[] = [
-  {
-    id: "squid",
-    name: "SQUID",
-    icon: "squid",
-    items: ["Squid Karaage", "Squid Sashimi", "Squid Salad"],
-  },
-  {
-    id: "snapper",
-    name: "SNAPPER",
-    icon: "fish",
-    items: ["Snapper Aburi", "Snapper Sashimi", "Snapper Sushi", "Spicy Snapper Tataki"],
-  },
-  {
-    id: "trevally",
-    name: "TREVALLY",
-    icon: "fish",
-    items: ["Trevally Aburi", "Trevally Sashimi", "Trevally Sushi", "Spicy Trevally Tataki"],
-  },
-  {
-    id: "tuna",
-    name: "TUNA",
-    icon: "fish",
-    items: ["Tuna Aburi", "Tuna Sashimi", "Tuna Sushi", "Spicy Tuna Tataki"],
-  },
-];
+type ApiCategory = {
+  categoryId: string;
+  displayName: string;
+  subName?: string;
+  itemCount: number;
+  resetRule: string;
+  affectedItems: string[];
+};
 
 function FishIcon() {
   return (
@@ -100,6 +83,8 @@ export default function DailySoldOutPage() {
 
   const [soldOutIds, setSoldOutIds] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuError, setMenuError] = useState<string | null>(null);
 
   useEffect(() => {
     const db = getDb();
@@ -113,6 +98,31 @@ export default function DailySoldOutPage() {
     });
     return unsub;
   }, [today]);
+
+  // Pull the live menu from Square so the page always reflects the
+  // catalog rather than a hard-coded item list.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/menu/sold-out-categories", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+        const list = (data?.dailySoldOutCategories ?? []) as ApiCategory[];
+        setCategories(
+          list.map((c) => ({
+            id: c.categoryId,
+            name: c.displayName.toUpperCase(),
+            subName: c.subName,
+            items: c.affectedItems,
+            icon: c.categoryId === "squid" ? "squid" : "fish",
+          })),
+        );
+        setMenuError(null);
+      } catch (err) {
+        setMenuError(err instanceof Error ? err.message : "Could not load menu.");
+      }
+    })();
+  }, []);
 
   async function toggleSoldOut(id: string) {
     const db = getDb();
@@ -150,8 +160,14 @@ export default function DailySoldOutPage() {
         </p>
       </div>
 
+      {menuError && (
+        <p style={{ fontSize: 12, color: "#c14545", textAlign: "center", margin: "8px 0 0" }}>
+          {menuError}
+        </p>
+      )}
+
       <ul className={styles.list}>
-        {CATEGORIES.map((cat) => {
+        {categories.map((cat) => {
           const isSoldOut = soldOutIds.includes(cat.id);
           const isOpen = expanded.has(cat.id);
           return (
@@ -174,6 +190,11 @@ export default function DailySoldOutPage() {
                     className={`${styles.categoryName} ${isSoldOut ? styles.categoryNameSoldOut : ""}`}
                   >
                     {cat.name}
+                    {cat.subName ? (
+                      <span style={{ fontWeight: 500, marginLeft: 6, opacity: 0.7 }}>
+                        ({cat.subName})
+                      </span>
+                    ) : null}
                   </div>
                   <div
                     className={`${styles.categoryCount} ${isSoldOut ? styles.categoryCountSoldOut : ""}`}
