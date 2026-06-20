@@ -349,6 +349,24 @@ export default function InsightsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? `Refresh failed (${res.status})`);
+      // Surface what each integration returned so we can see why a 200
+      // response can still leave the cards blank (Square location wrong,
+      // no orders for that week, Xero not connected yet, etc.).
+      const sq = data?.square;
+      const xe = data?.xero;
+      const sqMsg = sq?.error
+        ? `Square: ${sq.error}`
+        : typeof sq?.grossSales === "number"
+          ? `Square: $${sq.grossSales.toFixed(2)} (${sq.days} days)`
+          : "Square: no response";
+      const xeMsg = xe === null
+        ? "Xero: not connected yet — visit /api/xero/connect"
+        : xe?.error
+          ? `Xero: ${xe.error}`
+          : typeof xe?.gross === "number"
+            ? `Xero: gross $${xe.gross}, super $${xe.super}`
+            : "Xero: no matching pay run for that week";
+      setRefreshError(`${sqMsg}  |  ${xeMsg}`);
       // Re-read both Firestore maps after the sync wrote new docs.
       try {
         const snap = await getDocs(collection(getDb(), "payroll_weekly"));
@@ -411,7 +429,7 @@ export default function InsightsPage() {
       </header>
 
       {refreshError && (
-        <p style={{ fontSize: 12, color: "#c14545", textAlign: "center", margin: 0 }}>
+        <p style={{ fontSize: 12, color: refreshError.startsWith("Square:") ? "#1f8d5f" : "#c14545", textAlign: "center", margin: 0, padding: "0 8px", lineHeight: 1.4 }}>
           {refreshError}
         </p>
       )}
