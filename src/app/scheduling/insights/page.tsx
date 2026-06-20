@@ -342,25 +342,69 @@ export default function InsightsPage() {
   const overTarget = hasSales && payrollPct > TARGET_PAYROLL_PCT;
 
   // Highest cost day
+  // Rank by roster estimate when we have a published roster; otherwise
+  // fall back to daily sales (busiest day proxies for highest cost).
+  // Day's payroll is the roster estimate when present; if the weekly
+  // actual payroll is synced, prorate it across days using the sales
+  // share so the card shows real dollars instead of $0.
   const highestDay = useMemo(() => {
-    let best: { iso: string; date: Date; cost: number; shifts: number; dailySales: number } | null = null;
+    type Best = {
+      iso: string;
+      date: Date;
+      cost: number;
+      shifts: number;
+      dailySales: number;
+      shareOfWeek: number;
+    };
+    const days: Array<{
+      iso: string;
+      date: Date;
+      rosterCost: number;
+      shifts: number;
+      dailySales: number;
+    }> = [];
+    let totalRosterCost = 0;
+    let totalDailySales = 0;
     for (let i = 0; i < 7; i += 1) {
       const d = addDays(currentWeekStart, i);
       const iso = isoDate(d);
       const day = currentWeek.byDay[iso];
-      if (!day) continue;
-      if (!best || day.cost > best.cost) {
-        best = {
-          iso,
-          date: d,
-          cost: day.cost,
-          shifts: day.shifts,
-          dailySales: dailySalesMap[iso]?.grossSales ?? 0,
-        };
-      }
+      const rosterCost = day?.cost ?? 0;
+      const shifts = day?.shifts ?? 0;
+      const dailySales = dailySalesMap[iso]?.grossSales ?? 0;
+      if (rosterCost === 0 && shifts === 0 && dailySales === 0) continue;
+      totalRosterCost += rosterCost;
+      totalDailySales += dailySales;
+      days.push({ iso, date: d, rosterCost, shifts, dailySales });
     }
+    if (days.length === 0) return null;
+
+    // Pick the winner by whichever metric we have signal for.
+    const rankBySales = totalRosterCost === 0;
+    days.sort((a, b) =>
+      rankBySales ? b.dailySales - a.dailySales : b.rosterCost - a.rosterCost,
+    );
+    const top = days[0];
+
+    // Day's payroll: roster estimate if available; otherwise prorate
+    // the weekly actual by sales share so we still show a real number.
+    let dayPayroll = top.rosterCost;
+    if (dayPayroll === 0 && payrollCost > 0 && totalDailySales > 0) {
+      dayPayroll = payrollCost * (top.dailySales / totalDailySales);
+    }
+    const weekBase = payrollCost > 0 ? payrollCost : totalRosterCost;
+    const shareOfWeek = weekBase > 0 ? (dayPayroll / weekBase) * 100 : 0;
+
+    const best: Best = {
+      iso: top.iso,
+      date: top.date,
+      cost: dayPayroll,
+      shifts: top.shifts,
+      dailySales: top.dailySales,
+      shareOfWeek,
+    };
     return best;
-  }, [currentWeek, currentWeekStart, dailySalesMap]);
+  }, [currentWeek, currentWeekStart, dailySalesMap, payrollCost]);
 
   // Trend chart geometry — actual payroll when synced from Xero,
   // estimated from roster otherwise. For each week we also compute
@@ -761,10 +805,8 @@ export default function InsightsPage() {
               </div>
               <div className={styles.highDivider} />
               <p className={styles.highLabel}>SHARE OF WEEK</p>
-              <p className={`${styles.highPct} ${currentWeek.estimatedCost > 0 && (highestDay.cost / currentWeek.estimatedCost) > 0.3 ? styles.highPctDanger : styles.highPctWarm}`}>
-                {currentWeek.estimatedCost > 0
-                  ? fmtPct((highestDay.cost / currentWeek.estimatedCost) * 100)
-                  : "—"}
+              <p className={`${styles.highPct} ${highestDay.shareOfWeek > 30 ? styles.highPctDanger : styles.highPctWarm}`}>
+                {highestDay.shareOfWeek > 0 ? fmtPct(highestDay.shareOfWeek) : "—"}
               </p>
             </>
           ) : (

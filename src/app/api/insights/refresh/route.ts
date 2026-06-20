@@ -89,7 +89,19 @@ async function syncSquareWeek(mondayKey: string): Promise<{ grossSales: number; 
     let dayGross = 0;
     for (const o of orders) dayGross += squareGrossSalesCents(o);
     const refunds = await sumRefundCents(locationId, startAt, endAt);
-    weekGrossCents += dayGross - refunds;
+    const dayNetCents = dayGross - refunds;
+    await adminDb().collection("sales_daily").doc(dayKey).set(
+      {
+        dateISO: dayKey,
+        weekStartISO: mondayKey,
+        grossSales: Math.round(dayNetCents) / 100,
+        currency: "AUD",
+        source: "square",
+        syncedAt: Timestamp.now(),
+      },
+      { merge: true },
+    );
+    weekGrossCents += dayNetCents;
     daysIncluded += 1;
   }
   const grossSales = Math.round(weekGrossCents) / 100;
