@@ -139,19 +139,21 @@ async function applyToCategory(
     if (!it.id) continue;
     const stamp = Date.now();
 
-    // 1. Flip the Manage Inventory Status pill. Square uses
-    //    absent_at_location_ids for the per-location Unavailable toggle.
-    //    Setting it to the full location list makes every row show
-    //    "Unavailable"; clearing it (and re-asserting present_at_all)
-    //    restores them all to "Available".
+    // 1. Flip the Manage Inventory Status pill.
+    //    Unavailable everywhere: present_at_all_locations=false +
+    //    present_at_location_ids=[] (the item is present at no locations).
+    //    Available everywhere: present_at_all_locations=true +
+    //    present_at_location_ids=[] + absent_at_location_ids=[].
+    //    Spread the existing item first, then overwrite the three flags
+    //    explicitly so stale values from the catalog don't leak through.
     const nextItem = {
       ...(it as Record<string, unknown>),
       type: "ITEM",
       id: it.id,
       version: typeof it.version === "number" ? BigInt(it.version) : it.version,
-      presentAtAllLocations: true,
-      presentAtLocationIds: available ? locationIds : [],
-      absentAtLocationIds: available ? [] : locationIds,
+      presentAtAllLocations: available,
+      presentAtLocationIds: [],
+      absentAtLocationIds: [],
     } as UpsertObject;
     await squareClient.catalog.object.upsert({
       idempotencyKey: `sold-out-item-${cfg.id}-${available ? "in" : "out"}-${it.id}-${stamp}`,

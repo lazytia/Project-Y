@@ -55,6 +55,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, categoryId, soldOut, itemsUpdated: updated });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to update Square.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const detail =
+      err && typeof err === "object"
+        ? JSON.stringify(
+            { ...(err as Record<string, unknown>), message: msg },
+            (_k, v) => (typeof v === "bigint" ? v.toString() : v),
+          )
+        : msg;
+    console.error("[set-sold-out] Square upsert failed:", detail);
+    return NextResponse.json({ error: msg, detail }, { status: 500 });
   }
 }
