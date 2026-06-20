@@ -215,44 +215,44 @@ export default function DailySoldOutPage() {
           const isOpen = expanded.has(cat.id);
           return (
             <li key={cat.id} className={styles.categoryCard}>
-              <div
-                className={styles.categoryRow}
-                onClick={() => toggleExpanded(cat.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === "Enter" && toggleExpanded(cat.id)}
-              >
-                <div
+              <div className={styles.categoryRow}>
+                <button
+                  type="button"
+                  className={styles.expandTrigger}
+                  onClick={() => toggleExpanded(cat.id)}
+                  aria-expanded={isOpen}
+                  aria-label={isOpen ? `Collapse ${cat.name} item list` : `Expand ${cat.name} item list`}
+                >
+                  <div
                     className={`${styles.categoryIcon} ${isSoldOut ? styles.categoryIconSoldOut : ""}`}
                   >
                     {cat.icon === "squid" ? <SquidIcon /> : <FishIcon />}
                   </div>
 
-                <div className={styles.categoryInfo}>
-                  <div
-                    className={`${styles.categoryName} ${isSoldOut ? styles.categoryNameSoldOut : ""}`}
-                  >
-                    {cat.name}
-                    {cat.subName ? (
-                      <span style={{ fontWeight: 500, marginLeft: 6, opacity: 0.7 }}>
-                        ({cat.subName})
-                      </span>
-                    ) : null}
+                  <div className={styles.categoryInfo}>
+                    <div
+                      className={`${styles.categoryName} ${isSoldOut ? styles.categoryNameSoldOut : ""}`}
+                    >
+                      {cat.name}
+                      {cat.subName ? (
+                        <span style={{ fontWeight: 500, marginLeft: 6, opacity: 0.7 }}>
+                          ({cat.subName})
+                        </span>
+                      ) : null}
+                    </div>
+                    <div
+                      className={`${styles.categoryCount} ${isSoldOut ? styles.categoryCountSoldOut : ""}`}
+                    >
+                      {cat.items.length} item{cat.items.length !== 1 ? "s" : ""}
+                    </div>
                   </div>
-                  <div
-                    className={`${styles.categoryCount} ${isSoldOut ? styles.categoryCountSoldOut : ""}`}
-                  >
-                    {cat.items.length} item{cat.items.length !== 1 ? "s" : ""}
-                  </div>
-                </div>
+                </button>
 
                 <button
                   type="button"
                   className={styles.statusWrap}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSoldOut(cat.id);
-                  }}
+                  onClick={() => toggleSoldOut(cat.id)}
+                  disabled={busyId === cat.id}
                   aria-label={
                     isSoldOut
                       ? `Mark ${cat.name} as available`
@@ -265,15 +265,18 @@ export default function DailySoldOutPage() {
                   <span
                     className={`${styles.statusLabel} ${isSoldOut ? styles.statusLabelSoldOut : ""}`}
                   >
-                    {isSoldOut ? "SOLD OUT TODAY" : "AVAILABLE"}
+                    {busyId === cat.id ? "…" : isSoldOut ? "SOLD OUT TODAY" : "AVAILABLE"}
                   </span>
                 </button>
 
-                <span
+                <button
+                  type="button"
                   className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ""}`}
+                  onClick={() => toggleExpanded(cat.id)}
+                  aria-label={isOpen ? "Collapse" : "Expand"}
                 >
                   <ChevronIcon />
-                </span>
+                </button>
               </div>
 
               {isOpen && cat.items.length > 0 && (
