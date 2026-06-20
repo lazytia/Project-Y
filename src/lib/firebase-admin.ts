@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { getApps, initializeApp, applicationDefault, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 import { getFirestore } from "firebase-admin/firestore";
@@ -33,6 +34,14 @@ function ensureApp() {
       credential: cert(JSON.parse(inlineCred)),
       projectId: resolveProjectId(),
     });
+  }
+  // If GOOGLE_APPLICATION_CREDENTIALS points at a path that no longer exists
+  // (common on dev machines that carry over env vars from older projects),
+  // clear it so applicationDefault() falls back to user gcloud ADC instead
+  // of failing the very first verifyIdToken call.
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (credPath && !existsSync(credPath)) {
+    delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
   }
   return initializeApp({
     credential: applicationDefault(),
