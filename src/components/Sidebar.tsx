@@ -43,6 +43,7 @@ const NAV: NavGroup[] = [
     icon: "🍽",
     label: "Operations",
     children: [
+      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering Orders", href: "/operations/catering-orders" },
       { label: "Online Orders", href: "/operations/online-orders" },
@@ -111,6 +112,7 @@ export default function Sidebar({ open, onClose }: Props) {
       icon: "🍽",
       label: "Operations",
       children: [
+        { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
         { label: "Reservations", href: "/operations/reservations" },
         { label: "Catering Orders", href: "/operations/catering-orders" },
         { label: "Online Orders", href: "/operations/online-orders" },

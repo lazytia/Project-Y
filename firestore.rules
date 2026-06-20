@@ -70,6 +70,20 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // Sold-out category definitions — static config written by owners,
+    // read by all signed-in users.
+    match /sold_out_categories/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isOwner();
+    }
+
+    // Daily sold-out state — keyed by YYYY-MM-DD. A missing doc means
+    // nothing is sold out for that day (auto-reset by date change).
+    match /sold_out_daily/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isOwner();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;
