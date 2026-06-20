@@ -9,27 +9,32 @@ type Category = {
   id: string;
   name: string;
   items: string[];
+  icon: "squid" | "fish";
 };
 
 const CATEGORIES: Category[] = [
   {
     id: "squid",
     name: "SQUID",
+    icon: "squid",
     items: ["Squid Karaage", "Squid Sashimi", "Squid Salad"],
   },
   {
     id: "snapper",
     name: "SNAPPER",
+    icon: "fish",
     items: ["Snapper Aburi", "Snapper Sashimi", "Snapper Sushi", "Spicy Snapper Tataki"],
   },
   {
     id: "trevally",
     name: "TREVALLY",
+    icon: "fish",
     items: ["Trevally Aburi", "Trevally Sashimi", "Trevally Sushi", "Spicy Trevally Tataki"],
   },
   {
     id: "tuna",
     name: "TUNA",
+    icon: "fish",
     items: ["Tuna Aburi", "Tuna Sashimi", "Tuna Sushi", "Spicy Tuna Tataki"],
   },
 ];
@@ -37,8 +42,8 @@ const CATEGORIES: Category[] = [
 function FishIcon() {
   return (
     <svg
-      width="28"
-      height="28"
+      width="26"
+      height="26"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -49,6 +54,26 @@ function FishIcon() {
       <path d="M6.5 12c0 0-2-4 3-6s9 2 9 6-4 8-9 6-3-6-3-6z" />
       <circle cx="15" cy="11" r="1" fill="currentColor" stroke="none" />
       <path d="M3 12c0 0 1-3 3.5-3.5M3 12c0 0 1 3 3.5 3.5" />
+    </svg>
+  );
+}
+
+function SquidIcon() {
+  return (
+    <svg
+      width="26"
+      height="26"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3c-3 0-5 2-5 5v5c0 2 1 3 2 4l1 3m2-12c0 0 0 8 0 12m2-12c0 0 0 8 0 12m-6-5c0 0-1 2-2 2m10-2c0 0 1 2 2 2" />
+      <ellipse cx="12" cy="8" rx="5" ry="4" />
+      <circle cx="10" cy="7" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="14" cy="7" r="0.8" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -92,9 +117,14 @@ export default function DailySoldOutPage() {
   async function toggleSoldOut(id: string) {
     const db = getDb();
     const ref = doc(db, "sold_out_daily", today);
-    const next = soldOutIds.includes(id)
+    const isCurrentlySoldOut = soldOutIds.includes(id);
+    const next = isCurrentlySoldOut
       ? soldOutIds.filter((x) => x !== id)
       : [...soldOutIds, id];
+    // Auto-expand when marking sold out
+    if (!isCurrentlySoldOut) {
+      setExpanded((prev) => new Set([...prev, id]));
+    }
     await setDoc(ref, { soldOutIds: next, date: today }, { merge: true });
   }
 
@@ -134,10 +164,10 @@ export default function DailySoldOutPage() {
                 onKeyDown={(e) => e.key === "Enter" && toggleExpanded(cat.id)}
               >
                 <div
-                  className={`${styles.categoryIcon} ${isSoldOut ? styles.categoryIconSoldOut : ""}`}
-                >
-                  <FishIcon />
-                </div>
+                    className={`${styles.categoryIcon} ${isSoldOut ? styles.categoryIconSoldOut : ""}`}
+                  >
+                    {cat.icon === "squid" ? <SquidIcon /> : <FishIcon />}
+                  </div>
 
                 <div className={styles.categoryInfo}>
                   <div
