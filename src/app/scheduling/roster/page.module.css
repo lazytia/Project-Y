@@ -682,6 +682,66 @@
   flex: 1 1 auto;
 }
 
+.staffSectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  width: 100%;
+  text-align: left;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  cursor: default;
+}
+
+.staffSectionHeadWarn {
+  cursor: pointer;
+}
+
+.staffSectionIconGreen {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.staffSectionIconOrange {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(234, 88, 12, 0.12);
+  color: var(--color-warm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.staffSectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-fg-muted);
+  flex: 1;
+}
+
+.staffSectionChevron {
+  color: var(--color-fg-muted);
+  transition: transform 0.2s;
+}
+
+.staffSectionChevronOpen {
+  transform: rotate(180deg);
+}
+
 .staffRow {
   display: grid;
   grid-template-columns: 12px 1fr auto auto auto;
@@ -695,7 +755,38 @@
   background: rgba(234, 88, 12, 0.04);
 }
 
-.staffList li:last-child .staffRow { border-bottom: none; }
+.staffNameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.warnPill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+
+.warnPillHoliday {
+  background: rgba(234, 88, 12, 0.12);
+  color: var(--color-warm);
+}
+
+.warnPillUnavail {
+  background: rgba(126, 87, 194, 0.12);
+  color: #7e57c2;
+}
+
+.warnSub {
+  font-size: 10px;
+  color: var(--color-warm);
+  font-weight: 500;
+}
 
 .staffDot {
   width: 8px;

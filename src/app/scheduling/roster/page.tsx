@@ -240,6 +240,7 @@ export default function ManagerRosterPage() {
   const [nextWeekDoc, setNextWeekDoc] = useState<RosterWeekDoc>({});
   const [prevWeekDoc, setPrevWeekDoc] = useState<RosterWeekDoc>({});
   const [modalCell, setModalCell] = useState<{ iso: string; meal: Meal; weekKey: string } | null>(null);
+  const [warnSectionOpen, setWarnSectionOpen] = useState(true);
   const [noteModal, setNoteModal] = useState<{
     label: string; text: string; iso: string; weekKey: "current" | "next" | "prev";
   } | null>(null);
@@ -1140,11 +1141,12 @@ export default function ManagerRosterPage() {
                 </div>
               </section>
 
-              <ul className={styles.staffList}>
+              <div className={styles.staffList}>
                 {(() => {
-                  // Build a warning map: uid → reason string (holiday / unavailable)
+                  // Build a warning map: uid → { type }
                   const cellDayKey = DAY_KEYS[dowIdx] as string | undefined;
-                  const warningMap = new Map<string, string>();
+                  type WarnInfo = { type: "holiday" | "unavailability" };
+                  const warningMap = new Map<string, WarnInfo>();
                   for (const d of staffDocs) {
                     // 1. Approved holiday covering this date
                     for (const r of d.holidayRequests ?? []) {
@@ -1155,7 +1157,7 @@ export default function ManagerRosterPage() {
                         const sDay = new Date(s); sDay.setHours(0, 0, 0, 0);
                         const eDay = new Date(e); eDay.setHours(23, 59, 59, 999);
                         if (cellDate >= sDay && cellDate <= eDay) {
-                          warningMap.set(d.uid, "On holiday");
+                          warningMap.set(d.uid, { type: "holiday" });
                           break;
                         }
                       }
@@ -1167,12 +1169,16 @@ export default function ManagerRosterPage() {
                     if (approvedChanges.length > 0) {
                       const avail = approvedChanges[approvedChanges.length - 1].requested?.[cellDayKey];
                       if (avail?.kind === "unavailable") {
-                        warningMap.set(d.uid, "Unavailable this day");
+                        warningMap.set(d.uid, { type: "unavailability" });
                       }
                     }
                   }
 
-                  const real = staffDocs
+                  type StaffEntry = {
+                    uid: string; name: string; role: string;
+                    isTemp: boolean; warning: WarnInfo | null;
+                  };
+                  const real: StaffEntry[] = staffDocs
                     .map((d) => ({
                       uid: d.uid,
                       name: displayName(d),
@@ -1181,55 +1187,109 @@ export default function ManagerRosterPage() {
                       warning: warningMap.get(d.uid) ?? null,
                     }))
                     .sort((a, b) => a.name.localeCompare(b.name));
-                  const temp = Object.keys(cur)
+                  const temp: StaffEntry[] = Object.keys(cur)
                     .filter((u) => u.startsWith("tr_"))
                     .map((u) => ({
                       uid: u,
                       name: u.startsWith("tr_kitchen_") ? "TR Kitchen Staff" : "TR Hall Staff",
                       role: "TR",
                       isTemp: true,
-                      warning: null as string | null,
+                      warning: null,
                     }));
-                  return [...real, ...temp];
-                })().map((s) => {
-                  const assigned = cur[s.uid];
-                  return (
-                    <li key={s.uid} className={`${styles.staffRow} ${s.warning ? styles.staffRowWarn : ""}`}>
-                      <span className={styles.staffDot} style={{ background: colorForUid(s.uid) }} />
-                      <span className={styles.staffName}>
-                        {s.name}
-                        {s.warning && (
-                          <span className={styles.warnBadge} title={s.warning} aria-label={s.warning}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
-                            </svg>
-                          </span>
+
+                  const available = [...real.filter(s => !s.warning), ...temp];
+                  const warned = real.filter(s => s.warning);
+                  const holidayCount = warned.filter(s => s.warning?.type === "holiday").length;
+                  const unavailCount = warned.filter(s => s.warning?.type === "unavailability").length;
+                  const warnLabel = holidayCount > 0 && unavailCount > 0
+                    ? `On Holiday / Unavailable (${warned.length})`
+                    : holidayCount > 0
+                      ? `On Holiday (${warned.length})`
+                      : `Unavailable (${warned.length})`;
+
+                  const renderRow = (s: StaffEntry) => {
+                    const assigned = cur[s.uid];
+                    return (
+                      <div key={s.uid} className={`${styles.staffRow} ${s.warning ? styles.staffRowWarn : ""}`}>
+                        <span className={styles.staffDot} style={{ background: colorForUid(s.uid) }} />
+                        {s.warning ? (
+                          <div className={styles.staffNameBlock}>
+                            <span className={styles.staffName}>{s.name}</span>
+                            <span className={`${styles.warnPill} ${s.warning.type === "holiday" ? styles.warnPillHoliday : styles.warnPillUnavail}`}>
+                              {s.warning.type === "holiday" ? "ON HOLIDAY" : "UNAVAILABLE"}
+                            </span>
+                            <span className={styles.warnSub}>
+                              {s.warning.type === "holiday" ? "Approved Holiday" : "Approved Change"}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className={styles.staffName}>{s.name}</span>
                         )}
-                      </span>
-                      <span className={styles.staffRole}>{s.role}</span>
-                      <button
-                        type="button"
-                        className={`${styles.staffStartBtn} ${assigned ? styles.staffStartBtnAssigned : ""}`}
-                        disabled={savingShift}
-                        onClick={() => assignStaff(s.uid, pendingStart)}
-                      >
-                        {assigned ? `${assigned} Start` : `+ ${pendingStart} Start`}
-                      </button>
-                      {(s.isTemp || assigned) && (
+                        <span className={styles.staffRole}>{s.role}</span>
                         <button
                           type="button"
-                          className={styles.staffRemoveBtn}
+                          className={`${styles.staffStartBtn} ${assigned ? styles.staffStartBtnAssigned : ""}`}
                           disabled={savingShift}
-                          onClick={() => removeStaff(s.uid)}
-                          aria-label="Remove"
+                          onClick={() => assignStaff(s.uid, pendingStart)}
                         >
-                          ×
+                          {assigned ? `${assigned} Start` : `+ ${pendingStart} Start`}
                         </button>
+                        {(s.isTemp || assigned) && (
+                          <button
+                            type="button"
+                            className={styles.staffRemoveBtn}
+                            disabled={savingShift}
+                            onClick={() => removeStaff(s.uid)}
+                            aria-label="Remove"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <>
+                      {/* Available Staff section */}
+                      <div className={styles.staffSectionHead}>
+                        <span className={styles.staffSectionIconGreen}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                          </svg>
+                        </span>
+                        <span className={styles.staffSectionLabel}>Available Staff</span>
+                      </div>
+                      {available.map(renderRow)}
+
+                      {/* Warned section (collapsible) */}
+                      {warned.length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            className={`${styles.staffSectionHead} ${styles.staffSectionHeadWarn}`}
+                            onClick={() => setWarnSectionOpen((o) => !o)}
+                          >
+                            <span className={styles.staffSectionIconOrange}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+                              </svg>
+                            </span>
+                            <span className={styles.staffSectionLabel}>{warnLabel}</span>
+                            <svg
+                              className={`${styles.staffSectionChevron} ${warnSectionOpen ? styles.staffSectionChevronOpen : ""}`}
+                              width="14" height="14" viewBox="0 0 24 24" fill="currentColor"
+                            >
+                              <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                            </svg>
+                          </button>
+                          {warnSectionOpen && warned.map(renderRow)}
+                        </>
                       )}
-                    </li>
+                    </>
                   );
-                })}
-              </ul>
+                })()}
+              </div>
 
               <footer className={styles.modalFoot}>
                 <button
