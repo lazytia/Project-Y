@@ -571,11 +571,13 @@ export default function InsightsPage() {
             <>
               <p className={styles.highDay}>{fmtDayLong(highestDay.date)}</p>
               <div className={styles.highRow}>
-                <p className={styles.highLabel}>SHIFTS</p>
-                <p className={styles.highValue}>{highestDay.shifts}</p>
+                <p className={styles.highLabel}>Sales $</p>
+                <p className={styles.highValue}>
+                  {hasSales ? fmtCurrency(sales / 6) : "—"}
+                </p>
               </div>
               <div className={styles.highRow}>
-                <p className={styles.highLabel}>EST. PAYROLL</p>
+                <p className={styles.highLabel}>Payroll $</p>
                 <p className={styles.highValue}>{fmtCurrency(highestDay.cost)}</p>
               </div>
               <div className={styles.highDivider} />
