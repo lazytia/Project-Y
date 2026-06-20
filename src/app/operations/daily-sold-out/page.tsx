@@ -247,8 +247,8 @@ export default function DailySoldOutPage() {
 
               {isOpen && cat.items.length > 0 && (
                 <ul className={styles.itemList}>
-                  {cat.items.map((item) => (
-                    <li key={item} className={styles.item}>
+                  {cat.items.map((item, idx) => (
+                    <li key={`${item}-${idx}`} className={styles.item}>
                       {item}
                     </li>
                   ))}
