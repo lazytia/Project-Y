@@ -89,6 +89,7 @@ export default function NoticeGivenEditPage({
   const [noticeGivenDate, setNoticeGivenDate] = useState(todayIso());
   const [lastWorkingDay, setLastWorkingDay] = useState("");
   const [reasonForLeaving, setReasonForLeaving] = useState("");
+  const [reasonForLeavingOther, setReasonForLeavingOther] = useState("");
   const [rehireEligible, setRehireEligible] = useState<"Yes" | "No" | "Unsure" | "">("");
 
   /* ── Final Shift ── */
@@ -127,6 +128,7 @@ export default function NoticeGivenEditPage({
           setNoticeGivenDate((d.noticeGivenDate as string) ?? todayIso());
           setLastWorkingDay((d.lastWorkingDay as string) ?? "");
           setReasonForLeaving((d.reasonForLeaving as string) ?? "");
+          setReasonForLeavingOther((d.reasonForLeavingOther as string) ?? "");
           setRehireEligible(
             (["Yes", "No", "Unsure"].includes(d.rehireEligible as string)
               ? d.rehireEligible
@@ -194,7 +196,12 @@ export default function NoticeGivenEditPage({
     ? staff.filter((s) => s.name.toLowerCase().includes(staffSearch.toLowerCase()))
     : staff;
 
-  const canSave = !!selectedUid && !!noticeGivenDate && !!lastWorkingDay && !!reasonForLeaving;
+  const canSave =
+    !!selectedUid &&
+    !!noticeGivenDate &&
+    !!lastWorkingDay &&
+    !!reasonForLeaving &&
+    (reasonForLeaving !== "Other" || reasonForLeavingOther.trim().length > 0);
 
   async function handleSave() {
     if (!canSave || saving || !selectedStaff || !docId) return;
@@ -207,6 +214,7 @@ export default function NoticeGivenEditPage({
         noticeGivenDate,
         lastWorkingDay,
         reasonForLeaving,
+        reasonForLeavingOther: reasonForLeaving === "Other" ? reasonForLeavingOther.trim() : "",
         rehireEligible,
         finalShiftDate,
         finalShiftTime,
@@ -362,6 +370,21 @@ export default function NoticeGivenEditPage({
             ))}
           </select>
         </div>
+
+        {reasonForLeaving === "Other" && (
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Please specify the reason</label>
+            <textarea
+              className={styles.select}
+              value={reasonForLeavingOther}
+              onChange={(e) => setReasonForLeavingOther(e.target.value)}
+              placeholder="e.g. Relocating overseas, personal circumstances…"
+              rows={3}
+              maxLength={300}
+              style={{ height: "auto", padding: "10px 14px", lineHeight: 1.5, resize: "vertical" }}
+            />
+          </div>
+        )}
 
         <div className={styles.field}>
           <label className={styles.fieldLabel}>Rehire Eligible</label>

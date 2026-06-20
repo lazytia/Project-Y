@@ -23,6 +23,7 @@ type StoredNotice = {
   noticeGivenDate?: string;
   lastWorkingDay?: string;
   reasonForLeaving?: string;
+  reasonForLeavingOther?: string;
   rehireEligible?: string;
   finalShiftDate?: string;
   finalShiftTime?: string;
@@ -39,6 +40,7 @@ type Notice = {
   noticeGivenDate: string;
   lastWorkingDay: string;
   reasonForLeaving: string;
+  reasonForLeavingOther: string;
   rehireEligible: string;
   finalShiftDate: string;
   finalShiftTime: string;
@@ -135,6 +137,7 @@ export default function NoticeGivenPage() {
             noticeGivenDate: data.noticeGivenDate ?? "",
             lastWorkingDay: data.lastWorkingDay ?? "",
             reasonForLeaving: data.reasonForLeaving ?? "",
+            reasonForLeavingOther: data.reasonForLeavingOther ?? "",
             rehireEligible: data.rehireEligible ?? "",
             finalShiftDate: data.finalShiftDate ?? "",
             finalShiftTime: data.finalShiftTime ?? "",
@@ -279,7 +282,11 @@ export default function NoticeGivenPage() {
                     {n.reasonForLeaving && (
                       <div className={styles.metaItem}>
                         <dt className={styles.metaLabel}>Reason</dt>
-                        <dd className={styles.metaValue}>{n.reasonForLeaving}</dd>
+                        <dd className={styles.metaValue}>
+                          {n.reasonForLeaving === "Other" && n.reasonForLeavingOther
+                            ? `Other — ${n.reasonForLeavingOther}`
+                            : n.reasonForLeaving}
+                        </dd>
                       </div>
                     )}
                   </dl>
