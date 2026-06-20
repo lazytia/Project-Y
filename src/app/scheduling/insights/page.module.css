@@ -1,0 +1,383 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 760px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Top bar ── */
+.header {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--color-fg);
+}
+
+.iconBtn:hover { background: var(--color-surface); }
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+/* ── Week pill row ── */
+.weekRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.weekPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 99px;
+  background: #111;
+  color: #fff;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.weekChev {
+  font-size: 11px;
+  transition: transform 0.15s;
+}
+
+.weekChevOpen { transform: rotate(180deg); }
+
+.weekCompare {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Snapshot card ── */
+.snapshot {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr 1px 1fr;
+  align-items: stretch;
+  gap: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.snapshotCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  text-align: center;
+}
+
+.snapshotDivider {
+  width: 1px;
+  background: var(--color-border);
+  margin: 4px 4px;
+}
+
+.snapshotLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+}
+
+.snapshotValue {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.snapshotValueWarm { color: var(--color-warm); }
+.snapshotValueDanger { color: #c14545; }
+
+.snapshotMeta {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.targetPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.targetPillOk {
+  background: rgba(34, 139, 95, 0.10);
+  color: #1f8d5f;
+}
+
+.targetPillDanger {
+  background: rgba(193, 69, 69, 0.10);
+  color: #c14545;
+}
+
+.targetIcon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+}
+
+.targetPillOk .targetIcon { background: #1f8d5f; }
+.targetPillDanger .targetIcon { background: #c14545; }
+
+.snapshotTargetLine {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Generic card ── */
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardTitleSub {
+  color: var(--color-fg-muted);
+  font-weight: 700;
+}
+
+.sparkle { color: var(--color-warm); }
+
+/* ── Planned vs Actual ── */
+.pvaGrid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.pvaCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pvaLabel {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+}
+
+.pvaValue {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.pvaValueWarm { color: var(--color-warm); }
+
+.pvaMeta {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.pvaOp {
+  font-size: 22px;
+  color: var(--color-fg-muted);
+  font-weight: 700;
+}
+
+/* ── Two-col layout for trend + highest day ── */
+.twoCol {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .snapshotValue { font-size: 22px; }
+  .pvaGrid { grid-template-columns: 1fr; }
+  .pvaOp { display: none; }
+  .twoCol { grid-template-columns: 1fr; }
+}
+
+/* ── Trend chart card ── */
+.trendCard { gap: 4px; }
+
+.trendSvg {
+  width: 100%;
+  height: 220px;
+  display: block;
+}
+
+.trendAxis {
+  font-size: 10px;
+  fill: var(--color-fg-muted);
+  font-family: var(--font-sans);
+}
+
+.trendAxisRight {
+  font-size: 10px;
+  fill: var(--color-fg-muted);
+  font-family: var(--font-sans);
+}
+
+.trendTarget {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.trendLine {
+  fill: none;
+  stroke: var(--color-warm);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.trendDot {
+  fill: var(--color-warm);
+  stroke: var(--color-warm);
+}
+
+.trendValue {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+.trendX {
+  font-size: 10px;
+  fill: var(--color-fg);
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+
+.trendXLast {
+  font-size: 10px;
+  fill: var(--color-warm);
+  font-weight: 800;
+  font-family: var(--font-sans);
+}
+
+/* ── Highest cost day card ── */
+.highCard { gap: 8px; }
+
+.highDay {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.highRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.highLabel {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+}
+
+.highValue {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.highDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 6px 0;
+}
+
+.highPct {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.highPctWarm { color: var(--color-warm); }
+.highPctDanger { color: #c14545; }
+
+.highVsAvg {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.highVsAvgWarm { color: var(--color-warm); }
+.highVsAvgDanger { color: #c14545; }
+
+/* ── Insights list ── */
+.insightList {
+  list-style: disc;
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-fg);
+  line-height: 1.55;
+}
