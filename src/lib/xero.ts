@@ -15,15 +15,16 @@
 import { XeroClient, type TokenSet } from "xero-node";
 import { adminDb } from "./firebase-admin";
 
+// Xero scope names (no .read suffix for payroll AU — those scopes are
+// granted read+write together). Minimum needed: payroll.payruns to read
+// the gross + super totals every Friday. accounting.reports.read is
+// optional but useful if we later want sales reports from Xero too.
 const SCOPES = [
   "openid",
   "profile",
   "email",
   "offline_access",
-  "accounting.transactions.read",
-  "payroll.payruns.read",
-  "payroll.employees.read",
-  "payroll.timesheets.read",
+  "payroll.payruns",
 ];
 
 const SECRETS_DOC = "secrets/xero";
