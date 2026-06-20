@@ -96,6 +96,7 @@
 
 .categoryInfo {
   flex: 1;
+  min-width: 0;
 }
 
 .categoryName {
@@ -104,6 +105,9 @@
   letter-spacing: 0.06em;
   color: var(--color-fg);
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .categoryNameSoldOut {
