@@ -159,8 +159,14 @@
 }
 
 .statusWrap:disabled {
-  opacity: 0.6;
+  opacity: 0.3;
   cursor: progress;
+  animation: statusPulse 1s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.15; }
 }
 
 .statusDot {
