@@ -1,10 +1,12 @@
 /**
  * Shared helpers for syncing the Daily Sold Out state to Square.
  *
- * Strategy: flip each item variation's per-location `soldOut` override.
- * This is exactly the toggle the Square dashboard exposes as
- * "Mark as Sold Out" — the item stays visible but shows a Sold Out
- * badge on POS + Online Ordering.
+ * Strategy (both at once, so dashboard + POS reflect the change):
+ *  1. Flip the ITEM's `presentAtAllLocations` flag → drives the
+ *     Available/Unavailable Status pill in Square Dashboard's
+ *     "Manage inventory" section.
+ *  2. Flip each ITEM_VARIATION's per-location `soldOut` override →
+ *     drives the red "Sold Out" badge on POS + Online Ordering.
  */
 import { squareClient, squareEnv } from "@/lib/square";
 
@@ -117,8 +119,7 @@ function withSoldOut(
   return {
     ...v,
     type: "ITEM_VARIATION",
-    version:
-      typeof v.version === "number" ? BigInt(v.version) : v.version,
+    version: typeof v.version === "number" ? BigInt(v.version) : v.version,
     itemVariationData: {
       ...(v.itemVariationData ?? {}),
       locationOverrides: Array.from(byId.values()),
@@ -126,23 +127,41 @@ function withSoldOut(
   };
 }
 
-async function applySoldOutToCategory(
+async function applyToCategory(
   cfg: CategoryDef,
   all: CatalogObject[],
   locationIds: string[],
-  soldOut: boolean,
+  available: boolean,
 ): Promise<number> {
   const items = itemsInCategory(all, cfg);
   let updated = 0;
   for (const it of items) {
+    if (!it.id) continue;
+    const stamp = Date.now();
+
+    // 1. Flip item-level presence (drives Manage Inventory Status pill).
+    const nextItem = {
+      ...(it as Record<string, unknown>),
+      type: "ITEM",
+      id: it.id,
+      version: typeof it.version === "number" ? BigInt(it.version) : it.version,
+      presentAtAllLocations: available,
+    } as UpsertObject;
+    await squareClient.catalog.object.upsert({
+      idempotencyKey: `sold-out-item-${cfg.id}-${available ? "in" : "out"}-${it.id}-${stamp}`,
+      object: nextItem,
+    });
+    updated += 1;
+
+    // 2. Flip each variation's per-location soldOut override
+    //    (drives the red Sold Out badge on POS + Online Ordering).
     const variations = it.itemData?.variations ?? [];
     for (const v of variations) {
       if (!v.id) continue;
-      const next = withSoldOut(v, locationIds, soldOut);
-      const idempotencyKey = `sold-out-${cfg.id}-${soldOut ? "out" : "in"}-${v.id}-${Date.now()}`;
+      const nextVar = withSoldOut(v, locationIds, !available);
       await squareClient.catalog.object.upsert({
-        idempotencyKey,
-        object: next as UpsertObject,
+        idempotencyKey: `sold-out-var-${cfg.id}-${available ? "in" : "out"}-${v.id}-${stamp}`,
+        object: nextVar as UpsertObject,
       });
       updated += 1;
     }
@@ -157,14 +176,14 @@ export async function setCategoryPresence(categoryId: string, available: boolean
   if (locationIds.length === 0) {
     throw new Error("No Square locations resolved — cannot toggle sold-out.");
   }
-  return applySoldOutToCategory(cfg, all, locationIds, !available);
+  return applyToCategory(cfg, all, locationIds, available);
 }
 
 export async function restoreAllCategories(): Promise<{ category: string; restored: number }[]> {
   const [all, locationIds] = await Promise.all([listAllCatalog(), listLocationIds()]);
   const result: { category: string; restored: number }[] = [];
   for (const cfg of SOLD_OUT_CATEGORIES) {
-    const restored = await applySoldOutToCategory(cfg, all, locationIds, false);
+    const restored = await applyToCategory(cfg, all, locationIds, true);
     result.push({ category: cfg.id, restored });
   }
   return result;
