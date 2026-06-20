@@ -124,10 +124,25 @@ async function applyToCategory(
         variations,
       },
     } as UpsertObject;
-    await squareClient.catalog.object.upsert({
+    console.log("[sold-out] UPSERT REQUEST", JSON.stringify({
+      itemId: it.id,
+      available,
+      presentAtAllLocations: (nextItem as { presentAtAllLocations?: boolean }).presentAtAllLocations,
+      presentAtLocationIds: (nextItem as { presentAtLocationIds?: string[] }).presentAtLocationIds,
+      absentAtLocationIds: (nextItem as { absentAtLocationIds?: string[] }).absentAtLocationIds,
+      variationCount: variations.length,
+    }));
+    const upsertResp = await squareClient.catalog.object.upsert({
       idempotencyKey: `sold-out-${cfg.id}-${available ? "in" : "out"}-${it.id}-${Date.now()}`,
       object: nextItem,
     });
+    const respObj = (upsertResp as { catalogObject?: Record<string, unknown> }).catalogObject;
+    console.log("[sold-out] UPSERT RESPONSE", JSON.stringify({
+      itemId: it.id,
+      presentAtAllLocations: respObj?.presentAtAllLocations,
+      presentAtLocationIds: respObj?.presentAtLocationIds,
+      absentAtLocationIds: respObj?.absentAtLocationIds,
+    }, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
     updated += 1;
   }
   return updated;
