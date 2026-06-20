@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
     }
     await writeXeroSecret({
       refreshToken: tokenSet.refresh_token,
-      tokenSet,
       tenantId: tenant?.tenantId,
       tenantName: tenant?.tenantName,
     });

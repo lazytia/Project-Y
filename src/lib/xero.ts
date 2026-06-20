@@ -12,7 +12,7 @@
  *   XERO_REDIRECT_URI         — e.g. https://your.app/api/xero/callback
  *   XERO_SYNC_SHARED_TOKEN    — random secret protecting /api/xero/sync
  */
-import { XeroClient, type TokenSet } from "xero-node";
+import { XeroClient } from "xero-node";
 import { adminDb } from "./firebase-admin";
 
 // Xero scope names (no .read suffix for payroll AU — those scopes are
@@ -31,7 +31,6 @@ const SECRETS_DOC = "secrets/xero";
 
 export type XeroSecret = {
   refreshToken: string;
-  tokenSet?: TokenSet;
   tenantId?: string;
   tenantName?: string;
   updatedAt?: FirebaseFirestore.Timestamp;
@@ -103,7 +102,6 @@ export async function authedXeroClient(): Promise<{ client: XeroClient; tenantId
   // Persist the refreshed refresh token so the next run starts clean.
   await writeXeroSecret({
     refreshToken: newTokenSet.refresh_token ?? secret.refreshToken,
-    tokenSet: newTokenSet,
     tenantId: tenant.tenantId,
     tenantName: tenant.tenantName,
   });
