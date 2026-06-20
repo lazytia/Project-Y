@@ -91,37 +91,25 @@ async function applyToCategory(
   let updated = 0;
   for (const it of items) {
     if (!it.id) continue;
-    const stamp = Date.now();
 
-    // Square requires the item AND its variations to agree on which
-    // locations they're enabled at. If we flip just the item, prior
-    // variation overrides referencing those locations leave the catalog
-    // in an inconsistent state and the next upsert errors with
-    // "ITEM_VARIATION is enabled at unit X, but the referenced object
-    // of type ITEM is not". Flip every variation first (clear stale
-    // location overrides) then flip the parent item.
-    const variations = it.itemData?.variations ?? [];
-    for (const v of variations) {
-      if (!v.id) continue;
-      const nextVar = {
-        ...(v as Record<string, unknown>),
-        type: "ITEM_VARIATION",
-        id: v.id,
-        version: typeof v.version === "number" ? BigInt(v.version) : v.version,
-        presentAtAllLocations: available,
-        presentAtLocationIds: [],
-        absentAtLocationIds: [],
-        itemVariationData: {
-          ...(v.itemVariationData ?? {}),
-          locationOverrides: [],
-        },
-      } as UpsertObject;
-      await squareClient.catalog.object.upsert({
-        idempotencyKey: `sold-out-var-${cfg.id}-${available ? "in" : "out"}-${v.id}-${stamp}`,
-        object: nextVar,
-      });
-      updated += 1;
-    }
+    // Upsert the item AND its variations together in a single call so
+    // Square sees consistent presence flags. Updating them in separate
+    // calls trips "ITEM_VARIATION is enabled at unit X, but the
+    // referenced object of type ITEM is not" because Square validates
+    // the tree mid-flight.
+    const variations = (it.itemData?.variations ?? []).map((v) => ({
+      ...(v as Record<string, unknown>),
+      type: "ITEM_VARIATION",
+      id: v.id,
+      version: typeof v.version === "number" ? BigInt(v.version) : v.version,
+      presentAtAllLocations: available,
+      presentAtLocationIds: [],
+      absentAtLocationIds: [],
+      itemVariationData: {
+        ...(v.itemVariationData ?? {}),
+        locationOverrides: [],
+      },
+    }));
 
     const nextItem = {
       ...(it as Record<string, unknown>),
@@ -131,9 +119,13 @@ async function applyToCategory(
       presentAtAllLocations: available,
       presentAtLocationIds: [],
       absentAtLocationIds: [],
+      itemData: {
+        ...(it.itemData ?? {}),
+        variations,
+      },
     } as UpsertObject;
     await squareClient.catalog.object.upsert({
-      idempotencyKey: `sold-out-item-${cfg.id}-${available ? "in" : "out"}-${it.id}-${stamp}`,
+      idempotencyKey: `sold-out-${cfg.id}-${available ? "in" : "out"}-${it.id}-${Date.now()}`,
       object: nextItem,
     });
     updated += 1;
