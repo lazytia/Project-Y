@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getDb } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { useAuth } from "@/components/AuthProvider";
 import styles from "./page.module.css";
 
 type Category = {
@@ -92,11 +93,13 @@ function ChevronIcon() {
 
 export default function DailySoldOutPage() {
   const today = new Date().toLocaleDateString("en-CA");
+  const { user } = useAuth();
 
   const [soldOutIds, setSoldOutIds] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuError, setMenuError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     const db = getDb();
@@ -137,6 +140,7 @@ export default function DailySoldOutPage() {
   }, []);
 
   async function toggleSoldOut(id: string) {
+    if (busyId) return;
     const db = getDb();
     const ref = doc(db, "sold_out_daily", today);
     const isCurrentlySoldOut = soldOutIds.includes(id);
@@ -147,7 +151,34 @@ export default function DailySoldOutPage() {
     if (!isCurrentlySoldOut) {
       setExpanded((prev) => new Set([...prev, id]));
     }
-    await setDoc(ref, { soldOutIds: next, date: today }, { merge: true });
+    setBusyId(id);
+    setMenuError(null);
+    try {
+      // 1. Mirror state in Firestore so other surfaces (and the cards
+      //    on this page) update straight away.
+      await setDoc(ref, { soldOutIds: next, date: today }, { merge: true });
+      // 2. Push the same change into Square so POS + Online Ordering
+      //    flip availability in real time.
+      if (user) {
+        const idToken = await user.getIdToken();
+        const res = await fetch("/api/menu/set-sold-out", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ categoryId: id, soldOut: !isCurrentlySoldOut }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data?.error ?? `Square update failed (${res.status})`);
+        }
+      }
+    } catch (err) {
+      // Roll back the Firestore flip so the UI doesn't lie about
+      // Square state.
+      await setDoc(ref, { soldOutIds, date: today }, { merge: true });
+      setMenuError(err instanceof Error ? err.message : "Square update failed.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   function toggleExpanded(id: string) {
