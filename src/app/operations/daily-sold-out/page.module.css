@@ -100,9 +100,9 @@
 }
 
 .categoryName {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--color-fg);
   text-transform: uppercase;
   white-space: nowrap;
@@ -115,7 +115,7 @@
 }
 
 .categoryCount {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-fg-muted);
   margin-top: 2px;
 }
