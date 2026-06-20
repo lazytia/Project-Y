@@ -86,6 +86,12 @@ type WeeklySales = {
   source?: "square" | "manual";
 };
 
+type DailySales = {
+  dateISO?: string;
+  weekStartISO?: string;
+  grossSales?: number;
+};
+
 type WeekStats = {
   weekStartISO: string;
   totalShifts: number;
@@ -185,6 +191,7 @@ export default function InsightsPage() {
   const [docs, setDocs] = useState<Record<string, WeekDoc>>({});
   const [payroll, setPayroll] = useState<Record<string, WeeklyPayroll>>({});
   const [salesMap, setSalesMap] = useState<Record<string, WeeklySales>>({});
+  const [dailySalesMap, setDailySalesMap] = useState<Record<string, DailySales>>({});
   const [staffRates, setStaffRates] = useState<Record<string, StaffRate>>({});
   const [loading, setLoading] = useState(true);
 
@@ -221,6 +228,12 @@ export default function InsightsPage() {
       } catch {
         /* keep empty */
       }
+      try {
+        const dailySnap = await getDocs(collection(getDb(), "sales_daily"));
+        const dmap: Record<string, DailySales> = {};
+        for (const d of dailySnap.docs) dmap[d.id] = d.data() as DailySales;
+        setDailySalesMap(dmap);
+      } catch { /* ignore */ }
       try {
         const snap = await getDocs(collection(getDb(), "staff_onboarding"));
         const map: Record<string, StaffRate> = {};
@@ -330,18 +343,24 @@ export default function InsightsPage() {
 
   // Highest cost day
   const highestDay = useMemo(() => {
-    let best: { iso: string; date: Date; cost: number; shifts: number } | null = null;
+    let best: { iso: string; date: Date; cost: number; shifts: number; dailySales: number } | null = null;
     for (let i = 0; i < 7; i += 1) {
       const d = addDays(currentWeekStart, i);
       const iso = isoDate(d);
       const day = currentWeek.byDay[iso];
       if (!day) continue;
       if (!best || day.cost > best.cost) {
-        best = { iso, date: d, cost: day.cost, shifts: day.shifts };
+        best = {
+          iso,
+          date: d,
+          cost: day.cost,
+          shifts: day.shifts,
+          dailySales: dailySalesMap[iso]?.grossSales ?? 0,
+        };
       }
     }
     return best;
-  }, [currentWeek, currentWeekStart]);
+  }, [currentWeek, currentWeekStart, dailySalesMap]);
 
   // Trend chart geometry — actual payroll when synced from Xero,
   // estimated from roster otherwise. For each week we also compute
@@ -437,6 +456,12 @@ export default function InsightsPage() {
         const map: Record<string, WeeklySales> = {};
         for (const d of snap.docs) map[d.id] = d.data() as WeeklySales;
         setSalesMap(map);
+      } catch { /* ignore */ }
+      try {
+        const dailySnap = await getDocs(collection(getDb(), "sales_daily"));
+        const dmap: Record<string, DailySales> = {};
+        for (const d of dailySnap.docs) dmap[d.id] = d.data() as DailySales;
+        setDailySalesMap(dmap);
       } catch { /* ignore */ }
     } catch (err) {
       setRefreshError(err instanceof Error ? err.message : "Refresh failed.");
@@ -726,7 +751,9 @@ export default function InsightsPage() {
               <p className={styles.highDay}>{fmtDayLong(highestDay.date)}</p>
               <div className={styles.highRow}>
                 <p className={styles.highLabel}>Sales $</p>
-                <p className={styles.highValue}>—</p>
+                <p className={styles.highValue}>
+                  {highestDay.dailySales > 0 ? fmtCurrency(highestDay.dailySales) : "—"}
+                </p>
               </div>
               <div className={styles.highRow}>
                 <p className={styles.highLabel}>Payroll $</p>
