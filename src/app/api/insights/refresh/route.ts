@@ -170,21 +170,62 @@ export async function POST(req: NextRequest) {
   }
   const mondayKey = isoOf(weekStart);
 
+  // Sync the selected week + the previous 3 weeks so the labour trend
+  // chart (4 weeks) and the "vs last week" comparison fill in from a
+  // single click of the refresh button.
+  const SYNC_WEEKS = 4;
+  const weeksToSync: { iso: string; date: Date }[] = [];
+  for (let i = 0; i < SYNC_WEEKS; i += 1) {
+    const d = addDays(weekStart, -7 * i);
+    weeksToSync.push({ iso: isoOf(d), date: d });
+  }
+
   const out: {
     week: string;
-    square?: { grossSales: number; days: number } | { error: string };
-    xero?: { gross: number; super: number; payRunID: string | null } | { error: string } | null;
+    square?: { grossSales: number; days: number; perWeek: { iso: string; grossSales: number; days: number }[] } | { error: string };
+    xero?: { gross: number; super: number; payRunID: string | null; perWeek: { iso: string; gross: number; super: number }[] } | { error: string } | null;
   } = { week: mondayKey };
 
-  try {
-    out.square = await syncSquareWeek(mondayKey);
-  } catch (err) {
-    out.square = { error: err instanceof Error ? err.message : "Square sync failed." };
+  const sqResults: { iso: string; grossSales: number; days: number }[] = [];
+  let sqError: string | null = null;
+  for (const w of weeksToSync) {
+    try {
+      const r = await syncSquareWeek(w.iso);
+      sqResults.push({ iso: w.iso, ...r });
+    } catch (err) {
+      sqError = err instanceof Error ? err.message : "Square sync failed.";
+      break;
+    }
   }
-  try {
-    out.xero = await syncXeroWeek(weekStart);
-  } catch (err) {
-    out.xero = { error: err instanceof Error ? err.message : "Xero sync failed." };
+  if (sqError) {
+    out.square = { error: sqError };
+  } else if (sqResults.length > 0) {
+    const selected = sqResults.find((r) => r.iso === mondayKey) ?? sqResults[0];
+    out.square = { grossSales: selected.grossSales, days: selected.days, perWeek: sqResults };
+  }
+
+  const xeResults: { iso: string; gross: number; super: number }[] = [];
+  let xeError: string | null = null;
+  let anyXero = false;
+  for (const w of weeksToSync) {
+    try {
+      const r = await syncXeroWeek(w.date);
+      if (r) {
+        xeResults.push({ iso: w.iso, gross: r.gross, super: r.super });
+        anyXero = true;
+      }
+    } catch (err) {
+      xeError = err instanceof Error ? err.message : "Xero sync failed.";
+      break;
+    }
+  }
+  if (xeError) {
+    out.xero = { error: xeError };
+  } else if (anyXero) {
+    const selected = xeResults.find((r) => r.iso === mondayKey) ?? xeResults[0];
+    out.xero = { gross: selected.gross, super: selected.super, payRunID: null, perWeek: xeResults };
+  } else {
+    out.xero = null;
   }
 
   return NextResponse.json({ ok: true, ...out });
