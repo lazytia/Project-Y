@@ -541,14 +541,24 @@ export default function InsightsPage() {
                 </text>
               ))}
               <path d={chart.linePath} className={styles.trendLine} />
-              {chart.points.map((p, i) => (
-                <g key={i}>
-                  <circle cx={p.x} cy={p.y} r={3.5} className={styles.trendDot} />
-                  <text x={p.x + 10} y={p.y - 6} className={styles.trendValue}>
-                    {fmtCurrency(p.value)}
-                  </text>
-                </g>
-              ))}
+              {chart.points.map((p, i) => {
+                const isLast = i === chart.points.length - 1;
+                // Anchor the last label to the right of its point so the
+                // dollar value can't spill past the chart edge.
+                return (
+                  <g key={i}>
+                    <circle cx={p.x} cy={p.y} r={3.5} className={styles.trendDot} />
+                    <text
+                      x={isLast ? p.x - 8 : p.x + 8}
+                      y={p.y - 6}
+                      textAnchor={isLast ? "end" : "start"}
+                      className={styles.trendValue}
+                    >
+                      {fmtCurrency(p.value)}
+                    </text>
+                  </g>
+                );
+              })}
               {chart.points.map((p, i) => {
                 const start = addDays(currentWeekStart, -7 * (TREND_WEEKS - 1 - i));
                 const label = `W${i + 1}`;
@@ -649,7 +659,7 @@ function buildTrendChart(
   const width = 360;
   const height = 220;
   const padLeft = 56;
-  const padRight = 32;
+  const padRight = 72;
   const padTop = 16;
   const padBottom = 38;
   const values = data.map((w) => w.displayCost ?? w.estimatedCost);
