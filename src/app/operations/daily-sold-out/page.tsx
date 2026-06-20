@@ -265,7 +265,7 @@ export default function DailySoldOutPage() {
                   <span
                     className={`${styles.statusLabel} ${isSoldOut ? styles.statusLabelSoldOut : ""}`}
                   >
-                    {busyId === cat.id ? "…" : isSoldOut ? "SOLD OUT TODAY" : "AVAILABLE"}
+                    {isSoldOut ? "SOLD OUT" : "AVAILABLE"}
                   </span>
                 </button>
 
