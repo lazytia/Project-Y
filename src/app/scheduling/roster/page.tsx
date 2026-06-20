@@ -1161,17 +1161,14 @@ export default function ManagerRosterPage() {
                       }
                     }
                     if (warningMap.has(d.uid) || !cellDayKey) continue;
-                    // 2. Current availability says unavailable for this weekday
-                    // Check base availability, then override with latest approved change
-                    let avail = d.availability?.[cellDayKey] as DayAvailability | undefined;
+                    // 2. Manager-approved availability change makes this day unavailable
                     const approvedChanges = (d.availabilityRequests ?? [])
                       .filter((r) => r.status === "approved" && r.requested?.[cellDayKey]);
                     if (approvedChanges.length > 0) {
-                      // Latest approved change wins
-                      avail = approvedChanges[approvedChanges.length - 1].requested?.[cellDayKey];
-                    }
-                    if (avail?.kind === "unavailable") {
-                      warningMap.set(d.uid, "Unavailable this day");
+                      const avail = approvedChanges[approvedChanges.length - 1].requested?.[cellDayKey];
+                      if (avail?.kind === "unavailable") {
+                        warningMap.set(d.uid, "Unavailable this day");
+                      }
                     }
                   }
 
