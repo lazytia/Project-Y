@@ -213,6 +213,8 @@ export default function InsightsPage() {
 
   const [selectedWeekISO, setSelectedWeekISO] = useState<string>(() => isoDate(startOfWeekMon(new Date())));
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const currentWeekStart = useMemo(() => {
     const [y, m, d] = selectedWeekISO.split("-").map(Number);
@@ -321,6 +323,38 @@ export default function InsightsPage() {
 
   const weekEnd = useMemo(() => addDays(currentWeekStart, 5), [currentWeekStart]); // Mon→Sat
   const prevWeekEnd = useMemo(() => addDays(prevWeekStart, 5), [prevWeekStart]);
+
+  async function handleRefresh() {
+    if (refreshing || !user) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/insights/refresh?week=${selectedWeekISO}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Refresh failed (${res.status})`);
+      // Re-read both Firestore maps after the sync wrote new docs.
+      try {
+        const snap = await getDocs(collection(getDb(), "payroll_weekly"));
+        const map: Record<string, WeeklyPayroll> = {};
+        for (const d of snap.docs) map[d.id] = d.data() as WeeklyPayroll;
+        setPayroll(map);
+      } catch { /* ignore */ }
+      try {
+        const snap = await getDocs(collection(getDb(), "sales_weekly"));
+        const map: Record<string, WeeklySales> = {};
+        for (const d of snap.docs) map[d.id] = d.data() as WeeklySales;
+        setSalesMap(map);
+      } catch { /* ignore */ }
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : "Refresh failed.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   if (authLoading || loading) return <Splash />;
   if (!allowed) return null;
