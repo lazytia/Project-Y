@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   collection,
@@ -341,14 +341,12 @@ export default function InsightsPage() {
   // a different week). Runs in the background — the existing
   // Firestore-read pass renders any stale data immediately so the
   // page never blocks on Square / Xero round-trips.
-  const autoSyncedFor = useState<Set<string>>(() => new Set())[0];
+  const hasAutoRefreshed = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (authLoading || loading || !user || !allowed) return;
     if (refreshing) return;
-    if (autoSyncedFor.has(selectedWeekISO)) return;
-    autoSyncedFor.add(selectedWeekISO);
-    // Defer to the next tick so the initial Splash → page render
-    // finishes before we kick off the heavier sync call.
+    if (hasAutoRefreshed.current.has(selectedWeekISO)) return;
+    hasAutoRefreshed.current.add(selectedWeekISO);
     const id = setTimeout(() => {
       void handleRefresh();
     }, 50);
