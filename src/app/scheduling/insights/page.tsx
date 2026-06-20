@@ -32,8 +32,15 @@ import styles from "./page.module.css";
 
 const TARGET_PAYROLL_PCT = 25;
 const EST_HOURLY_RATE = 25;
-const LUNCH_HOURS = 4;
-const DINNER_HOURS = 5;
+const LUNCH_END_H = 14;   // 2:00 pm
+const DINNER_END_H = 21;  // 9:00 pm
+
+function shiftHours(startTime: string, endHour: number): number {
+  if (!startTime) return 0;
+  const [h, m] = startTime.split(":").map(Number);
+  if (isNaN(h)) return 0;
+  return Math.max(0, endHour - h - (m ?? 0) / 60);
+}
 const TREND_WEEKS = 4; // current + previous 3
 
 type Meal = "lunch" | "dinner";
@@ -144,24 +151,27 @@ function aggregateWeek(weekStart: Date, doc: WeekDoc | undefined, rates: Record<
   for (let i = 0; i < 7; i += 1) {
     const d = addDays(weekStart, i);
     const iso = isoDate(d);
-    const lunchUids = Object.keys(doc?.assignments?.[iso]?.lunch ?? {});
-    const dinnerUids = Object.keys(doc?.assignments?.[iso]?.dinner ?? {});
+    const lunchMap = doc?.assignments?.[iso]?.lunch ?? {};
+    const dinnerMap = doc?.assignments?.[iso]?.dinner ?? {};
     const isSaturday = d.getDay() === 6;
 
     let dayCost = 0;
-    for (const uid of lunchUids) {
+    for (const [uid, startTime] of Object.entries(lunchMap)) {
       const weekRate = rates[uid]?.weekRate ?? EST_HOURLY_RATE;
       const actualRate = isSaturday ? (rates[uid]?.satRate ?? weekRate) : weekRate;
-      dayCost += LUNCH_HOURS * actualRate;
+      const hours = shiftHours(startTime as string, LUNCH_END_H);
+      dayCost += hours * actualRate;
     }
-    for (const uid of dinnerUids) {
+    for (const [uid, startTime] of Object.entries(dinnerMap)) {
       const weekRate = rates[uid]?.weekRate ?? EST_HOURLY_RATE;
       const actualRate = isSaturday ? (rates[uid]?.satRate ?? weekRate) : weekRate;
-      dayCost += DINNER_HOURS * actualRate;
+      const hours = shiftHours(startTime as string, DINNER_END_H);
+      dayCost += hours * actualRate;
     }
 
-    stats.byDay[iso] = { shifts: lunchUids.length + dinnerUids.length, cost: dayCost };
-    stats.totalShifts += lunchUids.length + dinnerUids.length;
+    const totalShifts = Object.keys(lunchMap).length + Object.keys(dinnerMap).length;
+    stats.byDay[iso] = { shifts: totalShifts, cost: dayCost };
+    stats.totalShifts += totalShifts;
     stats.estimatedCost += dayCost;
   }
   return stats;
