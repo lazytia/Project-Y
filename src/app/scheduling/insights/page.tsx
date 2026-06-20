@@ -155,8 +155,28 @@ export default function InsightsPage() {
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
-  const currentWeekStart = useMemo(() => startOfWeekMon(today), [today]);
+  const todayWeekStart = useMemo(() => startOfWeekMon(today), [today]);
+
+  const [selectedWeekISO, setSelectedWeekISO] = useState<string>(() => isoDate(startOfWeekMon(new Date())));
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
+
+  const currentWeekStart = useMemo(() => {
+    const [y, m, d] = selectedWeekISO.split("-").map(Number);
+    if (!y || !m || !d) return todayWeekStart;
+    return new Date(y, m - 1, d);
+  }, [selectedWeekISO, todayWeekStart]);
   const prevWeekStart = useMemo(() => addDays(currentWeekStart, -7), [currentWeekStart]);
+
+  // Build the list of weeks the manager can pick — every week that has
+  // an entry in rosters_published, plus the current week as a fallback.
+  const weekOptions = useMemo(() => {
+    const set = new Set<string>(Object.keys(docs));
+    set.add(isoDate(todayWeekStart));
+    // Also include the 8 most recent weeks for navigation.
+    for (let i = 0; i < 8; i += 1) set.add(isoDate(addDays(todayWeekStart, -7 * i)));
+    return Array.from(set)
+      .sort((a, b) => (a < b ? 1 : -1));
+  }, [docs, todayWeekStart]);
 
   // Aggregations
   const currentWeek = useMemo(
@@ -249,10 +269,54 @@ export default function InsightsPage() {
       </header>
 
       <div className={styles.weekRow}>
-        <span className={styles.weekPill}>
-          <span>{fmtRange(currentWeekStart, weekEnd)}</span>
-          <span className={styles.weekChev}>▾</span>
-        </span>
+        <div className={styles.weekPickerWrap}>
+          <button
+            type="button"
+            className={styles.weekPill}
+            onClick={() => setWeekPickerOpen((s) => !s)}
+            aria-haspopup="listbox"
+            aria-expanded={weekPickerOpen}
+          >
+            <span>{fmtRange(currentWeekStart, weekEnd)}</span>
+            <span className={`${styles.weekChev} ${weekPickerOpen ? styles.weekChevOpen : ""}`}>▾</span>
+          </button>
+          {weekPickerOpen && (
+            <>
+              <button
+                type="button"
+                className={styles.weekBackdrop}
+                onClick={() => setWeekPickerOpen(false)}
+                aria-label="Close week picker"
+              />
+              <ul className={styles.weekMenu} role="listbox">
+                {weekOptions.map((iso) => {
+                  const [y, m, d] = iso.split("-").map(Number);
+                  const start = new Date(y, m - 1, d);
+                  const end = addDays(start, 5);
+                  const isCurrent = iso === selectedWeekISO;
+                  const isThisWeek = iso === isoDate(todayWeekStart);
+                  return (
+                    <li key={iso}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isCurrent}
+                        className={`${styles.weekOption} ${isCurrent ? styles.weekOptionActive : ""}`}
+                        onClick={() => {
+                          setSelectedWeekISO(iso);
+                          setWeekPickerOpen(false);
+                        }}
+                      >
+                        <span>{fmtRange(start, end)}</span>
+                        {isThisWeek && <span className={styles.weekOptionBadge}>This week</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </div>
         <p className={styles.weekCompare}>Compared to {fmtRange(prevWeekStart, prevWeekEnd)}</p>
       </div>
 

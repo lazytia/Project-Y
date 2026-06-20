@@ -48,6 +48,10 @@
   gap: 4px;
 }
 
+.weekPickerWrap {
+  position: relative;
+}
+
 .weekPill {
   display: inline-flex;
   align-items: center;
@@ -61,6 +65,71 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.weekPill:hover { opacity: 0.92; }
+
+.weekBackdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: default;
+  z-index: 90;
+}
+
+.weekMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+}
+
+.weekOption {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+  text-align: left;
+}
+
+.weekOption:hover { background: var(--color-surface); }
+
+.weekOptionActive {
+  background: rgba(234, 88, 12, 0.10);
+  color: var(--color-warm);
+}
+
+.weekOptionBadge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
 }
 
 .weekChev {
