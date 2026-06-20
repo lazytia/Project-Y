@@ -48,10 +48,11 @@ function parseMoney(v: unknown): number | null {
 }
 
 function authClient() {
-  // Use Application Default Credentials so the App Hosting / Cloud Run
-  // workload identity is reused. Locally, GOOGLE_APPLICATION_CREDENTIALS
-  // (or FIREBASE_SERVICE_ACCOUNT_JSON) points at a service account JSON.
-  const inline = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+  // Prefer a sheet-specific service account JSON (set as
+  // PAYROLL_SHEET_SA_JSON in Secret Manager) so we don't have to grant
+  // the Firebase Admin SA extra scopes for Google Sheets. Fall back to
+  // FIREBASE_SERVICE_ACCOUNT_JSON for backwards compat, then to ADC.
+  const inline = (process.env.PAYROLL_SHEET_SA_JSON ?? process.env.FIREBASE_SERVICE_ACCOUNT_JSON)?.trim();
   if (inline) {
     const creds = JSON.parse(inline);
     return new google.auth.JWT({
