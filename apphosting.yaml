@@ -25,3 +25,15 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  # Xero OAuth + sync — feeds payroll_weekly for the Insights dashboard.
+  - variable: XERO_CLIENT_ID
+    secret: XERO_CLIENT_ID
+  - variable: XERO_CLIENT_SECRET
+    secret: XERO_CLIENT_SECRET
+  - variable: XERO_REDIRECT_URI
+    secret: XERO_REDIRECT_URI
+  - variable: XERO_SYNC_SHARED_TOKEN
+    secret: XERO_SYNC_SHARED_TOKEN
+  # Bearer token guarding the cron-style Square sales sync endpoint.
+  - variable: SQUARE_SYNC_SHARED_TOKEN
+    secret: SQUARE_SYNC_SHARED_TOKEN
