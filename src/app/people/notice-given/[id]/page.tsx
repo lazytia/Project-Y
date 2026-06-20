@@ -94,8 +94,6 @@ export default function NoticeGivenEditPage({
 
   /* ── Final Shift ── */
   const [finalShiftDate, setFinalShiftDate] = useState("");
-  const [finalShiftTime, setFinalShiftTime] = useState("");
-  const [replacementNeeded, setReplacementNeeded] = useState<"Yes" | "No" | "Not Sure" | "">("");
 
   /* ── Manager Notes ── */
   const [managerNotes, setManagerNotes] = useState("");
@@ -135,12 +133,6 @@ export default function NoticeGivenEditPage({
               : "") as "Yes" | "No" | "Unsure" | "",
           );
           setFinalShiftDate((d.finalShiftDate as string) ?? "");
-          setFinalShiftTime((d.finalShiftTime as string) ?? "");
-          setReplacementNeeded(
-            (["Yes", "No", "Not Sure"].includes(d.replacementNeeded as string)
-              ? d.replacementNeeded
-              : "") as "Yes" | "No" | "Not Sure" | "",
-          );
           setManagerNotes((d.managerNotes as string) ?? "");
         }
       } catch {
@@ -217,8 +209,6 @@ export default function NoticeGivenEditPage({
         reasonForLeavingOther: reasonForLeaving === "Other" ? reasonForLeavingOther.trim() : "",
         rehireEligible,
         finalShiftDate,
-        finalShiftTime,
-        replacementNeeded,
         managerNotes: managerNotes.trim(),
         updatedAt: serverTimestamp(),
       });
@@ -424,31 +414,6 @@ export default function NoticeGivenEditPage({
           </button>
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>Final Shift Time</label>
-          <input
-            type="time"
-            className={styles.timeInput}
-            value={finalShiftTime}
-            onChange={(e) => setFinalShiftTime(e.target.value)}
-          />
-        </div>
-
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>Replacement Needed</label>
-          <div className={styles.btnGroup}>
-            {(["Yes", "No", "Not Sure"] as const).map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                className={`${styles.groupBtn} ${replacementNeeded === opt ? styles.groupBtnActive : ""}`}
-                onClick={() => setReplacementNeeded(opt)}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* ── Section 4: Manager Notes ── */}

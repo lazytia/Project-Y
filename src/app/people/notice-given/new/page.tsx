@@ -134,8 +134,6 @@ export default function NoticeGivenNewPage() {
 
   /* ── Final Shift ── */
   const [finalShiftDate, setFinalShiftDate] = useState("");
-  const [finalShiftTime, setFinalShiftTime] = useState("");
-  const [replacementNeeded, setReplacementNeeded] = useState<"Yes" | "No" | "Not Sure" | "">("");
 
   /* ── Manager Notes ── */
   const [managerNotes, setManagerNotes] = useState("");
@@ -168,8 +166,6 @@ export default function NoticeGivenNewPage() {
         reasonForLeavingOther: reasonForLeaving === "Other" ? reasonForLeavingOther.trim() : "",
         rehireEligible,
         finalShiftDate,
-        finalShiftTime,
-        replacementNeeded,
         managerNotes: managerNotes.trim(),
         createdAt: serverTimestamp(),
       });
@@ -353,31 +349,6 @@ export default function NoticeGivenNewPage() {
           </button>
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>Final Shift Time</label>
-          <input
-            type="time"
-            className={styles.timeInput}
-            value={finalShiftTime}
-            onChange={(e) => setFinalShiftTime(e.target.value)}
-          />
-        </div>
-
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>Replacement Needed</label>
-          <div className={styles.btnGroup}>
-            {(["Yes", "No", "Not Sure"] as const).map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                className={`${styles.groupBtn} ${replacementNeeded === opt ? styles.groupBtnActive : ""}`}
-                onClick={() => setReplacementNeeded(opt)}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* ── Section 4: Manager Notes ── */}
