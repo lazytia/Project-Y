@@ -71,10 +71,14 @@ export async function readXeroSecret(): Promise<XeroSecret | null> {
 /** Persist the secret back to Firestore. */
 export async function writeXeroSecret(s: Partial<XeroSecret>): Promise<void> {
   const [coll, id] = SECRETS_DOC.split("/");
-  await adminDb()
-    .collection(coll)
-    .doc(id)
-    .set({ ...s, updatedAt: new Date() }, { merge: true });
+  // Whitelist the fields we write so a stray class-instance value (e.g.
+  // xero-node's TokenSet) can't sneak into the payload — Firestore
+  // refuses to serialise objects with custom prototypes.
+  const safe: Record<string, unknown> = { updatedAt: new Date() };
+  if (typeof s.refreshToken === "string") safe.refreshToken = s.refreshToken;
+  if (typeof s.tenantId === "string") safe.tenantId = s.tenantId;
+  if (typeof s.tenantName === "string") safe.tenantName = s.tenantName;
+  await adminDb().collection(coll).doc(id).set(safe, { merge: true });
 }
 
 /**
