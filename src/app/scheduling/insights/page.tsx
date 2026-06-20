@@ -759,7 +759,7 @@ export default function InsightsPage() {
           <li>
             {payrollIsActual ? "Actual payroll" : "Estimated payroll"} for the week:{" "}
             {fmtCurrency(payrollCost)}
-            {payrollIsActual ? " (incl. super, from Xero)" : ""} across {currentWeek.totalShifts} shifts.
+            across {currentWeek.totalShifts} shifts.
           </li>
           {prevPayrollCost > 0 && (
             <li>
