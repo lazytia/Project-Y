@@ -241,6 +241,23 @@
   color: var(--color-fg-muted);
 }
 
+.sourcePill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(34, 139, 95, 0.10);
+  color: #1f8d5f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.pvaSource {
+  color: #1f8d5f;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 /* ── Generic card ── */
 .card {
   background: var(--color-bg);

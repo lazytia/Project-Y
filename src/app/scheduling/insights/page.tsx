@@ -42,6 +42,29 @@ type WeekDoc = {
   assignments?: Record<string, Record<Meal, Record<string, string>>>;
 };
 
+/**
+ * payroll_weekly/{weekStartISO} — populated by the Xero sync job.
+ * Pay run runs every Friday; the document keyed by the Monday of that
+ * work week stores the gross wages and super separately so we can show
+ * either the gross or the all-in (gross + super) total.
+ *
+ *   {
+ *     weekStartISO: "2026-06-15",
+ *     payDate: <Timestamp>,         // Friday pay run
+ *     gross: 7400,                  // total gross wages for the week
+ *     super: 814,                   // 11 % super (or per-employee actual)
+ *     source: "xero" | "manual",
+ *     syncedAt?: <Timestamp>,
+ *   }
+ */
+type WeeklyPayroll = {
+  weekStartISO?: string;
+  payDate?: Timestamp;
+  gross?: number;
+  super?: number;
+  source?: "xero" | "manual";
+};
+
 type WeekStats = {
   weekStartISO: string;
   totalShifts: number;
@@ -127,6 +150,7 @@ export default function InsightsPage() {
   const allowed = isOwner(user);
 
   const [docs, setDocs] = useState<Record<string, WeekDoc>>({});
+  const [payroll, setPayroll] = useState<Record<string, WeeklyPayroll>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -143,9 +167,17 @@ export default function InsightsPage() {
         setDocs(map);
       } catch {
         /* keep empty */
-      } finally {
-        setLoading(false);
       }
+      try {
+        // Pulled from Xero by the sync job (or entered manually).
+        const snap = await getDocs(collection(getDb(), "payroll_weekly"));
+        const map: Record<string, WeeklyPayroll> = {};
+        for (const d of snap.docs) map[d.id] = d.data() as WeeklyPayroll;
+        setPayroll(map);
+      } catch {
+        /* keep empty */
+      }
+      setLoading(false);
     })();
   }, [authLoading, allowed, router]);
 
@@ -198,10 +230,23 @@ export default function InsightsPage() {
     return out;
   }, [currentWeekStart, docs]);
 
-  // Derived
-  const payrollCost = currentWeek.estimatedCost;
-  const prevPayrollCost = prevWeek.estimatedCost;
-  const rosterPlanned = payrollCost; // same source for now
+  // Resolve actual payroll (gross + super) from payroll_weekly when
+  // it's been synced; otherwise fall back to the roster estimate.
+  function actualOrEstimate(weekStart: Date, estimate: number): { value: number; isActual: boolean } {
+    const iso = isoDate(weekStart);
+    const row = payroll[iso];
+    if (row && typeof row.gross === "number") {
+      const total = row.gross + (typeof row.super === "number" ? row.super : 0);
+      return { value: total, isActual: true };
+    }
+    return { value: estimate, isActual: false };
+  }
+  const currentPayroll = actualOrEstimate(currentWeekStart, currentWeek.estimatedCost);
+  const prevPayroll = actualOrEstimate(prevWeekStart, prevWeek.estimatedCost);
+  const payrollCost = currentPayroll.value;
+  const prevPayrollCost = prevPayroll.value;
+  const payrollIsActual = currentPayroll.isActual;
+  const rosterPlanned = currentWeek.estimatedCost; // planned always from roster estimate
   const variance = payrollCost - rosterPlanned;
 
   // Sales — no source yet. Use a global config doc later; for now, "—".
@@ -226,8 +271,20 @@ export default function InsightsPage() {
     return best;
   }, [currentWeek, currentWeekStart]);
 
-  // Trend chart geometry — show payroll cost trend (estimated)
-  const chart = useMemo(() => buildTrendChart(trend), [trend]);
+  // Trend chart geometry — actual payroll when synced from Xero,
+  // estimated from roster otherwise. Mark each point's source so the
+  // chart can render them differently.
+  const trendWithActuals = useMemo(
+    () =>
+      trend.map((w) => {
+        const [y, m, d] = w.weekStartISO.split("-").map(Number);
+        const start = new Date(y, m - 1, d);
+        const resolved = actualOrEstimate(start, w.estimatedCost);
+        return { ...w, displayCost: resolved.value, isActual: resolved.isActual };
+      }),
+    [trend, payroll], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const chart = useMemo(() => buildTrendChart(trendWithActuals), [trendWithActuals]);
 
   // Comparison labels
   const compareSales = prevPayrollCost > 0
@@ -317,7 +374,6 @@ export default function InsightsPage() {
             </>
           )}
         </div>
-        <p className={styles.weekCompare}>Compared to {fmtRange(prevWeekStart, prevWeekEnd)}</p>
       </div>
 
       {/* Snapshot card */}
@@ -363,8 +419,11 @@ export default function InsightsPage() {
           <p className={styles.snapshotMeta}>
             {prevPayrollCost > 0
               ? `${payrollVsLast >= 0 ? "+" : ""}${fmtPct(payrollVsLast)} vs last week`
-              : "Estimated"}
+              : payrollIsActual ? "Actual incl. super" : "Estimated"}
           </p>
+          {payrollIsActual && (
+            <span className={styles.sourcePill}>From Xero</span>
+          )}
         </div>
       </section>
 
@@ -379,9 +438,15 @@ export default function InsightsPage() {
           </div>
           <span className={styles.pvaOp} aria-hidden="true">−</span>
           <div className={styles.pvaCol}>
-            <p className={styles.pvaLabel}>PAYROLL COST (ACTUAL)</p>
+            <p className={styles.pvaLabel}>
+              PAYROLL COST (ACTUAL){payrollIsActual && <span className={styles.pvaSource}> · Xero</span>}
+            </p>
             <p className={`${styles.pvaValue} ${styles.pvaValueWarm}`}>{fmtCurrency(payrollCost)}</p>
-            <p className={styles.pvaMeta}>{hasSales ? `${fmtPct(payrollPct)} of sales` : "Estimated"}</p>
+            <p className={styles.pvaMeta}>
+              {hasSales
+                ? `${fmtPct(payrollPct)} of sales`
+                : payrollIsActual ? "incl. super" : "Estimated"}
+            </p>
           </div>
           <span className={styles.pvaOp} aria-hidden="true">=</span>
           <div className={styles.pvaCol}>
@@ -400,7 +465,9 @@ export default function InsightsPage() {
       <section className={styles.twoCol}>
         <div className={`${styles.card} ${styles.trendCard}`}>
           <p className={styles.cardTitle}>
-            LABOUR TREND <span className={styles.cardTitleSub}>(EST. COST)</span>
+            LABOUR TREND <span className={styles.cardTitleSub}>
+              ({trendWithActuals.some((w) => w.isActual) ? "ACTUAL · XERO" : "EST. COST"})
+            </span>
           </p>
           {chart.points.every((p) => p.value === 0) ? (
             <p className={styles.emptyChart}>No roster data for the last {TREND_WEEKS} weeks.</p>
@@ -475,7 +542,9 @@ export default function InsightsPage() {
         </p>
         <ul className={styles.insightList}>
           <li>
-            Estimated payroll for the week: {fmtCurrency(payrollCost)} across {currentWeek.totalShifts} shifts.
+            {payrollIsActual ? "Actual payroll" : "Estimated payroll"} for the week:{" "}
+            {fmtCurrency(payrollCost)}
+            {payrollIsActual ? " (incl. super, from Xero)" : ""} across {currentWeek.totalShifts} shifts.
           </li>
           {prevPayrollCost > 0 && (
             <li>
@@ -501,7 +570,7 @@ export default function InsightsPage() {
 /* ── Trend chart geometry helper ── */
 
 function buildTrendChart(
-  data: WeekStats[],
+  data: (WeekStats & { displayCost?: number; isActual?: boolean })[],
 ): {
   width: number;
   height: number;
@@ -511,7 +580,7 @@ function buildTrendChart(
   padBottom: number;
   yLabels: { value: number; y: number }[];
   linePath: string;
-  points: { x: number; y: number; value: number }[];
+  points: { x: number; y: number; value: number; isActual: boolean }[];
 } {
   const width = 360;
   const height = 220;
@@ -519,7 +588,7 @@ function buildTrendChart(
   const padRight = 32;
   const padTop = 16;
   const padBottom = 38;
-  const values = data.map((w) => w.estimatedCost);
+  const values = data.map((w) => w.displayCost ?? w.estimatedCost);
   const maxRaw = Math.max(...values, 1);
   const yMax = Math.ceil(maxRaw / 1000) * 1000 || 1000;
   const yMin = 0;
@@ -532,11 +601,15 @@ function buildTrendChart(
     });
   }
   const xSpan = width - padLeft - padRight;
-  const points = data.map((d, i) => ({
-    x: padLeft + (data.length === 1 ? xSpan / 2 : (i / (data.length - 1)) * xSpan),
-    y: padTop + ((yMax - d.estimatedCost) / (yMax - yMin)) * (height - padTop - padBottom),
-    value: d.estimatedCost,
-  }));
+  const points = data.map((d, i) => {
+    const v = d.displayCost ?? d.estimatedCost;
+    return {
+      x: padLeft + (data.length === 1 ? xSpan / 2 : (i / (data.length - 1)) * xSpan),
+      y: padTop + ((yMax - v) / (yMax - yMin)) * (height - padTop - padBottom),
+      value: v,
+      isActual: !!d.isActual,
+    };
+  });
   const linePath = points
     .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
     .join(" ");

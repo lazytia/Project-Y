@@ -35,6 +35,15 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // Weekly payroll totals — written by the Xero sync job (server)
+    // or by an owner via a manual entry form, read by the Insights
+    // dashboard. Documents are keyed by the Monday ISO date of the
+    // pay-run's work week and contain { gross, super, payDate }.
+    match /payroll_weekly/{weekStartISO} {
+      allow read: if request.auth != null;
+      allow write: if isOwner();
+    }
+
     // Cash payments: owner + manager only. Tracks every recorded
     // cash payment to candidates or active employees.
     match /cash_payments/{paymentId} {
