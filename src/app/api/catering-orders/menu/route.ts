@@ -74,7 +74,12 @@ export async function GET(req: NextRequest) {
       });
     }
     items.sort((a, b) => a.name.localeCompare(b.name));
-    return NextResponse.json({ items });
+    return NextResponse.json(
+      { items },
+      // Square catalog rarely changes within a session; cache briefly so
+      // re-opening the Add Item sheet doesn't hit Square again.
+      { headers: { "cache-control": "private, max-age=300" } },
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load Square menu.";
     return NextResponse.json({ error: msg }, { status: 500 });

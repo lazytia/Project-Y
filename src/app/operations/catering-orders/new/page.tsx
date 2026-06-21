@@ -194,6 +194,33 @@ export default function NewCateringOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addItemOpen, setAddItemOpen] = useState(false);
+  // Catalog is fetched once on mount so opening the Add Item sheet is instant.
+  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [menuError, setMenuError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch("/api/catering-orders/menu", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+        if (!cancelled) setMenu((data?.items ?? []) as MenuItem[]);
+      } catch (err) {
+        if (!cancelled) setMenuError(err instanceof Error ? err.message : "Could not load menu.");
+      } finally {
+        if (!cancelled) setMenuLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const readyByTime = useMemo(
     () => formatTimeMinusMinutes(deliveryTime, KITCHEN_PREP_MINUTES),
@@ -521,6 +548,9 @@ export default function NewCateringOrderPage() {
 
       {addItemOpen && (
         <AddItemModal
+          menu={menu}
+          loading={menuLoading}
+          error={menuError}
           onClose={() => setAddItemOpen(false)}
           onPick={(name, priceCents) => {
             addItem(name, priceCents / 100);
@@ -561,42 +591,24 @@ function Field({
 }
 
 function AddItemModal({
-  onClose, onPick,
-}: { onClose: () => void; onPick: (name: string, priceCents: number) => void }) {
-  const { user } = useAuth();
+  menu, loading, error, onClose, onPick,
+}: {
+  menu: MenuItem[];
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+  onPick: (name: string, priceCents: number) => void;
+}) {
   const [query, setQuery] = useState("");
-  const [items, setItems] = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customPrice, setCustomPrice] = useState<number | "">("");
 
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        const idToken = await user.getIdToken();
-        const res = await fetch("/api/catering-orders/menu", {
-          headers: { Authorization: `Bearer ${idToken}` },
-          cache: "no-store",
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
-        setItems((data?.items ?? []) as MenuItem[]);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not load menu.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items.slice(0, 50);
-    return items.filter((i) => i.name.toLowerCase().includes(q)).slice(0, 50);
-  }, [items, query]);
+    if (!q) return menu.slice(0, 50);
+    return menu.filter((i) => i.name.toLowerCase().includes(q)).slice(0, 50);
+  }, [menu, query]);
 
   function pickCustom() {
     if (!customName.trim() || customPrice === "" || customPrice <= 0) return;
