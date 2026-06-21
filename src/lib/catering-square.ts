@@ -329,7 +329,7 @@ function buildNotesBlob(form: CateringOrderForm): string {
   return lines.join("\n");
 }
 
-function buildFulfillment(form: CateringOrderForm): Record<string, unknown> {
+function buildFulfillment(form: CateringOrderForm, metaBlob: string): Record<string, unknown> {
   const timezone = tz();
   const whenIso = combineLocalDateTime(form.deliveryDateISO, form.deliveryTime, timezone);
   const recipient = {
@@ -340,25 +340,21 @@ function buildFulfillment(form: CateringOrderForm): Record<string, unknown> {
       ? { addressLine1: form.deliveryAddress }
       : undefined,
   };
+  // Square silently drops order.note for OPEN orders, but fulfillment.note
+  // persists reliably. Stash the whole metadata blob (including dietary)
+  // there so the detail page can parse it back out.
+  const note = metaBlob || undefined;
   if (form.fulfillmentType === "DELIVERY") {
     return {
       type: "DELIVERY" as const,
       state: "PROPOSED" as const,
-      deliveryDetails: {
-        deliverAt: whenIso,
-        recipient,
-        note: form.dietaryNotes || undefined,
-      },
+      deliveryDetails: { deliverAt: whenIso, recipient, note },
     };
   }
   return {
     type: "PICKUP" as const,
     state: "PROPOSED" as const,
-    pickupDetails: {
-      pickupAt: whenIso,
-      recipient,
-      note: form.dietaryNotes || undefined,
-    },
+    pickupDetails: { pickupAt: whenIso, recipient, note },
   };
 }
 
@@ -380,12 +376,12 @@ function buildRichOrderBody(form: CateringOrderForm) {
         quantity: "1",
         basePriceMoney: { amount: BigInt(0), currency: "AUD" as const },
       }];
+  const blob = buildNotesBlob(form);
   return {
     locationId: platterId,
     state: "OPEN" as const,
     lineItems,
-    fulfillments: [buildFulfillment(form)],
-    note: buildNotesBlob(form) || undefined,
+    fulfillments: [buildFulfillment(form, blob)],
   };
 }
 
