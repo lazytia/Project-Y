@@ -477,6 +477,12 @@ export default function NewCateringOrderPage() {
             </button>
           </li>
         </ul>
+        <div className={styles.totalRow}>
+          <span className={styles.totalLabel}>TOTAL</span>
+          <span className={styles.totalValue}>
+            ${items.reduce((sum, it) => sum + it.qty * it.unitPrice, 0).toFixed(2)}
+          </span>
+        </div>
       </Section>
 
       {/* 6. SPECIAL DIETARY REQUEST */}
