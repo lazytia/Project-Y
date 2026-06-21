@@ -44,6 +44,7 @@ type SqLineItem = {
   variationName?: string;
   quantity?: string;
   note?: string;
+  basePriceMoney?: SqMoney;
   totalMoney?: SqMoney;
 };
 type SqOrder = {
@@ -156,10 +157,20 @@ function menuFor(o: SqOrder): CateringMenuLine[] {
   for (const li of o.lineItems ?? []) {
     if (!li.name) continue;
     const qty = li.quantity ? parseInt(li.quantity, 10) : 1;
+    const safeQty = Number.isFinite(qty) && qty > 0 ? qty : 1;
     const name = li.variationName && li.variationName !== "Regular"
       ? `${li.name} (${li.variationName})`
       : li.name;
-    lines.push({ name, qty: Number.isFinite(qty) ? qty : 1 });
+    // Prefer basePriceMoney (per-unit); fall back to totalMoney/qty so the
+    // detail/edit views can show the right total.
+    const baseCents = moneyToDollars(li.basePriceMoney) * 100;
+    const totalCents = moneyToDollars(li.totalMoney) * 100;
+    const unitPrice = baseCents > 0
+      ? baseCents / 100
+      : totalCents > 0
+        ? totalCents / 100 / safeQty
+        : undefined;
+    lines.push({ name, qty: safeQty, unitPrice });
   }
   return lines;
 }
