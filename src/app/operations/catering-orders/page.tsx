@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 import {
   type CateringOrder,
   dCountdownLabel,
@@ -29,12 +30,10 @@ function isoOf(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Mon-first weekday index (0..6). */
 function weekdayMonFirst(d: Date): number {
   return (d.getDay() + 6) % 7;
 }
 
-/** Start of current week (Monday) for a given date. */
 function startOfWeek(d: Date): Date {
   const x = new Date(d);
   x.setDate(x.getDate() - weekdayMonFirst(x));
@@ -58,24 +57,31 @@ function ChevronRight() {
 }
 
 export default function CateringOrdersPage() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState<Date>(() => new Date());
+  const [modalDay, setModalDay] = useState<string | null>(null);
   const today = todayISO();
 
+  async function reload() {
+    if (!user) return;
+    try {
+      const list = await fetchCateringOrders(user);
+      setOrders(list);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Could not load orders.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    (async () => {
-      try {
-        const list = await fetchCateringOrders();
-        setOrders(list);
-      } catch (err) {
-        setLoadError(err instanceof Error ? err.message : "Could not load orders.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const ordersByDate = useMemo(() => {
     const m: Record<string, CateringOrder[]> = {};
@@ -98,7 +104,6 @@ export default function CateringOrdersPage() {
     return orders.find((o) => daysUntil(o.deliveryDateISO) >= 0) ?? null;
   }, [orders]);
 
-  // Build the calendar grid for the cursor month.
   const monthGrid = useMemo(() => {
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const gridStart = startOfWeek(first);
@@ -170,44 +175,39 @@ export default function CateringOrdersPage() {
           const dayOrders = ordersByDate[iso] ?? [];
           const isNextOrderDay = nextOrder?.deliveryDateISO === iso;
           return (
-            <div
+            <button
               key={iso}
+              type="button"
+              onClick={() => setModalDay(iso)}
               className={`${styles.cell} ${inMonth ? "" : styles.cellOut}`}
             >
               {isNextOrderDay ? (
-                <Link href={`/operations/catering-orders/${nextOrder!.id}`} className={styles.dayHighlight}>
-                  {date.getDate()}
-                </Link>
+                <span className={styles.dayHighlight}>{date.getDate()}</span>
               ) : (
                 <span className={`${styles.dayNum} ${iso === today ? styles.dayToday : ""}`}>
                   {date.getDate()}
                 </span>
               )}
-              {dayOrders.map((o) => (
-                <Link
-                  key={o.id}
-                  href={`/operations/catering-orders/${o.id}`}
-                  className={styles.cellOrder}
-                >
+              {dayOrders.slice(0, 1).map((o) => (
+                <span key={o.id} className={styles.cellOrder}>
                   {!isNextOrderDay || o.id !== nextOrder!.id ? (
                     <span className={styles.cellDot} aria-hidden="true" />
                   ) : null}
                   <span className={styles.cellName}>{o.clientName}</span>
                   <span className={styles.cellPax}>{o.guestsCount} pax</span>
                   <span className={styles.cellDay}>{dCountdownLabel(o.deliveryDateISO)}</span>
-                </Link>
+                </span>
               ))}
-            </div>
+              {dayOrders.length > 1 ? (
+                <span className={styles.cellMore}>+{dayOrders.length - 1}</span>
+              ) : null}
+            </button>
           );
         })}
       </div>
 
-      {/* Upcoming order summary */}
       <div className={styles.upcomingHead}>
         <p className={styles.upcomingTitle}>UPCOMING ORDER</p>
-        {orders.length > 0 ? (
-          <Link href="/operations/catering-orders/list" className={styles.viewAll}>VIEW ALL</Link>
-        ) : null}
       </div>
 
       {loading ? (
@@ -230,7 +230,6 @@ export default function CateringOrdersPage() {
             <li><span className={styles.upcomingFactIcon}>👥</span>{nextOrder.guestsCount} Guests</li>
             <li><span className={styles.upcomingFactIcon}>＄</span>{fmtMoney(nextOrder.totalAmount)}</li>
           </ul>
-
           {nextOrder.menu.length > 0 ? (
             <>
               <p className={styles.menuTitle}>MENU SUMMARY</p>
@@ -244,23 +243,172 @@ export default function CateringOrdersPage() {
               </ul>
             </>
           ) : null}
-
-          {nextOrder.deliveryAddressLines.length > 0 ? (
-            <>
-              <p className={styles.menuTitle}>DELIVERY ADDRESS</p>
-              <p className={styles.address}>
-                {nextOrder.deliveryAddressLines.map((line, idx) => (
-                  <span key={idx} style={{ display: "block" }}>{line}</span>
-                ))}
-              </p>
-            </>
-          ) : null}
-
           <span className={styles.viewDetailsBtn}>VIEW DETAILS &rsaquo;</span>
         </Link>
       ) : (
         <p className={styles.empty}>No upcoming orders.</p>
       )}
+
+      {modalDay && (
+        <DayModal
+          day={modalDay}
+          orders={ordersByDate[modalDay] ?? []}
+          onClose={() => setModalDay(null)}
+          onChanged={reload}
+        />
+      )}
+    </div>
+  );
+}
+
+function DayModal({
+  day, orders, onClose, onChanged,
+}: { day: string; orders: CateringOrder[]; onClose: () => void; onChanged: () => Promise<void> }) {
+  const { user } = useAuth();
+  const [mode, setMode] = useState<"list" | "add">(orders.length === 0 ? "add" : "list");
+  const [clientName, setClientName] = useState("");
+  const [deliveryTime, setDeliveryTime] = useState("11:30 AM");
+  const [guestsCount, setGuestsCount] = useState<number | "">("");
+  const [totalAmount, setTotalAmount] = useState<number | "">("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submitAdd() {
+    if (!user) return;
+    if (!clientName || !deliveryTime || !totalAmount) {
+      setError("Client name, time and total are required.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/catering-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({
+          clientName,
+          deliveryDateISO: day,
+          deliveryTime,
+          guestsCount: guestsCount === "" ? 0 : guestsCount,
+          totalAmount,
+          notes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+      await onChanged();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create order.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitDelete(orderId: string) {
+    if (!user) return;
+    if (!confirm("Cancel this catering order in Square?")) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/catering-orders/${encodeURIComponent(orderId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to cancel order.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className={styles.modalBackdrop} onClick={onClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <div>
+            <p className={styles.modalDay}>{day}</p>
+            <p className={styles.modalSub}>{orders.length} order{orders.length === 1 ? "" : "s"}</p>
+          </div>
+          <button type="button" className={styles.modalClose} onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        {mode === "list" ? (
+          <>
+            <ul className={styles.modalList}>
+              {orders.map((o) => (
+                <li key={o.id} className={styles.modalListItem}>
+                  <Link href={`/operations/catering-orders/${o.id}`} className={styles.modalListLink}>
+                    <span className={styles.modalListName}>{o.clientName}</span>
+                    <span className={styles.modalListMeta}>{o.deliveryTime} · {o.guestsCount} pax · {fmtMoney(o.totalAmount)}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    className={styles.modalDeleteBtn}
+                    onClick={() => submitDelete(o.id)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className={styles.modalPrimary} onClick={() => setMode("add")}>
+              + Add Order
+            </button>
+          </>
+        ) : (
+          <>
+            <div className={styles.formGrid}>
+              <label className={styles.formField}>
+                <span>Client name</span>
+                <input value={clientName} onChange={(e) => setClientName(e.target.value)} />
+              </label>
+              <label className={styles.formField}>
+                <span>Delivery time</span>
+                <input value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="11:30 AM" />
+              </label>
+              <label className={styles.formField}>
+                <span>Guests</span>
+                <input
+                  type="number"
+                  value={guestsCount}
+                  onChange={(e) => setGuestsCount(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
+                />
+              </label>
+              <label className={styles.formField}>
+                <span>Total ($)</span>
+                <input
+                  type="number"
+                  value={totalAmount}
+                  onChange={(e) => setTotalAmount(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                />
+              </label>
+              <label className={`${styles.formField} ${styles.formFieldWide}`}>
+                <span>Notes</span>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+              </label>
+            </div>
+            {error ? <p className={styles.error}>{error}</p> : null}
+            <div className={styles.modalActions}>
+              {orders.length > 0 ? (
+                <button type="button" className={styles.modalSecondary} onClick={() => setMode("list")} disabled={submitting}>
+                  Cancel
+                </button>
+              ) : null}
+              <button type="button" className={styles.modalPrimary} onClick={submitAdd} disabled={submitting}>
+                {submitting ? "Saving…" : "Create order"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,12 +1,10 @@
-import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
-import { getDb } from "@/lib/firebase";
+import type { User } from "firebase/auth";
 
 /**
- * Catering Orders — Firestore-backed event jobs surfaced on
- * /operations/catering-orders.
+ * Catering Orders — sourced from Square Platter via /api/catering-orders.
  *
- * Collection: catering_orders (named DB "project-y")
- * Document ID: free-form (e.g. "one-rail-2026-07-15").
+ * The server adapter (src/lib/catering-square.ts) handles the messy
+ * Square shape; this file is the shared type contract + client fetchers.
  */
 
 export type CateringOrderStatus = "CONFIRMED" | "PENDING" | "CANCELLED";
@@ -37,17 +35,34 @@ export type CateringOrder = {
   menu: CateringMenuLine[];
 };
 
-export async function fetchCateringOrders(): Promise<CateringOrder[]> {
-  const snap = await getDocs(
-    query(collection(getDb(), "catering_orders"), orderBy("deliveryDateISO", "asc")),
-  );
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<CateringOrder, "id">) }));
+async function authHeader(user: User | null | undefined): Promise<HeadersInit> {
+  if (!user) return {};
+  const idToken = await user.getIdToken();
+  return { Authorization: `Bearer ${idToken}` };
 }
 
-export async function fetchCateringOrder(id: string): Promise<CateringOrder | null> {
-  const snap = await getDoc(doc(getDb(), "catering_orders", id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as Omit<CateringOrder, "id">) };
+export async function fetchCateringOrders(user: User | null | undefined): Promise<CateringOrder[]> {
+  const res = await fetch("/api/catering-orders", {
+    cache: "no-store",
+    headers: await authHeader(user),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+  return (data?.orders ?? []) as CateringOrder[];
+}
+
+export async function fetchCateringOrder(
+  user: User | null | undefined,
+  id: string,
+): Promise<CateringOrder | null> {
+  const res = await fetch(`/api/catering-orders/${encodeURIComponent(id)}`, {
+    cache: "no-store",
+    headers: await authHeader(user),
+  });
+  if (res.status === 404) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+  return (data?.order ?? null) as CateringOrder | null;
 }
 
 /** YYYY-MM-DD in local timezone. */

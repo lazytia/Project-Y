@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 import {
   type CateringOrder,
   dCountdownLabel,
@@ -105,15 +106,16 @@ function MapPinIcon() {
 export default function CateringOrderDetailPage() {
   const params = useParams<{ orderId: string }>();
   const router = useRouter();
+  const { user } = useAuth();
   const [order, setOrder] = useState<CateringOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!params?.orderId || !user) return;
     (async () => {
-      if (!params?.orderId) return;
       try {
-        const o = await fetchCateringOrder(params.orderId);
+        const o = await fetchCateringOrder(user, params.orderId);
         if (!o) setError("Order not found.");
         setOrder(o);
       } catch (err) {
@@ -122,7 +124,7 @@ export default function CateringOrderDetailPage() {
         setLoading(false);
       }
     })();
-  }, [params?.orderId]);
+  }, [params?.orderId, user]);
 
   const groupedMenu = useMemo(() => {
     if (!order) return [];
