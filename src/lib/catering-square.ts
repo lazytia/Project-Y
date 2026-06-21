@@ -56,6 +56,7 @@ type SqOrder = {
   createdAt?: string;
   totalMoney?: SqMoney;
   customerId?: string;
+  note?: string;
   fulfillments?: SqFulfillment[];
   lineItems?: SqLineItem[];
 };
@@ -144,6 +145,10 @@ function clientNameFor(o: SqOrder): string {
 
 function notesFor(o: SqOrder): string[] {
   const out: string[] = [];
+  // Top-level order note carries the new-order form's metadata blob
+  // (Company/Method/Payment/Utensils/Dietary). Must come first so the
+  // metadata parser sees it.
+  if (o.note) out.push(o.note);
   const f = pickFulfillment(o);
   const fNote = f?.deliveryDetails?.note ?? f?.pickupDetails?.note;
   if (fNote) out.push(fNote);
