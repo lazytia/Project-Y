@@ -30,6 +30,7 @@ type SqRecipient = {
   address?: SqAddress;
 };
 type SqFulfillment = {
+  uid?: string;
   type?: string;
   state?: string;
   pickupDetails?: { pickupAt?: string; note?: string; recipient?: SqRecipient };
@@ -361,14 +362,46 @@ export async function updatePlatterCateringOrder(
 
 export async function cancelPlatterCateringOrder(orderId: string): Promise<void> {
   const current = await squareClient.orders.get({ orderId });
-  const existing = current.order as (SqOrder & { version?: number | bigint }) | undefined;
+  const existing = current.order as
+    | (SqOrder & { version?: number | bigint; fulfillments?: Array<SqFulfillment & { uid?: string }> })
+    | undefined;
   if (!existing) return;
   const platterId = squareEnv.platterLocationId;
   if (!platterId) throw new Error("SQUARE_PLATTER_LOCATION_ID not set.");
-  const version =
-    typeof existing.version === "bigint"
-      ? Number(existing.version)
-      : (existing.version ?? 0);
+  const toNum = (v: number | bigint | undefined): number =>
+    typeof v === "bigint" ? Number(v) : (v ?? 0);
+
+  // Square refuses to flip an order to CANCELED while any fulfillment is
+  // still PROPOSED/RESERVED. Cancel each active fulfillment first, then
+  // cancel the order. We replay through orders.update each time so the
+  // version number stays current.
+  // Square's update only accepts PICKUP/DELIVERY/SHIPMENT fulfillment
+  // updates here; DIGITAL fulfillments don't block order cancellation.
+  const cancellableTypes = new Set(["PICKUP", "DELIVERY", "SHIPMENT"]);
+  const activeFulfillments = (existing.fulfillments ?? []).filter(
+    (f) =>
+      f.uid &&
+      cancellableTypes.has(f.type ?? "") &&
+      f.state !== "CANCELED" &&
+      f.state !== "COMPLETED" &&
+      f.state !== "FAILED",
+  );
+  let version = toNum(existing.version);
+  if (activeFulfillments.length > 0) {
+    const resp = await squareClient.orders.update({
+      orderId,
+      order: {
+        locationId: platterId,
+        version,
+        fulfillments: activeFulfillments.map((f) => ({
+          uid: f.uid!,
+          type: f.type as "PICKUP" | "DELIVERY" | "SHIPMENT",
+          state: "CANCELED",
+        })),
+      },
+    });
+    version = toNum((resp.order as { version?: number | bigint } | undefined)?.version);
+  }
   await squareClient.orders.update({
     orderId,
     order: { locationId: platterId, state: "CANCELED", version },
