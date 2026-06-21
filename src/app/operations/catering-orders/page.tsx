@@ -78,6 +78,10 @@ export default function CateringOrdersPage() {
     }
   }
 
+  function removeOrderLocally(id: string) {
+    setOrders((prev) => prev.filter((o) => o.id !== id));
+  }
+
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -255,6 +259,7 @@ export default function CateringOrdersPage() {
           orders={ordersByDate[modalDay] ?? []}
           onClose={() => setModalDay(null)}
           onChanged={reload}
+          onLocalRemove={removeOrderLocally}
         />
       )}
     </div>
@@ -262,8 +267,14 @@ export default function CateringOrdersPage() {
 }
 
 function DayModal({
-  day, orders, onClose, onChanged,
-}: { day: string; orders: CateringOrder[]; onClose: () => void; onChanged: () => Promise<void> }) {
+  day, orders, onClose, onChanged, onLocalRemove,
+}: {
+  day: string;
+  orders: CateringOrder[];
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+  onLocalRemove: (id: string) => void;
+}) {
   const { user } = useAuth();
   const [mode, setMode] = useState<"list" | "add">(orders.length === 0 ? "add" : "list");
   const [clientName, setClientName] = useState("");
@@ -320,7 +331,13 @@ function DayModal({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
-      await onChanged();
+      // Square's order search is eventually consistent — purge the cancelled
+      // order from local state immediately so the calendar reflects reality
+      // even before the next refetch catches up.
+      onLocalRemove(orderId);
+      // Best-effort background refresh; if it still returns the stale row
+      // Square's index will sync within a few seconds.
+      onChanged().catch(() => undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to cancel order.");
     } finally {
