@@ -56,6 +56,12 @@ export type CateringOrder = {
   deliveryAddressLines: string[];
   notes: string[];
   menu: CateringMenuLine[];
+  fulfillmentType?: CateringFulfillmentType;
+  companyName?: string;
+  orderMethod?: CateringOrderMethod;
+  paymentStatus?: CateringPaymentStatus;
+  utensilsCount?: number;
+  dietaryNotes?: string;
 };
 
 async function authHeader(user: User | null | undefined): Promise<HeadersInit> {

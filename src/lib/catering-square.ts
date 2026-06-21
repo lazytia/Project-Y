@@ -9,10 +9,13 @@
  */
 import { squareClient, squareEnv } from "@/lib/square";
 import type {
+  CateringFulfillmentType,
   CateringMenuLine,
   CateringOrder,
   CateringOrderForm,
+  CateringOrderMethod,
   CateringOrderStatus,
+  CateringPaymentStatus,
 } from "@/lib/catering-orders";
 
 type SqMoney = { amount?: number | bigint; currency?: string };
@@ -183,12 +186,47 @@ function guestsFor(o: SqOrder): number {
   }, 0);
 }
 
+function parseMetadata(rawNotes: string[]): {
+  notes: string[];
+  companyName?: string;
+  orderMethod?: CateringOrderMethod;
+  paymentStatus?: CateringPaymentStatus;
+  utensilsCount?: number;
+  dietaryNotes?: string;
+} {
+  // The new-order form stores form-only fields as "Key: value" lines in the
+  // Square order's note. Pull them back out and keep any other free text
+  // as plain notes.
+  const blob = rawNotes.join("\n");
+  const out: ReturnType<typeof parseMetadata> = { notes: [] };
+  const m = (re: RegExp) => blob.match(re)?.[1]?.trim();
+  out.companyName = m(/Company:\s*([^\n]+)/i);
+  const method = m(/Method:\s*([A-Z_]+)/i);
+  if (method) out.orderMethod = method as CateringOrderMethod;
+  const payment = m(/Payment:\s*([A-Z_]+)/i);
+  if (payment) out.paymentStatus = payment as CateringPaymentStatus;
+  const utensils = m(/Utensils:\s*(\d+)/i);
+  if (utensils) out.utensilsCount = parseInt(utensils, 10);
+  out.dietaryNotes = m(/Dietary:\s*([\s\S]+?)(?:\n[A-Z][a-z]+:|$)/);
+  // Strip the metadata lines so what's left is genuine free-form notes.
+  const leftover = blob
+    .split(/\r?\n/)
+    .filter((line) => !/^(Company|Phone|Email|Method|Payment|Utensils|Dietary):/i.test(line))
+    .map((l) => l.trim())
+    .filter(Boolean);
+  out.notes = leftover;
+  return out;
+}
+
 export function toCateringOrder(o: SqOrder): CateringOrder | null {
   if (!o.id) return null;
   const f = pickFulfillment(o);
   const whenIso = fulfillmentTimeIso(f) ?? o.createdAt;
   const r = recipient(f);
   const timezone = tz();
+  const ftype: CateringFulfillmentType | undefined =
+    f?.type === "DELIVERY" ? "DELIVERY" : f?.type === "PICKUP" ? "PICKUP" : undefined;
+  const meta = parseMetadata(notesFor(o));
   return {
     id: o.id,
     clientName: clientNameFor(o),
@@ -201,8 +239,14 @@ export function toCateringOrder(o: SqOrder): CateringOrder | null {
     contactPhone: r?.phoneNumber,
     contactEmail: r?.emailAddress,
     deliveryAddressLines: addressLines(r?.address),
-    notes: notesFor(o),
+    notes: meta.notes,
     menu: menuFor(o),
+    fulfillmentType: ftype,
+    companyName: meta.companyName,
+    orderMethod: meta.orderMethod,
+    paymentStatus: meta.paymentStatus,
+    utensilsCount: meta.utensilsCount,
+    dietaryNotes: meta.dietaryNotes,
   };
 }
 

@@ -343,6 +343,17 @@ export default function NewCateringOrderPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+      // Square's order-search index lags ~5-30s after create/update, so
+      // hand the freshly returned order to the calendar via sessionStorage
+      // and let it inject the row immediately instead of waiting for the
+      // refetch to (eventually) include it.
+      if (typeof window !== "undefined" && data?.order) {
+        try {
+          sessionStorage.setItem("catering-just-saved", JSON.stringify(data.order));
+        } catch {
+          /* sessionStorage can be unavailable in private mode — non-fatal */
+        }
+      }
       router.push("/operations/catering-orders");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save order.");

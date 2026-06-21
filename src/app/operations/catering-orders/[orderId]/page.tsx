@@ -18,6 +18,24 @@ function fmtMoney(n: number): string {
   return `$${n.toLocaleString("en-AU", { maximumFractionDigits: 0 })}`;
 }
 
+function prettyMethod(m: string): string {
+  switch (m) {
+    case "WEBSITE": return "Website";
+    case "PHONE": return "Phone";
+    case "EMAIL": return "Email";
+    case "OTHER": return "Other";
+    default: return m;
+  }
+}
+function prettyPayment(s: string): string {
+  switch (s) {
+    case "PAID": return "Paid";
+    case "PARTIALLY_PAID": return "Partially Paid";
+    case "UNPAID": return "Unpaid";
+    default: return s;
+  }
+}
+
 function fmtDate(iso: string): { date: string; weekday: string } {
   const [y, m, d] = iso.split("-").map((x) => parseInt(x, 10));
   const dt = new Date(y, m - 1, d);
@@ -176,15 +194,24 @@ export default function CateringOrderDetailPage() {
 
           <div className={styles.factGrid}>
             <FactCol icon={<CalIcon />} value={fmtDate(order.deliveryDateISO).date} label={fmtDate(order.deliveryDateISO).weekday} />
-            <FactCol icon={<ClockIcon />} value={order.deliveryTime} label="Delivery" />
+            <FactCol
+              icon={<ClockIcon />}
+              value={order.deliveryTime}
+              label={order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
+            />
             <FactCol icon={<PeopleIcon />} value={String(order.guestsCount)} label="Guests" />
             <FactCol icon={<DollarIcon />} value={fmtMoney(order.totalAmount)} label="Total" />
           </div>
 
-          {(order.contactName || order.contactPhone || order.contactEmail) && (
+          {(order.contactName || order.contactPhone || order.contactEmail || order.companyName) && (
             <section className={styles.section}>
               <p className={styles.sectionTitle}>CONTACT</p>
               {order.contactName ? <p className={styles.line}>{order.contactName}</p> : null}
+              {order.companyName ? (
+                <p className={styles.line} style={{ color: "var(--color-fg-muted)" }}>
+                  {order.companyName}
+                </p>
+              ) : null}
               {order.contactPhone ? (
                 <div className={styles.row}>
                   <p className={styles.line}>{order.contactPhone}</p>
@@ -197,6 +224,33 @@ export default function CateringOrderDetailPage() {
                   <a href={`mailto:${order.contactEmail}`} className={styles.iconBtn} aria-label="Email"><MailIcon /></a>
                 </div>
               ) : null}
+            </section>
+          )}
+
+          {(order.orderMethod || order.fulfillmentType || order.paymentStatus) && (
+            <section className={styles.section}>
+              <p className={styles.sectionTitle}>ORDER</p>
+              <div className={styles.tagRow}>
+                {order.orderMethod ? (
+                  <span className={styles.tag}>Method · {prettyMethod(order.orderMethod)}</span>
+                ) : null}
+                {order.fulfillmentType ? (
+                  <span className={styles.tag}>{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}</span>
+                ) : null}
+                {order.paymentStatus ? (
+                  <span
+                    className={`${styles.tag} ${
+                      order.paymentStatus === "PAID"
+                        ? styles.tagPaid
+                        : order.paymentStatus === "PARTIALLY_PAID"
+                          ? styles.tagPartial
+                          : styles.tagUnpaid
+                    }`}
+                  >
+                    {prettyPayment(order.paymentStatus)}
+                  </span>
+                ) : null}
+              </div>
             </section>
           )}
 
@@ -221,6 +275,20 @@ export default function CateringOrderDetailPage() {
               </div>
             </section>
           )}
+
+          {order.dietaryNotes ? (
+            <section className={styles.section}>
+              <p className={styles.sectionTitle}>SPECIAL DIETARY REQUEST</p>
+              <p className={styles.line} style={{ whiteSpace: "pre-wrap" }}>{order.dietaryNotes}</p>
+            </section>
+          ) : null}
+
+          {typeof order.utensilsCount === "number" && order.utensilsCount > 0 ? (
+            <section className={styles.section}>
+              <p className={styles.sectionTitle}>UTENSILS QTY</p>
+              <p className={styles.line}>{order.utensilsCount}</p>
+            </section>
+          ) : null}
 
           {order.notes.length > 0 && (
             <section className={styles.section}>

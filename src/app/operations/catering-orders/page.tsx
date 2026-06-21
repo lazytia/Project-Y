@@ -117,6 +117,19 @@ export default function CateringOrdersPage() {
 
   useEffect(() => {
     reload();
+    // Pick up any order the /new page just saved while navigating back here.
+    if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem("catering-just-saved");
+        if (raw) {
+          const saved = JSON.parse(raw) as CateringOrder;
+          if (saved?.id) addOrderLocally(saved);
+          sessionStorage.removeItem("catering-just-saved");
+        }
+      } catch {
+        /* ignore corrupted storage values */
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
