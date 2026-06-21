@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { squareClient } from "@/lib/square";
+import { SOLD_OUT_EXCLUDED_NAME } from "@/lib/sold-out-square";
 
 /**
  * GET /api/menu/sold-out-categories
@@ -62,6 +63,9 @@ export async function GET() {
           const d = it.itemData;
           if (!d) return false;
           const itemName = d.name ?? "";
+          // Skip items that the Daily Sold Out toggle isn't allowed to manage
+          // (e.g. cooked tuna, katsu kushi).
+          if (SOLD_OUT_EXCLUDED_NAME.test(itemName)) return false;
           if (catId) {
             // Match by Square category ID first (most accurate).
             if (d.categoryId === catId) return true;
@@ -76,13 +80,25 @@ export async function GET() {
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b));
 
+      // Square sometimes has the same dish twice with different casing
+      // (e.g. "Ika (Squid) Sushi" and "IKA (Squid) Sushi"). Both still get
+      // toggled sold-out, but show the user one row per dish.
+      const seen = new Set<string>();
+      const uniqueAffected: string[] = [];
+      for (const n of affected) {
+        const key = n.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        uniqueAffected.push(n);
+      }
+
       return {
         categoryId: cfg.id,
         displayName: cfg.displayName,
         ...(cfg.subName ? { subName: cfg.subName } : {}),
-        itemCount: affected.length,
+        itemCount: uniqueAffected.length,
         resetRule: "Reset automatically at end of day",
-        affectedItems: affected,
+        affectedItems: uniqueAffected,
       };
     });
 

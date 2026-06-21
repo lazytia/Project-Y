@@ -36,6 +36,13 @@ export const SOLD_OUT_CATEGORIES: CategoryDef[] = [
   { id: "tuna", match: /\btuna\b/i },
 ];
 
+/**
+ * Item names that the regex above would otherwise match but should NEVER be
+ * managed by the Daily Sold Out toggle (different supply chain — cooked tuna
+ * uses pantry tins, katsu kushi uses pre-portioned breaded fish).
+ */
+export const SOLD_OUT_EXCLUDED_NAME = /cooked\s+tuna|katsu\s+kushi/i;
+
 type Variation = {
   id?: string;
   type?: string;
@@ -96,11 +103,13 @@ function itemsInCategory(all: CatalogObject[], cfg: CategoryDef): CatalogObject[
   return items.filter((it) => {
     const d = it.itemData;
     if (!d) return false;
+    const name = d.name ?? "";
+    if (SOLD_OUT_EXCLUDED_NAME.test(name)) return false;
     if (catId) {
       if (d.categoryId === catId) return true;
       if (Array.isArray(d.categories) && d.categories.some((c) => c.id === catId)) return true;
     }
-    return cfg.match.test(d.name ?? "");
+    return cfg.match.test(name);
   });
 }
 
