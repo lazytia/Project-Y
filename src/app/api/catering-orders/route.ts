@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
-import { createPlatterCateringOrder, listPlatterCateringOrders } from "@/lib/catering-square";
+import {
+  createPlatterCateringOrder,
+  createPlatterCateringOrderFromForm,
+  listPlatterCateringOrders,
+} from "@/lib/catering-square";
+import type { CateringOrderForm } from "@/lib/catering-orders";
 
 /**
  * GET /api/catering-orders
@@ -40,12 +45,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await verifyAuth(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  let body: {
-    clientName?: string;
-    deliveryDateISO?: string;
-    deliveryTime?: string;
-    guestsCount?: number;
+  let body: Partial<CateringOrderForm> & {
     totalAmount?: number;
+    guestsCount?: number;
     notes?: string;
   };
   try {
@@ -53,13 +55,39 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
-  if (!body.clientName || !body.deliveryDateISO || !body.deliveryTime || !body.totalAmount) {
+  if (!body.clientName || !body.deliveryDateISO || !body.deliveryTime) {
     return NextResponse.json(
-      { error: "Required: clientName, deliveryDateISO, deliveryTime, totalAmount." },
+      { error: "Required: clientName, deliveryDateISO, deliveryTime." },
       { status: 400 },
     );
   }
   try {
+    // New-form path: itemised + fulfilment type + contact metadata.
+    if (Array.isArray(body.items)) {
+      const order = await createPlatterCateringOrderFromForm({
+        clientName: body.clientName,
+        companyName: body.companyName,
+        contactPhone: body.contactPhone,
+        contactEmail: body.contactEmail,
+        orderMethod: body.orderMethod ?? "OTHER",
+        fulfillmentType: body.fulfillmentType ?? "PICKUP",
+        deliveryDateISO: body.deliveryDateISO,
+        deliveryTime: body.deliveryTime,
+        deliveryAddress: body.deliveryAddress,
+        items: body.items,
+        dietaryNotes: body.dietaryNotes,
+        utensilsCount: body.utensilsCount,
+        paymentStatus: body.paymentStatus,
+      });
+      return NextResponse.json({ order });
+    }
+    // Legacy quick-add path from the day modal.
+    if (!body.totalAmount) {
+      return NextResponse.json(
+        { error: "Required for quick-add: totalAmount." },
+        { status: 400 },
+      );
+    }
     const order = await createPlatterCateringOrder({
       clientName: body.clientName,
       deliveryDateISO: body.deliveryDateISO,

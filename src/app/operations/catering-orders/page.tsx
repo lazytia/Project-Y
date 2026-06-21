@@ -293,7 +293,6 @@ export default function CateringOrdersPage() {
           onClose={() => setModalDay(null)}
           onChanged={reload}
           onLocalRemove={removeOrderLocally}
-          onLocalAdd={addOrderLocally}
         />
       )}
     </div>
@@ -301,61 +300,17 @@ export default function CateringOrdersPage() {
 }
 
 function DayModal({
-  day, orders, onClose, onChanged, onLocalRemove, onLocalAdd,
+  day, orders, onClose, onChanged, onLocalRemove,
 }: {
   day: string;
   orders: CateringOrder[];
   onClose: () => void;
   onChanged: () => Promise<void>;
   onLocalRemove: (id: string) => void;
-  onLocalAdd: (o: CateringOrder) => void;
 }) {
   const { user } = useAuth();
-  const [mode, setMode] = useState<"list" | "add">(orders.length === 0 ? "add" : "list");
-  const [clientName, setClientName] = useState("");
-  const [deliveryTime, setDeliveryTime] = useState("11:30 AM");
-  const [guestsCount, setGuestsCount] = useState<number | "">("");
-  const [totalAmount, setTotalAmount] = useState<number | "">("");
-  const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function submitAdd() {
-    if (!user) return;
-    if (!clientName || !deliveryTime || !totalAmount) {
-      setError("Client name, time and total are required.");
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/catering-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({
-          clientName,
-          deliveryDateISO: day,
-          deliveryTime,
-          guestsCount: guestsCount === "" ? 0 : guestsCount,
-          totalAmount,
-          notes,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
-      // The created order may take a few seconds to appear in Square's
-      // order-search index. Drop it into local state immediately and
-      // let the background refetch reconcile when it shows up.
-      if (data?.order) onLocalAdd(data.order as CateringOrder);
-      onChanged().catch(() => undefined);
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create order.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function submitDelete(orderId: string) {
     if (!user) return;
@@ -395,75 +350,33 @@ function DayModal({
           <button type="button" className={styles.modalClose} onClick={onClose} aria-label="Close">×</button>
         </div>
 
-        {mode === "list" ? (
-          <>
-            <ul className={styles.modalList}>
-              {orders.map((o) => (
-                <li key={o.id} className={styles.modalListItem}>
-                  <Link href={`/operations/catering-orders/${o.id}`} className={styles.modalListLink}>
-                    <span className={styles.modalListName}>{o.clientName}</span>
-                    <span className={styles.modalListMeta}>{o.deliveryTime} · {o.guestsCount} pax · {fmtMoney(o.totalAmount)}</span>
-                  </Link>
-                  <button
-                    type="button"
-                    className={styles.modalDeleteBtn}
-                    onClick={() => submitDelete(o.id)}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <button type="button" className={styles.modalPrimary} onClick={() => setMode("add")}>
-              + Add Order
-            </button>
-          </>
-        ) : (
-          <>
-            <div className={styles.formGrid}>
-              <label className={styles.formField}>
-                <span>Client name</span>
-                <input value={clientName} onChange={(e) => setClientName(e.target.value)} />
-              </label>
-              <label className={styles.formField}>
-                <span>Delivery time</span>
-                <input value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="11:30 AM" />
-              </label>
-              <label className={styles.formField}>
-                <span>Guests</span>
-                <input
-                  type="number"
-                  value={guestsCount}
-                  onChange={(e) => setGuestsCount(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
-                />
-              </label>
-              <label className={styles.formField}>
-                <span>Total ($)</span>
-                <input
-                  type="number"
-                  value={totalAmount}
-                  onChange={(e) => setTotalAmount(e.target.value === "" ? "" : parseFloat(e.target.value))}
-                />
-              </label>
-              <label className={`${styles.formField} ${styles.formFieldWide}`}>
-                <span>Notes</span>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-              </label>
-            </div>
-            {error ? <p className={styles.error}>{error}</p> : null}
-            <div className={styles.modalActions}>
-              {orders.length > 0 ? (
-                <button type="button" className={styles.modalSecondary} onClick={() => setMode("list")} disabled={submitting}>
+        {orders.length > 0 ? (
+          <ul className={styles.modalList}>
+            {orders.map((o) => (
+              <li key={o.id} className={styles.modalListItem}>
+                <Link href={`/operations/catering-orders/${o.id}`} className={styles.modalListLink}>
+                  <span className={styles.modalListName}>{o.clientName}</span>
+                  <span className={styles.modalListMeta}>{o.deliveryTime} · {o.guestsCount} pax · {fmtMoney(o.totalAmount)}</span>
+                </Link>
+                <button
+                  type="button"
+                  className={styles.modalDeleteBtn}
+                  onClick={() => submitDelete(o.id)}
+                  disabled={submitting}
+                >
                   Cancel
                 </button>
-              ) : null}
-              <button type="button" className={styles.modalPrimary} onClick={submitAdd} disabled={submitting}>
-                {submitting ? "Saving…" : "Create order"}
-              </button>
-            </div>
-          </>
-        )}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {error ? <p className={styles.error}>{error}</p> : null}
+        <Link
+          href={`/operations/catering-orders/new?date=${encodeURIComponent(day)}`}
+          className={styles.modalPrimary}
+        >
+          Create order
+        </Link>
       </div>
     </div>
   );

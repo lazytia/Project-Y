@@ -9,11 +9,34 @@ import type { User } from "firebase/auth";
 
 export type CateringOrderStatus = "CONFIRMED" | "PENDING" | "CANCELLED";
 
+export type CateringOrderMethod = "WEBSITE" | "PHONE" | "EMAIL" | "OTHER";
+export type CateringFulfillmentType = "PICKUP" | "DELIVERY";
+export type CateringPaymentStatus = "UNPAID" | "PARTIALLY_PAID" | "PAID";
+
 export type CateringMenuLine = {
   /** Optional group header on the detail view ("Donburi", "Ramen", ...). */
   category?: string;
   name: string;
   qty: number;
+  /** Per-unit price in dollars, if known (used when computing totals). */
+  unitPrice?: number;
+};
+
+/** Shape posted by the new full-page form to /api/catering-orders. */
+export type CateringOrderForm = {
+  clientName: string;
+  companyName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  orderMethod: CateringOrderMethod;
+  fulfillmentType: CateringFulfillmentType;
+  deliveryDateISO: string;
+  deliveryTime: string;
+  deliveryAddress?: string;
+  items: Array<{ name: string; qty: number; unitPrice: number }>;
+  dietaryNotes?: string;
+  utensilsCount?: number;
+  paymentStatus?: CateringPaymentStatus;
 };
 
 export type CateringOrder = {

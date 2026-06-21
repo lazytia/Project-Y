@@ -1,0 +1,664 @@
+.page {
+  padding: var(--space-4) var(--space-4) calc(var(--space-7) + 72px);
+}
+
+.title {
+  text-align: center;
+  margin: 0 0 var(--space-5);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--color-fg);
+}
+
+.section {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4) 0;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--space-3);
+}
+
+.stepBadge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-fg);
+  color: var(--color-bg);
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-fg);
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.helper {
+  margin: var(--space-2) 0 0 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Field ── */
+.fieldOuter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-fg-muted);
+}
+
+.fieldInner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.fieldInner input,
+.fieldInner textarea {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-fg);
+  resize: vertical;
+}
+
+.fieldIcon { color: var(--color-fg-muted); display: inline-flex; }
+
+/* ── 2. Method ── */
+.methodGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.methodBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.methodBtnActive {
+  border-color: var(--color-warm);
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+.methodIcon { display: inline-flex; color: inherit; }
+
+/* ── 3. Pickup/Delivery ── */
+.pickupGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pickupCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--color-fg);
+}
+
+.pickupCardActive {
+  border-color: var(--color-warm);
+  background: var(--color-warm-bg);
+}
+
+.pickupIcon { color: var(--color-fg); }
+.pickupCardActive .pickupIcon { color: var(--color-warm); }
+
+.pickupTitle {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.pickupSub {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  text-align: center;
+}
+
+.pickupCardActive .pickupTitle,
+.pickupCardActive .pickupSub { color: var(--color-warm); }
+
+/* ── 4. Date + Ready-by ── */
+.dateRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.readyByCard {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  background: var(--color-warm-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.readyByIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--color-warm);
+  color: var(--color-bg);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.readyByBody {
+  flex: 1;
+}
+
+.readyByHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.readyByLabel {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-warm);
+}
+
+.readyByPill {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-warm);
+  background: var(--color-bg);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.readyByTime {
+  margin: 4px 0 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-warm);
+}
+
+.readyByHint {
+  margin: 2px 0 0 0;
+  font-size: 11px;
+  color: var(--color-warm);
+}
+
+.addressCard {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.addressTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-fg);
+}
+
+/* ── 5. Order details ── */
+.itemList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.itemName {
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-fg);
+}
+
+.qtyControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qtyVal {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 30px;
+  text-align: center;
+}
+
+.qtyBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-fg);
+}
+
+.trashBtn {
+  background: none;
+  border: none;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.addItemBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--space-3);
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-warm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── 6. Dietary ── */
+.dietaryWrap {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.dietaryWrap textarea {
+  width: 100%;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-fg);
+  resize: vertical;
+  min-height: 80px;
+}
+
+.dietaryCount {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 10px;
+  color: var(--color-fg-muted);
+}
+
+/* ── 7. Utensils ── */
+.utensilsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.utensilsField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.utensilsValue {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.utensilsControls {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 8. Payment ── */
+.paymentGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.paymentBtn {
+  padding: 10px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.paymentBtnActive {
+  background: var(--color-fg);
+  color: var(--color-bg);
+  border-color: var(--color-fg);
+}
+
+/* ── Sticky action bar ── */
+.actionBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+  z-index: 20;
+}
+
+.saveDraft {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-fg);
+  text-decoration: none;
+  padding: var(--space-2);
+}
+
+.saveBtn {
+  flex: 1;
+  max-width: 280px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-fg);
+  color: var(--color-bg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.saveBtn:disabled { opacity: 0.5; cursor: progress; }
+
+.error {
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-negative);
+  margin: var(--space-3) 0 0 0;
+}
+
+/* ── Bottom sheet (Add Item) ── */
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 60;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--color-bg);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: var(--space-4);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@media (min-width: 600px) {
+  .sheetBackdrop { align-items: center; }
+  .sheet { border-radius: var(--radius-lg); }
+}
+
+.sheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.sheetTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.sheetClose {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  padding: 0 6px;
+}
+
+.sheetLabel {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+}
+
+.searchWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+
+.searchIcon { color: var(--color-fg-muted); display: inline-flex; }
+
+.searchInput {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-fg);
+}
+
+.searchClear {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.menuList {
+  list-style: none;
+  margin: 0 0 var(--space-3) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.menuThumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.menuInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.menuName {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.menuPrice {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.menuAdd {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-sm);
+  color: var(--color-warm);
+  cursor: pointer;
+}
+
+.sheetEmpty {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  text-align: center;
+  padding: var(--space-3);
+}
+
+.customBlock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.customForm {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+}
+
+.customForm input {
+  flex: 1;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--color-surface);
+}
+
+.customHint {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.customLink {
+  background: none;
+  border: none;
+  color: var(--color-warm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sheetFooter {
+  margin: var(--space-3) 0 0 0;
+  font-size: 11px;
+  color: var(--color-fg-subtle);
+  text-align: center;
+}

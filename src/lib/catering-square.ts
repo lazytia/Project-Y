@@ -11,6 +11,7 @@ import { squareClient, squareEnv } from "@/lib/square";
 import type {
   CateringMenuLine,
   CateringOrder,
+  CateringOrderForm,
   CateringOrderStatus,
 } from "@/lib/catering-orders";
 
@@ -255,6 +256,92 @@ type CateringOrderInput = {
   totalAmount: number;
   notes?: string;
 };
+
+function buildNotesBlob(form: CateringOrderForm): string {
+  const lines: string[] = [];
+  if (form.companyName) lines.push(`Company: ${form.companyName}`);
+  if (form.contactPhone) lines.push(`Phone: ${form.contactPhone}`);
+  if (form.contactEmail) lines.push(`Email: ${form.contactEmail}`);
+  if (form.orderMethod) lines.push(`Method: ${form.orderMethod}`);
+  if (form.paymentStatus) lines.push(`Payment: ${form.paymentStatus}`);
+  if (typeof form.utensilsCount === "number") lines.push(`Utensils: ${form.utensilsCount}`);
+  if (form.dietaryNotes) lines.push(`Dietary: ${form.dietaryNotes}`);
+  return lines.join("\n");
+}
+
+function buildFulfillment(form: CateringOrderForm): Record<string, unknown> {
+  const timezone = tz();
+  const whenIso = combineLocalDateTime(form.deliveryDateISO, form.deliveryTime, timezone);
+  const recipient = {
+    displayName: form.clientName,
+    emailAddress: form.contactEmail || undefined,
+    phoneNumber: form.contactPhone || undefined,
+    address: form.deliveryAddress
+      ? { addressLine1: form.deliveryAddress }
+      : undefined,
+  };
+  if (form.fulfillmentType === "DELIVERY") {
+    return {
+      type: "DELIVERY" as const,
+      state: "PROPOSED" as const,
+      deliveryDetails: {
+        deliverAt: whenIso,
+        recipient,
+        note: form.dietaryNotes || undefined,
+      },
+    };
+  }
+  return {
+    type: "PICKUP" as const,
+    state: "PROPOSED" as const,
+    pickupDetails: {
+      pickupAt: whenIso,
+      recipient,
+      note: form.dietaryNotes || undefined,
+    },
+  };
+}
+
+function buildRichOrderBody(form: CateringOrderForm) {
+  const platterId = squareEnv.platterLocationId;
+  if (!platterId) throw new Error("SQUARE_PLATTER_LOCATION_ID not set.");
+  const lineItems = form.items.length > 0
+    ? form.items.map((it) => ({
+        name: it.name,
+        quantity: String(Math.max(1, Math.round(it.qty))),
+        basePriceMoney: {
+          amount: BigInt(Math.round(it.unitPrice * 100)),
+          currency: "AUD" as const,
+        },
+      }))
+    : [{
+        // Fallback: at least one line item so Square accepts the order.
+        name: form.clientName,
+        quantity: "1",
+        basePriceMoney: { amount: BigInt(0), currency: "AUD" as const },
+      }];
+  return {
+    locationId: platterId,
+    state: "OPEN" as const,
+    lineItems,
+    fulfillments: [buildFulfillment(form)],
+    note: buildNotesBlob(form) || undefined,
+  };
+}
+
+export async function createPlatterCateringOrderFromForm(
+  form: CateringOrderForm,
+): Promise<CateringOrder> {
+  const resp = await squareClient.orders.create({
+    idempotencyKey: `catering-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    order: buildRichOrderBody(form),
+  });
+  const o = resp.order as SqOrder | undefined;
+  if (!o) throw new Error("Square did not return a created order.");
+  const mapped = toCateringOrder(o);
+  if (!mapped) throw new Error("Could not map newly created order.");
+  return mapped;
+}
 
 /**
  * Convert local YYYY-MM-DD + "11:30 AM" (or "11:30") in the venue's TZ to
