@@ -635,19 +635,19 @@ function AddItemModal({
         ) : (
           <ul className={styles.menuList}>
             {filtered.map((it) => (
-              <li key={it.id} className={styles.menuItem}>
-                <div className={styles.menuThumb} aria-hidden="true">🍱</div>
-                <div className={styles.menuInfo}>
-                  <p className={styles.menuName}>{it.name}</p>
-                  <p className={styles.menuPrice}>${(it.priceCents / 100).toFixed(2)}</p>
-                </div>
+              <li key={it.id}>
                 <button
                   type="button"
-                  className={styles.menuAdd}
+                  className={styles.menuItem}
                   onClick={() => onPick(it.name, it.priceCents)}
                   aria-label={`Add ${it.name}`}
                 >
-                  <PlusIcon />
+                  <span className={styles.menuThumb} aria-hidden="true">🍱</span>
+                  <span className={styles.menuInfo}>
+                    <span className={styles.menuName}>{it.name}</span>
+                    <span className={styles.menuPrice}>${(it.priceCents / 100).toFixed(2)}</span>
+                  </span>
+                  <span className={styles.menuAdd} aria-hidden="true"><PlusIcon /></span>
                 </button>
               </li>
             ))}
