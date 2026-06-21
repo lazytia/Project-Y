@@ -85,11 +85,10 @@ service cloud.firestore {
     }
 
     // Catering orders — event jobs surfaced on /operations/catering-orders.
-    // Any signed-in user can read so kitchen/prep staff see what's upcoming;
-    // only owners can create or edit orders.
+    // Operations team (owners + managers + any signed-in staff) can create,
+    // edit, and delete orders; everyone signed in can read.
     match /catering_orders/{orderId} {
-      allow read: if request.auth != null;
-      allow write: if isOwner();
+      allow read, write: if request.auth != null;
     }
 
     // Default: deny all other access
