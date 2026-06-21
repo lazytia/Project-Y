@@ -58,7 +58,14 @@ function ChevronRight() {
 
 export default function CateringOrdersPage() {
   const { user } = useAuth();
-  const [orders, setOrders] = useState<CateringOrder[]>([]);
+  const [serverOrders, setServerOrders] = useState<CateringOrder[]>([]);
+  // Square's order search is eventually consistent — after a cancel, the
+  // just-cancelled row still appears as OPEN for ~30s; after a create,
+  // the new row is missing for ~30s. We hold these locally so the UI
+  // reflects user actions immediately and self-heals once Square's index
+  // catches up.
+  const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
+  const [pendingAdds, setPendingAdds] = useState<CateringOrder[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState<Date>(() => new Date());
@@ -69,8 +76,17 @@ export default function CateringOrdersPage() {
     if (!user) return;
     try {
       const list = await fetchCateringOrders(user);
-      setOrders(list);
+      setServerOrders(list);
       setLoadError(null);
+      // Reconcile local overrides once Square's index has caught up.
+      const ids = new Set(list.map((o) => o.id));
+      setCancelledIds((prev) => {
+        // Drop any cancelled id Square is no longer returning (= synced).
+        const next = new Set<string>();
+        for (const id of prev) if (ids.has(id)) next.add(id);
+        return next;
+      });
+      setPendingAdds((prev) => prev.filter((o) => !ids.has(o.id)));
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Could not load orders.");
     } finally {
@@ -78,8 +94,25 @@ export default function CateringOrdersPage() {
     }
   }
 
+  const orders = useMemo(() => {
+    const filtered = serverOrders.filter((o) => !cancelledIds.has(o.id));
+    // Avoid duplicates if a pending-add already appeared in the server list.
+    const haveIds = new Set(filtered.map((o) => o.id));
+    const merged = [...filtered, ...pendingAdds.filter((o) => !haveIds.has(o.id))];
+    merged.sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
+    return merged;
+  }, [serverOrders, cancelledIds, pendingAdds]);
+
   function removeOrderLocally(id: string) {
-    setOrders((prev) => prev.filter((o) => o.id !== id));
+    setCancelledIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
+
+  function addOrderLocally(o: CateringOrder) {
+    setPendingAdds((prev) => [...prev.filter((x) => x.id !== o.id), o]);
   }
 
   useEffect(() => {
@@ -260,6 +293,7 @@ export default function CateringOrdersPage() {
           onClose={() => setModalDay(null)}
           onChanged={reload}
           onLocalRemove={removeOrderLocally}
+          onLocalAdd={addOrderLocally}
         />
       )}
     </div>
@@ -267,13 +301,14 @@ export default function CateringOrdersPage() {
 }
 
 function DayModal({
-  day, orders, onClose, onChanged, onLocalRemove,
+  day, orders, onClose, onChanged, onLocalRemove, onLocalAdd,
 }: {
   day: string;
   orders: CateringOrder[];
   onClose: () => void;
   onChanged: () => Promise<void>;
   onLocalRemove: (id: string) => void;
+  onLocalAdd: (o: CateringOrder) => void;
 }) {
   const { user } = useAuth();
   const [mode, setMode] = useState<"list" | "add">(orders.length === 0 ? "add" : "list");
@@ -309,7 +344,11 @@ function DayModal({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
-      await onChanged();
+      // The created order may take a few seconds to appear in Square's
+      // order-search index. Drop it into local state immediately and
+      // let the background refetch reconcile when it shows up.
+      if (data?.order) onLocalAdd(data.order as CateringOrder);
+      onChanged().catch(() => undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create order.");
