@@ -148,9 +148,13 @@ export default function CateringOrderDetailPage() {
         <button type="button" className={styles.iconBtn} onClick={() => router.back()} aria-label="Back">
           <BackIcon />
         </button>
-        <button type="button" className={styles.iconBtn} aria-label="Edit">
+        <Link
+          href={order ? `/operations/catering-orders/new?editId=${encodeURIComponent(order.id)}` : "#"}
+          className={styles.iconBtn}
+          aria-label="Edit"
+        >
           <EditIcon />
-        </button>
+        </Link>
       </div>
 
       {loading ? (
@@ -246,10 +250,6 @@ export default function CateringOrderDetailPage() {
             ))}
             <p className={styles.totalMeals}>Total {totalMeals} Meals</p>
           </section>
-
-          <button type="button" className={styles.ctaBtn}>
-            PRODUCTION SUMMARY &rsaquo;
-          </button>
         </>
       )}
     </div>

@@ -176,6 +176,11 @@
 .menuQty {
   font-size: 13px;
   color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+  padding-left: var(--space-3);
 }
 
 .totalMeals {

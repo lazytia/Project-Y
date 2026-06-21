@@ -318,8 +318,12 @@ export default function NewCateringOrderPage() {
     setError(null);
     try {
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/catering-orders", {
-        method: "POST",
+      const url = editId
+        ? `/api/catering-orders/${encodeURIComponent(editId)}`
+        : "/api/catering-orders";
+      const method = editId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           clientName,
