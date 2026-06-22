@@ -464,27 +464,45 @@ export default function InsightsPage() {
 
   // Range-scoped metrics derived from the calendar picker selection
   const rangeSales = useMemo(() => {
-    let total = 0;
     const [sy, sm, sd] = rangeStartISO.split("-").map(Number);
     const [ey, em, ed] = rangeEndISO.split("-").map(Number);
     if (!sy || !ey) return 0;
     const start = new Date(sy, sm - 1, sd);
     const end = new Date(ey, em - 1, ed);
+
+    // Primary: sum from sales_daily (granular per-day data).
+    let dailyTotal = 0;
     let cur = new Date(start);
     while (cur <= end) {
-      total += dailySalesMap[isoDate(cur)]?.grossSales ?? 0;
+      dailyTotal += dailySalesMap[isoDate(cur)]?.grossSales ?? 0;
       cur = addDays(cur, 1);
     }
-    return total;
-  }, [rangeStartISO, rangeEndISO, dailySalesMap]);
+    if (dailyTotal > 0) return dailyTotal;
+
+    // Fallback: sum from sales_weekly when sales_daily is empty.
+    let weeklyTotal = 0;
+    const seenWeeks = new Set<string>();
+    cur = new Date(start);
+    while (cur <= end) {
+      const weekKey = isoDate(startOfWeekMon(cur));
+      if (!seenWeeks.has(weekKey)) {
+        seenWeeks.add(weekKey);
+        weeklyTotal += salesMap[weekKey]?.grossSales ?? 0;
+      }
+      cur = addDays(cur, 1);
+    }
+    return weeklyTotal;
+  }, [rangeStartISO, rangeEndISO, dailySalesMap, salesMap]);
 
   const rangePayrollCost = useMemo(() => {
-    let total = 0;
     const [sy, sm, sd] = rangeStartISO.split("-").map(Number);
     const [ey, em, ed] = rangeEndISO.split("-").map(Number);
     if (!sy || !ey) return 0;
     const start = new Date(sy, sm - 1, sd);
     const end = new Date(ey, em - 1, ed);
+
+    // Primary: compute from roster assignments (exact per-shift estimate).
+    let rosterTotal = 0;
     let cur = new Date(start);
     while (cur <= end) {
       const iso = isoDate(cur);
@@ -496,17 +514,34 @@ export default function InsightsPage() {
       for (const [uid, startTime] of Object.entries(lunchMap)) {
         const wr = staffRates[uid]?.weekRate ?? EST_HOURLY_RATE;
         const rate = isSat ? (staffRates[uid]?.satRate ?? wr) : wr;
-        total += shiftHours(startTime as string, LUNCH_END_H, 4) * rate;
+        rosterTotal += shiftHours(startTime as string, LUNCH_END_H, 4) * rate;
       }
       for (const [uid, startTime] of Object.entries(dinnerMap)) {
         const wr = staffRates[uid]?.weekRate ?? EST_HOURLY_RATE;
         const rate = isSat ? (staffRates[uid]?.satRate ?? wr) : wr;
-        total += shiftHours(startTime as string, DINNER_END_H, 5) * rate;
+        rosterTotal += shiftHours(startTime as string, DINNER_END_H, 5) * rate;
       }
       cur = addDays(cur, 1);
     }
-    return total;
-  }, [rangeStartISO, rangeEndISO, docs, staffRates]);
+    if (rosterTotal > 0) return rosterTotal;
+
+    // Fallback: sum from payroll_weekly (actual Xero data) when no roster
+    // assignments exist — mirrors the same logic used by PLANNED VS ACTUAL.
+    let payrollTotal = 0;
+    const seenWeeks = new Set<string>();
+    cur = new Date(start);
+    while (cur <= end) {
+      const weekMon = startOfWeekMon(cur);
+      const weekKey = isoDate(weekMon);
+      if (!seenWeeks.has(weekKey)) {
+        seenWeeks.add(weekKey);
+        const { value } = actualOrEstimate(weekMon, 0);
+        payrollTotal += value;
+      }
+      cur = addDays(cur, 1);
+    }
+    return payrollTotal;
+  }, [rangeStartISO, rangeEndISO, docs, staffRates, payroll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rangeHasSales = rangeSales > 0;
   const rangePayrollPct = rangeHasSales ? (rangePayrollCost / rangeSales) * 100 : null;
