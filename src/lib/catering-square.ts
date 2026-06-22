@@ -483,31 +483,41 @@ export async function createPlatterCateringOrder(
 
 export async function updatePlatterCateringOrder(
   orderId: string,
-  patch: Partial<CateringOrderInput>,
+  patch: Partial<CateringOrderForm>,
 ): Promise<CateringOrder> {
-  // Fetch the existing order to keep its version number — Square requires
-  // it on every update.
   const current = await squareClient.orders.get({ orderId });
   const existing = current.order as (SqOrder & { version?: number | bigint }) | undefined;
   if (!existing) throw new Error("Order not found.");
   const existingFull = toCateringOrder(existing);
   if (!existingFull) throw new Error("Could not read existing order.");
 
-  const merged: CateringOrderInput = {
+  // Square rejects partial fulfillment updates, so we go cancel + recreate.
+  // Merge the entire form shape so metadata (method/payment/utensils/dietary/
+  // readyBy/etc.) survives every edit — losing any of those on save would
+  // be a data-loss bug.
+  const merged: CateringOrderForm = {
     clientName: patch.clientName ?? existingFull.clientName,
+    companyName: patch.companyName ?? existingFull.companyName,
+    contactPhone: patch.contactPhone ?? existingFull.contactPhone,
+    contactEmail: patch.contactEmail ?? existingFull.contactEmail,
+    orderMethod: patch.orderMethod ?? existingFull.orderMethod ?? "OTHER",
+    fulfillmentType: patch.fulfillmentType ?? existingFull.fulfillmentType ?? "PICKUP",
     deliveryDateISO: patch.deliveryDateISO ?? existingFull.deliveryDateISO,
     deliveryTime: patch.deliveryTime ?? existingFull.deliveryTime,
-    guestsCount: patch.guestsCount ?? existingFull.guestsCount,
-    totalAmount: patch.totalAmount ?? existingFull.totalAmount,
-    notes: patch.notes ?? existingFull.notes.join("\n"),
+    readyByTime: patch.readyByTime ?? existingFull.readyByTime,
+    deliveryAddress: patch.deliveryAddress ?? (existingFull.deliveryAddressLines.join(", ") || undefined),
+    items: patch.items ?? existingFull.menu.map((m) => ({
+      name: m.name,
+      qty: m.qty,
+      unitPrice: m.unitPrice ?? 0,
+    })),
+    dietaryNotes: patch.dietaryNotes ?? existingFull.dietaryNotes,
+    utensilsCount: patch.utensilsCount ?? existingFull.utensilsCount,
+    paymentStatus: patch.paymentStatus ?? existingFull.paymentStatus,
   };
 
-  // Square's update requires you to send the fields you want to change
-  // and identify what to replace via fieldsToClear. To keep this simple
-  // and resilient (Square rejects partial replacements of fulfillments),
-  // we cancel + recreate, which mirrors the "edit" UX exactly.
   await cancelPlatterCateringOrder(orderId);
-  return createPlatterCateringOrder(merged);
+  return createPlatterCateringOrderFromForm(merged);
 }
 
 export async function cancelPlatterCateringOrder(orderId: string): Promise<void> {

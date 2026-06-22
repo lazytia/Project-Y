@@ -101,6 +101,9 @@ export default function CateringOrderDetailPage() {
   const [order, setOrder] = useState<CateringOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingReadyBy, setEditingReadyBy] = useState(false);
+  const [readyByDraft, setReadyByDraft] = useState("");
+  const [savingReadyBy, setSavingReadyBy] = useState(false);
 
   useEffect(() => {
     if (!params?.orderId || !user) return;
@@ -116,6 +119,39 @@ export default function CateringOrderDetailPage() {
       }
     })();
   }, [params?.orderId, user]);
+
+  async function saveReadyBy() {
+    if (!user || !order) return;
+    const next = readyByDraft.trim();
+    if (!next || next === order.readyByTime) {
+      setEditingReadyBy(false);
+      return;
+    }
+    setSavingReadyBy(true);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/catering-orders/${encodeURIComponent(order.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ readyByTime: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+      // Cancel+recreate gives the order a fresh id; jump to that URL so
+      // refresh and back navigation point at the right document.
+      const newId = (data?.order as { id?: string } | undefined)?.id;
+      if (newId && newId !== order.id) {
+        router.replace(`/operations/catering-orders/${encodeURIComponent(newId)}`);
+      } else if (data?.order) {
+        setOrder(data.order as CateringOrder);
+      }
+      setEditingReadyBy(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save ready-by.");
+    } finally {
+      setSavingReadyBy(false);
+    }
+  }
 
   const totalMeals = useMemo(() => {
     if (!order) return 0;
@@ -181,7 +217,33 @@ export default function CateringOrderDetailPage() {
               <span className={styles.readyByLabel}>READY BY</span>
               <span className={styles.readyByPill}>KITCHEN DEADLINE</span>
             </div>
-            <p className={styles.readyByTime}>{readyBy}</p>
+            {editingReadyBy ? (
+              <input
+                className={styles.readyByEdit}
+                value={readyByDraft}
+                autoFocus
+                disabled={savingReadyBy}
+                placeholder="10:45 AM"
+                onChange={(e) => setReadyByDraft(e.target.value)}
+                onBlur={saveReadyBy}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+                  if (e.key === "Escape") setEditingReadyBy(false);
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className={styles.readyByTime}
+                onClick={() => {
+                  setReadyByDraft(readyBy);
+                  setEditingReadyBy(true);
+                }}
+                aria-label="Edit ready-by time"
+              >
+                {readyBy}
+              </button>
+            )}
             <p className={styles.readyByHint}>Kitchen must be ready by this time</p>
           </div>
         </div>

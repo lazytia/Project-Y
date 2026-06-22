@@ -104,14 +104,10 @@
 }
 
 .infoIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-fg);
+  color: var(--color-warm);
   flex-shrink: 0;
 }
 
@@ -145,8 +141,7 @@
 }
 
 .readyByIcon {
-  background: var(--color-warm);
-  color: var(--color-bg);
+  color: var(--color-warm);
 }
 
 .readyByHead {
@@ -176,10 +171,33 @@
 }
 
 .readyByTime {
+  display: inline-block;
   margin: 0;
   font-size: 22px;
   font-weight: 800;
   color: var(--color-warm);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: text;
+  text-align: left;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+}
+
+.readyByEdit {
+  display: block;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-warm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  width: 130px;
+  outline: none;
+  font-family: inherit;
 }
 
 .readyByHint {
