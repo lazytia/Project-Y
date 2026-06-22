@@ -286,7 +286,7 @@ export default function InsightsPage() {
   // Free-form range the user picked via the calendar. Starts seeded to the
   // selected week's Mon–Sat span; once they pick a custom range we trust it.
   const [rangeStartISO, setRangeStartISO] = useState<string>(() => isoDate(addDays(startOfWeekMon(new Date()), -7)));
-  const [rangeEndISO, setRangeEndISO] = useState<string>(() => isoDate(addDays(addDays(startOfWeekMon(new Date()), -7), 5)));
+  const [rangeEndISO, setRangeEndISO] = useState<string>(() => isoDate(addDays(addDays(startOfWeekMon(new Date()), -7), 6)));
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -863,9 +863,6 @@ function RangeCalendarPicker({
     const [y, m, d] = rangeStartISO.split("-").map(Number);
     return new Date(y, m - 1, d);
   });
-  // Local in-flight picks: when the user has only clicked the start so far,
-  // we wait for the second click before committing the range upward.
-  const [pendingStart, setPendingStart] = useState<Date | null>(null);
 
   const committedStart = useMemo(() => {
     const [y, m, d] = rangeStartISO.split("-").map(Number);
@@ -875,8 +872,12 @@ function RangeCalendarPicker({
     const [y, m, d] = rangeEndISO.split("-").map(Number);
     return new Date(y, m - 1, d);
   }, [rangeEndISO]);
+
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const todayISOStr = isoDate(today);
+  // Any week whose Monday >= todayWeekStart is disabled (current week + future).
+  const todayWeekStart = startOfWeekMon(today);
 
   const cells = useMemo(() => {
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -889,36 +890,27 @@ function RangeCalendarPicker({
     return out;
   }, [cursor]);
 
+  // A cell is disabled if its week (Monday) is >= the current week's Monday.
+  function isDisabled(date: Date): boolean {
+    return startOfWeekMon(date) >= todayWeekStart;
+  }
+
+  // Single-click selects the full Mon–Sun week containing the clicked date.
   function pick(date: Date) {
-    if (!pendingStart) {
-      // First click: arm a new range start.
-      setPendingStart(date);
-      return;
-    }
-    // Second click: pin the range. Whichever click is earlier becomes
-    // the start so the order the user taps doesn't matter.
-    const a = pendingStart;
-    const b = date;
-    const start = a <= b ? a : b;
-    const end = a <= b ? b : a;
-    onSelect(isoDate(start), isoDate(end));
-    setPendingStart(null);
+    if (isDisabled(date)) return;
+    const monday = startOfWeekMon(date);
+    const sunday = addDays(monday, 6);
+    onSelect(isoDate(monday), isoDate(sunday));
   }
 
   function gotoMonth(delta: number) {
     setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
   }
 
-  // Highlight the in-flight start single-day when armed, otherwise the
-  // committed range.
   function isInRange(d: Date): boolean {
-    if (pendingStart) return d.getTime() === pendingStart.getTime();
     return d >= committedStart && d <= committedEnd;
   }
   function isRangeEdge(d: Date): "start" | "end" | "single" | null {
-    if (pendingStart) {
-      return d.getTime() === pendingStart.getTime() ? "single" : null;
-    }
     const isStart = d.getTime() === committedStart.getTime();
     const isEnd = d.getTime() === committedEnd.getTime();
     if (isStart && isEnd) return "single";
@@ -928,7 +920,7 @@ function RangeCalendarPicker({
   }
 
   return (
-    <div className={styles.weekCal} role="dialog" aria-label="Pick a date range">
+    <div className={styles.weekCal} role="dialog" aria-label="Select a week">
       <div className={styles.weekCalHead}>
         <button type="button" className={styles.weekCalNav} onClick={() => gotoMonth(-1)} aria-label="Previous month">‹</button>
         <span className={styles.weekCalMonth}>{MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}</span>
@@ -941,14 +933,16 @@ function RangeCalendarPicker({
       </div>
       <div className={styles.weekCalGrid}>
         {cells.map(({ date, iso, inMonth }) => {
-          const inSel = isInRange(date);
-          const edge = isRangeEdge(date);
+          const disabled = isDisabled(date);
+          const inSel = !disabled && isInRange(date);
+          const edge = !disabled ? isRangeEdge(date) : null;
           const isToday = iso === todayISOStr;
           return (
             <button
               key={iso}
               type="button"
               onClick={() => pick(date)}
+              disabled={disabled}
               className={[
                 styles.weekCalCell,
                 inSel ? styles.weekCalCellSelected : "",
@@ -957,6 +951,7 @@ function RangeCalendarPicker({
                 edge === "start" ? styles.weekCalCellEdgeStart : "",
                 edge === "end" ? styles.weekCalCellEdgeEnd : "",
                 edge === "single" ? styles.weekCalCellEdgeSingle : "",
+                disabled ? styles.weekCalCellDisabled : "",
               ].filter(Boolean).join(" ")}
               aria-pressed={inSel}
             >
@@ -965,11 +960,7 @@ function RangeCalendarPicker({
           );
         })}
       </div>
-      <p className={styles.weekCalHint}>
-        {pendingStart
-          ? `Start: ${pendingStart.getDate()} ${MONTH_NAMES[pendingStart.getMonth()].slice(0, 3)} — tap another day for the end.`
-          : "Tap a start date, then tap an end date."}
-      </p>
+      <p className={styles.weekCalHint}>Tap any date to select that full Mon–Sun week.</p>
     </div>
   );
 }

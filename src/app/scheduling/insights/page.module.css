@@ -243,6 +243,12 @@
   border-color: var(--color-fg);
 }
 
+.weekCalCellDisabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .weekCalHint {
   margin: var(--space-2) 0 0 0;
   font-size: 10px;
