@@ -556,8 +556,8 @@ export default function InsightsPage() {
         </button>
       </header>
 
-      {refreshError && (
-        <p style={{ fontSize: 12, color: refreshError.startsWith("Square:") ? "#1f8d5f" : "#c14545", textAlign: "center", margin: 0, padding: "0 8px", lineHeight: 1.4 }}>
+      {refreshError && refreshError.startsWith("Square:") && (
+        <p style={{ fontSize: 12, color: "#1f8d5f", textAlign: "center", margin: 0, padding: "0 8px", lineHeight: 1.4 }}>
           {refreshError}
         </p>
       )}
