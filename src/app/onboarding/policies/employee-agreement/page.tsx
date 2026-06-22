@@ -121,6 +121,16 @@ export default function EmployeeAgreementPage() {
           <p className={styles.paragraph}>
             This obligation continues after employment ends.
           </p>
+          <h3 className={styles.subSectionH}>SOCIAL MEDIA</h3>
+          <p className={styles.paragraph}>
+            Photos, videos, screenshots, or recordings taken during work must
+            not be posted online or shared publicly without management approval.
+          </p>
+          <p className={styles.paragraph}>
+            This policy helps protect the privacy of our customers and
+            employees, as well as YURICA&apos;s confidential business
+            information.
+          </p>
         </section>
 
         {/* 5. Company Policies */}
