@@ -64,6 +64,29 @@ function TruckIcon() {
 function BagIcon() {
   return <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>;
 }
+function GlobeIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" /><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18" /></svg>;
+}
+function DotsIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>;
+}
+
+function methodIconFor(m: string | undefined) {
+  switch (m) {
+    case "WEBSITE": return <GlobeIcon />;
+    case "PHONE": return <PhoneIcon />;
+    case "EMAIL": return <MailIcon />;
+    default: return <DotsIcon />;
+  }
+}
+function methodLabel(m: string | undefined): string {
+  switch (m) {
+    case "WEBSITE": return "Website";
+    case "PHONE": return "Phone";
+    case "EMAIL": return "Email";
+    default: return "Other";
+  }
+}
 function CalIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
 }
@@ -194,6 +217,12 @@ export default function CateringOrderDetailPage() {
           <div>
             <h1 className={styles.heroTitle}>{order.clientName}</h1>
             <p className={styles.heroSub}>{fulfillmentLabel} Order</p>
+            {order.orderMethod ? (
+              <p className={styles.heroMethod}>
+                <span className={styles.heroMethodIcon}>{methodIconFor(order.orderMethod)}</span>
+                Via {methodLabel(order.orderMethod)}
+              </p>
+            ) : null}
           </div>
         </div>
         <div className={styles.heroRight}>
