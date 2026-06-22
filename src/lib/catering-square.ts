@@ -526,6 +526,10 @@ export async function cancelPlatterCateringOrder(orderId: string): Promise<void>
     | (SqOrder & { version?: number | bigint; fulfillments?: Array<SqFulfillment & { uid?: string }> })
     | undefined;
   if (!existing) return;
+  // Already-cancelled orders cannot transition to CANCELED again — Square
+  // 400s. The PATCH "edit" path may pass us a cancelled order when a prior
+  // edit already cancelled+recreated; in that case nothing to do here.
+  if (existing.state === "CANCELED") return;
   const platterId = squareEnv.platterLocationId;
   if (!platterId) throw new Error("SQUARE_PLATTER_LOCATION_ID not set.");
   const toNum = (v: number | bigint | undefined): number =>

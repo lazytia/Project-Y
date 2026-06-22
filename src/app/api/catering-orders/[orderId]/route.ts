@@ -64,7 +64,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ orderId: 
     return NextResponse.json({ order });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to update Square order.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const detail =
+      err && typeof err === "object"
+        ? JSON.stringify(err, (_k, v) => (typeof v === "bigint" ? v.toString() : v))
+        : undefined;
+    console.error("[catering-orders] PATCH failed:", detail ?? msg);
+    return NextResponse.json({ error: msg, detail }, { status: 500 });
   }
 }
 
