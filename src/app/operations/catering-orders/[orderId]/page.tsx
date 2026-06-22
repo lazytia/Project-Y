@@ -130,17 +130,20 @@ export default function CateringOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!params?.orderId || !user) return;
+    const controller = new AbortController();
     (async () => {
       try {
-        const o = await fetchCateringOrder(user, params.orderId);
+        const o = await fetchCateringOrder(user, params.orderId, controller.signal);
         if (!o) setError("Order not found.");
         setOrder(o);
       } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Could not load order.");
       } finally {
         setLoading(false);
       }
     })();
+    return () => controller.abort();
   }, [params?.orderId, user]);
 
   const totalMeals = useMemo(() => {

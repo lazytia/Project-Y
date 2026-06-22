@@ -72,10 +72,10 @@ export default function CateringOrdersPage() {
   const [modalDay, setModalDay] = useState<string | null>(null);
   const today = todayISO();
 
-  async function reload() {
+  async function reload(signal?: AbortSignal) {
     if (!user) return;
     try {
-      const list = await fetchCateringOrders(user);
+      const list = await fetchCateringOrders(user, signal);
       setServerOrders(list);
       setLoadError(null);
       // Reconcile local overrides once Square's index has caught up.
@@ -88,6 +88,7 @@ export default function CateringOrdersPage() {
       });
       setPendingAdds((prev) => prev.filter((o) => !ids.has(o.id)));
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setLoadError(err instanceof Error ? err.message : "Could not load orders.");
     } finally {
       setLoading(false);
@@ -120,7 +121,8 @@ export default function CateringOrdersPage() {
   }
 
   useEffect(() => {
-    reload();
+    const controller = new AbortController();
+    reload(controller.signal);
     // Pick up any order the /new page just saved while navigating back here.
     if (typeof window !== "undefined") {
       try {
@@ -134,6 +136,7 @@ export default function CateringOrdersPage() {
         /* ignore corrupted storage values */
       }
     }
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
