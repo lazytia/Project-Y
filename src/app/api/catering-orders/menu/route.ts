@@ -58,8 +58,8 @@ export async function GET(req: NextRequest) {
     // Square's Platter catalog contains a handful of duplicated ITEMs
     // (same name, separate IDs, different prices — likely accidental
     // dupes from manual data entry). Collapse by case-insensitive name
-    // and keep the cheapest variant so the Add Item sheet only shows one
-    // row per dish.
+    // and keep the higher-priced variant (the up-to-date one the owners
+    // use) so the Add Item sheet only shows one row per dish.
     const byName = new Map<string, { id: string; name: string; priceCents: number; currency: string }>();
     const page = await squareClient.catalog.list({ types: "ITEM" });
     for await (const obj of page) {
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
       };
       const key = name.trim().toLowerCase();
       const existing = byName.get(key);
-      if (!existing || candidate.priceCents < existing.priceCents) {
+      if (!existing || candidate.priceCents > existing.priceCents) {
         byName.set(key, candidate);
       }
     }
