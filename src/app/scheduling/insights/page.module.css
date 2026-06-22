@@ -224,6 +224,21 @@
 
 .weekCalCellSelected:hover { background: var(--color-warm-bg); }
 
+.weekCalCellEdgeStart,
+.weekCalCellEdgeEnd,
+.weekCalCellEdgeSingle {
+  background: var(--color-warm);
+  color: var(--color-bg);
+  border-color: var(--color-warm);
+  font-weight: 800;
+}
+
+.weekCalCellEdgeStart:hover,
+.weekCalCellEdgeEnd:hover,
+.weekCalCellEdgeSingle:hover {
+  background: var(--color-warm);
+}
+
 .weekCalCellToday {
   border-color: var(--color-fg);
 }
