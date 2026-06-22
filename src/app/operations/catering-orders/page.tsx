@@ -243,7 +243,9 @@ export default function CateringOrdersPage() {
                   {!isNextOrderDay || o.id !== nextOrder!.id ? (
                     <span className={styles.cellDot} aria-hidden="true" />
                   ) : null}
-                  <span className={styles.cellName}>{o.clientName}</span>
+                  <span className={styles.cellName}>
+                    {o.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
+                  </span>
                   <span className={styles.cellPax}>{o.guestsCount} pax</span>
                   <span className={styles.cellDay}>{dCountdownLabel(o.deliveryDateISO)}</span>
                 </span>
