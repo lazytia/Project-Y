@@ -192,9 +192,7 @@ export default function CateringOrdersPage() {
                 {dCountdownLabel(nextOrder.deliveryDateISO)}
               </p>
               <p className={styles.statSub}>
-                {nextOrder.companyName
-                  || nextOrder.contactName
-                  || `Order #${nextOrder.id.slice(-4).toUpperCase()}`}
+                {nextOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
               </p>
             </>
           ) : (
