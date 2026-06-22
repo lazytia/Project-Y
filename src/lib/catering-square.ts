@@ -249,11 +249,15 @@ export function toCateringOrder(o: SqOrder): CateringOrder | null {
     menu: menuFor(o),
     fulfillmentType: ftype,
     companyName: meta.companyName,
-    orderMethod: meta.orderMethod,
-    paymentStatus: meta.paymentStatus,
     utensilsCount: meta.utensilsCount,
     dietaryNotes: meta.dietaryNotes,
     readyByTime: meta.readyByTime,
+    // Square-origin orders (no form metadata blob) all come from the
+    // online ordering site and are paid up-front. Default both fields
+    // here; orders made via our form set them explicitly in the blob,
+    // so we trust those values when present.
+    orderMethod: meta.orderMethod ?? "WEBSITE",
+    paymentStatus: meta.paymentStatus ?? "PAID",
   };
 }
 
