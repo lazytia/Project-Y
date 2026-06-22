@@ -46,7 +46,6 @@ const NAV: NavGroup[] = [
       { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering Orders", href: "/operations/catering-orders" },
-      { label: "Online Orders", href: "/operations/online-orders" },
       { label: "ARS", href: "/operations/ars", ownerOnly: true },
     ],
   },
@@ -115,7 +114,6 @@ export default function Sidebar({ open, onClose }: Props) {
         { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
         { label: "Reservations", href: "/operations/reservations" },
         { label: "Catering Orders", href: "/operations/catering-orders" },
-        { label: "Online Orders", href: "/operations/online-orders" },
       ],
     },
   ];
