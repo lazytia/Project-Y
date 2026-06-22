@@ -55,7 +55,12 @@ export async function GET(req: NextRequest) {
   const platterId = squareEnv.platterLocationId;
   if (!platterId) return NextResponse.json({ error: "SQUARE_PLATTER_LOCATION_ID not set." }, { status: 500 });
   try {
-    const items: Array<{ id: string; name: string; priceCents: number; currency: string }> = [];
+    // Square's Platter catalog contains a handful of duplicated ITEMs
+    // (same name, separate IDs, different prices — likely accidental
+    // dupes from manual data entry). Collapse by case-insensitive name
+    // and keep the cheapest variant so the Add Item sheet only shows one
+    // row per dish.
+    const byName = new Map<string, { id: string; name: string; priceCents: number; currency: string }>();
     const page = await squareClient.catalog.list({ types: "ITEM" });
     for await (const obj of page) {
       const o = obj as CatalogObject;
@@ -66,14 +71,19 @@ export async function GET(req: NextRequest) {
       const v = o.itemData?.variations?.[0];
       const amt = v?.itemVariationData?.priceMoney?.amount;
       const cents = typeof amt === "bigint" ? Number(amt) : (amt ?? 0);
-      items.push({
+      const candidate = {
         id: o.id,
         name,
         priceCents: cents,
         currency: v?.itemVariationData?.priceMoney?.currency ?? "AUD",
-      });
+      };
+      const key = name.trim().toLowerCase();
+      const existing = byName.get(key);
+      if (!existing || candidate.priceCents < existing.priceCents) {
+        byName.set(key, candidate);
+      }
     }
-    items.sort((a, b) => a.name.localeCompare(b.name));
+    const items = Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
     return NextResponse.json(
       { items },
       // Square catalog rarely changes within a session; cache briefly so
