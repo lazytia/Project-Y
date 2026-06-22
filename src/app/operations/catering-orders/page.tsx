@@ -191,7 +191,11 @@ export default function CateringOrdersPage() {
               <p className={`${styles.statBig} ${styles.warm}`}>
                 {dCountdownLabel(nextOrder.deliveryDateISO)}
               </p>
-              <p className={styles.statSub}>{nextOrder.clientName}</p>
+              <p className={styles.statSub}>
+                {nextOrder.companyName
+                  || nextOrder.contactName
+                  || `Order #${nextOrder.id.slice(-4).toUpperCase()}`}
+              </p>
             </>
           ) : (
             <>
@@ -276,11 +280,16 @@ export default function CateringOrdersPage() {
               return `IN ${n} DAYS · ${dCountdownLabel(nextOrder.deliveryDateISO)}`;
             })()}
           </p>
-          <p className={styles.upcomingClient}>{nextOrder.clientName}</p>
+          <p className={styles.upcomingClient}>
+            {nextOrder.companyName
+              || nextOrder.contactName
+              || `Order #${nextOrder.id.slice(-4).toUpperCase()}`}
+          </p>
           <ul className={styles.upcomingFacts}>
-            <li><span className={styles.upcomingFactIcon}>🕒</span>{nextOrder.deliveryTime} Delivery</li>
-            <li><span className={styles.upcomingFactIcon}>👥</span>{nextOrder.guestsCount} Guests</li>
-            <li><span className={styles.upcomingFactIcon}>＄</span>{fmtMoney(nextOrder.totalAmount)}</li>
+            <li>
+              <span className={styles.upcomingFactIcon}>🕒</span>
+              {nextOrder.deliveryTime} {nextOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
+            </li>
           </ul>
           {nextOrder.menu.length > 0 ? (
             <>
