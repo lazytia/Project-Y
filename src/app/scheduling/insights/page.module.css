@@ -132,6 +132,109 @@
   color: var(--color-fg-muted);
 }
 
+/* ── Week calendar picker ── */
+.weekCal {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11;
+  width: min(320px, calc(100vw - 32px));
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  padding: var(--space-3);
+  box-sizing: border-box;
+}
+
+.weekCalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.weekCalNav {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--color-fg);
+  cursor: pointer;
+  padding: 0;
+}
+
+.weekCalMonth {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--color-fg);
+}
+
+.weekCalWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.weekCalWeekday {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-fg-muted);
+}
+
+.weekCalGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.weekCalCell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+  padding: 0;
+}
+
+.weekCalCell:hover { background: var(--color-surface); }
+
+.weekCalCellOut { color: var(--color-fg-subtle); }
+
+.weekCalCellSelected {
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  border-color: rgba(255, 106, 19, 0.3);
+}
+
+.weekCalCellSelected:hover { background: var(--color-warm-bg); }
+
+.weekCalCellToday {
+  border-color: var(--color-fg);
+}
+
+.weekCalHint {
+  margin: var(--space-2) 0 0 0;
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  text-align: center;
+}
+
 .weekChev {
   font-size: 11px;
   transition: transform 0.15s;

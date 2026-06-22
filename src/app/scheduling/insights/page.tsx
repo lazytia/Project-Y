@@ -582,32 +582,13 @@ export default function InsightsPage() {
                 onClick={() => setWeekPickerOpen(false)}
                 aria-label="Close week picker"
               />
-              <ul className={styles.weekMenu} role="listbox">
-                {weekOptions.map((iso) => {
-                  const [y, m, d] = iso.split("-").map(Number);
-                  const start = new Date(y, m - 1, d);
-                  const end = addDays(start, 5);
-                  const isCurrent = iso === selectedWeekISO;
-                  const isLastWeek = iso === isoDate(addDays(todayWeekStart, -7));
-                  return (
-                    <li key={iso}>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={isCurrent}
-                        className={`${styles.weekOption} ${isCurrent ? styles.weekOptionActive : ""}`}
-                        onClick={() => {
-                          setSelectedWeekISO(iso);
-                          setWeekPickerOpen(false);
-                        }}
-                      >
-                        <span>{fmtRange(start, end)}</span>
-                        {isLastWeek && <span className={styles.weekOptionBadge}>Last week</span>}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <WeekCalendarPicker
+                selectedWeekISO={selectedWeekISO}
+                onSelect={(iso) => {
+                  setSelectedWeekISO(iso);
+                  setWeekPickerOpen(false);
+                }}
+              />
             </>
           )}
         </div>
@@ -699,8 +680,8 @@ export default function InsightsPage() {
         </div>
       </section>
 
-      {/* Labour trend + highest cost day */}
-      <section className={styles.twoCol}>
+      {/* Labour trend */}
+      <section>
         <div className={`${styles.card} ${styles.trendCard}`}>
           <p className={styles.cardTitle}>
             LABOUR TREND <span className={styles.cardTitleSub}>
@@ -786,71 +767,90 @@ export default function InsightsPage() {
           )}
         </div>
 
-        <div className={`${styles.card} ${styles.highCard}`}>
-          <p className={styles.cardTitle}>HIGHEST COST DAY</p>
-          {highestDay ? (
-            <>
-              <p className={styles.highDay}>{fmtDayLong(highestDay.date)}</p>
-              <div className={styles.highRow}>
-                <p className={styles.highLabel}>Sales $</p>
-                <p className={styles.highValue}>
-                  {highestDay.dailySales > 0 ? fmtCurrency(highestDay.dailySales) : "—"}
-                </p>
-              </div>
-              <div className={styles.highRow}>
-                <p className={styles.highLabel}>Payroll $</p>
-                <p className={styles.highValue}>{fmtCurrency(highestDay.cost)}</p>
-              </div>
-              <div className={styles.highDivider} />
-              <p className={styles.highLabel}>SHARE OF WEEK</p>
-              <p className={`${styles.highPct} ${highestDay.shareOfWeek > 30 ? styles.highPctDanger : styles.highPctWarm}`}>
-                {highestDay.shareOfWeek > 0 ? fmtPct(highestDay.shareOfWeek) : "—"}
-              </p>
-            </>
-          ) : (
-            <p className={styles.emptyChart}>No shifts rostered yet this week.</p>
-          )}
-        </div>
-      </section>
-
-      {/* Insights */}
-      <section className={styles.card}>
-        <p className={styles.cardTitle}>
-          <span className={styles.sparkle} aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z" />
-            </svg>
-          </span>
-          INSIGHTS
-        </p>
-        <ul className={styles.insightList}>
-          <li>
-            {payrollIsActual ? "Actual payroll" : "Estimated payroll"} for the week:{" "}
-            {fmtCurrency(payrollCost)}
-            across {currentWeek.totalShifts} shifts.
-          </li>
-          {prevPayrollCost > 0 && (
-            <li>
-              Estimated payroll {payrollVsLast >= 0 ? "increased" : "decreased"} by {fmtPct(Math.abs(payrollVsLast))} vs last week.
-            </li>
-          )}
-          {highestDay && (
-            <li>
-              {fmtDayLong(highestDay.date)} is currently the busiest day ({highestDay.shifts} shifts).
-            </li>
-          )}
-          {!hasSales && (
-            <li className={styles.insightMuted}>
-              Sales integration not connected — Payroll % and target comparison will activate once sales data is wired.
-            </li>
-          )}
-        </ul>
       </section>
     </div>
   );
 }
 
 /* ── Trend chart geometry helper ── */
+
+/* ── Week calendar picker ── */
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const WEEKDAY_HEADERS = ["M", "T", "W", "T", "F", "S", "S"];
+
+function WeekCalendarPicker({
+  selectedWeekISO,
+  onSelect,
+}: { selectedWeekISO: string; onSelect: (mondayISO: string) => void }) {
+  // Cursor starts on the month of the currently-selected week.
+  const [cursor, setCursor] = useState<Date>(() => {
+    const [y, m, d] = selectedWeekISO.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  });
+
+  const selectedStart = useMemo(() => {
+    const [y, m, d] = selectedWeekISO.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }, [selectedWeekISO]);
+  const selectedEnd = useMemo(() => addDays(selectedStart, 6), [selectedStart]);
+  const todayWeekMonday = startOfWeekMon(new Date());
+
+  const cells = useMemo(() => {
+    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const gridStart = startOfWeekMon(first);
+    const out: Array<{ date: Date; iso: string; inMonth: boolean }> = [];
+    for (let i = 0; i < 42; i += 1) {
+      const d = addDays(gridStart, i);
+      out.push({ date: d, iso: isoDate(d), inMonth: d.getMonth() === cursor.getMonth() });
+    }
+    return out;
+  }, [cursor]);
+
+  function pick(date: Date) {
+    onSelect(isoDate(startOfWeekMon(date)));
+  }
+
+  function gotoMonth(delta: number) {
+    setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
+  }
+
+  return (
+    <div className={styles.weekCal} role="dialog" aria-label="Pick a week">
+      <div className={styles.weekCalHead}>
+        <button type="button" className={styles.weekCalNav} onClick={() => gotoMonth(-1)} aria-label="Previous month">‹</button>
+        <span className={styles.weekCalMonth}>{MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}</span>
+        <button type="button" className={styles.weekCalNav} onClick={() => gotoMonth(1)} aria-label="Next month">›</button>
+      </div>
+      <div className={styles.weekCalWeekdays}>
+        {WEEKDAY_HEADERS.map((w, idx) => (
+          <span key={idx} className={styles.weekCalWeekday}>{w}</span>
+        ))}
+      </div>
+      <div className={styles.weekCalGrid}>
+        {cells.map(({ date, iso, inMonth }) => {
+          const inSelected = date >= selectedStart && date <= selectedEnd;
+          const isThisWeekMonday = iso === isoDate(todayWeekMonday);
+          return (
+            <button
+              key={iso}
+              type="button"
+              onClick={() => pick(date)}
+              className={`${styles.weekCalCell} ${inSelected ? styles.weekCalCellSelected : ""} ${!inMonth ? styles.weekCalCellOut : ""} ${isThisWeekMonday ? styles.weekCalCellToday : ""}`}
+              aria-pressed={inSelected}
+            >
+              {date.getDate()}
+            </button>
+          );
+        })}
+      </div>
+      <p className={styles.weekCalHint}>Tap any day — the whole week (Mon–Sun) gets selected.</p>
+    </div>
+  );
+}
 
 function buildTrendChart(
   data: (WeekStats & { displayCost?: number; isActual?: boolean; pct?: number | null })[],
