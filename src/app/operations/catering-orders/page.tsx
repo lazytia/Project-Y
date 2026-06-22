@@ -387,7 +387,7 @@ function DayModal({
                   <span className={styles.modalListName}>{o.clientName}</span>
                   <span className={styles.modalListMeta}>{o.deliveryTime} · {o.guestsCount} pax · {fmtMoney(o.totalAmount)}</span>
                 </Link>
-                {o.status !== "COMPLETED" && o.status !== "CANCELLED" && (
+                {o.status !== "COMPLETED" && o.status !== "CANCELLED" && day >= todayISO() && (
                   <button
                     type="button"
                     className={styles.modalDeleteBtn}
