@@ -244,9 +244,9 @@ export default function CateringOrdersPage() {
                     <span className={styles.cellDot} aria-hidden="true" />
                   ) : null}
                   <span className={styles.cellName}>
-                    {o.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
+                    {o.fulfillmentType === "DELIVERY" ? "D" : "P"}
                   </span>
-                  <span className={styles.cellPax}>{o.guestsCount} pax</span>
+                  <span className={styles.cellPax}>{o.deliveryTime.toLowerCase()}</span>
                   <span className={styles.cellDay}>{dCountdownLabel(o.deliveryDateISO)}</span>
                 </span>
               ))}
