@@ -7,7 +7,7 @@ import type { User } from "firebase/auth";
  * Square shape; this file is the shared type contract + client fetchers.
  */
 
-export type CateringOrderStatus = "CONFIRMED" | "PENDING" | "CANCELLED";
+export type CateringOrderStatus = "CONFIRMED" | "PENDING" | "CANCELLED" | "COMPLETED";
 
 export type CateringOrderMethod = "WEBSITE" | "PHONE" | "EMAIL" | "OTHER";
 export type CateringFulfillmentType = "PICKUP" | "DELIVERY";
@@ -73,10 +73,14 @@ async function authHeader(user: User | null | undefined): Promise<HeadersInit> {
   return { Authorization: `Bearer ${idToken}` };
 }
 
-export async function fetchCateringOrders(user: User | null | undefined): Promise<CateringOrder[]> {
+export async function fetchCateringOrders(
+  user: User | null | undefined,
+  signal?: AbortSignal,
+): Promise<CateringOrder[]> {
   const res = await fetch("/api/catering-orders", {
     cache: "no-store",
     headers: await authHeader(user),
+    signal,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
@@ -86,10 +90,12 @@ export async function fetchCateringOrders(user: User | null | undefined): Promis
 export async function fetchCateringOrder(
   user: User | null | undefined,
   id: string,
+  signal?: AbortSignal,
 ): Promise<CateringOrder | null> {
   const res = await fetch(`/api/catering-orders/${encodeURIComponent(id)}`, {
     cache: "no-store",
     headers: await authHeader(user),
+    signal,
   });
   if (res.status === 404) return null;
   const data = await res.json().catch(() => ({}));

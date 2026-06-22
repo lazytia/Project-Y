@@ -91,10 +91,11 @@ function mapStatus(state: string | undefined): CateringOrderStatus {
     case "CANCELED":
     case "CANCELLED":
       return "CANCELLED";
+    case "COMPLETED":
+      return "COMPLETED";
     case "DRAFT":
     case "OPEN":
       return "PENDING";
-    case "COMPLETED":
     default:
       return "CONFIRMED";
   }
@@ -618,15 +619,15 @@ export async function updatePlatterCateringOrder(
         basePriceMoney: { amount: BigInt(0), currency: "AUD" as const },
       }];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updateFn = squareClient.orders.update as unknown as (req: Record<string, any>) => Promise<{ order?: unknown }>;
-  const resp = await updateFn({
+  const resp = await squareClient.orders.update({
     orderId,
     order: {
       locationId: platterId,
       version,
-      fulfillments: [newFulfillment],
-      lineItems: newLineItems,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fulfillments: [newFulfillment] as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lineItems: newLineItems as any,
     },
     fieldsToClear,
   });
@@ -648,6 +649,11 @@ export async function cancelPlatterCateringOrder(orderId: string): Promise<void>
   // 400s. The PATCH "edit" path may pass us a cancelled order when a prior
   // edit already cancelled+recreated; in that case nothing to do here.
   if (existing.state === "CANCELED") return;
+  // Completed orders are immutable in Square — attempting to cancel them
+  // returns a 400 BAD_REQUEST. Surface a clean error instead of a raw JSON blob.
+  if (existing.state === "COMPLETED") {
+    throw new Error("Cannot cancel: this order is already completed.");
+  }
   const platterId = squareEnv.platterLocationId;
   if (!platterId) throw new Error("SQUARE_PLATTER_LOCATION_ID not set.");
   const toNum = (v: number | bigint | undefined): number =>

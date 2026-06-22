@@ -384,14 +384,16 @@ function DayModal({
                   <span className={styles.modalListName}>{o.clientName}</span>
                   <span className={styles.modalListMeta}>{o.deliveryTime} · {o.guestsCount} pax · {fmtMoney(o.totalAmount)}</span>
                 </Link>
-                <button
-                  type="button"
-                  className={styles.modalDeleteBtn}
-                  onClick={() => submitDelete(o.id)}
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
+                {o.status !== "COMPLETED" && o.status !== "CANCELLED" && (
+                  <button
+                    type="button"
+                    className={styles.modalDeleteBtn}
+                    onClick={() => submitDelete(o.id)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                )}
               </li>
             ))}
           </ul>

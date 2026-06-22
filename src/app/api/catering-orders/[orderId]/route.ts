@@ -76,6 +76,19 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ orderId:
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to cancel Square order.";
+    // Completed orders cannot be cancelled — return 409 with a human-readable
+    // message instead of leaking raw Square JSON as a 500.
+    const isCompleted =
+      msg.toLowerCase().includes("already completed") ||
+      (typeof err === "object" &&
+        err !== null &&
+        JSON.stringify(err).toUpperCase().includes("COMPLETED"));
+    if (isCompleted) {
+      return NextResponse.json(
+        { error: "Cannot cancel: this order is already completed." },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
