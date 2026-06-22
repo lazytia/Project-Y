@@ -228,7 +228,11 @@ export default function CateringOrderDetailPage() {
               value={order.deliveryTime}
               label={order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
             />
-            <FactCol icon={<PeopleIcon />} value={String(order.guestsCount)} label="Guests" />
+            <FactCol
+              icon={<PeopleIcon />}
+              value={String(order.utensilsCount ?? 0)}
+              label="Utensils"
+            />
             <FactCol icon={<DollarIcon />} value={fmtMoney(order.totalAmount)} label="Total" />
           </div>
 
@@ -240,7 +244,7 @@ export default function CateringOrderDetailPage() {
                 <span className={styles.readyByPill}>KITCHEN DEADLINE</span>
               </div>
               <p className={styles.readyByTime}>
-                {formatTimeMinusMinutes(order.deliveryTime, KITCHEN_PREP_MINUTES)}
+                {order.readyByTime || formatTimeMinusMinutes(order.deliveryTime, KITCHEN_PREP_MINUTES)}
               </p>
               <p className={styles.readyByHint}>Order must be ready by this time</p>
             </div>
@@ -319,19 +323,23 @@ export default function CateringOrderDetailPage() {
             </section>
           )}
 
-          {order.dietaryNotes ? (
-            <section className={styles.section}>
-              <p className={styles.sectionTitle}>SPECIAL DIETARY REQUEST</p>
-              <p className={styles.line} style={{ whiteSpace: "pre-wrap" }}>{order.dietaryNotes}</p>
-            </section>
-          ) : null}
+          <section className={styles.section}>
+            <p className={styles.sectionTitle}>SPECIAL DIETARY REQUEST</p>
+            <p
+              className={styles.line}
+              style={{
+                whiteSpace: "pre-wrap",
+                color: order.dietaryNotes ? "var(--color-fg)" : "var(--color-fg-subtle)",
+              }}
+            >
+              {order.dietaryNotes || "—"}
+            </p>
+          </section>
 
-          {typeof order.utensilsCount === "number" && order.utensilsCount > 0 ? (
-            <section className={styles.section}>
-              <p className={styles.sectionTitle}>UTENSILS QTY</p>
-              <p className={styles.line}>{order.utensilsCount}</p>
-            </section>
-          ) : null}
+          <section className={styles.section}>
+            <p className={styles.sectionTitle}>UTENSILS QTY</p>
+            <p className={styles.line}>{order.utensilsCount ?? 0}</p>
+          </section>
 
           {order.notes.length > 0 && (
             <section className={styles.section}>

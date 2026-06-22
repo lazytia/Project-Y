@@ -19,6 +19,15 @@ const KITCHEN_PREP_MINUTES = 45;
 type MenuItem = { id: string; name: string; priceCents: number; currency: string };
 type FormItem = { tempId: string; name: string; qty: number; unitPrice: number };
 
+function BackIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  );
+}
+
 function PhoneIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -222,10 +231,17 @@ export default function NewCateringOrderPage() {
     };
   }, [user]);
 
-  const readyByTime = useMemo(
+  const computedReadyBy = useMemo(
     () => formatTimeMinusMinutes(deliveryTime, KITCHEN_PREP_MINUTES),
     [deliveryTime],
   );
+  // User can override the suggested kitchen deadline. We only auto-sync from
+  // deliveryTime while the user hasn't touched the field manually.
+  const [readyByTime, setReadyByTime] = useState<string>(computedReadyBy);
+  const [readyByDirty, setReadyByDirty] = useState(false);
+  useEffect(() => {
+    if (!readyByDirty) setReadyByTime(computedReadyBy);
+  }, [computedReadyBy, readyByDirty]);
 
   // Edit-mode hydration: pull the existing Square order and pre-fill state.
   useEffect(() => {
@@ -270,6 +286,10 @@ export default function NewCateringOrderPage() {
     if (payment) setPaymentStatus(payment as CateringPaymentStatus);
     if (utensilsStr) setUtensils(parseInt(utensilsStr, 10) || 0);
     if (dietary) setDietary(dietary);
+    if (o.readyByTime) {
+      setReadyByTime(o.readyByTime);
+      setReadyByDirty(true);
+    }
     setItems(
       o.menu.map((m2) => ({
         tempId: tempId(),
@@ -334,6 +354,7 @@ export default function NewCateringOrderPage() {
           fulfillmentType,
           deliveryDateISO: deliveryDate,
           deliveryTime,
+          readyByTime: readyByTime || undefined,
           deliveryAddress: fulfillmentType === "DELIVERY" ? deliveryAddress : undefined,
           items: items.map((i) => ({ name: i.name, qty: i.qty, unitPrice: i.unitPrice })),
           dietaryNotes: dietary || undefined,
@@ -364,7 +385,13 @@ export default function NewCateringOrderPage() {
 
   return (
     <div className={styles.page}>
-      <p className={styles.title}>NEW CATERING ORDER</p>
+      <div className={styles.topBar}>
+        <button type="button" className={styles.backBtn} onClick={() => router.back()} aria-label="Back">
+          <BackIcon />
+        </button>
+        <p className={styles.title}>{editId ? "EDIT CATERING ORDER" : "NEW CATERING ORDER"}</p>
+        <span className={styles.topBarSpacer} aria-hidden="true" />
+      </div>
 
       {/* 1. ORDER INFORMATION */}
       <Section step={1} title="ORDER INFORMATION">
@@ -447,7 +474,16 @@ export default function NewCateringOrderPage() {
               <span className={styles.readyByLabel}>READY BY TIME</span>
               <span className={styles.readyByPill}>KITCHEN DEADLINE</span>
             </div>
-            <p className={styles.readyByTime}>{readyByTime}</p>
+            <input
+              className={styles.readyByInput}
+              value={readyByTime}
+              onChange={(e) => {
+                setReadyByTime(e.target.value);
+                setReadyByDirty(true);
+              }}
+              placeholder="10:45 AM"
+              aria-label="Ready by time"
+            />
             <p className={styles.readyByHint}>Order must be ready by this time</p>
           </div>
         </div>

@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
         fulfillmentType: body.fulfillmentType ?? "PICKUP",
         deliveryDateISO: body.deliveryDateISO,
         deliveryTime: body.deliveryTime,
+        readyByTime: body.readyByTime,
         deliveryAddress: body.deliveryAddress,
         items: body.items,
         dietaryNotes: body.dietaryNotes,

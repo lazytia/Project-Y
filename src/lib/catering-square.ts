@@ -198,6 +198,7 @@ function parseMetadata(rawNotes: string[]): {
   paymentStatus?: CateringPaymentStatus;
   utensilsCount?: number;
   dietaryNotes?: string;
+  readyByTime?: string;
 } {
   // The new-order form stores form-only fields as "Key: value" lines in the
   // Square order's note. Pull them back out and keep any other free text
@@ -212,11 +213,11 @@ function parseMetadata(rawNotes: string[]): {
   if (payment) out.paymentStatus = payment as CateringPaymentStatus;
   const utensils = m(/Utensils:\s*(\d+)/i);
   if (utensils) out.utensilsCount = parseInt(utensils, 10);
+  out.readyByTime = m(/ReadyBy:\s*([^\n]+)/i);
   out.dietaryNotes = m(/Dietary:\s*([\s\S]+?)(?:\n[A-Z][a-z]+:|$)/);
-  // Strip the metadata lines so what's left is genuine free-form notes.
   const leftover = blob
     .split(/\r?\n/)
-    .filter((line) => !/^(Company|Phone|Email|Method|Payment|Utensils|Dietary):/i.test(line))
+    .filter((line) => !/^(Company|Phone|Email|Method|Payment|Utensils|ReadyBy|Dietary):/i.test(line))
     .map((l) => l.trim())
     .filter(Boolean);
   out.notes = leftover;
@@ -252,6 +253,7 @@ export function toCateringOrder(o: SqOrder): CateringOrder | null {
     paymentStatus: meta.paymentStatus,
     utensilsCount: meta.utensilsCount,
     dietaryNotes: meta.dietaryNotes,
+    readyByTime: meta.readyByTime,
   };
 }
 
@@ -325,6 +327,7 @@ function buildNotesBlob(form: CateringOrderForm): string {
   if (form.orderMethod) lines.push(`Method: ${form.orderMethod}`);
   if (form.paymentStatus) lines.push(`Payment: ${form.paymentStatus}`);
   if (typeof form.utensilsCount === "number") lines.push(`Utensils: ${form.utensilsCount}`);
+  if (form.readyByTime) lines.push(`ReadyBy: ${form.readyByTime}`);
   if (form.dietaryNotes) lines.push(`Dietary: ${form.dietaryNotes}`);
   return lines.join("\n");
 }

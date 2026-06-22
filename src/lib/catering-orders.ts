@@ -32,6 +32,8 @@ export type CateringOrderForm = {
   fulfillmentType: CateringFulfillmentType;
   deliveryDateISO: string;
   deliveryTime: string;
+  /** Optional override of the kitchen ready-by time ("10:45 AM"). */
+  readyByTime?: string;
   deliveryAddress?: string;
   items: Array<{ name: string; qty: number; unitPrice: number }>;
   dietaryNotes?: string;
@@ -62,6 +64,7 @@ export type CateringOrder = {
   paymentStatus?: CateringPaymentStatus;
   utensilsCount?: number;
   dietaryNotes?: string;
+  readyByTime?: string;
 };
 
 async function authHeader(user: User | null | undefined): Promise<HeadersInit> {

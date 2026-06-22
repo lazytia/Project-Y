@@ -3,9 +3,37 @@
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  color: var(--color-fg);
+  cursor: pointer;
+  padding: 0;
+}
+
+.topBarSpacer {
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+}
+
 .title {
+  flex: 1;
   text-align: center;
-  margin: 0 0 var(--space-5);
+  margin: 0;
   font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -231,6 +259,19 @@
   font-size: 22px;
   font-weight: 800;
   color: var(--color-warm);
+}
+
+.readyByInput {
+  margin: 4px 0 0 0;
+  width: 100%;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-warm);
+  padding: 0;
 }
 
 .readyByHint {
