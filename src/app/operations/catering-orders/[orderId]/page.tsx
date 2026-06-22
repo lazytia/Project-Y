@@ -36,6 +36,35 @@ function prettyPayment(s: string): string {
   }
 }
 
+const KITCHEN_PREP_MINUTES = 45;
+
+function formatTimeMinusMinutes(time: string, minus: number): string {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(time.trim());
+  if (!m) return "—";
+  let h = parseInt(m[1], 10);
+  const mins = parseInt(m[2], 10);
+  const ampm = m[3]?.toUpperCase();
+  if (ampm === "PM" && h !== 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  const totalMin = h * 60 + mins - minus;
+  const wrapped = (totalMin + 24 * 60) % (24 * 60);
+  const hh = Math.floor(wrapped / 60);
+  const mm = wrapped % 60;
+  const display12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+  const meridian = hh < 12 ? "AM" : "PM";
+  return `${display12}:${String(mm).padStart(2, "0")} ${meridian}`;
+}
+
+function StopwatchIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="13" r="8" />
+      <polyline points="12 9 12 13 14 14" />
+      <line x1="9" y1="2" x2="15" y2="2" />
+    </svg>
+  );
+}
+
 function fmtDate(iso: string): { date: string; weekday: string } {
   const [y, m, d] = iso.split("-").map((x) => parseInt(x, 10));
   const dt = new Date(y, m - 1, d);
@@ -201,6 +230,20 @@ export default function CateringOrderDetailPage() {
             />
             <FactCol icon={<PeopleIcon />} value={String(order.guestsCount)} label="Guests" />
             <FactCol icon={<DollarIcon />} value={fmtMoney(order.totalAmount)} label="Total" />
+          </div>
+
+          <div className={styles.readyByCard}>
+            <div className={styles.readyByIcon}><StopwatchIcon /></div>
+            <div className={styles.readyByBody}>
+              <div className={styles.readyByHead}>
+                <span className={styles.readyByLabel}>READY BY TIME</span>
+                <span className={styles.readyByPill}>KITCHEN DEADLINE</span>
+              </div>
+              <p className={styles.readyByTime}>
+                {formatTimeMinusMinutes(order.deliveryTime, KITCHEN_PREP_MINUTES)}
+              </p>
+              <p className={styles.readyByHint}>Order must be ready by this time</p>
+            </div>
           </div>
 
           {(order.contactName || order.contactPhone || order.contactEmail || order.companyName) && (
