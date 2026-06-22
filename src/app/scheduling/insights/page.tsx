@@ -234,26 +234,41 @@ export default function InsightsPage() {
         for (const d of dailySnap.docs) dmap[d.id] = d.data() as DailySales;
         setDailySalesMap(dmap);
       } catch { /* ignore */ }
-      try {
-        const snap = await getDocs(collection(getDb(), "staff_onboarding"));
-        const map: Record<string, StaffRate> = {};
-        for (const d of snap.docs) {
-          const data = d.data() as Record<string, unknown>;
-          const weekRate =
-            (typeof data.weekRate === "number" ? data.weekRate : undefined) ??
-            (typeof data.weeklyRate === "number" ? data.weeklyRate : undefined) ??
-            (typeof data.hourlyRate === "number" ? data.hourlyRate : undefined) ??
-            (typeof data.baseRate === "number" ? data.baseRate : undefined) ??
-            EST_HOURLY_RATE;
-          const satRate =
-            (typeof data.satRate === "number" ? data.satRate : undefined) ??
-            (typeof data.saturdayRate === "number" ? data.saturdayRate : undefined) ??
-            weekRate;
-          map[d.id] = { weekRate, satRate };
-        }
-        setStaffRates(map);
-      } catch {
-        /* keep empty */
+      {
+        const ratesMap: Record<string, StaffRate> = {};
+        try {
+          const snap = await getDocs(collection(getDb(), "staff_onboarding"));
+          for (const d of snap.docs) {
+            const data = d.data() as Record<string, unknown>;
+            const weekRate =
+              (typeof data.weekRate === "number" ? data.weekRate : undefined) ??
+              (typeof data.weeklyRate === "number" ? data.weeklyRate : undefined) ??
+              (typeof data.hourlyRate === "number" ? data.hourlyRate : undefined) ??
+              (typeof data.baseRate === "number" ? data.baseRate : undefined) ??
+              EST_HOURLY_RATE;
+            const satRate =
+              (typeof data.satRate === "number" ? data.satRate : undefined) ??
+              (typeof data.saturdayRate === "number" ? data.saturdayRate : undefined) ??
+              weekRate;
+            ratesMap[d.id] = { weekRate, satRate };
+          }
+        } catch { /* keep empty */ }
+        try {
+          const snap = await getDocs(collection(getDb(), "staff"));
+          for (const d of snap.docs) {
+            const data = d.data() as Record<string, unknown>;
+            const weekdayRate = typeof data.weekdayRate === "number" ? data.weekdayRate : undefined;
+            const saturdayRate = typeof data.saturdayRate === "number" ? data.saturdayRate : undefined;
+            if (weekdayRate !== undefined || saturdayRate !== undefined) {
+              const ex = ratesMap[d.id];
+              ratesMap[d.id] = {
+                weekRate: weekdayRate ?? ex?.weekRate ?? EST_HOURLY_RATE,
+                satRate: saturdayRate ?? ex?.satRate ?? (weekdayRate ?? EST_HOURLY_RATE),
+              };
+            }
+          }
+        } catch { /* keep empty */ }
+        setStaffRates(ratesMap);
       }
       setLoading(false);
     })();
@@ -336,14 +351,10 @@ export default function InsightsPage() {
   const rosterPlanned = currentWeek.estimatedCost; // planned always from roster estimate
   const variance = payrollCost - rosterPlanned;
 
-  // Square Gross Sales for this and the previous week.
+  // Square Gross Sales for this week (used in Planned vs Actual section).
   const sales = salesMap[isoDate(currentWeekStart)]?.grossSales ?? 0;
-  const prevSales = salesMap[isoDate(prevWeekStart)]?.grossSales ?? 0;
   const hasSales = sales > 0;
-  const salesVsLast = prevSales > 0 ? ((sales - prevSales) / prevSales) * 100 : 0;
   const payrollPct = hasSales ? (payrollCost / sales) * 100 : 0;
-  const prevPayrollPct = hasSales ? (prevPayrollCost / sales) * 100 : 0;
-  const overTarget = hasSales && payrollPct > TARGET_PAYROLL_PCT;
 
   // Highest cost day
   // Rank by roster estimate when we have a published roster; otherwise
@@ -450,6 +461,56 @@ export default function InsightsPage() {
 
   const weekEnd = useMemo(() => addDays(currentWeekStart, 5), [currentWeekStart]); // Mon→Sat
   const prevWeekEnd = useMemo(() => addDays(prevWeekStart, 5), [prevWeekStart]);
+
+  // Range-scoped metrics derived from the calendar picker selection
+  const rangeSales = useMemo(() => {
+    let total = 0;
+    const [sy, sm, sd] = rangeStartISO.split("-").map(Number);
+    const [ey, em, ed] = rangeEndISO.split("-").map(Number);
+    if (!sy || !ey) return 0;
+    const start = new Date(sy, sm - 1, sd);
+    const end = new Date(ey, em - 1, ed);
+    let cur = new Date(start);
+    while (cur <= end) {
+      total += dailySalesMap[isoDate(cur)]?.grossSales ?? 0;
+      cur = addDays(cur, 1);
+    }
+    return total;
+  }, [rangeStartISO, rangeEndISO, dailySalesMap]);
+
+  const rangePayrollCost = useMemo(() => {
+    let total = 0;
+    const [sy, sm, sd] = rangeStartISO.split("-").map(Number);
+    const [ey, em, ed] = rangeEndISO.split("-").map(Number);
+    if (!sy || !ey) return 0;
+    const start = new Date(sy, sm - 1, sd);
+    const end = new Date(ey, em - 1, ed);
+    let cur = new Date(start);
+    while (cur <= end) {
+      const iso = isoDate(cur);
+      const weekStart = isoDate(startOfWeekMon(cur));
+      const weekDoc = docs[weekStart];
+      const lunchMap = weekDoc?.assignments?.[iso]?.lunch ?? {};
+      const dinnerMap = weekDoc?.assignments?.[iso]?.dinner ?? {};
+      const isSat = cur.getDay() === 6;
+      for (const [uid, startTime] of Object.entries(lunchMap)) {
+        const wr = staffRates[uid]?.weekRate ?? EST_HOURLY_RATE;
+        const rate = isSat ? (staffRates[uid]?.satRate ?? wr) : wr;
+        total += shiftHours(startTime as string, LUNCH_END_H, 4) * rate;
+      }
+      for (const [uid, startTime] of Object.entries(dinnerMap)) {
+        const wr = staffRates[uid]?.weekRate ?? EST_HOURLY_RATE;
+        const rate = isSat ? (staffRates[uid]?.satRate ?? wr) : wr;
+        total += shiftHours(startTime as string, DINNER_END_H, 5) * rate;
+      }
+      cur = addDays(cur, 1);
+    }
+    return total;
+  }, [rangeStartISO, rangeEndISO, docs, staffRates]);
+
+  const rangeHasSales = rangeSales > 0;
+  const rangePayrollPct = rangeHasSales ? (rangePayrollCost / rangeSales) * 100 : null;
+  const rangeOverTarget = rangePayrollPct !== null && rangePayrollPct > TARGET_PAYROLL_PCT;
 
   // Auto-sync when the page first loads (and when the manager picks
   // a different week). Runs in the background — the existing
@@ -561,9 +622,7 @@ export default function InsightsPage() {
       </header>
 
       {refreshError && refreshError.startsWith("Square:") && (
-        <p style={{ fontSize: 12, color: "#1f8d5f", textAlign: "center", margin: 0, padding: "0 8px", lineHeight: 1.4 }}>
-          {refreshError}
-        </p>
+        <p className={styles.refreshError}>{refreshError}</p>
       )}
 
       <div className={styles.weekRow}>
@@ -608,29 +667,25 @@ export default function InsightsPage() {
         </div>
       </div>
 
-      {/* Snapshot card */}
+      {/* Snapshot card — values are scoped to the selected date range */}
       <section className={styles.snapshot}>
         <div className={styles.snapshotCol}>
           <p className={styles.snapshotLabel}>SALES</p>
-          <p className={styles.snapshotValue}>{hasSales ? fmtCurrency(sales) : "—"}</p>
+          <p className={styles.snapshotValue}>{rangeHasSales ? fmtCurrency(rangeSales) : "—"}</p>
           <p className={styles.snapshotMeta}>
-            {hasSales
-              ? prevSales > 0
-                ? `${salesVsLast >= 0 ? "+" : ""}${fmtPct(salesVsLast)} vs last week`
-                : "Gross sales (Square)"
-              : "Not connected"}
+            {rangeHasSales ? "Gross sales (range)" : "No sales data"}
           </p>
         </div>
         <div className={styles.snapshotDivider} />
         <div className={styles.snapshotCol}>
           <p className={styles.snapshotLabel}>PAYROLL %</p>
-          <p className={`${styles.snapshotValue} ${overTarget ? styles.snapshotValueDanger : styles.snapshotValueWarm}`}>
-            {hasSales ? fmtPct(payrollPct) : "—"}
+          <p className={`${styles.snapshotValue} ${rangeOverTarget ? styles.snapshotValueDanger : styles.snapshotValueWarm}`}>
+            {rangePayrollPct !== null ? fmtPct(rangePayrollPct) : "—"}
           </p>
-          {hasSales ? (
-            <span className={`${styles.targetPill} ${overTarget ? styles.targetPillDanger : styles.targetPillOk}`}>
+          {rangePayrollPct !== null ? (
+            <span className={`${styles.targetPill} ${rangeOverTarget ? styles.targetPillDanger : styles.targetPillOk}`}>
               <span className={styles.targetIcon} aria-hidden="true">
-                {overTarget ? (
+                {rangeOverTarget ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="6" y1="6" x2="18" y2="18" />
                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -641,7 +696,7 @@ export default function InsightsPage() {
                   </svg>
                 )}
               </span>
-              {overTarget ? "Over Target" : "Under Target"}
+              {rangeOverTarget ? "Over Target" : "Under Target"}
             </span>
           ) : (
             <span className={styles.snapshotMeta}>Needs sales data</span>
@@ -651,11 +706,9 @@ export default function InsightsPage() {
         <div className={styles.snapshotDivider} />
         <div className={styles.snapshotCol}>
           <p className={styles.snapshotLabel}>PAYROLL COST</p>
-          <p className={styles.snapshotValue}>{fmtCurrency(payrollCost)}</p>
+          <p className={styles.snapshotValue}>{rangePayrollCost > 0 ? fmtCurrency(rangePayrollCost) : "—"}</p>
           <p className={styles.snapshotMeta}>
-            {prevPayrollCost > 0
-              ? `${payrollVsLast >= 0 ? "+" : ""}${fmtPct(payrollVsLast)} vs last week`
-              : payrollIsActual ? "Actual incl. super" : "Estimated"}
+            {rangePayrollCost > 0 ? "Roster estimate (range)" : "No roster data"}
           </p>
         </div>
       </section>

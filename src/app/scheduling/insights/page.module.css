@@ -594,6 +594,16 @@
 .highVsAvgWarm { color: var(--color-warm); }
 .highVsAvgDanger { color: #c14545; }
 
+/* ── Refresh error banner ── */
+.refreshError {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-positive);
+  text-align: center;
+  margin: 0;
+  padding: 0 var(--space-2);
+  line-height: 1.4;
+}
+
 /* ── Insights list ── */
 .insightList {
   list-style: disc;
