@@ -5,6 +5,7 @@ import {
   getPlatterCateringOrder,
   updatePlatterCateringOrder,
 } from "@/lib/catering-square";
+import type { CateringOrderForm } from "@/lib/catering-orders";
 
 /**
  * GET /api/catering-orders/[orderId]
@@ -46,14 +47,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ orderId: 
   const auth = await verifyAuth(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const { orderId } = await ctx.params;
-  let body: {
-    clientName?: string;
-    deliveryDateISO?: string;
-    deliveryTime?: string;
-    guestsCount?: number;
-    totalAmount?: number;
-    notes?: string;
-  };
+  let body: Partial<CateringOrderForm>;
   try {
     body = await req.json();
   } catch {

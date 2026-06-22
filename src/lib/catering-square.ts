@@ -491,7 +491,6 @@ export async function updatePlatterCateringOrder(
   const existingFull = toCateringOrder(existing);
   if (!existingFull) throw new Error("Could not read existing order.");
 
-  // Square rejects partial fulfillment updates, so we go cancel + recreate.
   // Merge the entire form shape so metadata (method/payment/utensils/dietary/
   // readyBy/etc.) survives every edit — losing any of those on save would
   // be a data-loss bug.
@@ -516,8 +515,127 @@ export async function updatePlatterCateringOrder(
     paymentStatus: patch.paymentStatus ?? existingFull.paymentStatus,
   };
 
-  await cancelPlatterCateringOrder(orderId);
-  return createPlatterCateringOrderFromForm(merged);
+  const platterId = squareEnv.platterLocationId;
+  if (!platterId) throw new Error("SQUARE_PLATTER_LOCATION_ID not set.");
+
+  const toNum = (v: number | bigint | undefined): number =>
+    typeof v === "bigint" ? Number(v) : (v ?? 0);
+
+  const timezone = tz();
+  const whenIso = combineLocalDateTime(merged.deliveryDateISO, merged.deliveryTime, timezone);
+  const recipientData = {
+    displayName: merged.clientName,
+    emailAddress: merged.contactEmail || undefined,
+    phoneNumber: merged.contactPhone || undefined,
+    address: merged.deliveryAddress ? { addressLine1: merged.deliveryAddress } : undefined,
+  };
+  const blob = buildNotesBlob(merged);
+
+  // Identify the current fulfillment so we can update it in-place (preserving
+  // the order ID) instead of cancel + recreate.
+  const existingFulfillment = pickFulfillment(existing);
+  const existingFulfillmentUid = existingFulfillment?.uid;
+  const existingFulfillmentType = existingFulfillment?.type;
+  const newFulfillmentType = merged.fulfillmentType;
+
+  // Square does not allow mutating a fulfillment's type after creation.
+  // When the type changes we cancel the old fulfillment first, then the
+  // update below adds a brand-new one (no uid = new fulfillment).
+  const typeChanged = Boolean(
+    existingFulfillmentUid &&
+    existingFulfillmentType &&
+    existingFulfillmentType !== newFulfillmentType,
+  );
+
+  let version = toNum(existing.version);
+
+  if (typeChanged && existingFulfillmentUid) {
+    const cancelResp = await squareClient.orders.update({
+      orderId,
+      order: {
+        locationId: platterId,
+        version,
+        fulfillments: [{
+          uid: existingFulfillmentUid,
+          type: existingFulfillmentType as "PICKUP" | "DELIVERY" | "SHIPMENT",
+          state: "CANCELED" as const,
+        }],
+      },
+    });
+    version = toNum(
+      (cancelResp.order as { version?: number | bigint } | undefined)?.version,
+    );
+  }
+
+  // Update-in-place: keep the same uid so Square updates the existing
+  // fulfillment rather than adding a second one. When the type changed we
+  // omit the uid so Square creates a fresh fulfillment.
+  const fulfillmentUid = typeChanged ? undefined : existingFulfillmentUid;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const newFulfillment: Record<string, any> = newFulfillmentType === "DELIVERY"
+    ? {
+        uid: fulfillmentUid,
+        type: "DELIVERY" as const,
+        state: "PROPOSED" as const,
+        deliveryDetails: {
+          deliverAt: whenIso,
+          recipient: recipientData,
+          note: blob || undefined,
+        },
+      }
+    : {
+        uid: fulfillmentUid,
+        type: "PICKUP" as const,
+        state: "PROPOSED" as const,
+        pickupDetails: {
+          pickupAt: whenIso,
+          recipient: recipientData,
+          note: blob || undefined,
+        },
+      };
+
+  // Replace all line items: mark every existing uid for removal, then supply
+  // the new items without uids (= new in Square's sparse-update model).
+  const existingLineItemUids = (existing.lineItems ?? [])
+    .map((li) => li.uid)
+    .filter((uid): uid is string => Boolean(uid));
+  const fieldsToClear: string[] = existingLineItemUids.map(
+    (uid) => `line_items[${uid}]`,
+  );
+
+  const newLineItems = merged.items.length > 0
+    ? merged.items.map((it) => ({
+        name: it.name,
+        quantity: String(Math.max(1, Math.round(it.qty))),
+        basePriceMoney: {
+          amount: BigInt(Math.round(it.unitPrice * 100)),
+          currency: "AUD" as const,
+        },
+      }))
+    : [{
+        name: merged.clientName,
+        quantity: "1",
+        basePriceMoney: { amount: BigInt(0), currency: "AUD" as const },
+      }];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateFn = squareClient.orders.update as unknown as (req: Record<string, any>) => Promise<{ order?: unknown }>;
+  const resp = await updateFn({
+    orderId,
+    order: {
+      locationId: platterId,
+      version,
+      fulfillments: [newFulfillment],
+      lineItems: newLineItems,
+    },
+    fieldsToClear,
+  });
+
+  const o = resp.order as SqOrder | undefined;
+  if (!o) throw new Error("Square did not return an updated order.");
+  const mapped = toCateringOrder(o);
+  if (!mapped) throw new Error("Could not map updated order.");
+  return mapped;
 }
 
 export async function cancelPlatterCateringOrder(orderId: string): Promise<void> {

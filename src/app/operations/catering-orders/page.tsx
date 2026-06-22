@@ -95,10 +95,14 @@ export default function CateringOrdersPage() {
   }
 
   const orders = useMemo(() => {
-    const filtered = serverOrders.filter((o) => !cancelledIds.has(o.id));
-    // Avoid duplicates if a pending-add already appeared in the server list.
-    const haveIds = new Set(filtered.map((o) => o.id));
-    const merged = [...filtered, ...pendingAdds.filter((o) => !haveIds.has(o.id))];
+    // pendingAdds always wins over a stale server copy for the same ID.
+    // This covers both new orders (Square index lag after create) and edited
+    // orders (Square index lag after update).
+    const pendingIds = new Set(pendingAdds.map((o) => o.id));
+    const filtered = serverOrders.filter(
+      (o) => !cancelledIds.has(o.id) && !pendingIds.has(o.id),
+    );
+    const merged = [...filtered, ...pendingAdds];
     merged.sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
     return merged;
   }, [serverOrders, cancelledIds, pendingAdds]);
