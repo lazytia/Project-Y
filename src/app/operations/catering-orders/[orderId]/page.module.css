@@ -331,6 +331,33 @@
   color: var(--color-fg);
 }
 
+.orderTotalRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.orderTotalLabel {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.orderTotalItems {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+
+.orderTotalValue {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
 /* ── 3-up bottom mini cards ── */
 .threeUp {
   display: grid;

@@ -15,6 +15,10 @@ const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const KITCHEN_PREP_MINUTES = 45;
 
+function fmtMoney(n: number): string {
+  return `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-").map((x) => parseInt(x, 10));
   const dt = new Date(y, m - 1, d);
@@ -244,7 +248,7 @@ export default function CateringOrderDetailPage() {
                 {readyBy}
               </button>
             )}
-            <p className={styles.readyByHint}>Kitchen must be ready by this time</p>
+            <p className={styles.readyByHint}>Order must be ready by this time</p>
           </div>
         </div>
       </div>
@@ -308,7 +312,12 @@ export default function CateringOrderDetailPage() {
               </li>
             ))}
           </ul>
-          <p className={styles.totalMeals}>Total {totalMeals} Meals</p>
+          <div className={styles.orderTotalRow}>
+            <span className={styles.orderTotalLabel}>
+              Total <span className={styles.orderTotalItems}>({totalMeals} items)</span>
+            </span>
+            <span className={styles.orderTotalValue}>{fmtMoney(order.totalAmount)}</span>
+          </div>
         </div>
       </section>
 
