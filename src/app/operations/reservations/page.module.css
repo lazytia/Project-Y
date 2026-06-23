@@ -645,6 +645,9 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  /* Push everything below the YURICA app shell + iOS notch so the Back
+     button isn't hidden under the top bar. */
+  padding-top: calc(var(--header-height, 56px) + env(safe-area-inset-top, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
