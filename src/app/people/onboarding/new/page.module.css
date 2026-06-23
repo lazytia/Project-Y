@@ -1,0 +1,470 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 520px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Header ── */
+.header {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.backBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--color-fg);
+}
+
+.backBtn:hover {
+  background: var(--color-surface);
+}
+
+.headerTitles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.eyebrow {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  text-align: center;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.headerSpacer {
+  display: block;
+  width: 36px;
+}
+
+/* ── Field ── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-fg-muted);
+}
+
+.input {
+  height: 48px;
+  padding: 0 var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-fg);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  border-color: var(--color-warm);
+}
+
+.input::placeholder {
+  color: var(--color-fg-muted);
+  opacity: 0.55;
+}
+
+/* ── Select ── */
+.selectWrap {
+  position: relative;
+}
+
+.select {
+  height: 48px;
+  padding: 0 var(--space-6) 0 var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-fg);
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s;
+}
+
+.select:focus {
+  border-color: var(--color-warm);
+}
+
+.selectChev {
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-fg-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* ── Picker button (date / period) ── */
+.pickerBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 48px;
+  padding: 0 var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-fg);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+.pickerBtn:hover {
+  border-color: var(--color-warm);
+}
+
+.pickerLeadIcon {
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.pickerValue {
+  flex: 1;
+  min-width: 0;
+}
+
+.pickerBtn .selectChev {
+  position: static;
+  transform: none;
+}
+
+/* ── Rate input ── */
+.rateWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-4);
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.rateWrapFocused {
+  border-color: var(--color-warm);
+  background: var(--color-warm-bg);
+}
+
+.rateWrapMuted {
+  background: var(--color-surface);
+  border-width: 1px;
+}
+
+.rateBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-surface-hover);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.rateBadgeOn {
+  background: var(--color-warm);
+  color: var(--color-accent-fg);
+}
+
+.rateInput {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-fg);
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.rateInput::-webkit-outer-spin-button,
+.rateInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.rateInput::placeholder {
+  color: var(--color-fg-muted);
+  opacity: 0.5;
+}
+
+.rateSuffix {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-md);
+  flex-shrink: 0;
+}
+
+/* ── Info box ── */
+.infoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-warm-bg);
+  border: 1px solid var(--color-warm-bg);
+  border-radius: var(--radius-md);
+}
+
+.infoIcon {
+  flex-shrink: 0;
+  color: var(--color-warm);
+  margin-top: 1px;
+}
+
+.infoText {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+/* ── Textarea ── */
+.textarea {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-fg);
+  resize: vertical;
+  outline: none;
+  line-height: 1.55;
+  min-height: 96px;
+  transition: border-color 0.15s;
+}
+
+.textarea:focus {
+  border-color: var(--color-warm);
+}
+
+.textarea::placeholder {
+  color: var(--color-fg-muted);
+  opacity: 0.55;
+}
+
+/* ── Submit ── */
+.submitBtn {
+  display: block;
+  width: 100%;
+  height: 52px;
+  margin-top: var(--space-2);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.submitBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Calendar overlay ── */
+.calOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 20, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 700;
+}
+
+.calSheet {
+  width: min(520px, 100%);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+}
+
+/* ── Training period bottom sheet ── */
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 20, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 600;
+  overscroll-behavior: contain;
+}
+
+.sheet {
+  width: min(520px, 100%);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: var(--space-4) var(--space-5)
+    max(var(--space-5), env(safe-area-inset-bottom, 20px));
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sheetHandle {
+  width: 36px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 99px;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+
+.sheetTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.optionList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.optionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4) 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: left;
+  color: inherit;
+}
+
+.optionList li + li .optionRow {
+  border-top: 1px solid var(--color-border);
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.radioOn {
+  border-color: var(--color-warm);
+}
+
+.radioDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-warm);
+}
+
+.optionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.optionLabel {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.optionSub {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  line-height: 1.45;
+}
+
+.sheetDone {
+  display: block;
+  width: 100%;
+  height: 52px;
+  margin-top: var(--space-2);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.sheetDone:hover {
+  opacity: 0.9;
+}
