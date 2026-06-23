@@ -12,6 +12,7 @@ import {
   serviceFor,
   setReservationStatus,
   todayISO,
+  tsToDate,
   updateReservation,
 } from "@/lib/reservations";
 import styles from "./page.module.css";
@@ -121,7 +122,33 @@ export default function ReservationsPage() {
   }, [dateISO, user]);
 
   const active = useMemo(() => list.filter((r) => r.status !== "cancelled" && r.status !== "no-show"), [list]);
-  const cancelled = useMemo(() => list.filter((r) => r.status === "cancelled"), [list]);
+
+  // Recent activity to surface in the alert strip: cancellations first, then
+  // brand-new bookings, then customer-updated edits. Each row carries a tag
+  // so the UI can colour them differently.
+  const activity = useMemo(() => {
+    type Item = { reservation: Reservation; kind: "cancelled" | "new" | "updated"; at: number };
+    const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // surface anything from the last 24h
+    const now = Date.now();
+    const out: Item[] = [];
+    for (const r of list) {
+      if (r.status === "cancelled") {
+        const t = tsToDate(r.customerUpdatedAt ?? r.createdAt ?? null);
+        out.push({ reservation: r, kind: "cancelled", at: t?.getTime() ?? 0 });
+        continue;
+      }
+      const createdMs = tsToDate(r.createdAt ?? null)?.getTime();
+      if (typeof createdMs === "number" && now - createdMs <= RECENT_WINDOW_MS) {
+        out.push({ reservation: r, kind: "new", at: createdMs });
+        continue;
+      }
+      const updatedMs = tsToDate(r.customerUpdatedAt ?? null)?.getTime();
+      if (r.customerUpdated && typeof updatedMs === "number" && now - updatedMs <= RECENT_WINDOW_MS) {
+        out.push({ reservation: r, kind: "updated", at: updatedMs });
+      }
+    }
+    return out.sort((a, b) => b.at - a.at).slice(0, 4);
+  }, [list]);
 
   const totals = useMemo(() => {
     const indoor = active.filter((r) => r.seating === "indoor").reduce((s, r) => s + r.count, 0);
@@ -185,16 +212,33 @@ export default function ReservationsPage() {
         <Stat value={String(totals.outdoor)} label="OUTDOOR" hint="Guests" />
       </div>
 
-      {cancelled.slice(-1).map((c) => (
-        <div key={c.id} className={styles.cancelBanner}>
-          <span className={styles.cancelIcon}><AlertIcon /></span>
-          <div className={styles.cancelBody}>
-            <p className={styles.cancelTitle}>Cancelled Reservation</p>
-            <p className={styles.cancelMeta}>{c.name} · {fmtLongDate(c.date).replace(/, \d{4}$/, "")} · {fmt12h(c.time)}</p>
-          </div>
-          <button type="button" className={styles.cancelView} onClick={() => setFocused(c)}>View</button>
-        </div>
-      ))}
+      {activity.length > 0 && (
+        <ul className={styles.activityList}>
+          {activity.map(({ reservation, kind }) => (
+            <li
+              key={`${kind}-${reservation.id}`}
+              className={`${styles.activityRow} ${
+                kind === "cancelled" ? styles.activityCancelled
+                  : kind === "new" ? styles.activityNew
+                    : styles.activityUpdated
+              }`}
+            >
+              <span className={styles.activityIcon}><AlertIcon /></span>
+              <div className={styles.activityBody}>
+                <p className={styles.activityTitle}>
+                  {kind === "cancelled" ? "Cancelled Reservation"
+                    : kind === "new" ? "New Reservation"
+                      : "Updated Reservation"}
+                </p>
+                <p className={styles.activityMeta}>
+                  {reservation.name} · {fmtLongDate(reservation.date).replace(/, \d{4}$/, "")} · {fmt12h(reservation.time)}
+                </p>
+              </div>
+              <button type="button" className={styles.activityView} onClick={() => setFocused(reservation)}>View</button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className={styles.searchWrap}>
         <span className={styles.searchIcon}><SearchIcon /></span>

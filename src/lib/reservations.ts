@@ -16,6 +16,8 @@ export type ReservationSeating = "indoor" | "outdoor" | "bar";
 export type ReservationBranch = "macquariepark" | "northsydney";
 export type ReservationService = "LUNCH" | "DINNER";
 
+type FirestoreTimestamp = { _seconds?: number; seconds?: number } | string | number | null;
+
 export type Reservation = {
   id: string;
   name: string;
@@ -33,7 +35,27 @@ export type Reservation = {
   status?: ReservationStatus;
   tableNumber?: string;
   seatingRemark?: string;
+  /** When the booking was first created. */
+  createdAt?: FirestoreTimestamp;
+  /** When the customer most recently edited their own booking. */
+  customerUpdated?: boolean;
+  customerUpdatedAt?: FirestoreTimestamp;
 };
+
+/** Convert Firestore-style timestamp (or epoch / ISO string) into a Date. */
+export function tsToDate(ts: FirestoreTimestamp): Date | null {
+  if (ts == null) return null;
+  if (typeof ts === "string") {
+    const d = new Date(ts);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof ts === "number") {
+    return new Date(ts);
+  }
+  const secs = ts._seconds ?? ts.seconds;
+  if (typeof secs === "number") return new Date(secs * 1000);
+  return null;
+}
 
 export type ReservationCreateInput = {
   name: string;

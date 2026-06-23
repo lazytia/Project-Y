@@ -116,7 +116,79 @@
   color: var(--color-fg-muted);
 }
 
-/* ── Cancel banner ── */
+/* ── Activity strip (cancelled / new / updated) ── */
+.activityList {
+  list-style: none;
+  margin: 0 0 var(--space-3) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.activityRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.activityIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.activityBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.activityTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.activityMeta {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.activityView {
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-fg);
+  cursor: pointer;
+  padding: 4px 6px;
+  text-decoration: underline;
+}
+
+.activityCancelled {
+  background: var(--color-warm-bg);
+  border-color: rgba(255, 106, 19, 0.2);
+}
+.activityCancelled .activityIcon { color: var(--color-warm); }
+
+.activityNew {
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.25);
+}
+.activityNew .activityIcon { color: var(--color-positive); }
+
+.activityUpdated {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+.activityUpdated .activityIcon { color: var(--color-fg-muted); }
+
+/* ── Cancel banner (legacy, kept for compat) ── */
 .cancelBanner {
   display: flex;
   align-items: center;
