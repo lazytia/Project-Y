@@ -494,16 +494,42 @@ export default function InsightsPage() {
     return weeklyTotal;
   }, [rangeStartISO, rangeEndISO, dailySalesMap, salesMap]);
 
-  const rangePayrollCost = useMemo(() => {
+  // Pair the cost with the source that produced it so the snapshot label
+  // can read "actual (Sheet)" vs "Roster estimate (range)" honestly.
+  const rangePayroll = useMemo<{ value: number; source: "actual" | "estimate" | "none" }>(() => {
     const [sy, sm, sd] = rangeStartISO.split("-").map(Number);
     const [ey, em, ed] = rangeEndISO.split("-").map(Number);
-    if (!sy || !ey) return 0;
+    if (!sy || !ey) return { value: 0, source: "none" };
     const start = new Date(sy, sm - 1, sd);
     const end = new Date(ey, em - 1, ed);
 
-    // Primary: compute from roster assignments (exact per-shift estimate).
-    let rosterTotal = 0;
+    // Primary: actual payroll synced from the Google Sheet, summed across
+    // every Mon-Sun week that overlaps the range. Only count a week when
+    // we actually have an actual entry — fall through to the roster
+    // estimate otherwise so we don't undercount.
+    let actualTotal = 0;
+    let anyActual = false;
+    const seenWeeks = new Set<string>();
     let cur = new Date(start);
+    while (cur <= end) {
+      const weekMon = startOfWeekMon(cur);
+      const weekKey = isoDate(weekMon);
+      if (!seenWeeks.has(weekKey)) {
+        seenWeeks.add(weekKey);
+        const { value, isActual } = actualOrEstimate(weekMon, 0);
+        if (isActual && value > 0) {
+          actualTotal += value;
+          anyActual = true;
+        }
+      }
+      cur = addDays(cur, 1);
+    }
+    if (anyActual) return { value: actualTotal, source: "actual" };
+
+    // Fallback: compute the roster estimate (exact per-shift) for the
+    // selected range when no actual is available yet.
+    let rosterTotal = 0;
+    cur = new Date(start);
     while (cur <= end) {
       const iso = isoDate(cur);
       const weekStart = isoDate(startOfWeekMon(cur));
@@ -523,25 +549,11 @@ export default function InsightsPage() {
       }
       cur = addDays(cur, 1);
     }
-    if (rosterTotal > 0) return rosterTotal;
-
-    // Fallback: sum from payroll_weekly (actual Xero data) when no roster
-    // assignments exist — mirrors the same logic used by PLANNED VS ACTUAL.
-    let payrollTotal = 0;
-    const seenWeeks = new Set<string>();
-    cur = new Date(start);
-    while (cur <= end) {
-      const weekMon = startOfWeekMon(cur);
-      const weekKey = isoDate(weekMon);
-      if (!seenWeeks.has(weekKey)) {
-        seenWeeks.add(weekKey);
-        const { value } = actualOrEstimate(weekMon, 0);
-        payrollTotal += value;
-      }
-      cur = addDays(cur, 1);
-    }
-    return payrollTotal;
+    if (rosterTotal > 0) return { value: rosterTotal, source: "estimate" };
+    return { value: 0, source: "none" };
   }, [rangeStartISO, rangeEndISO, docs, staffRates, payroll]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rangePayrollCost = rangePayroll.value;
+  const rangePayrollSource = rangePayroll.source;
 
   const rangeHasSales = rangeSales > 0;
   const rangePayrollPct = rangeHasSales ? (rangePayrollCost / rangeSales) * 100 : null;
@@ -743,7 +755,11 @@ export default function InsightsPage() {
           <p className={styles.snapshotLabel}>PAYROLL COST</p>
           <p className={styles.snapshotValue}>{rangePayrollCost > 0 ? fmtCurrency(rangePayrollCost) : "—"}</p>
           <p className={styles.snapshotMeta}>
-            {rangePayrollCost > 0 ? "Roster estimate (range)" : "No roster data"}
+            {rangePayrollSource === "actual"
+              ? "Actual (range)"
+              : rangePayrollSource === "estimate"
+                ? "Roster estimate (range)"
+                : "No payroll data"}
           </p>
         </div>
       </section>
