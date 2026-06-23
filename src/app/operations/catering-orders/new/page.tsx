@@ -272,20 +272,15 @@ export default function NewCateringOrderPage() {
       setFulfillmentType("DELIVERY");
       setDeliveryAddress(o.deliveryAddressLines.join("\n"));
     }
-    // Pull metadata back out of the notes blob (best-effort — Square doesn't
-    // give us a structured place to store the form-only fields).
-    const blob = o.notes.join("\n");
-    const m = (re: RegExp) => blob.match(re)?.[1]?.trim();
-    const company = m(/Company:\s*([^\n]+)/i);
-    const method = m(/Method:\s*([A-Z_]+)/i);
-    const payment = m(/Payment:\s*([A-Z_]+)/i);
-    const utensilsStr = m(/Utensils:\s*(\d+)/i);
-    const dietary = m(/Dietary:\s*([\s\S]+?)(?:\n[A-Z][a-z]+:|$)/);
-    if (company) setCompanyName(company);
-    if (method) setOrderMethod(method as CateringOrderMethod);
-    if (payment) setPaymentStatus(payment as CateringPaymentStatus);
-    if (utensilsStr) setUtensils(parseInt(utensilsStr, 10) || 0);
-    if (dietary) setDietary(dietary);
+    // Adapter already parses the metadata blob into typed fields and
+    // strips those lines from o.notes, so read directly off the order
+    // (re-parsing notes here always came up empty for sections 6/7/8).
+    if (o.companyName) setCompanyName(o.companyName);
+    if (o.orderMethod) setOrderMethod(o.orderMethod);
+    if (o.paymentStatus) setPaymentStatus(o.paymentStatus);
+    if (typeof o.utensilsCount === "number") setUtensils(o.utensilsCount);
+    if (o.dietaryNotes) setDietary(o.dietaryNotes);
+    if (o.fulfillmentType) setFulfillmentType(o.fulfillmentType);
     if (o.readyByTime) {
       setReadyByTime(o.readyByTime);
       setReadyByDirty(true);
