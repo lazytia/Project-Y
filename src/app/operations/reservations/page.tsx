@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   type Reservation,
@@ -100,7 +100,40 @@ export default function ReservationsPage() {
   const [focused, setFocused] = useState<Reservation | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Reservation | null>(null);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  // Native date picker — we toss a hidden input into the page and call
+  // its showPicker() so a tap on the calendar icon goes straight to the
+  // OS picker instead of opening an intermediate sheet.
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+  function openDatePicker() {
+    const el = dateInputRef.current;
+    if (!el) return;
+    try {
+      (el as unknown as { showPicker?: () => void }).showPicker?.();
+    } catch { /* ignore — older browsers fall through to focus() */ }
+    el.focus();
+  }
+  // Activity entries the user has dismissed via the Clear button. Persisted
+  // in sessionStorage so a reload doesn't bring them back, but cleared once
+  // the tab closes (intentional — they re-appear on next visit if still
+  // recent so nothing important slips through).
+  const [clearedActivity, setClearedActivity] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = sessionStorage.getItem("reservations-cleared-activity");
+      if (!raw) return new Set();
+      return new Set(JSON.parse(raw) as string[]);
+    } catch { return new Set(); }
+  });
+  function clearActivity(key: string) {
+    setClearedActivity((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      try {
+        sessionStorage.setItem("reservations-cleared-activity", JSON.stringify([...next]));
+      } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   async function reload() {
     if (!user) return;
@@ -147,8 +180,11 @@ export default function ReservationsPage() {
         out.push({ reservation: r, kind: "updated", at: updatedMs });
       }
     }
-    return out.sort((a, b) => b.at - a.at).slice(0, 4);
-  }, [list]);
+    return out
+      .filter((item) => !clearedActivity.has(`${item.kind}-${item.reservation.id}`))
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 4);
+  }, [list, clearedActivity]);
 
   const totals = useMemo(() => {
     const indoor = active.filter((r) => r.seating === "indoor").reduce((s, r) => s + r.count, 0);
@@ -197,7 +233,16 @@ export default function ReservationsPage() {
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.iconBtn} onClick={reload} aria-label="Refresh"><RefreshIcon /></button>
-          <button type="button" className={styles.iconBtn} onClick={() => setDatePickerOpen(true)} aria-label="Pick date"><CalIcon /></button>
+          <button type="button" className={styles.iconBtn} onClick={openDatePicker} aria-label="Pick date"><CalIcon /></button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            className={styles.hiddenDateInput}
+            value={dateISO}
+            onChange={(e) => { if (e.target.value) setDateISO(e.target.value); }}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
         </div>
       </div>
 
@@ -235,6 +280,14 @@ export default function ReservationsPage() {
                 </p>
               </div>
               <button type="button" className={styles.activityView} onClick={() => setFocused(reservation)}>View</button>
+              <button
+                type="button"
+                className={styles.activityClear}
+                onClick={() => clearActivity(`${kind}-${reservation.id}`)}
+                aria-label="Dismiss"
+              >
+                Clear
+              </button>
             </li>
           ))}
         </ul>
@@ -334,13 +387,6 @@ export default function ReservationsPage() {
         />
       )}
 
-      {datePickerOpen && (
-        <DatePickerSheet
-          dateISO={dateISO}
-          onClose={() => setDatePickerOpen(false)}
-          onPick={(iso) => { setDateISO(iso); setDatePickerOpen(false); }}
-        />
-      )}
     </div>
   );
 }
@@ -599,27 +645,3 @@ function FieldBlock({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-/* ── Date picker sheet ── */
-
-function DatePickerSheet({
-  dateISO, onClose, onPick,
-}: { dateISO: string; onClose: () => void; onPick: (iso: string) => void }) {
-  const [value, setValue] = useState(dateISO);
-  return (
-    <div className={styles.sheetBackdrop} onClick={onClose}>
-      <div className={styles.sheet} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className={styles.sheetClose} onClick={onClose} aria-label="Close">×</button>
-        <h2 className={styles.sheetName}>Pick a date</h2>
-        <input
-          type="date"
-          className={styles.dateInput}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
-        <button type="button" className={styles.editBtn} onClick={() => onPick(value)}>
-          <span>View {fmtLongDate(value)}</span>
-        </button>
-      </div>
-    </div>
-  );
-}

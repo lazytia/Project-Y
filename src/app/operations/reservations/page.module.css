@@ -170,6 +170,29 @@
   text-decoration: underline;
 }
 
+.activityClear {
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.hiddenDateInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 .activityCancelled {
   background: var(--color-warm-bg);
   border-color: rgba(255, 106, 19, 0.2);
