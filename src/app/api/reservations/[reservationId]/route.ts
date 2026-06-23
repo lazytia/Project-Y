@@ -5,6 +5,7 @@ import { adminAuth } from "@/lib/firebase-admin";
  * PUT /api/reservations/[id] → update via booking platform.
  */
 const BOOKING_API = "https://australia-southeast1-yurica-system.cloudfunctions.net/bookingApi";
+const SPOOF_ORIGIN = "https://book.admin.yurica.com.au";
 
 async function verifyAuth(req: NextRequest) {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -30,7 +31,7 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ reservation
   try {
     const upstream = await fetch(`${BOOKING_API}/reservations/${encodeURIComponent(reservationId)}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Origin: SPOOF_ORIGIN },
       body: JSON.stringify(body),
     });
     const data = await upstream.json().catch(() => ({}));

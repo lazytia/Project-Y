@@ -8,6 +8,8 @@ import type { User } from "firebase/auth";
 
 export type ReservationStatus =
   | "pending"
+  | "unconfirmed"
+  | "updated"
   | "confirmed"
   | "seated"
   | "no-show"

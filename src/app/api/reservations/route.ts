@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
+import { mirrorReservation, mirrorReservations } from "@/lib/reservations-mirror";
 
 /**
  * Proxy to the yurica-system booking platform's admin API.
@@ -10,6 +11,13 @@ import { adminAuth } from "@/lib/firebase-admin";
  * directly, and gates calls on a Firebase ID token.
  */
 const BOOKING_API = "https://australia-southeast1-yurica-system.cloudfunctions.net/bookingApi";
+/**
+ * The booking platform's CORS middleware crashes (TypeError: Invalid URL)
+ * when no Origin header is present — it falls back to "*" and tries
+ * `new URL("*")`. Server-side fetch doesn't send Origin by default, so
+ * spoof a value that's already on its allowlist.
+ */
+const SPOOF_ORIGIN = "https://book.admin.yurica.com.au";
 
 async function verifyAuth(req: NextRequest) {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -36,7 +44,7 @@ export async function GET(req: NextRequest) {
   try {
     const upstream = await fetch(
       `${BOOKING_API}/reservations?date=${encodeURIComponent(date)}&branch=${encodeURIComponent(branch)}`,
-      { cache: "no-store" },
+      { cache: "no-store", headers: { Origin: SPOOF_ORIGIN } },
     );
     const data = await upstream.json().catch(() => ({}));
     if (!upstream.ok) {
@@ -60,7 +68,7 @@ export async function POST(req: NextRequest) {
   try {
     const upstream = await fetch(`${BOOKING_API}/reservations`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Origin: SPOOF_ORIGIN },
       body: JSON.stringify(body),
     });
     const data = await upstream.json().catch(() => ({}));

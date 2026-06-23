@@ -3,6 +3,7 @@ import { adminAuth } from "@/lib/firebase-admin";
 
 /** PATCH /api/reservations/[id]/status — confirm / no-show / cancelled. */
 const BOOKING_API = "https://australia-southeast1-yurica-system.cloudfunctions.net/bookingApi";
+const SPOOF_ORIGIN = "https://book.admin.yurica.com.au";
 
 async function verifyAuth(req: NextRequest) {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -28,7 +29,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ reservati
   try {
     const upstream = await fetch(`${BOOKING_API}/reservations/${encodeURIComponent(reservationId)}/status`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Origin: SPOOF_ORIGIN },
       body: JSON.stringify(body),
     });
     const data = await upstream.json().catch(() => ({}));

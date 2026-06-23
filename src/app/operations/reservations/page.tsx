@@ -277,17 +277,23 @@ export default function ReservationsPage() {
                           <span className={styles.cardName}>{r.name}</span>
                           <span className={styles.cardMeta}>{r.count} Guests · {prettySeating(r.seating)}</span>
                         </span>
-                        {r.status && r.status !== "confirmed" && r.status !== "pending" ? (
-                          <span className={`${styles.statusPill} ${
-                            r.status === "no-show" ? styles.statusPillNoShow
-                              : r.status === "seated" ? styles.statusPillSeated
-                                : styles.statusPillCancelled
-                          }`}>
-                            {r.status === "no-show" ? "No Show"
-                              : r.status === "seated" ? "Seated"
-                                : "Cancelled"}
-                          </span>
-                        ) : null}
+                        {(() => {
+                          // Only render a pill for statuses staff need to act on.
+                          // "unconfirmed", "confirmed", "pending" are the
+                          // normal flow and don't need a badge.
+                          switch (r.status) {
+                            case "no-show":
+                              return <span className={`${styles.statusPill} ${styles.statusPillNoShow}`}>No Show</span>;
+                            case "seated":
+                              return <span className={`${styles.statusPill} ${styles.statusPillSeated}`}>Seated</span>;
+                            case "cancelled":
+                              return <span className={`${styles.statusPill} ${styles.statusPillCancelled}`}>Cancelled</span>;
+                            case "updated":
+                              return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Updated</span>;
+                            default:
+                              return null;
+                          }
+                        })()}
                         <span className={styles.cardChev}><ChevronRight /></span>
                       </button>
                     </li>
@@ -413,8 +419,7 @@ function FactIcon({ icon, label, value }: { icon: React.ReactNode; label: string
 
 /* ── Edit / Add Full-screen Sheet ── */
 
-const STATUS_OPTIONS: { value: Exclude<ReservationStatus, "pending">; label: string }[] = [
-  { value: "confirmed", label: "Confirmed" },
+const STATUS_OPTIONS: { value: Exclude<ReservationStatus, "pending" | "confirmed" | "unconfirmed" | "updated">; label: string }[] = [
   { value: "seated", label: "Seated" },
   { value: "no-show", label: "No Show" },
   { value: "cancelled", label: "Cancelled" },
@@ -500,6 +505,15 @@ function AddReservationModal({
       </div>
 
       <div className={styles.fullSheetBody}>
+        <div className={styles.fullSheetTopRow}>
+          <button type="button" className={styles.fullSheetBackInline} onClick={onClose} aria-label="Back">
+            <BackArrowIcon />
+            <span>Back</span>
+          </button>
+          <span className={styles.fullSheetTitleInline}>{editing ? "Edit Reservation" : "New Reservation"}</span>
+          <span className={styles.fullSheetBackSpacer} aria-hidden="true" />
+        </div>
+
         <FieldBlock label="CUSTOMER NAME">
           <input value={name} onChange={(e) => setName(e.target.value)} />
         </FieldBlock>
