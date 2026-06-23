@@ -641,15 +641,24 @@
   position: fixed;
   inset: 0;
   background: var(--color-bg);
-  /* YURICA app shell + sidebar use z-index up to 500; the form has to sit
-     above them so its own Back button isn't covered by the top bar. */
-  z-index: 700;
+  /* The YURICA app shell top bar sits at z-index 300 and must stay visible.
+     Keep the form below it and start it under the bar (see the mobile rule)
+     so the Back button is never hidden behind the header. */
+  z-index: 100;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Mobile/tablet: the app shell renders a fixed top bar, so begin the form
+   below it and let the bar (plus the iOS notch safe area) show through. */
+@media (max-width: 1024px) {
+  .fullSheet {
+    top: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+  }
 }
 
 .fullSheetHeader {
@@ -659,7 +668,6 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
-  padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
   background: var(--color-bg);
   border-bottom: 1px solid var(--color-border);
   z-index: 1;
