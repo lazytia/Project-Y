@@ -601,21 +601,23 @@ function AddReservationModal({
           </div>
         </FieldBlock>
 
-        <FieldBlock label="STATUS">
-          <div className={styles.radioGrid3}>
-            {STATUS_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                className={`${styles.radioCard} ${status === opt.value ? styles.radioCardActive : ""}`}
-                onClick={() => setStatus(opt.value)}
-              >
-                <span className={`${styles.radioDot} ${status === opt.value ? styles.radioDotActive : ""}`} aria-hidden="true" />
-                <span>{opt.label}</span>
-              </button>
-            ))}
-          </div>
-        </FieldBlock>
+        {editing ? (
+          <FieldBlock label="STATUS">
+            <div className={styles.radioGrid3}>
+              {STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`${styles.radioCard} ${status === opt.value ? styles.radioCardActive : ""}`}
+                  onClick={() => setStatus(opt.value)}
+                >
+                  <span className={`${styles.radioDot} ${status === opt.value ? styles.radioDotActive : ""}`} aria-hidden="true" />
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </FieldBlock>
+        ) : null}
 
         <FieldBlock label="NOTES">
           <textarea
