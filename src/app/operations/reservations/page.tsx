@@ -551,15 +551,6 @@ function AddReservationModal({
       </div>
 
       <div className={styles.fullSheetBody}>
-        <div className={styles.fullSheetTopRow}>
-          <button type="button" className={styles.fullSheetBackInline} onClick={onClose} aria-label="Back">
-            <BackArrowIcon />
-            <span>Back</span>
-          </button>
-          <span className={styles.fullSheetTitleInline}>{editing ? "Edit Reservation" : "New Reservation"}</span>
-          <span className={styles.fullSheetBackSpacer} aria-hidden="true" />
-        </div>
-
         <FieldBlock label="CUSTOMER NAME">
           <input value={name} onChange={(e) => setName(e.target.value)} />
         </FieldBlock>

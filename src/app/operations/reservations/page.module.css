@@ -641,13 +641,14 @@
   position: fixed;
   inset: 0;
   background: var(--color-bg);
-  z-index: 60;
+  /* YURICA app shell + sidebar use z-index up to 500; the form has to sit
+     above them so its own Back button isn't covered by the top bar. */
+  z-index: 700;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  /* Push everything below the YURICA app shell + iOS notch so the Back
-     button isn't hidden under the top bar. */
-  padding-top: calc(var(--header-height, 56px) + env(safe-area-inset-top, 0px));
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -658,6 +659,7 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
+  padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
   background: var(--color-bg);
   border-bottom: 1px solid var(--color-border);
   z-index: 1;
