@@ -112,14 +112,14 @@ export default function ReservationsPage() {
     } catch { /* ignore — older browsers fall through to focus() */ }
     el.focus();
   }
-  // Activity entries the user has dismissed via the Clear button. Persisted
-  // in sessionStorage so a reload doesn't bring them back, but cleared once
-  // the tab closes (intentional — they re-appear on next visit if still
-  // recent so nothing important slips through).
+  // Activity entries the user has dismissed via the Clear button. Stored
+  // in localStorage so the Clear state is per-device and survives page
+  // reloads — clearing on one phone never affects what another phone
+  // sees, since each device keeps its own dismissed list.
   const [clearedActivity, setClearedActivity] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
-      const raw = sessionStorage.getItem("reservations-cleared-activity");
+      const raw = localStorage.getItem("reservations-cleared-activity");
       if (!raw) return new Set();
       return new Set(JSON.parse(raw) as string[]);
     } catch { return new Set(); }
@@ -129,7 +129,7 @@ export default function ReservationsPage() {
       const next = new Set(prev);
       next.add(key);
       try {
-        sessionStorage.setItem("reservations-cleared-activity", JSON.stringify([...next]));
+        localStorage.setItem("reservations-cleared-activity", JSON.stringify([...next]));
       } catch { /* ignore */ }
       return next;
     });
