@@ -18,8 +18,13 @@ import { restoreAllCategories } from "@/lib/sold-out-square";
  * Australia/Sydney timezone.
  */
 export async function POST(req: NextRequest) {
-  const want = process.env.SOLD_OUT_RESET_SHARED_TOKEN ?? "";
-  const got = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  // Trim both sides: the Secret Manager value sometimes carries a trailing
+  // CR/LF from how it was originally uploaded, and HTTP strips leading /
+  // trailing whitespace from header values on the wire — so the raw
+  // comparison was rejecting Cloud Scheduler with 401 every night and
+  // skipping the auto-reset.
+  const want = (process.env.SOLD_OUT_RESET_SHARED_TOKEN ?? "").trim();
+  const got = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!want || got !== want) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
