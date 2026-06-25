@@ -93,8 +93,6 @@ export default function ManagerDashboard() {
 
   // Square / system_yurica live data
   const [todaySales, setTodaySales] = useState<number | null>(null);
-  const [peakHour, setPeakHour] = useState<string | null>(null);
-  const [peakHourOrders, setPeakHourOrders] = useState<number | null>(null);
   const [totalPax, setTotalPax] = useState<number | null>(null);
   const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
   const [hallStaff, setHallStaff] = useState<number | null>(null);
@@ -138,8 +136,6 @@ export default function ManagerDashboard() {
       if (res.ok) {
         const d = await res.json();
         setTodaySales(d.todaySales ?? null);
-        setPeakHour(d.peakHour ?? null);
-        setPeakHourOrders(d.peakHourOrders ?? null);
       }
     } catch { /* ignore */ }
 
@@ -304,25 +300,6 @@ export default function ManagerDashboard() {
           <div className={styles.salesBlock}>
             <p className={styles.salesLabel}>Target Sales</p>
             <p className={styles.salesValue}>{fmtCurrency(dailyTarget)}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Peak Hour */}
-      <section>
-        <p className={styles.sectionLabel}>PEAK HOUR</p>
-        <div className={styles.peakCard}>
-          <span className={styles.peakIcon} aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          </span>
-          <div className={styles.peakBody}>
-            <p className={styles.peakRange}>{peakHour ?? "—"}</p>
-            <p className={styles.peakSub}>
-              {peakHourOrders !== null && peakHourOrders > 0 ? `${peakHourOrders} orders` : "—"}
-            </p>
           </div>
         </div>
       </section>
