@@ -281,30 +281,6 @@
   white-space: nowrap;
 }
 
-.pillReady {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 99px;
-  border: 1px solid #2563eb;
-  background: transparent;
-  color: #2563eb;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.pillReview {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 99px;
-  border: 1px solid #d97706;
-  background: transparent;
-  color: #d97706;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .dateSmall {
   font-size: 11px;
   color: var(--color-fg-muted);
