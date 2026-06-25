@@ -305,7 +305,6 @@ export default function ManagerOnboardingPage() {
                   >
                     {/* Top: avatar + name + status */}
                     <div className={styles.cardTop}>
-                      <span className={styles.avatar}>{initialsOf(row)}</span>
                       <span className={styles.cardWho}>
                         <span className={styles.name}>{fullName(row)}</span>
                         <span className={styles.position}>{positionLabel(row)}</span>
