@@ -86,6 +86,12 @@ function TrashIcon() {
 function PlusIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
 }
+function SunIcon() {
+  return <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>;
+}
+function MoonIcon() {
+  return <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /><circle cx="19" cy="5" r="1" fill="currentColor" stroke="none" /><circle cx="17" cy="9" r="0.5" fill="currentColor" stroke="none" /></svg>;
+}
 
 /* ── Page ── */
 
@@ -186,10 +192,17 @@ export default function ReservationsPage() {
       .slice(0, 4);
   }, [list, clearedActivity]);
 
-  const totals = useMemo(() => {
-    const indoor = active.filter((r) => r.seating === "indoor").reduce((s, r) => s + r.count, 0);
-    const outdoor = active.filter((r) => r.seating !== "indoor").reduce((s, r) => s + r.count, 0);
-    return { bookings: active.length, indoor, outdoor, total: indoor + outdoor };
+  const serviceTotals = useMemo(() => {
+    function calc(rows: Reservation[]) {
+      const indoor = rows.filter((r) => r.seating === "indoor").reduce((s, r) => s + r.count, 0);
+      const outdoor = rows.filter((r) => r.seating !== "indoor").reduce((s, r) => s + r.count, 0);
+      return { bookings: rows.length, guests: indoor + outdoor, indoor, outdoor };
+    }
+    const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
+    const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
+    const l = calc(lunch);
+    const d = calc(dinner);
+    return { lunch: l, dinner: d, total: l.guests + d.guests };
   }, [active]);
 
   const filteredActive = useMemo(() => {
@@ -246,15 +259,71 @@ export default function ReservationsPage() {
         </div>
       </div>
 
-      <div className={styles.hero}>
-        <p className={styles.heroNumber}>{totals.total}</p>
-        <p className={styles.heroLabel}>TODAY&apos;S GUESTS</p>
+      <div className={styles.serviceCards}>
+        <div className={`${styles.serviceCard} ${styles.serviceCardLunch}`}>
+          <div className={styles.serviceCardHead}>
+            <span className={styles.serviceCardIcon}><SunIcon /></span>
+            <div>
+              <p className={styles.serviceCardTitle}>LUNCH</p>
+              <p className={styles.serviceCardWindow}>11:30 – 14:00</p>
+            </div>
+          </div>
+          <div className={styles.serviceCardStats}>
+            <div className={styles.serviceCardStat}>
+              <p className={styles.serviceCardStatValue}>{serviceTotals.lunch.guests}</p>
+              <p className={styles.serviceCardStatLabel}>Total Guests</p>
+            </div>
+            <div className={styles.serviceCardStat}>
+              <p className={styles.serviceCardStatValueSm}>{serviceTotals.lunch.bookings}</p>
+              <p className={styles.serviceCardStatLabel}>Bookings</p>
+            </div>
+          </div>
+          <div className={styles.serviceCardStats}>
+            <div className={styles.serviceCardStat}>
+              <p className={styles.serviceCardStatLabel}>Indoor Guests</p>
+              <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.indoor}</p>
+            </div>
+            <div className={styles.serviceCardStat}>
+              <p className={styles.serviceCardStatLabel}>Outdoor Guests</p>
+              <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.outdoor}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className={`${styles.serviceCard} ${styles.serviceCardDinner}`}>
+          <div className={styles.serviceCardHead}>
+            <span className={styles.serviceCardIcon}><MoonIcon /></span>
+            <div>
+              <p className={styles.serviceCardTitle}>DINNER</p>
+              <p className={styles.serviceCardWindow}>17:30 – 22:00</p>
+            </div>
+          </div>
+          <div className={styles.serviceCardStats}>
+            <div className={styles.serviceCardStat}>
+              <p className={styles.serviceCardStatValue}>{serviceTotals.dinner.guests}</p>
+              <p className={styles.serviceCardStatLabel}>Total Guests</p>
+            </div>
+            <div className={styles.serviceCardStat}>
+              <p className={styles.serviceCardStatValueSm}>{serviceTotals.dinner.bookings}</p>
+              <p className={styles.serviceCardStatLabel}>Bookings</p>
+            </div>
+          </div>
+          <div className={styles.serviceCardStats}>
+            <div className={styles.serviceCardStat}>
+              <p className={styles.serviceCardStatLabel}>Indoor Guests</p>
+              <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.indoor}</p>
+            </div>
+            <div className={styles.serviceCardStat}>
+              <p className={styles.serviceCardStatLabel}>Outdoor Guests</p>
+              <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.outdoor}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className={styles.statsRow}>
-        <Stat value={String(totals.bookings)} label="BOOKINGS" />
-        <Stat value={String(totals.indoor)} label="INDOOR" hint="Guests" />
-        <Stat value={String(totals.outdoor)} label="OUTDOOR" hint="Guests" />
+      <div className={styles.hero}>
+        <p className={styles.heroNumber}>{serviceTotals.total}</p>
+        <p className={styles.heroLabel}>TODAY&apos;S GUESTS</p>
       </div>
 
       {activity.length > 0 && (
@@ -388,18 +457,6 @@ export default function ReservationsPage() {
         />
       )}
 
-    </div>
-  );
-}
-
-/* ── Stat tile ── */
-
-function Stat({ value, label, hint }: { value: string; label: string; hint?: string }) {
-  return (
-    <div className={styles.statTile}>
-      <p className={styles.statValue}>{value}</p>
-      <p className={styles.statLabel}>{label}</p>
-      {hint ? <p className={styles.statHint}>{hint}</p> : null}
     </div>
   );
 }
