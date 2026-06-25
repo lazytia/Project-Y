@@ -287,12 +287,12 @@ export default function ReservationsPage() {
           </div>
           <div className={styles.serviceCardStats}>
             <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatLabel}>Indoor Guests</p>
+              <p className={styles.serviceCardStatLabel}>Indoor</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.indoor}</p>
             </div>
             <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatLabel}>Outdoor Guests</p>
+              <p className={styles.serviceCardStatLabel}>Outdoor</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.outdoor}</p>
             </div>
           </div>
@@ -319,12 +319,12 @@ export default function ReservationsPage() {
           </div>
           <div className={styles.serviceCardStats}>
             <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatLabel}>Indoor Guests</p>
+              <p className={styles.serviceCardStatLabel}>Indoor</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.indoor}</p>
             </div>
             <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatLabel}>Outdoor Guests</p>
+              <p className={styles.serviceCardStatLabel}>Outdoor</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.outdoor}</p>
             </div>
           </div>
