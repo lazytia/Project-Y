@@ -279,6 +279,7 @@ export default function ReservationsPage() {
               <p className={styles.serviceCardStatValue}>{serviceTotals.lunch.guests}</p>
               <p className={styles.serviceCardStatLabel}>Total Guests</p>
             </div>
+            <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatValueSm}>{serviceTotals.lunch.bookings}</p>
               <p className={styles.serviceCardStatLabel}>Bookings</p>
@@ -289,6 +290,7 @@ export default function ReservationsPage() {
               <p className={styles.serviceCardStatLabel}>Indoor Guests</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.indoor}</p>
             </div>
+            <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatLabel}>Outdoor Guests</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.outdoor}</p>
@@ -309,6 +311,7 @@ export default function ReservationsPage() {
               <p className={styles.serviceCardStatValue}>{serviceTotals.dinner.guests}</p>
               <p className={styles.serviceCardStatLabel}>Total Guests</p>
             </div>
+            <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatValueSm}>{serviceTotals.dinner.bookings}</p>
               <p className={styles.serviceCardStatLabel}>Bookings</p>
@@ -319,6 +322,7 @@ export default function ReservationsPage() {
               <p className={styles.serviceCardStatLabel}>Indoor Guests</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.indoor}</p>
             </div>
+            <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatLabel}>Outdoor Guests</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.outdoor}</p>
