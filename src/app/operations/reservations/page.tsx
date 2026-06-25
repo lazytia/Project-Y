@@ -212,7 +212,7 @@ export default function ReservationsPage() {
     ];
   }, [filteredActive]);
 
-  async function applyStatus(id: string, status: "confirmed" | "no-show" | "cancelled") {
+  async function applyStatus(id: string, status: "confirmed" | "seated" | "no-show" | "cancelled") {
     if (!user) return;
     try {
       await setReservationStatus(user, id, status);
@@ -368,6 +368,7 @@ export default function ReservationsPage() {
           reservation={focused}
           onClose={() => setFocused(null)}
           onEdit={() => { setEditing(focused); setAddOpen(true); setFocused(null); }}
+          onSeat={() => applyStatus(focused.id, "seated")}
           onMarkNoShow={() => applyStatus(focused.id, "no-show")}
           onCancel={() => applyStatus(focused.id, "cancelled")}
         />
@@ -406,11 +407,12 @@ function Stat({ value, label, hint }: { value: string; label: string; hint?: str
 /* ── Detail Modal ── */
 
 function DetailModal({
-  reservation, onClose, onEdit, onMarkNoShow, onCancel,
+  reservation, onClose, onEdit, onSeat, onMarkNoShow, onCancel,
 }: {
   reservation: Reservation;
   onClose: () => void;
   onEdit: () => void;
+  onSeat: () => void | Promise<void>;
   onMarkNoShow: () => void | Promise<void>;
   onCancel: () => void | Promise<void>;
 }) {
@@ -431,10 +433,16 @@ function DetailModal({
           <FactIcon icon={<SeatIcon />} label="Seating" value={prettySeating(reservation.seating)} />
         </div>
 
-        <button type="button" className={styles.editBtn} onClick={onEdit}>
-          <EditIcon />
-          <span>Edit</span>
-        </button>
+        <div className={styles.editSeatRow}>
+          <button type="button" className={styles.editBtn} onClick={onEdit}>
+            <EditIcon />
+            <span>Edit</span>
+          </button>
+          <button type="button" className={styles.seatBtn} onClick={() => void onSeat()}>
+            <SeatIcon />
+            <span>Seat</span>
+          </button>
+        </div>
 
         <div className={styles.actionsRow}>
           <button type="button" className={styles.actionNoShow} onClick={() => void onMarkNoShow()}>
@@ -486,6 +494,7 @@ function AddReservationModal({
 }) {
   const { user } = useAuth();
   const [name, setName] = useState(editing?.name ?? "");
+  const [company, setCompany] = useState(editing?.company ?? "");
   const [phone, setPhone] = useState(editing?.phone ?? "");
   const [email] = useState(editing?.email ?? "");
   const [date, setDate] = useState(editing?.date ?? dateISO);
@@ -512,6 +521,7 @@ function AddReservationModal({
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim(),
+        ...(company.trim() ? { company: company.trim() } : {}),
         date,
         time,
         count: guests,
@@ -553,6 +563,10 @@ function AddReservationModal({
       <div className={styles.fullSheetBody}>
         <FieldBlock label="CUSTOMER NAME">
           <input value={name} onChange={(e) => setName(e.target.value)} />
+        </FieldBlock>
+
+        <FieldBlock label="COMPANY (OPTIONAL)">
+          <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company name" />
         </FieldBlock>
 
         <FieldBlock label="MOBILE NUMBER">

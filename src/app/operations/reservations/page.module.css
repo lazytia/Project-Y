@@ -565,7 +565,15 @@
   text-align: right;
 }
 
-.editBtn {
+.editSeatRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.editBtn,
+.seatBtn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -579,10 +587,16 @@
   font-weight: 700;
   color: var(--color-fg);
   cursor: pointer;
-  margin-bottom: var(--space-3);
 }
 
-.editBtn:disabled { opacity: 0.5; cursor: progress; }
+.seatBtn {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: #16a34a;
+}
+
+.editBtn:disabled,
+.seatBtn:disabled { opacity: 0.5; cursor: progress; }
 
 .actionsRow {
   display: grid;
