@@ -20,7 +20,8 @@ export async function fetchSystemYuricaTodayCounts(
 ): Promise<TodayCounts> {
   const token = process.env.SYSTEM_YURICA_TOKEN?.trim();
   if (!token) {
-    throw new Error("SYSTEM_YURICA_TOKEN not configured");
+    const today = dateKey || new Date().toISOString().slice(0, 10);
+    return { date: today, lunchPax: 0, dinnerPax: 0, lunchStaff: 0, dinnerStaff: 0 };
   }
   const url = new URL(`${UPSTREAM_BASE}/api/integrations/project-y/today`);
   if (dateKey) url.searchParams.set("date", dateKey);
