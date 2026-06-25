@@ -98,8 +98,8 @@
 }
 
 .serviceCardDinner {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: #f7f8fa;
+  border: 1px solid #e5e7eb;
 }
 
 .serviceCardHead {
@@ -116,7 +116,7 @@
 }
 
 .serviceCardLunch .serviceCardIcon { color: #ea580c; }
-.serviceCardDinner .serviceCardIcon { color: #2563eb; }
+.serviceCardDinner .serviceCardIcon { color: var(--color-fg); }
 
 .serviceCardTitle {
   margin: 0;
@@ -126,7 +126,7 @@
 }
 
 .serviceCardLunch .serviceCardTitle { color: #ea580c; }
-.serviceCardDinner .serviceCardTitle { color: #2563eb; }
+.serviceCardDinner .serviceCardTitle { color: var(--color-fg); }
 
 .serviceCardWindow {
   margin: 1px 0 0 0;
@@ -160,8 +160,8 @@
   line-height: 1.15;
 }
 
-.serviceCardLunch .serviceCardStatValue { color: #ea580c; }
-.serviceCardDinner .serviceCardStatValue { color: #2563eb; }
+.serviceCardLunch .serviceCardStatValue,
+.serviceCardDinner .serviceCardStatValue { color: #ea580c; }
 
 .serviceCardStatValueSm {
   margin: 0;
