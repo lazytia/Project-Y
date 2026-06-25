@@ -14,9 +14,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data);
   } catch (err) {
     console.error("[system-yurica/today-counts]", err);
-    return NextResponse.json(
-      { error: "Failed to fetch system_yurica counts" },
-      { status: 502 },
-    );
+    const today = dateKey || new Date().toISOString().slice(0, 10);
+    return NextResponse.json({
+      date: today,
+      lunchPax: 0,
+      dinnerPax: 0,
+      lunchStaff: 0,
+      dinnerStaff: 0,
+    });
   }
 }
