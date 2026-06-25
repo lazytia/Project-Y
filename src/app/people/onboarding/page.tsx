@@ -124,6 +124,53 @@ function isApproved(row: StaffOnboarding): boolean {
   return s === "approved" || s === "active" || !!row.approvedAt;
 }
 
+/**
+ * Derive a human-readable status from Firestore fields.
+ * Returns e.g. "Waiting for Documents", "Documents In Review",
+ * "Ready for Approval", "Approved".
+ */
+function statusLabel(row: StaffOnboarding): string {
+  if (isApproved(row)) return "Approved";
+
+  const raw = (row.status ?? "").trim();
+  const s = raw.toLowerCase();
+
+  // Human-readable value set by manager (e.g. "Waiting for Documents")
+  if (
+    raw &&
+    s !== "not_started" &&
+    s !== "in_progress" &&
+    s !== "step_complete" &&
+    s !== "complete" &&
+    s !== "completed"
+  ) {
+    return raw;
+  }
+
+  if ((row.completedStep ?? 0) >= TOTAL_STEPS) return "Ready for Approval";
+
+  const hasPassport = !!row.documents?.passportUrl;
+  const hasVisa = !!row.documents?.visaUrl;
+  const hasRsa = !!row.documents?.rsaUrl;
+  const hasTfn = !!row.taxFileNumber;
+  const hasBank = !!row.bankSuper?.bsb;
+
+  if (!hasPassport || !hasTfn || !hasBank) return "Waiting for Documents";
+  if (!hasVisa || !hasRsa) return "Documents In Review";
+  if (s === "complete" || s === "completed") return "Ready for Approval";
+
+  return "Waiting for Documents";
+}
+
+/** Pick the right CSS class for the pill based on status. */
+function pillClass(label: string, st: typeof styles): string {
+  const l = label.toLowerCase();
+  if (l === "approved") return st.pillApproved;
+  if (l === "ready for approval") return st.pillReady;
+  if (l === "documents in review") return st.pillReview;
+  return st.pillSubmitted; // default orange for "Waiting for Documents" etc.
+}
+
 export default function ManagerOnboardingPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -296,6 +343,7 @@ export default function ManagerOnboardingPage() {
           <ul className={styles.list}>
             {filtered.map((row) => {
               const rowApproved = isApproved(row);
+              const label = statusLabel(row);
               return (
                 <li key={row.uid}>
                   <button
@@ -303,15 +351,15 @@ export default function ManagerOnboardingPage() {
                     className={styles.card}
                     onClick={() => router.push(`/people/onboarding/${row.uid}`)}
                   >
-                    {/* Top: avatar + name + status */}
+                    {/* Top: name + status */}
                     <div className={styles.cardTop}>
                       <span className={styles.cardWho}>
                         <span className={styles.name}>{fullName(row)}</span>
                         <span className={styles.position}>{positionLabel(row)}</span>
                       </span>
                       <span className={styles.cardRight}>
-                        <span className={rowApproved ? styles.pillApproved : styles.pillSubmitted}>
-                          {rowApproved ? "Approved" : "Submitted"}
+                        <span className={pillClass(label, styles)}>
+                          {label}
                         </span>
                         <span className={styles.dateSmall}>
                           {rowApproved ? "Approved" : "Submitted"} {fmtDate(rowApproved ? (row.approvedAt ?? row.createdAt) : row.createdAt)}
