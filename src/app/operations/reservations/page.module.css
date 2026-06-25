@@ -184,10 +184,8 @@
   font-size: 22px;
   font-weight: 800;
   line-height: 1.2;
+  color: var(--color-fg);
 }
-
-.serviceCardLunch .serviceCardStatAccent { color: #ea580c; }
-.serviceCardDinner .serviceCardStatAccent { color: #2563eb; }
 
 /* ── Activity strip (cancelled / new / updated) ── */
 .activityList {
