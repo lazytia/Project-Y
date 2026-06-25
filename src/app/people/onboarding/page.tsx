@@ -130,26 +130,36 @@ function pillLabel(row: StaffOnboarding): string | null {
   const raw = (row.status ?? "").trim();
   const s = raw.toLowerCase();
 
-  // Suppress pill for in-flight states
-  if (
-    s === "in_progress" ||
-    s === "step_complete" ||
-    s === "complete" ||
-    s === "completed" ||
-    s === "approved"
-  ) {
-    return null;
-  }
-
   // Human-readable label set by the manager form (e.g. "Waiting for Documents")
   // Pass through as-is, excluding the technical sentinel values handled below.
-  if (raw && s !== "not_started" && s !== "active") return raw;
+  if (
+    raw &&
+    s !== "not_started" &&
+    s !== "active" &&
+    s !== "in_progress" &&
+    s !== "step_complete" &&
+    s !== "complete" &&
+    s !== "completed" &&
+    s !== "approved"
+  ) {
+    return raw;
+  }
 
   // Derive from onboarding document-upload progress
   if ((row.completedStep ?? 0) >= TOTAL_STEPS) return "Ready for Approval";
-  if (!row.documents?.passportUrl) return "Waiting for Documents";
-  if (!row.documents?.visaUrl || !row.documents?.rsaUrl) return "Documents In Review";
-  if (!row.taxFileNumber || !row.bankSuper?.bsb) return "Waiting for Documents";
+
+  const hasPassport = !!row.documents?.passportUrl;
+  const hasVisa = !!row.documents?.visaUrl;
+  const hasRsa = !!row.documents?.rsaUrl;
+  const hasTfn = !!row.taxFileNumber;
+  const hasBank = !!row.bankSuper?.bsb;
+
+  if (!hasPassport || !hasTfn || !hasBank) return "Waiting for Documents";
+  if (!hasVisa || !hasRsa) return "Documents In Review";
+
+  // All documents present but steps not complete
+  if (s === "complete" || s === "completed") return "Ready for Approval";
+
   return "Waiting for Documents";
 }
 
