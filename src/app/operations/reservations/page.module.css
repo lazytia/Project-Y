@@ -92,14 +92,10 @@
   gap: 12px;
 }
 
-.serviceCardLunch {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-}
-
+.serviceCardLunch,
 .serviceCardDinner {
-  background: #f7f8fa;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
 }
 
 .serviceCardHead {
@@ -271,10 +267,10 @@
 .activityCancelled .activityIcon { color: var(--color-warm); }
 
 .activityNew {
-  background: rgba(22, 163, 74, 0.08);
-  border-color: rgba(22, 163, 74, 0.25);
+  background: var(--color-warm-bg);
+  border-color: rgba(255, 106, 19, 0.2);
 }
-.activityNew .activityIcon { color: var(--color-positive); }
+.activityNew .activityIcon { color: var(--color-warm); }
 
 .activityUpdated {
   background: var(--color-surface);
