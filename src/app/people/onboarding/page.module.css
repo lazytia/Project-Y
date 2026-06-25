@@ -8,26 +8,58 @@
   gap: var(--space-4);
 }
 
-/* ── Header ── */
-.header {
-  display: grid;
-  grid-template-columns: 36px 1fr 36px;
-  align-items: center;
+/* ── Page header ── */
+.pageHeader {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
 }
 
-.headerSpacer {
-  display: block;
-  width: 36px;
-}
-
-.title {
+.pageTitle {
   margin: 0;
-  font-size: var(--font-size-xl);
+  font-size: 26px;
   font-weight: 800;
-  text-align: center;
   color: var(--color-fg);
   letter-spacing: -0.01em;
+}
+
+.pageDesc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-fg-muted);
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* ── Section bar ── */
+.sectionBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.sectionBarIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sectionBarLabel {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-fg);
 }
 
 /* ── States ── */
@@ -88,21 +120,9 @@
   opacity: 0.55;
 }
 
-.sparkleTopLeft {
-  top: 6px;
-  left: 8px;
-}
-
-.sparkleTopRight {
-  top: 14px;
-  right: 4px;
-}
-
-.sparkleBottomLeft {
-  bottom: 18px;
-  left: 0;
-  opacity: 0.4;
-}
+.sparkleTopLeft { top: 6px; left: 8px; }
+.sparkleTopRight { top: 14px; right: 4px; }
+.sparkleBottomLeft { bottom: 18px; left: 0; opacity: 0.4; }
 
 .emptyTitle {
   margin: 0;
@@ -119,54 +139,6 @@
   color: var(--color-fg-muted);
 }
 
-/* ── Intro block (active state) ── */
-.intro {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4) var(--space-2);
-}
-
-.introCircle {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--color-warm-bg);
-  color: var(--color-warm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--space-1);
-}
-
-.introTitle {
-  margin: 0;
-  font-size: var(--font-size-xl);
-  font-weight: 800;
-  color: var(--color-fg);
-}
-
-.introSub {
-  margin: 0;
-  max-width: 280px;
-  font-size: var(--font-size-md);
-  line-height: 1.5;
-  color: var(--color-fg-muted);
-}
-
-/* ── Section label ── */
-.sectionLabel {
-  margin: 0;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--color-fg-muted);
-}
-
 /* ── Card list ── */
 .list {
   list-style: none;
@@ -180,27 +152,37 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
   width: 100%;
   padding: var(--space-4);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  cursor: pointer;
   font-family: var(--font-sans);
   text-align: left;
   color: inherit;
-  transition: background 0.15s, border-color 0.15s;
+  border-left: 3px solid var(--color-warm);
 }
 
-.card:hover {
-  background: var(--color-surface);
-}
-
+/* ── Card top row: avatar + name + submitted ── */
 .cardTop {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
 }
 
 .cardWho {
@@ -212,37 +194,30 @@
 }
 
 .name {
-  font-size: var(--font-size-lg);
+  font-size: 17px;
   font-weight: 800;
   color: var(--color-fg);
-  /* Always show full name — wrap instead of truncating */
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 
 .position {
-  font-size: var(--font-size-sm);
+  font-size: 13px;
   color: var(--color-fg-muted);
 }
 
-.statusPill {
-  display: inline-block;
-  flex-shrink: 0;
-  padding: 4px var(--space-3);
-  border-radius: 99px;
-  background: var(--color-warm-bg);
-  color: var(--color-warm);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
+.submittedDate {
+  font-size: 12px;
+  color: var(--color-fg-muted);
   white-space: nowrap;
-  align-self: center;
+  flex-shrink: 0;
 }
 
-/* Card info row */
+/* ── Card info row: 4 columns ── */
 .infoRow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-2);
   margin: 0;
   padding-top: var(--space-3);
@@ -257,22 +232,50 @@
 }
 
 .infoCell + .infoCell {
-  padding-left: var(--space-3);
+  padding-left: var(--space-2);
   border-left: 1px solid var(--color-border);
 }
 
 .infoLabel {
-  font-size: var(--font-size-xs);
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--color-fg-muted);
+  text-transform: uppercase;
 }
 
 .infoValue {
   margin: 0;
-  font-size: var(--font-size-sm);
+  font-size: 13px;
   font-weight: 700;
   color: var(--color-fg);
+}
+
+/* ── Card footer: View / Edit ── */
+.cardFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-2);
+}
+
+.viewEditBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  background: none;
+  border: 1.5px solid var(--color-warm);
+  border-radius: var(--radius-md);
+  color: var(--color-warm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.viewEditBtn:hover {
+  background: var(--color-warm-bg);
 }
 
 /* ── Bottom bar ── */

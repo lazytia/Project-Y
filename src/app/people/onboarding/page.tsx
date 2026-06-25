@@ -35,6 +35,7 @@ type StaffOnboarding = {
   };
   taxFileNumber?: string;
   bankSuper?: { bsb?: string };
+  createdAt?: Date | null;
 };
 
 const TOTAL_STEPS = 7;
@@ -111,6 +112,14 @@ function positionLabel(row: StaffOnboarding): string {
   if (role === "manager") return "Manager";
   if (role && role !== "staff") return role.charAt(0).toUpperCase() + role.slice(1);
   return "Staff";
+}
+
+/** Generate 1–2 letter initials from the display name. */
+function initialsOf(row: StaffOnboarding): string {
+  const name = fullName(row);
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
 }
 
 /**
@@ -213,6 +222,7 @@ export default function ManagerOnboardingPage() {
             documents: raw.documents as StaffOnboarding["documents"],
             taxFileNumber: raw.taxFileNumber as string | undefined,
             bankSuper: raw.bankSuper as StaffOnboarding["bankSuper"],
+            createdAt: toDate(raw.createdAt),
           };
         });
         if (cancelled) return;
@@ -249,12 +259,6 @@ export default function ManagerOnboardingPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <span className={styles.headerSpacer} />
-        <h1 className={styles.title}>Onboarding ({count})</h1>
-        <span className={styles.headerSpacer} />
-      </header>
-
       {error && <p className={styles.error}>{error}</p>}
 
       {loading && <p className={styles.loading}>Loading…</p>}
@@ -278,58 +282,81 @@ export default function ManagerOnboardingPage() {
 
       {!loading && !isEmpty && (
         <>
-          <div className={styles.intro}>
-            <span className={styles.introCircle} aria-hidden="true">
-              <PersonPlusIcon size={26} />
-            </span>
-            <h2 className={styles.introTitle}>Onboarding</h2>
-            <p className={styles.introSub}>
-              Add a new employee and track their onboarding progress here.
+          {/* Header */}
+          <div className={styles.pageHeader}>
+            <h1 className={styles.pageTitle}>New Staff Request</h1>
+            <p className={styles.pageDesc}>
+              New staff added here will be reviewed by the owner
+              before activation. Once approved, the new staff will
+              be added to the scheduling, and their clock in/out no.
+              and Project Y log in ID will be created to begin onboarding.
             </p>
           </div>
 
-          <p className={styles.sectionLabel}>
-            {count} EMPLOYEE{count === 1 ? "" : "S"}
-          </p>
+          <div className={styles.divider} />
 
+          {/* Section bar */}
+          <div className={styles.sectionBar}>
+            <span className={styles.sectionBarIcon} aria-hidden="true">
+              <PersonPlusIcon size={22} />
+            </span>
+            <p className={styles.sectionBarLabel}>
+              {count} New Staff Request{count === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          {/* Card list */}
           <ul className={styles.list}>
-            {rows!.map((row) => {
-              const pill = pillLabel(row);
-              return (
-                <li key={row.uid}>
-                  <button
-                    type="button"
-                    className={styles.card}
-                    onClick={() => router.push(`/people/onboarding/${row.uid}`)}
-                  >
-                    <div className={styles.cardTop}>
-                      <span className={styles.cardWho}>
-                        <span className={styles.name}>{fullName(row)}</span>
-                        <span className={styles.position}>{positionLabel(row)}</span>
-                      </span>
-                      {pill && (
-                        <span className={styles.statusPill}>{pill}</span>
-                      )}
-                    </div>
+            {rows!.map((row) => (
+              <li key={row.uid}>
+                <div className={styles.card}>
+                  {/* Top: avatar + name + submitted date */}
+                  <div className={styles.cardTop}>
+                    <span className={styles.avatar}>{initialsOf(row)}</span>
+                    <span className={styles.cardWho}>
+                      <span className={styles.name}>{fullName(row)}</span>
+                      <span className={styles.position}>{positionLabel(row)}</span>
+                    </span>
+                    <span className={styles.submittedDate}>
+                      Submitted {fmtDate(row.createdAt)}
+                    </span>
+                    <ChevronIcon />
+                  </div>
 
-                    <dl className={styles.infoRow}>
-                      <div className={styles.infoCell}>
-                        <dt className={styles.infoLabel}>START DATE</dt>
-                        <dd className={styles.infoValue}>{fmtDate(row.startDate)}</dd>
-                      </div>
-                      <div className={styles.infoCell}>
-                        <dt className={styles.infoLabel}>TRAINING RATE</dt>
-                        <dd className={styles.infoValue}>{trainingRateLabel(row)}</dd>
-                      </div>
-                      <div className={styles.infoCell}>
-                        <dt className={styles.infoLabel}>TRAINING PERIOD</dt>
-                        <dd className={styles.infoValue}>{row.trainingPeriod ?? "—"}</dd>
-                      </div>
-                    </dl>
-                  </button>
-                </li>
-              );
-            })}
+                  {/* Info row: 4 columns */}
+                  <dl className={styles.infoRow}>
+                    <div className={styles.infoCell}>
+                      <dt className={styles.infoLabel}>START DATE</dt>
+                      <dd className={styles.infoValue}>{fmtDate(row.startDate)}</dd>
+                    </div>
+                    <div className={styles.infoCell}>
+                      <dt className={styles.infoLabel}>TRAINING RATE</dt>
+                      <dd className={styles.infoValue}>{fmtRate(row.trainingRate) ?? "—"}</dd>
+                    </div>
+                    <div className={styles.infoCell}>
+                      <dt className={styles.infoLabel}>AFTER TRAINING RATE</dt>
+                      <dd className={styles.infoValue}>{fmtRate(row.afterTrainingRate) ?? "—"}</dd>
+                    </div>
+                    <div className={styles.infoCell}>
+                      <dt className={styles.infoLabel}>TRAINING PERIOD</dt>
+                      <dd className={styles.infoValue}>{row.trainingPeriod ?? "—"}</dd>
+                    </div>
+                  </dl>
+
+                  {/* View / Edit button */}
+                  <div className={styles.cardFooter}>
+                    <button
+                      type="button"
+                      className={styles.viewEditBtn}
+                      onClick={() => router.push(`/people/onboarding/${row.uid}`)}
+                    >
+                      View / Edit
+                      <ChevronIcon />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
           </ul>
         </>
       )}
@@ -347,6 +374,24 @@ export default function ManagerOnboardingPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="9 6 15 12 9 18" />
+    </svg>
   );
 }
 
