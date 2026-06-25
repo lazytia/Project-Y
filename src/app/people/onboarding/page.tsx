@@ -36,7 +36,12 @@ type StaffOnboarding = {
   taxFileNumber?: string;
   bankSuper?: { bsb?: string };
   createdAt?: Date | null;
+  approvedAt?: Date | null;
+  addedToScheduling?: boolean;
+  accountCreated?: boolean;
 };
+
+type TabKey = "all" | "submitted" | "approved";
 
 const TOTAL_STEPS = 7;
 
@@ -82,14 +87,6 @@ function fmtRate(n: number | undefined): string | null {
   return `$${n.toFixed(2)}`;
 }
 
-/** "$26.00 → $28.00", or a single rate, or em dash. */
-function trainingRateLabel(row: StaffOnboarding): string {
-  const before = fmtRate(row.trainingRate);
-  const after = fmtRate(row.afterTrainingRate);
-  if (before && after) return `${before} → ${after}`;
-  return before ?? after ?? "—";
-}
-
 function fullName(row: StaffOnboarding): string {
   if (row.fullName?.trim()) return row.fullName.trim();
   const f = (row.firstName ?? "").trim();
@@ -106,9 +103,8 @@ function positionLabel(row: StaffOnboarding): string {
   if (p === "hall" || p === "hall_staff" || p === "hall staff") return "Hall Staff";
   if (p === "kitchen" || p === "kitchen_staff" || p === "kitchen staff") return "Kitchen Staff";
   if (row.position?.trim()) return row.position.trim();
-  // Fall back to role field
   const role = (row.role ?? "").toLowerCase();
-  if (role === "chef") return "Kitchen Staff";
+  if (role === "chef") return "Chef";
   if (role === "manager") return "Manager";
   if (role && role !== "staff") return role.charAt(0).toUpperCase() + role.slice(1);
   return "Staff";
@@ -122,54 +118,10 @@ function initialsOf(row: StaffOnboarding): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-/**
- * Returns the status pill label, or null if no pill should be shown.
- *
- * Statuses that mean "actively working through steps" suppress the pill so
- * the card doesn't show stale/misleading text while the employee is mid-flow.
- *
- * Status values written by the staff-side onboarding pages:
- *   "not_started"   initial state (staff-admin.ts)
- *   "in_progress"   staff is mid-step
- *   "step_complete" a step was saved
- *   "complete"      review-sign finished; awaiting manager approval
- *   "active"        fully approved (filtered out before reaching here)
- */
-function pillLabel(row: StaffOnboarding): string | null {
-  const raw = (row.status ?? "").trim();
-  const s = raw.toLowerCase();
-
-  // Human-readable label set by the manager form (e.g. "Waiting for Documents")
-  // Pass through as-is, excluding the technical sentinel values handled below.
-  if (
-    raw &&
-    s !== "not_started" &&
-    s !== "active" &&
-    s !== "in_progress" &&
-    s !== "step_complete" &&
-    s !== "complete" &&
-    s !== "completed" &&
-    s !== "approved"
-  ) {
-    return raw;
-  }
-
-  // Derive from onboarding document-upload progress
-  if ((row.completedStep ?? 0) >= TOTAL_STEPS) return "Ready for Approval";
-
-  const hasPassport = !!row.documents?.passportUrl;
-  const hasVisa = !!row.documents?.visaUrl;
-  const hasRsa = !!row.documents?.rsaUrl;
-  const hasTfn = !!row.taxFileNumber;
-  const hasBank = !!row.bankSuper?.bsb;
-
-  if (!hasPassport || !hasTfn || !hasBank) return "Waiting for Documents";
-  if (!hasVisa || !hasRsa) return "Documents In Review";
-
-  // All documents present but steps not complete
-  if (s === "complete" || s === "completed") return "Ready for Approval";
-
-  return "Waiting for Documents";
+/** Is this row considered "approved" by the manager? */
+function isApproved(row: StaffOnboarding): boolean {
+  const s = (row.status ?? "").toLowerCase();
+  return s === "approved" || s === "active" || !!row.approvedAt;
 }
 
 export default function ManagerOnboardingPage() {
@@ -179,6 +131,7 @@ export default function ManagerOnboardingPage() {
 
   const [rows, setRows] = useState<StaffOnboarding[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabKey>("all");
 
   // Owner-only page: redirect anyone else back to the dashboard.
   useEffect(() => {
@@ -223,11 +176,12 @@ export default function ManagerOnboardingPage() {
             taxFileNumber: raw.taxFileNumber as string | undefined,
             bankSuper: raw.bankSuper as StaffOnboarding["bankSuper"],
             createdAt: toDate(raw.createdAt),
+            approvedAt: toDate(raw.approvedAt),
+            addedToScheduling: raw.addedToScheduling as boolean | undefined,
+            accountCreated: raw.accountCreated as boolean | undefined,
           };
         });
         if (cancelled) return;
-        // Owners may have a doc here (for FCM tokens) — keep them out of the
-        // staff list. Fully-onboarded staff (status === "active") have moved on.
         const staffOnly = data.filter(
           (r) => r.role !== "owner" && r.status !== "active",
         );
@@ -248,14 +202,22 @@ export default function ManagerOnboardingPage() {
     };
   }, [allowed]);
 
-  const count = useMemo(() => rows?.length ?? 0, [rows]);
+  const { total, submitted, approved, filtered } = useMemo(() => {
+    if (!rows) return { total: 0, submitted: 0, approved: 0, filtered: [] };
+    const sub = rows.filter((r) => !isApproved(r));
+    const app = rows.filter((r) => isApproved(r));
+    let list = rows;
+    if (tab === "submitted") list = sub;
+    if (tab === "approved") list = app;
+    return { total: rows.length, submitted: sub.length, approved: app.length, filtered: list };
+  }, [rows, tab]);
 
   if (authLoading || !allowed) {
     return <Splash />;
   }
 
   const loading = rows == null;
-  const isEmpty = !loading && count === 0;
+  const isEmpty = !loading && total === 0;
 
   return (
     <div className={styles.page}>
@@ -298,65 +260,103 @@ export default function ManagerOnboardingPage() {
           {/* Section bar */}
           <div className={styles.sectionBar}>
             <span className={styles.sectionBarIcon} aria-hidden="true">
-              <PersonPlusIcon size={22} />
+              <PersonPlusIcon size={20} />
             </span>
             <p className={styles.sectionBarLabel}>
-              {count} New Staff Request{count === 1 ? "" : "s"}
+              {total} Request{total === 1 ? "" : "s"}
             </p>
+          </div>
+
+          {/* Tabs */}
+          <div className={styles.tabBar}>
+            <button
+              type="button"
+              className={`${styles.tab} ${tab === "all" ? styles.tabActive : ""}`}
+              onClick={() => setTab("all")}
+            >
+              All ({total})
+            </button>
+            <button
+              type="button"
+              className={`${styles.tab} ${tab === "submitted" ? styles.tabActive : ""}`}
+              onClick={() => setTab("submitted")}
+            >
+              Submitted ({submitted})
+            </button>
+            <button
+              type="button"
+              className={`${styles.tab} ${tab === "approved" ? styles.tabActive : ""}`}
+              onClick={() => setTab("approved")}
+            >
+              Approved ({approved})
+            </button>
           </div>
 
           {/* Card list */}
           <ul className={styles.list}>
-            {rows!.map((row) => (
-              <li key={row.uid}>
-                <div className={styles.card}>
-                  {/* Top: avatar + name + submitted date */}
-                  <div className={styles.cardTop}>
-                    <span className={styles.avatar}>{initialsOf(row)}</span>
-                    <span className={styles.cardWho}>
-                      <span className={styles.name}>{fullName(row)}</span>
-                      <span className={styles.position}>{positionLabel(row)}</span>
-                    </span>
-                    <span className={styles.submittedDate}>
-                      Submitted {fmtDate(row.createdAt)}
-                    </span>
-                    <ChevronIcon />
-                  </div>
+            {filtered.map((row) => {
+              const rowApproved = isApproved(row);
+              return (
+                <li key={row.uid}>
+                  <button
+                    type="button"
+                    className={styles.card}
+                    onClick={() => router.push(`/people/onboarding/${row.uid}`)}
+                  >
+                    {/* Top: avatar + name + status */}
+                    <div className={styles.cardTop}>
+                      <span className={styles.avatar}>{initialsOf(row)}</span>
+                      <span className={styles.cardWho}>
+                        <span className={styles.name}>{fullName(row)}</span>
+                        <span className={styles.position}>{positionLabel(row)}</span>
+                      </span>
+                      <span className={styles.cardRight}>
+                        <span className={rowApproved ? styles.pillApproved : styles.pillSubmitted}>
+                          {rowApproved ? "Approved" : "Submitted"}
+                        </span>
+                        <span className={styles.dateSmall}>
+                          {rowApproved ? "Approved" : "Submitted"} {fmtDate(rowApproved ? (row.approvedAt ?? row.createdAt) : row.createdAt)}
+                        </span>
+                      </span>
+                    </div>
 
-                  {/* Info row: 4 columns */}
-                  <dl className={styles.infoRow}>
-                    <div className={styles.infoCell}>
-                      <dt className={styles.infoLabel}>START DATE</dt>
-                      <dd className={styles.infoValue}>{fmtDate(row.startDate)}</dd>
-                    </div>
-                    <div className={styles.infoCell}>
-                      <dt className={styles.infoLabel}>TRAINING RATE</dt>
-                      <dd className={styles.infoValue}>{fmtRate(row.trainingRate) ?? "—"}</dd>
-                    </div>
-                    <div className={styles.infoCell}>
-                      <dt className={styles.infoLabel}>AFTER TRAINING RATE</dt>
-                      <dd className={styles.infoValue}>{fmtRate(row.afterTrainingRate) ?? "—"}</dd>
-                    </div>
-                    <div className={styles.infoCell}>
-                      <dt className={styles.infoLabel}>TRAINING PERIOD</dt>
-                      <dd className={styles.infoValue}>{row.trainingPeriod ?? "—"}</dd>
-                    </div>
-                  </dl>
+                    {/* Info row: 4 columns */}
+                    <dl className={styles.infoRow}>
+                      <div className={styles.infoCell}>
+                        <dt className={styles.infoLabel}>START DATE</dt>
+                        <dd className={styles.infoValue}>{fmtDate(row.startDate)}</dd>
+                      </div>
+                      <div className={styles.infoCell}>
+                        <dt className={styles.infoLabel}>TRAINING RATE</dt>
+                        <dd className={styles.infoValue}>{fmtRate(row.trainingRate) ?? "—"}</dd>
+                      </div>
+                      <div className={styles.infoCell}>
+                        <dt className={styles.infoLabel}>AFTER TRAINING RATE</dt>
+                        <dd className={styles.infoValue}>{fmtRate(row.afterTrainingRate) ?? "—"}</dd>
+                      </div>
+                      <div className={styles.infoCell}>
+                        <dt className={styles.infoLabel}>TRAINING PERIOD</dt>
+                        <dd className={styles.infoValue}>{row.trainingPeriod ?? "—"}</dd>
+                      </div>
+                    </dl>
 
-                  {/* View / Edit button */}
-                  <div className={styles.cardFooter}>
-                    <button
-                      type="button"
-                      className={styles.viewEditBtn}
-                      onClick={() => router.push(`/people/onboarding/${row.uid}`)}
-                    >
-                      View / Edit
-                      <ChevronIcon />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
+                    {/* Approved checkmarks */}
+                    {rowApproved && (
+                      <div className={styles.checksRow}>
+                        <span className={`${styles.check} ${row.addedToScheduling ? styles.checkDone : styles.checkPending}`}>
+                          {row.addedToScheduling ? <CheckIcon /> : <CircleIcon />}
+                          Added to Scheduling
+                        </span>
+                        <span className={`${styles.check} ${row.accountCreated ? styles.checkDone : styles.checkPending}`}>
+                          {row.accountCreated ? <CheckIcon /> : <CircleIcon />}
+                          Account Created
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
@@ -377,20 +377,21 @@ export default function ManagerOnboardingPage() {
   );
 }
 
-function ChevronIcon() {
+/* ── Icon components ── */
+
+function CheckIcon() {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="9 6 15 12 9 18" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" fill="#16a34a" />
+      <path d="M8 12l2.5 3L16 9" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CircleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="#d1d5db" strokeWidth="1.5" />
     </svg>
   );
 }
