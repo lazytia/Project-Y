@@ -6,6 +6,11 @@ import CalendarPicker from "@/components/CalendarPicker";
 import ManagerDashboard from "@/components/ManagerDashboard";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isStrictOwner } from "@/lib/permissions";
+import {
+  type Reservation,
+  fetchReservationsForDate,
+  serviceFor,
+} from "@/lib/reservations";
 
 const SYDNEY_TZ = "Australia/Sydney";
 
@@ -80,6 +85,7 @@ export default function DashboardPage() {
 }
 
 function OwnerDashboard() {
+  const { user } = useAuth();
   const todayKey = useMemo(sydneyTodayKey, []);
   const [selectedDate, setSelectedDate] = useState<string>(todayKey);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -101,12 +107,7 @@ function OwnerDashboard() {
     peakHourOrders: number;
     bestSellers: { name: string; sales: number; quantity: number }[];
   } | null>(null);
-  const [counts, setCounts] = useState<{
-    lunchPax: number;
-    dinnerPax: number;
-    lunchStaff: number;
-    dinnerStaff: number;
-  } | null>(null);
+  const [reservations, setReservations] = useState<Reservation[] | null>(null);
   const [rangeStats, setRangeStats] = useState<{
     todaySales: number;
     restaurantSales: number;
@@ -135,33 +136,31 @@ function OwnerDashboard() {
     }
   }, []);
 
-  const fetchCounts = useCallback(async (dateKey: string) => {
+  const fetchReservations = useCallback(async (dateKey: string) => {
     try {
-      const url = `/api/system-yurica/today-counts?date=${encodeURIComponent(dateKey)}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setCounts(await res.json());
+      const data = await fetchReservationsForDate(user, dateKey, "northsydney");
+      setReservations(data);
     } catch (err) {
-      console.error("[system_yurica] fetch error:", err);
+      console.error("[reservations] fetch error:", err);
     }
-  }, []);
+  }, [user]);
 
   // Reset displayed values on date change so we don't briefly show stale numbers.
   useEffect(() => {
     setStats(null);
-    setCounts(null);
+    setReservations(null);
     setLastUpdated(null);
     fetchStats(selectedDate);
-    fetchCounts(selectedDate);
+    fetchReservations(selectedDate);
     // Live poll only when viewing today — historical days don't change.
     if (!isToday) return;
     const id1 = setInterval(() => fetchStats(selectedDate), POLL_INTERVAL_MS);
-    const id2 = setInterval(() => fetchCounts(selectedDate), POLL_INTERVAL_MS);
+    const id2 = setInterval(() => fetchReservations(selectedDate), POLL_INTERVAL_MS);
     return () => {
       clearInterval(id1);
       clearInterval(id2);
     };
-  }, [selectedDate, isToday, fetchStats, fetchCounts]);
+  }, [selectedDate, isToday, fetchStats, fetchReservations]);
 
   // Range fetch
   useEffect(() => {
@@ -174,10 +173,25 @@ function OwnerDashboard() {
       .catch(() => setRangeLoading(false));
   }, [rangeDates]);
 
-  const lunchPax    = counts?.lunchPax ?? null;
-  const dinnerPax   = counts?.dinnerPax ?? null;
-  const lunchStaff  = counts?.lunchStaff ?? null;
-  const dinnerStaff = counts?.dinnerStaff ?? null;
+  const resCounts = useMemo(() => {
+    if (!reservations) return null;
+    const active = reservations.filter(
+      (r) => r.status !== "cancelled" && r.status !== "no-show",
+    );
+    const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
+    const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
+    return {
+      lunchPax: lunch.reduce((s, r) => s + r.count, 0),
+      lunchBookings: lunch.length,
+      dinnerPax: dinner.reduce((s, r) => s + r.count, 0),
+      dinnerBookings: dinner.length,
+    };
+  }, [reservations]);
+
+  const lunchPax      = resCounts?.lunchPax ?? null;
+  const lunchBookings = resCounts?.lunchBookings ?? null;
+  const dinnerPax     = resCounts?.dinnerPax ?? null;
+  const dinnerBookings = resCounts?.dinnerBookings ?? null;
 
   const todaySales     = stats?.todaySales ?? null;
   const weeklyProgress = stats?.weeklyProgress ?? null;
@@ -320,7 +334,7 @@ function OwnerDashboard() {
             {lunchPax ?? "—"} <span className={styles.splitUnit}>PAX</span>
           </p>
           <p className={styles.splitStaff}>
-            👥 {lunchStaff ?? "—"} <span className={styles.splitUnit}>STAFF</span>
+            📋 {lunchBookings ?? "—"} <span className={styles.splitUnit}>BOOKINGS</span>
           </p>
         </section>
         <section className={styles.splitCard}>
@@ -329,7 +343,7 @@ function OwnerDashboard() {
             {dinnerPax ?? "—"} <span className={styles.splitUnit}>PAX</span>
           </p>
           <p className={styles.splitStaff}>
-            👥 {dinnerStaff ?? "—"} <span className={styles.splitUnit}>STAFF</span>
+            📋 {dinnerBookings ?? "—"} <span className={styles.splitUnit}>BOOKINGS</span>
           </p>
         </section>
       </div>
