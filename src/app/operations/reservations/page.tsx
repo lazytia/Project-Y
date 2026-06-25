@@ -277,7 +277,7 @@ export default function ReservationsPage() {
           <div className={styles.serviceCardStats}>
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatValue}>{serviceTotals.lunch.guests}</p>
-              <p className={styles.serviceCardStatLabel}>Total Guests</p>
+              <p className={styles.serviceCardStatLabel}>Guests</p>
             </div>
             <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
@@ -289,11 +289,13 @@ export default function ReservationsPage() {
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatLabel}>Indoor</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.indoor}</p>
+              <p className={styles.serviceCardStatLabel}>Guests</p>
             </div>
             <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatLabel}>Outdoor</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.outdoor}</p>
+              <p className={styles.serviceCardStatLabel}>Guests</p>
             </div>
           </div>
         </div>
@@ -309,7 +311,7 @@ export default function ReservationsPage() {
           <div className={styles.serviceCardStats}>
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatValue}>{serviceTotals.dinner.guests}</p>
-              <p className={styles.serviceCardStatLabel}>Total Guests</p>
+              <p className={styles.serviceCardStatLabel}>Guests</p>
             </div>
             <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
@@ -321,11 +323,13 @@ export default function ReservationsPage() {
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatLabel}>Indoor</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.indoor}</p>
+              <p className={styles.serviceCardStatLabel}>Guests</p>
             </div>
             <span className={styles.serviceCardDivider} aria-hidden="true" />
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatLabel}>Outdoor</p>
               <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.outdoor}</p>
+              <p className={styles.serviceCardStatLabel}>Guests</p>
             </div>
           </div>
         </div>
