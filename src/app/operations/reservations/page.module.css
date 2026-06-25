@@ -111,7 +111,7 @@
   flex-shrink: 0;
 }
 
-.serviceCardLunch .serviceCardIcon { color: #ea580c; }
+.serviceCardLunch .serviceCardIcon { color: var(--color-fg); }
 .serviceCardDinner .serviceCardIcon { color: var(--color-fg); }
 
 .serviceCardTitle {
@@ -121,7 +121,7 @@
   letter-spacing: 0.04em;
 }
 
-.serviceCardLunch .serviceCardTitle { color: #ea580c; }
+.serviceCardLunch .serviceCardTitle { color: var(--color-fg); }
 .serviceCardDinner .serviceCardTitle { color: var(--color-fg); }
 
 .serviceCardWindow {
