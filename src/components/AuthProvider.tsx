@@ -60,29 +60,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const username = emailToUsername(user.email ?? "").toLowerCase();
     const role = isOwner(user) ? "owner" : "staff";
     const ref = doc(getDb(), "staff_onboarding", user.uid);
-    (async () => {
-      try {
-        await setDoc(
-          ref,
-          {
-            uid: user.uid,
-            username,
-            email: user.email ?? null,
-            role,
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true },
-        );
-        if (!isOwner(user)) {
-          const snap = await getDoc(ref);
+
+    // Fire-and-forget: don't block rendering on the write.
+    setDoc(
+      ref,
+      {
+        uid: user.uid,
+        username,
+        email: user.email ?? null,
+        role,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    ).catch(() => {/* best-effort */});
+
+    // Only staff need to wait for completedStep — read it in parallel.
+    if (!isOwner(user)) {
+      getDoc(ref)
+        .then((snap) => {
           const data = snap.data() ?? {};
           const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
           setStaffCompletedStep(completed);
-        }
-      } catch {
-        /* best-effort */
-      }
-    })();
+        })
+        .catch(() => {
+          setStaffCompletedStep(0);
+        });
+    }
   }, [user, loading]);
 
   const userIsOwner = isOwner(user);

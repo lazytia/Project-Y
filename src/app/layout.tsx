@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "Project Y",
   },
 };
@@ -39,7 +39,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body>
+      <body style={{ backgroundColor: "#FFFFFF" }}>
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>
