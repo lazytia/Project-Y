@@ -41,6 +41,14 @@ type SqFulfillment = {
   deliveryDetails?: { deliverAt?: string; note?: string; recipient?: SqRecipient };
   shipmentDetails?: { recipient?: SqRecipient };
 };
+type SqModifier = {
+  uid?: string;
+  name?: string;
+  quantity?: string;
+  basePriceMoney?: SqMoney;
+  totalPriceMoney?: SqMoney;
+  catalogObjectId?: string;
+};
 type SqLineItem = {
   uid?: string;
   name?: string;
@@ -49,6 +57,7 @@ type SqLineItem = {
   note?: string;
   basePriceMoney?: SqMoney;
   totalMoney?: SqMoney;
+  modifiers?: SqModifier[];
 };
 type SqOrder = {
   id?: string;
@@ -59,6 +68,7 @@ type SqOrder = {
   note?: string;
   fulfillments?: SqFulfillment[];
   lineItems?: SqLineItem[];
+  tenders?: { id?: string }[];
 };
 
 function tz(): string {
@@ -180,8 +190,39 @@ function menuFor(o: SqOrder): CateringMenuLine[] {
         ? totalCents / 100 / safeQty
         : undefined;
     lines.push({ name, qty: safeQty, unitPrice });
+
+    // Include modifiers as separate line items (e.g. "Extra Disposable Utensils")
+    for (const mod of li.modifiers ?? []) {
+      if (!mod.name) continue;
+      const modQty = mod.quantity ? parseInt(mod.quantity, 10) : 1;
+      const safeModQty = Number.isFinite(modQty) && modQty > 0 ? modQty : 1;
+      const modBaseCents = moneyToDollars(mod.basePriceMoney) * 100;
+      const modTotalCents = moneyToDollars(mod.totalPriceMoney) * 100;
+      const modUnitPrice = modBaseCents > 0
+        ? modBaseCents / 100
+        : modTotalCents > 0
+          ? modTotalCents / 100 / safeModQty
+          : undefined;
+      lines.push({ name: mod.name, qty: safeModQty, unitPrice: modUnitPrice });
+    }
   }
   return lines;
+}
+
+/**
+ * Extract utensils count from line item modifiers when metadata doesn't have it.
+ */
+function utensilsFromModifiers(o: SqOrder): number {
+  let total = 0;
+  for (const li of o.lineItems ?? []) {
+    for (const mod of li.modifiers ?? []) {
+      if (mod.name && isUtensilItem(mod.name)) {
+        const q = mod.quantity ? parseInt(mod.quantity, 10) : 1;
+        total += Number.isFinite(q) ? q : 1;
+      }
+    }
+  }
+  return total;
 }
 
 const UTENSIL_PATTERN = /utensil|cutlery|fork.*knife|spork/i;
@@ -242,12 +283,18 @@ export function toCateringOrder(o: SqOrder): CateringOrder | null {
   const meta = parseMetadata(notesFor(o));
   const menu = menuFor(o);
 
-  // If metadata didn't carry a utensils count, look for a utensil line item
-  // from Square online ordering (e.g. "Utensil Set", "Extra Utensils").
+  // If metadata didn't carry a utensils count, check line item modifiers
+  // (Square Online stores utensils as modifiers on food items) and then
+  // fall back to looking for a standalone utensil line item.
   let utensilsCount = meta.utensilsCount;
   if (utensilsCount === undefined) {
-    const utensilLine = menu.find((m) => isUtensilItem(m.name));
-    if (utensilLine) utensilsCount = utensilLine.qty;
+    const fromMods = utensilsFromModifiers(o);
+    if (fromMods > 0) {
+      utensilsCount = fromMods;
+    } else {
+      const utensilLine = menu.find((m) => isUtensilItem(m.name));
+      if (utensilLine) utensilsCount = utensilLine.qty;
+    }
   }
 
   return {
@@ -611,41 +658,49 @@ export async function updatePlatterCateringOrder(
         },
       };
 
-  // Replace all line items: mark every existing uid for removal, then supply
-  // the new items without uids (= new in Square's sparse-update model).
-  const existingLineItemUids = (existing.lineItems ?? [])
-    .map((li) => li.uid)
-    .filter((uid): uid is string => Boolean(uid));
-  const fieldsToClear: string[] = existingLineItemUids.map(
-    (uid) => `line_items[${uid}]`,
-  );
+  // Square blocks line-item mutations on orders with finalized tenders
+  // (i.e. already paid). In that case we only update fulfillment metadata
+  // (utensils, dietary, payment status, etc.) and skip line items.
+  const hasFinalizedTenders = (existing.tenders ?? []).length > 0;
 
-  const newLineItems = merged.items.length > 0
-    ? merged.items.map((it) => ({
-        name: it.name,
-        quantity: String(Math.max(1, Math.round(it.qty))),
-        basePriceMoney: {
-          amount: BigInt(Math.round(it.unitPrice * 100)),
-          currency: "AUD" as const,
-        },
-      }))
-    : [{
-        name: merged.clientName,
-        quantity: "1",
-        basePriceMoney: { amount: BigInt(0), currency: "AUD" as const },
-      }];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updatePayload: Record<string, any> = {
+    locationId: platterId,
+    version,
+    fulfillments: [newFulfillment],
+  };
+  let fieldsToClear: string[] = [];
+
+  if (!hasFinalizedTenders) {
+    // Replace all line items: mark every existing uid for removal, then supply
+    // the new items without uids (= new in Square's sparse-update model).
+    const existingLineItemUids = (existing.lineItems ?? [])
+      .map((li) => li.uid)
+      .filter((uid): uid is string => Boolean(uid));
+    fieldsToClear = existingLineItemUids.map(
+      (uid) => `line_items[${uid}]`,
+    );
+
+    updatePayload.lineItems = merged.items.length > 0
+      ? merged.items.map((it) => ({
+          name: it.name,
+          quantity: String(Math.max(1, Math.round(it.qty))),
+          basePriceMoney: {
+            amount: BigInt(Math.round(it.unitPrice * 100)),
+            currency: "AUD" as const,
+          },
+        }))
+      : [{
+          name: merged.clientName,
+          quantity: "1",
+          basePriceMoney: { amount: BigInt(0), currency: "AUD" as const },
+        }];
+  }
 
   const resp = await squareClient.orders.update({
     orderId,
-    order: {
-      locationId: platterId,
-      version,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fulfillments: [newFulfillment] as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      lineItems: newLineItems as any,
-    },
-    fieldsToClear,
+    order: updatePayload,
+    fieldsToClear: fieldsToClear.length > 0 ? fieldsToClear : undefined,
   });
 
   const o = resp.order as SqOrder | undefined;
