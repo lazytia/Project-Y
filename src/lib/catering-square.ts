@@ -699,7 +699,8 @@ export async function updatePlatterCateringOrder(
 
   const resp = await squareClient.orders.update({
     orderId,
-    order: updatePayload,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    order: updatePayload as any,
     fieldsToClear: fieldsToClear.length > 0 ? fieldsToClear : undefined,
   });
 
