@@ -294,6 +294,14 @@ export default function CateringOrderDetailPage() {
             </span>
             <span className={styles.orderTotalValue}>{fmtMoney(order.totalAmount)}</span>
           </div>
+          {order.notes.length > 0 && (
+            <div className={styles.customerNote}>
+              <p className={styles.customerNoteLabel}>Customer Note</p>
+              {order.notes.map((n, i) => (
+                <p key={i} className={styles.customerNoteText}>{n}</p>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
