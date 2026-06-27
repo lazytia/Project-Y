@@ -11,6 +11,12 @@ import {
   fetchReservationsForDate,
   serviceFor,
 } from "@/lib/reservations";
+import {
+  type CateringOrder,
+  fetchCateringOrders,
+  dCountdownLabel,
+  daysUntil,
+} from "@/lib/catering-orders";
 
 const SYDNEY_TZ = "Australia/Sydney";
 
@@ -108,6 +114,7 @@ function OwnerDashboard() {
     bestSellers: { name: string; sales: number; quantity: number }[];
   } | null>(null);
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
+  const [cateringOrders, setCateringOrders] = useState<CateringOrder[] | null>(null);
   const [rangeStats, setRangeStats] = useState<{
     todaySales: number;
     restaurantSales: number;
@@ -145,6 +152,15 @@ function OwnerDashboard() {
     }
   }, [user]);
 
+  const fetchCatering = useCallback(async () => {
+    try {
+      const orders = await fetchCateringOrders(user);
+      setCateringOrders(orders);
+    } catch (err) {
+      console.error("[catering] fetch error:", err);
+    }
+  }, [user]);
+
   // Reset displayed values on date change so we don't briefly show stale numbers.
   useEffect(() => {
     setStats(null);
@@ -152,6 +168,7 @@ function OwnerDashboard() {
     setLastUpdated(null);
     fetchStats(selectedDate);
     fetchReservations(selectedDate);
+    fetchCatering();
     // Live poll only when viewing today — historical days don't change.
     if (!isToday) return;
     const id1 = setInterval(() => fetchStats(selectedDate), POLL_INTERVAL_MS);
@@ -160,7 +177,7 @@ function OwnerDashboard() {
       clearInterval(id1);
       clearInterval(id2);
     };
-  }, [selectedDate, isToday, fetchStats, fetchReservations]);
+  }, [selectedDate, isToday, fetchStats, fetchReservations, fetchCatering]);
 
   // Range fetch
   useEffect(() => {
@@ -188,10 +205,46 @@ function OwnerDashboard() {
     };
   }, [reservations]);
 
-  const lunchPax      = resCounts?.lunchPax ?? null;
-  const lunchBookings = resCounts?.lunchBookings ?? null;
-  const dinnerPax     = resCounts?.dinnerPax ?? null;
-  const dinnerBookings = resCounts?.dinnerBookings ?? null;
+  const totalPax = resCounts
+    ? resCounts.lunchPax + resCounts.dinnerPax
+    : null;
+  const totalBookings = resCounts
+    ? resCounts.lunchBookings + resCounts.dinnerBookings
+    : null;
+
+  // Next upcoming catering order (confirmed/pending, delivery date >= today)
+  const nextCatering = useMemo(() => {
+    if (!cateringOrders) return null;
+    const upcoming = cateringOrders
+      .filter(
+        (o) =>
+          (o.status === "CONFIRMED" || o.status === "PENDING") &&
+          o.deliveryDateISO >= todayKey,
+      )
+      .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
+    return upcoming.length > 0 ? upcoming[0] : null;
+  }, [cateringOrders, todayKey]);
+
+  // This week's catering orders count
+  const weekCateringCount = useMemo(() => {
+    if (!cateringOrders) return null;
+    // Get Monday of this week
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset);
+    const mondayKey = monday.toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const sundayKey = sunday.toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
+    return cateringOrders.filter(
+      (o) =>
+        o.deliveryDateISO >= mondayKey &&
+        o.deliveryDateISO <= sundayKey &&
+        o.status !== "CANCELLED",
+    ).length;
+  }, [cateringOrders]);
 
   const todaySales     = stats?.todaySales ?? null;
   const weeklyProgress = stats?.weeklyProgress ?? null;
@@ -326,25 +379,75 @@ function OwnerDashboard() {
         </div>
       </section>
 
-      {/* LUNCH / DINNER */}
+      {/* TODAY'S OPERATIONS */}
+      <p className={styles.sectionTitle}>TODAY&rsquo;S OPERATIONS</p>
       <div className={styles.splitRow}>
+        {/* Today's Guests */}
         <section className={styles.splitCard}>
-          <p className={styles.splitLabel}>☀ LUNCH</p>
-          <p className={`${styles.splitPax} ${lunchPax === null ? styles.salesLoading : ""}`}>
-            {lunchPax ?? "—"} <span className={styles.splitUnit}>PAX</span>
+          <div className={styles.opsIconRow}>
+            <span className={styles.opsIcon} aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </span>
+            <span className={styles.opsLabel}>Today&rsquo;s Guests</span>
+          </div>
+          <p className={`${styles.opsValue} ${totalPax === null ? styles.salesLoading : ""}`}>
+            {totalPax ?? "—"} <span className={styles.opsUnit}>Pax</span>
           </p>
-          <p className={styles.splitStaff}>
-            📋 {lunchBookings ?? "—"} <span className={styles.splitUnit}>BOOKINGS</span>
-          </p>
+          <p className={styles.opsSub}>{totalBookings ?? "—"} Reservations</p>
+          <div className={styles.opsDivider} />
+          <a href="/operations/reservations" className={styles.opsView}>
+            View <span aria-hidden="true">→</span>
+          </a>
         </section>
+
+        {/* Next Catering */}
         <section className={styles.splitCard}>
-          <p className={styles.splitLabel}>🌙 DINNER</p>
-          <p className={`${styles.splitPax} ${dinnerPax === null ? styles.salesLoading : ""}`}>
-            {dinnerPax ?? "—"} <span className={styles.splitUnit}>PAX</span>
+          <div className={styles.opsIconRow}>
+            <span className={styles.opsIcon} aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 12h20" />
+                <path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+                <path d="M12 12v1" />
+                <circle cx="12" cy="4" r="1" />
+              </svg>
+            </span>
+            <span className={styles.opsLabel}>Next Catering</span>
+          </div>
+          {nextCatering ? (
+            <>
+              <p className={styles.opsCountdown}>
+                {dCountdownLabel(nextCatering.deliveryDateISO)}
+              </p>
+              <p className={styles.opsCateringDate}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                {new Date(nextCatering.deliveryDateISO + "T00:00:00").toLocaleDateString("en-AU", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                })}
+              </p>
+            </>
+          ) : (
+            <p className={styles.opsSub}>No upcoming orders</p>
+          )}
+          <p className={styles.opsSub}>
+            This Week<br />
+            <strong>{weekCateringCount ?? "—"} Orders</strong>
           </p>
-          <p className={styles.splitStaff}>
-            📋 {dinnerBookings ?? "—"} <span className={styles.splitUnit}>BOOKINGS</span>
-          </p>
+          <div className={styles.opsDivider} />
+          <a href="/operations/catering-orders" className={styles.opsView}>
+            View <span aria-hidden="true">→</span>
+          </a>
         </section>
       </div>
 

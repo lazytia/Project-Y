@@ -237,7 +237,18 @@
   line-height: 1;
 }
 
-/* ── LUNCH / DINNER ── */
+/* ── SECTION TITLE ── */
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: var(--space-2) 0 0;
+}
+
+/* ── TODAY'S OPERATIONS ── */
 .splitRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -251,46 +262,101 @@
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
-/* Card Title */
-.splitLabel {
+.opsIconRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.opsIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.opsLabel {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.opsValue {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-fg);
+  margin: var(--space-1) 0 0;
+  line-height: 1.1;
+}
+
+.opsUnit {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+}
+
+.opsSub {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.opsCountdown {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-warm);
+  margin: var(--space-1) 0 0;
+  line-height: 1.1;
+}
+
+.opsCateringDate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   font-family: var(--font-display);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-fg-muted);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  margin: 2px 0;
+  width: fit-content;
 }
 
-/* Secondary KPI (orange highlight) */
-.splitPax {
+.opsDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-1) 0;
+}
+
+.opsView {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: -0.02em;
   color: var(--color-warm);
-  margin: var(--space-2) 0 var(--space-1);
-  line-height: 1;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-/* Supporting Text */
-.splitUnit {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-fg-muted);
-  letter-spacing: 0;
-}
-
-.splitStaff {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-fg-muted);
-  margin: 0;
+.opsView:hover {
+  opacity: 0.8;
 }
 
 /* ── WEEKLY PROGRESS ── */
