@@ -184,6 +184,12 @@ function menuFor(o: SqOrder): CateringMenuLine[] {
   return lines;
 }
 
+const UTENSIL_PATTERN = /utensil|cutlery|fork.*knife|spork/i;
+
+function isUtensilItem(name: string): boolean {
+  return UTENSIL_PATTERN.test(name);
+}
+
 function guestsFor(o: SqOrder): number {
   // No real "pax" field — sum up line-item quantities as a stand-in.
   return (o.lineItems ?? []).reduce((sum, li) => {
@@ -234,6 +240,16 @@ export function toCateringOrder(o: SqOrder): CateringOrder | null {
   const ftype: CateringFulfillmentType | undefined =
     f?.type === "DELIVERY" ? "DELIVERY" : f?.type === "PICKUP" ? "PICKUP" : undefined;
   const meta = parseMetadata(notesFor(o));
+  const menu = menuFor(o);
+
+  // If metadata didn't carry a utensils count, look for a utensil line item
+  // from Square online ordering (e.g. "Utensil Set", "Extra Utensils").
+  let utensilsCount = meta.utensilsCount;
+  if (utensilsCount === undefined) {
+    const utensilLine = menu.find((m) => isUtensilItem(m.name));
+    if (utensilLine) utensilsCount = utensilLine.qty;
+  }
+
   return {
     id: o.id,
     clientName: clientNameFor(o),
@@ -247,10 +263,10 @@ export function toCateringOrder(o: SqOrder): CateringOrder | null {
     contactEmail: r?.emailAddress,
     deliveryAddressLines: addressLines(r?.address),
     notes: meta.notes,
-    menu: menuFor(o),
+    menu,
     fulfillmentType: ftype,
     companyName: meta.companyName,
-    utensilsCount: meta.utensilsCount,
+    utensilsCount,
     dietaryNotes: meta.dietaryNotes,
     readyByTime: meta.readyByTime,
     // Square-origin orders (no form metadata blob) all come from the

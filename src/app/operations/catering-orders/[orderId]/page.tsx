@@ -280,6 +280,13 @@ export default function CateringOrderDetailPage() {
                 <span className={styles.itemQty}>x {m.qty}</span>
               </li>
             ))}
+            {(order.utensilsCount ?? 0) > 0 &&
+              !order.menu.some((m) => /utensil|cutlery/i.test(m.name)) && (
+              <li className={styles.itemLine}>
+                <span className={styles.itemName}>Utensil Set</span>
+                <span className={styles.itemQty}>x {order.utensilsCount}</span>
+              </li>
+            )}
           </ul>
           <div className={styles.orderTotalRow}>
             <span className={styles.orderTotalLabel}>
