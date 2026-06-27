@@ -294,14 +294,16 @@ export default function CateringOrderDetailPage() {
             </span>
             <span className={styles.orderTotalValue}>{fmtMoney(order.totalAmount)}</span>
           </div>
-          {order.notes.length > 0 && (
-            <div className={styles.customerNote}>
-              <p className={styles.customerNoteLabel}>Customer Note</p>
-              {order.notes.map((n, i) => (
+          <div className={styles.customerNote}>
+            <p className={styles.customerNoteLabel}>Customer Note</p>
+            {order.notes.length > 0 ? (
+              order.notes.map((n, i) => (
                 <p key={i} className={styles.customerNoteText}>{n}</p>
-              ))}
-            </div>
-          )}
+              ))
+            ) : (
+              <p className={styles.customerNoteEmpty}>No notes from customer.</p>
+            )}
+          </div>
         </div>
       </section>
 

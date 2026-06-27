@@ -380,6 +380,12 @@
   margin: 0;
 }
 
+.customerNoteEmpty {
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  margin: 0;
+}
+
 /* ── 3-up bottom mini cards ── */
 .threeUp {
   display: grid;
