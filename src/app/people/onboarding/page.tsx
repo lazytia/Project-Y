@@ -253,10 +253,12 @@ export default function ManagerOnboardingPage() {
           <div className={styles.pageHeader}>
             <h1 className={styles.pageTitle}>New Staff Request</h1>
             <p className={styles.pageDesc}>
-              New staff added here will be reviewed by the owner
-              before activation. Once approved, the new staff will
-              be added to the scheduling, and their clock in/out no.
-              and Project Y log in ID will be created to begin onboarding.
+              Submit new staff details for owner approval.
+            </p>
+            <p className={styles.pageDesc}>
+              Once approved, the employee will be added to Scheduling,
+              and their Clock In ID and Project Y account will be
+              created automatically.
             </p>
           </div>
 
