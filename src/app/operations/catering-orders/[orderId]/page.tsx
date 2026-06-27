@@ -301,7 +301,7 @@ export default function CateringOrderDetailPage() {
       <div className={styles.threeUp}>
         <div className={styles.miniCard}>
           <span className={styles.miniIcon}><ForkKnifeIcon /></span>
-          <p className={styles.miniLabel}>UTENSILS QTY</p>
+          <p className={styles.miniLabel}>TOTAL UTENSILS QTY</p>
           <p className={styles.miniValueLarge}>
             {order.utensilsCount ?? 0}<span className={styles.miniUnit}> Sets</span>
           </p>
