@@ -270,6 +270,71 @@
   color: var(--color-fg);
 }
 
+/* ── Required asterisk ── */
+.required {
+  color: #e53e3e;
+  font-weight: 700;
+}
+
+/* ── Mobile number ── */
+.mobileWrap {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.mobileWrap:focus-within {
+  border-color: var(--color-warm);
+}
+
+.countryCode {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-fg);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.mobileDivider {
+  width: 1px;
+  height: 24px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+.mobileInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--space-4);
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-fg);
+}
+
+.mobileInput::placeholder {
+  color: var(--color-fg-muted);
+  opacity: 0.55;
+}
+
+.fieldHint {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+  line-height: 1.4;
+}
+
 /* ── Textarea ── */
 .textarea {
   width: 100%;

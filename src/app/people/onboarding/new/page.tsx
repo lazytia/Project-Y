@@ -70,6 +70,7 @@ export default function NewEmployeePage() {
   const [trainingRate, setTrainingRate] = useState("");
   const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>("First 2 Weeks");
   const [afterTrainingRate, setAfterTrainingRate] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [notes, setNotes] = useState("");
 
   const [rateFocused, setRateFocused] = useState(false);
@@ -84,7 +85,8 @@ export default function NewEmployeePage() {
     fullName.trim().length > 0 &&
     !!startDate &&
     !!trainingRate.trim() &&
-    !Number.isNaN(parseFloat(trainingRate));
+    !Number.isNaN(parseFloat(trainingRate)) &&
+    mobileNumber.trim().length > 0;
 
   async function handleSave() {
     if (!canSave || saving) return;
@@ -99,6 +101,7 @@ export default function NewEmployeePage() {
         afterTrainingRate: afterTrainingRate.trim()
           ? parseFloat(afterTrainingRate)
           : null,
+        mobileNumber: mobileNumber.trim(),
         notes: notes.trim(),
         status: DEFAULT_STATUS,
         role: "staff",
@@ -338,6 +341,53 @@ export default function NewEmployeePage() {
           />
           <span className={styles.rateSuffix}>/ hour</span>
         </div>
+      </div>
+
+      {/* Mobile number info box */}
+      <div className={styles.infoBox}>
+        <svg
+          className={styles.infoIcon}
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+        <p className={styles.infoText}>
+          Mobile number is required. We will send the employee their Clock In ID
+          and Project Y login details via SMS.
+        </p>
+      </div>
+
+      {/* Mobile number */}
+      <div className={styles.field}>
+        <label className={styles.fieldLabel}>
+          MOBILE NUMBER <span className={styles.required}>*</span>
+        </label>
+        <div className={styles.mobileWrap}>
+          <span className={styles.countryCode}>+61</span>
+          <span className={styles.mobileDivider} />
+          <input
+            type="tel"
+            inputMode="tel"
+            className={styles.mobileInput}
+            placeholder="e.g. 412 345 678"
+            value={mobileNumber}
+            onChange={(e) => setMobileNumber(e.target.value)}
+            maxLength={15}
+          />
+        </div>
+        <span className={styles.fieldHint}>
+          Used to send Clock In ID and Project Y login details via SMS.
+        </span>
       </div>
 
       {/* Notes */}
