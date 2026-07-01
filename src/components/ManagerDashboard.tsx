@@ -108,11 +108,16 @@ export default function ManagerDashboard() {
   const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
   const [hallStaff, setHallStaff] = useState<number | null>(null);
 
-  const todayKey = sydneyTodayKey();
-  const todayDow = (() => {
+  const [todayKey, setTodayKey] = useState("");
+  const [greeting, setGreeting] = useState("");
+  useEffect(() => {
+    setTodayKey(sydneyTodayKey());
+    setGreeting(greetingForNow());
+  }, []);
+  const todayDow = todayKey ? (() => {
     const [y, m, d] = todayKey.split("-").map(Number);
     return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
-  })();
+  })() : new Date().getUTCDay();
   const dailyTarget = DAILY_TARGETS[todayDow] ?? 0;
 
   useEffect(() => {
@@ -141,6 +146,7 @@ export default function ManagerDashboard() {
 
   // Square + system_yurica + roster
   const fetchLiveData = useCallback(async () => {
+    if (!todayKey) return;
     // Square today-stats
     try {
       const res = await fetch(`/api/square/today-stats?date=${todayKey}`);
@@ -245,7 +251,6 @@ export default function ManagerDashboard() {
     attention.holidayRequests + attention.availabilityChanges +
     attention.newOnboarding + attention.visaExpiring;
 
-  const greeting = greetingForNow();
   const team = (kitchenStaff ?? 0) + (hallStaff ?? 0);
 
   return (
@@ -253,7 +258,7 @@ export default function ManagerDashboard() {
       {/* Greeting */}
       <header className={styles.greeting}>
         <h1 className={styles.greetingTitle}>
-          {greeting}, {firstName || "there"}
+          {greeting || "Hello"}, {firstName || "there"}
         </h1>
         <p className={styles.greetingRole}>Store Manager</p>
       </header>
