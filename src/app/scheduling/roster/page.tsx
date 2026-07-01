@@ -132,6 +132,8 @@ const DAY_LABELS_LONG = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_LABELS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const DAYS_IN_WEEK = 6;
+const SYDNEY_TZ = "Australia/Sydney";
+const TIME_PATTERN = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 /* ── helpers ── */
 
@@ -199,6 +201,67 @@ function displayName(d: StaffDoc): string {
   return d.uid.slice(0, 6);
 }
 
+function sydneyTodayDate(): Date {
+  const key = new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function assignmentCount(doc: RosterWeekDoc, iso: string, meal: Meal): number {
+  const assignments = doc.assignments?.[iso]?.[meal] ?? {};
+  const fromAssignments = Object.keys(assignments).length;
+  if (fromAssignments > 0) return fromAssignments;
+  return doc.counts?.[iso]?.[meal] ?? 0;
+}
+
+function resolveShiftStaff(
+  key: string,
+  value: string,
+  staffDocs: StaffDoc[],
+): { name: string; startTime: string | null } {
+  if (key.startsWith("tr_kitchen_")) {
+    return {
+      name: "TR Kitchen Staff",
+      startTime: TIME_PATTERN.test(value) ? value : null,
+    };
+  }
+  if (key.startsWith("tr_hall_")) {
+    return {
+      name: "TR Hall Staff",
+      startTime: TIME_PATTERN.test(value) ? value : null,
+    };
+  }
+
+  const byUid = staffDocs.find((d) => d.uid === key);
+  if (byUid) {
+    return {
+      name: displayName(byUid),
+      startTime: TIME_PATTERN.test(value) ? value : null,
+    };
+  }
+
+  if (TIME_PATTERN.test(value)) {
+    const byName = staffDocs.find(
+      (d) => displayName(d).toLowerCase() === key.trim().toLowerCase(),
+    );
+    return {
+      name: byName ? displayName(byName) : key,
+      startTime: value,
+    };
+  }
+
+  const legacyName = value.trim() || key.trim();
+  const byLegacyName = staffDocs.find(
+    (d) => displayName(d).toLowerCase() === legacyName.toLowerCase(),
+  );
+  return {
+    name: byLegacyName ? displayName(byLegacyName) : legacyName,
+    startTime: null,
+  };
+}
+
 function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -255,6 +318,7 @@ type NoteEntriesListProps = {
   notes: NoteEntry[];
   userUid: string | undefined;
   weekKey: RosterViewWeekKey;
+  isChefViewer: boolean;
   noteEditingId: string | null;
   noteEditingDraft: string;
   setNoteEditingId: (id: string | null) => void;
@@ -270,6 +334,7 @@ function NoteEntriesList({
   notes,
   userUid,
   weekKey,
+  isChefViewer,
   noteEditingId,
   noteEditingDraft,
   setNoteEditingId,
@@ -330,7 +395,9 @@ function NoteEntriesList({
             ) : (
               <div className={styles.noteEntryCardBody}>
                 <p className={styles.noteEntryText}>{note.text}</p>
-                {userUid === note.authorUid && weekKey !== "prev" && (
+                {userUid === note.authorUid
+                  && weekKey !== "prev"
+                  && (!isChefViewer || note.authorRole === "chef") && (
                   <div
                     className={styles.noteOptionsWrap}
                     onClick={(e) => e.stopPropagation()}
@@ -436,9 +503,7 @@ export default function ManagerRosterPage() {
   });
 
   useEffect(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    setTodayDate(d);
+    setTodayDate(sydneyTodayDate());
   }, []);
   const weekStart = useMemo(() => startOfWeek(today), [today]);
   const weekStartISO = useMemo(() => isoDate(weekStart), [weekStart]);
@@ -467,10 +532,28 @@ export default function ManagerRosterPage() {
   const load = useCallback(async () => {
     try {
       const staffSnap = await getDocs(collection(getDb(), "staff_onboarding"));
-      const docs: StaffDoc[] = staffSnap.docs
-        .map((d) => ({ uid: d.id, ...(d.data() as Omit<StaffDoc, "uid">) }))
-        .filter((d) => d.role !== "owner");
-      setStaffDocs(docs);
+      const byUid = new Map<string, StaffDoc>();
+      for (const d of staffSnap.docs) {
+        byUid.set(d.id, { uid: d.id, ...(d.data() as Omit<StaffDoc, "uid">) });
+      }
+      try {
+        const activeSnap = await getDocs(collection(getDb(), "staff"));
+        for (const d of activeSnap.docs) {
+          const data = d.data() as Omit<StaffDoc, "uid"> & { firstName?: string; lastName?: string };
+          const existing = byUid.get(d.id);
+          byUid.set(d.id, {
+            uid: d.id,
+            ...existing,
+            ...data,
+            firstName: data.firstName ?? existing?.firstName,
+            lastName: data.lastName ?? existing?.lastName,
+            role: data.role ?? existing?.role,
+          });
+        }
+      } catch {
+        /* staff collection optional */
+      }
+      setStaffDocs([...byUid.values()].filter((d) => d.role !== "owner"));
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("[roster] staff load failed", err);
@@ -650,8 +733,16 @@ export default function ManagerRosterPage() {
     setNoteOptionsId(null);
   }
 
+  function noteCanBeManaged(note: NoteEntry): boolean {
+    if (!user || noteModal?.weekKey === "prev") return false;
+    if (note.authorUid !== user.uid) return false;
+    if (isChefUser && note.authorRole !== "chef") return false;
+    return true;
+  }
+
   async function handleSaveNewNote() {
     if (!user || !noteModal) return;
+    if (noteModal.weekKey === "prev") return;
     const trimmed = noteDraft.trim();
     if (!trimmed) return;
     setSavingNote(true);
@@ -687,10 +778,12 @@ export default function ManagerRosterPage() {
 
   async function handleDeleteNote(noteId: string) {
     if (!user || !noteModal) return;
+    const ws = weekStateForKey(noteModal.weekKey);
+    const current = normalizeNotes(ws.wDoc.notes?.[noteModal.iso]);
+    const target = current.find((n) => n.id === noteId);
+    if (!target || !noteCanBeManaged(target)) return;
     setSavingNote(true);
     try {
-      const ws = weekStateForKey(noteModal.weekKey);
-      const current = normalizeNotes(ws.wDoc.notes?.[noteModal.iso]);
       const updated = current.filter((n) => n.id !== noteId);
       const updatedNotes = { ...(ws.wDoc.notes ?? {}), [noteModal.iso]: updated };
       await setDoc(
@@ -711,10 +804,12 @@ export default function ManagerRosterPage() {
     if (!user || !noteModal) return;
     const trimmed = noteEditingDraft.trim();
     if (!trimmed) return;
+    const ws = weekStateForKey(noteModal.weekKey);
+    const current = normalizeNotes(ws.wDoc.notes?.[noteModal.iso]);
+    const target = current.find((n) => n.id === noteId);
+    if (!target || !noteCanBeManaged(target)) return;
     setSavingNote(true);
     try {
-      const ws = weekStateForKey(noteModal.weekKey);
-      const current = normalizeNotes(ws.wDoc.notes?.[noteModal.iso]);
       const updated = current.map((n) => n.id === noteId ? { ...n, text: trimmed } : n);
       const updatedNotes = { ...(ws.wDoc.notes ?? {}), [noteModal.iso]: updated };
       await setDoc(
@@ -836,8 +931,7 @@ export default function ManagerRosterPage() {
           </div>
           {weekDays.map((d, i) => {
             const iso = isoDate(d);
-            const assignments = weekDoc.assignments?.[iso]?.lunch ?? {};
-            const n = Object.keys(assignments).length;
+            const n = assignmentCount(weekDoc, iso, "lunch");
             if (isChefUser) {
               if (n > 0) {
                 return (
@@ -883,8 +977,7 @@ export default function ManagerRosterPage() {
           </div>
           {weekDays.map((d, i) => {
             const iso = isoDate(d);
-            const assignments = weekDoc.assignments?.[iso]?.dinner ?? {};
-            const n = Object.keys(assignments).length;
+            const n = assignmentCount(weekDoc, iso, "dinner");
             if (isChefUser) {
               if (n > 0) {
                 return (
@@ -979,8 +1072,7 @@ export default function ManagerRosterPage() {
             <div className={styles.rowLabel}><SunIcon /> Lunch</div>
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
-              const assignments = nextWeekDoc.assignments?.[iso]?.lunch ?? {};
-              const n = Object.keys(assignments).length;
+              const n = assignmentCount(nextWeekDoc, iso, "lunch");
               if (isChefUser) {
                 if (n > 0) {
                   return (
@@ -1024,8 +1116,7 @@ export default function ManagerRosterPage() {
             <div className={styles.rowLabel}><MoonIcon /> Dinner</div>
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
-              const assignments = nextWeekDoc.assignments?.[iso]?.dinner ?? {};
-              const n = Object.keys(assignments).length;
+              const n = assignmentCount(nextWeekDoc, iso, "dinner");
               if (isChefUser) {
                 if (n > 0) {
                   return (
@@ -1128,8 +1219,7 @@ export default function ManagerRosterPage() {
                 <div className={styles.rowLabel}><SunIcon /> Lunch</div>
                 {prevWeekDays.map((d, i) => {
                   const iso = isoDate(d);
-                  const assignments = prevWeekDoc.assignments?.[iso]?.lunch ?? {};
-                  const n = Object.keys(assignments).length;
+                  const n = assignmentCount(prevWeekDoc, iso, "lunch");
                   if (isChefUser && n > 0) {
                     return (
                       <button
@@ -1158,8 +1248,7 @@ export default function ManagerRosterPage() {
                 <div className={styles.rowLabel}><MoonIcon /> Dinner</div>
                 {prevWeekDays.map((d, i) => {
                   const iso = isoDate(d);
-                  const assignments = prevWeekDoc.assignments?.[iso]?.dinner ?? {};
-                  const n = Object.keys(assignments).length;
+                  const n = assignmentCount(prevWeekDoc, iso, "dinner");
                   if (isChefUser && n > 0) {
                     return (
                       <button
@@ -1367,6 +1456,7 @@ export default function ManagerRosterPage() {
                         notes={noteModalManagerNotes}
                         userUid={user?.uid}
                         weekKey={noteModal.weekKey}
+                        isChefViewer={isChefUser}
                         noteEditingId={noteEditingId}
                         noteEditingDraft={noteEditingDraft}
                         setNoteEditingId={setNoteEditingId}
@@ -1394,6 +1484,7 @@ export default function ManagerRosterPage() {
                         notes={noteModalChefNotes}
                         userUid={user?.uid}
                         weekKey={noteModal.weekKey}
+                        isChefViewer={isChefUser}
                         noteEditingId={noteEditingId}
                         noteEditingDraft={noteEditingDraft}
                         setNoteEditingId={setNoteEditingId}
@@ -1759,23 +1850,20 @@ export default function ManagerRosterPage() {
                 <p className={styles.chefStaffEmpty}>No staff assigned for this shift.</p>
               ) : (
                 Object.entries(assignedFor(chefStaffModal.iso, chefStaffModal.meal, chefStaffModal.weekKey))
-                  .sort(([, a], [, b]) => a.localeCompare(b))
-                  .map(([uid, startTime]) => {
-                    let name: string;
-                    if (uid.startsWith("tr_kitchen_")) name = "TR Kitchen Staff";
-                    else if (uid.startsWith("tr_hall_")) name = "TR Hall Staff";
-                    else {
-                      const found = staffDocs.find((d) => d.uid === uid);
-                      name = found ? displayName(found) : uid.slice(0, 8);
-                    }
-                    return (
+                  .map(([uid, startTime]) => ({
+                    uid,
+                    ...resolveShiftStaff(uid, startTime, staffDocs),
+                  }))
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(({ uid, name, startTime }) => (
                       <div key={uid} className={styles.chefStaffRow}>
                         <span className={styles.chefStaffDot} style={{ background: colorForUid(uid) }} />
                         <span className={styles.chefStaffName}>{name}</span>
-                        <span className={styles.chefStaffTime}>{startTime} Start</span>
+                        <span className={styles.chefStaffTime}>
+                          {startTime ? `${startTime} Start` : "—"}
+                        </span>
                       </div>
-                    );
-                  })
+                    ))
               )}
             </div>
 
