@@ -251,6 +251,134 @@ function fmtNoteDate(d: Date): string {
   return `${dow}, ${day} ${month}`;
 }
 
+type NoteEntriesListProps = {
+  notes: NoteEntry[];
+  userUid: string | undefined;
+  weekKey: RosterViewWeekKey;
+  noteEditingId: string | null;
+  noteEditingDraft: string;
+  setNoteEditingId: (id: string | null) => void;
+  setNoteEditingDraft: (draft: string) => void;
+  noteOptionsId: string | null;
+  setNoteOptionsId: (id: string | null) => void;
+  savingNote: boolean;
+  onUpdate: (noteId: string) => void;
+  onDelete: (noteId: string) => void;
+};
+
+function NoteEntriesList({
+  notes,
+  userUid,
+  weekKey,
+  noteEditingId,
+  noteEditingDraft,
+  setNoteEditingId,
+  setNoteEditingDraft,
+  noteOptionsId,
+  setNoteOptionsId,
+  savingNote,
+  onUpdate,
+  onDelete,
+}: NoteEntriesListProps) {
+  if (notes.length === 0) return null;
+
+  return (
+    <>
+      {notes.map((note) => {
+        const createdDate = tsDate(note.createdAt);
+        return (
+          <div key={note.id} className={styles.noteEntryBlock}>
+            <div className={styles.noteEntryCardHead}>
+              <span className={styles.noteEntryAuthor}>
+                {note.authorName} ({roleDisplayLabel(note.authorRole)})
+              </span>
+              {createdDate && (
+                <span className={styles.noteEntryTime}>{fmtTime(createdDate)}</span>
+              )}
+            </div>
+            {noteEditingId === note.id ? (
+              <div>
+                <textarea
+                  autoFocus
+                  className={styles.noteEditTextarea}
+                  value={noteEditingDraft}
+                  maxLength={500}
+                  onChange={(e) => setNoteEditingDraft(e.target.value)}
+                  rows={3}
+                />
+                <div className={styles.noteEditActions}>
+                  <button
+                    type="button"
+                    className={styles.noteEditCancelBtn}
+                    onClick={() => {
+                      setNoteEditingId(null);
+                      setNoteEditingDraft("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.noteEditSaveBtn}
+                    disabled={savingNote || !noteEditingDraft.trim()}
+                    onClick={() => onUpdate(note.id)}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.noteEntryCardBody}>
+                <p className={styles.noteEntryText}>{note.text}</p>
+                {userUid === note.authorUid && weekKey !== "prev" && (
+                  <div
+                    className={styles.noteOptionsWrap}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className={styles.noteOptionsBtn}
+                      aria-label="Note options"
+                      onClick={() =>
+                        setNoteOptionsId(noteOptionsId === note.id ? null : note.id)
+                      }
+                    >
+                      ...
+                    </button>
+                    {noteOptionsId === note.id && (
+                      <div className={styles.noteOptionsMenu}>
+                        <button
+                          type="button"
+                          className={styles.noteOptionsItem}
+                          onClick={() => {
+                            setNoteEditingId(note.id);
+                            setNoteEditingDraft(note.text);
+                            setNoteOptionsId(null);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.noteOptionsItem} ${styles.noteOptionsItemDelete}`}
+                          disabled={savingNote}
+                          onClick={() => onDelete(note.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 /** Render a count as a 2-column dot grid (max 8 dots). */
 function DotCount({ n }: { n: number }) {
   if (n <= 0) return <span className={styles.dash} aria-hidden="true">—</span>;
@@ -1226,208 +1354,59 @@ export default function ManagerRosterPage() {
                 <span>Notes are visible to all managers and Head Chef.</span>
               </div>
 
-              {/* Scrollable note list */}
+              {/* Scrollable note list — always show Manager + Head Chef sections */}
               <div className={styles.noteModalScroll}>
-              {/* Manager notes section */}
-              {noteModalManagerNotes.length > 0 && (
                 <div className={styles.noteSectionBlock}>
-                  <p className={styles.noteSectionTitle}>MANAGER NOTE</p>
-                  {noteModalManagerNotes.map((note) => {
-                    const createdDate = tsDate(note.createdAt);
-                    return (
-                      <div key={note.id} className={styles.noteEntryRow}>
-                        <div className={`${styles.noteEntryAvatar} ${styles.noteEntryAvatarManager}`}>
-                          <PersonIcon />
-                        </div>
-                        <div className={styles.noteEntryCard}>
-                          <div className={styles.noteEntryCardHead}>
-                            <span className={styles.noteEntryAuthor}>
-                              {note.authorName} ({roleDisplayLabel(note.authorRole)})
-                            </span>
-                            {createdDate && (
-                              <span className={styles.noteEntryTime}>{fmtTime(createdDate)}</span>
-                            )}
-                          </div>
-                          {noteEditingId === note.id ? (
-                            <div>
-                              <textarea
-                                autoFocus
-                                className={styles.noteEditTextarea}
-                                value={noteEditingDraft}
-                                maxLength={500}
-                                onChange={(e) => setNoteEditingDraft(e.target.value)}
-                                rows={3}
-                              />
-                              <div className={styles.noteEditActions}>
-                                <button
-                                  type="button"
-                                  className={styles.noteEditCancelBtn}
-                                  onClick={() => { setNoteEditingId(null); setNoteEditingDraft(""); }}
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.noteEditSaveBtn}
-                                  disabled={savingNote || !noteEditingDraft.trim()}
-                                  onClick={() => handleUpdateNote(note.id)}
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className={styles.noteEntryCardBody}>
-                              <p className={styles.noteEntryText}>{note.text}</p>
-                              {user?.uid === note.authorUid && noteModal.weekKey !== "prev" && (
-                                <div
-                                  className={styles.noteOptionsWrap}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <button
-                                    type="button"
-                                    className={styles.noteOptionsBtn}
-                                    aria-label="Note options"
-                                    onClick={() => setNoteOptionsId(noteOptionsId === note.id ? null : note.id)}
-                                  >
-                                    ...
-                                  </button>
-                                  {noteOptionsId === note.id && (
-                                    <div className={styles.noteOptionsMenu}>
-                                      <button
-                                        type="button"
-                                        className={styles.noteOptionsItem}
-                                        onClick={() => {
-                                          setNoteEditingId(note.id);
-                                          setNoteEditingDraft(note.text);
-                                          setNoteOptionsId(null);
-                                        }}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`${styles.noteOptionsItem} ${styles.noteOptionsItemDelete}`}
-                                        disabled={savingNote}
-                                        onClick={() => handleDeleteNote(note.id)}
-                                      >
-                                        Delete
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className={styles.noteSectionGrid}>
+                    <div className={`${styles.noteSectionIcon} ${styles.noteSectionIconManager}`}>
+                      <PersonIcon />
+                    </div>
+                    <div className={styles.noteSectionContent}>
+                      <p className={styles.noteSectionTitle}>MANAGER NOTE</p>
+                      <NoteEntriesList
+                        notes={noteModalManagerNotes}
+                        userUid={user?.uid}
+                        weekKey={noteModal.weekKey}
+                        noteEditingId={noteEditingId}
+                        noteEditingDraft={noteEditingDraft}
+                        setNoteEditingId={setNoteEditingId}
+                        setNoteEditingDraft={setNoteEditingDraft}
+                        noteOptionsId={noteOptionsId}
+                        setNoteOptionsId={setNoteOptionsId}
+                        savingNote={savingNote}
+                        onUpdate={handleUpdateNote}
+                        onDelete={handleDeleteNote}
+                      />
+                    </div>
+                  </div>
                 </div>
-              )}
 
-              {/* Chef notes section */}
-              {noteModalChefNotes.length > 0 && (
+                <div className={styles.noteSectionDivider} aria-hidden="true" />
+
                 <div className={styles.noteSectionBlock}>
-                  <p className={styles.noteSectionTitle}>HEAD CHEF NOTE</p>
-                  {noteModalChefNotes.map((note) => {
-                    const createdDate = tsDate(note.createdAt);
-                    return (
-                      <div key={note.id} className={styles.noteEntryRow}>
-                        <div className={`${styles.noteEntryAvatar} ${styles.noteEntryAvatarChef}`}>
-                          <ChefHatIcon />
-                        </div>
-                        <div className={styles.noteEntryCard}>
-                          <div className={styles.noteEntryCardHead}>
-                            <span className={styles.noteEntryAuthor}>
-                              {note.authorName} ({roleDisplayLabel(note.authorRole)})
-                            </span>
-                            {createdDate && (
-                              <span className={styles.noteEntryTime}>{fmtTime(createdDate)}</span>
-                            )}
-                          </div>
-                          {noteEditingId === note.id ? (
-                            <div>
-                              <textarea
-                                autoFocus
-                                className={styles.noteEditTextarea}
-                                value={noteEditingDraft}
-                                maxLength={500}
-                                onChange={(e) => setNoteEditingDraft(e.target.value)}
-                                rows={3}
-                              />
-                              <div className={styles.noteEditActions}>
-                                <button
-                                  type="button"
-                                  className={styles.noteEditCancelBtn}
-                                  onClick={() => { setNoteEditingId(null); setNoteEditingDraft(""); }}
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.noteEditSaveBtn}
-                                  disabled={savingNote || !noteEditingDraft.trim()}
-                                  onClick={() => handleUpdateNote(note.id)}
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className={styles.noteEntryCardBody}>
-                              <p className={styles.noteEntryText}>{note.text}</p>
-                              {user?.uid === note.authorUid && noteModal.weekKey !== "prev" && (
-                                <div
-                                  className={styles.noteOptionsWrap}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <button
-                                    type="button"
-                                    className={styles.noteOptionsBtn}
-                                    aria-label="Note options"
-                                    onClick={() => setNoteOptionsId(noteOptionsId === note.id ? null : note.id)}
-                                  >
-                                    ...
-                                  </button>
-                                  {noteOptionsId === note.id && (
-                                    <div className={styles.noteOptionsMenu}>
-                                      <button
-                                        type="button"
-                                        className={styles.noteOptionsItem}
-                                        onClick={() => {
-                                          setNoteEditingId(note.id);
-                                          setNoteEditingDraft(note.text);
-                                          setNoteOptionsId(null);
-                                        }}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`${styles.noteOptionsItem} ${styles.noteOptionsItemDelete}`}
-                                        disabled={savingNote}
-                                        onClick={() => handleDeleteNote(note.id)}
-                                      >
-                                        Delete
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className={styles.noteSectionGrid}>
+                    <div className={`${styles.noteSectionIcon} ${styles.noteSectionIconChef}`}>
+                      <ChefHatIcon />
+                    </div>
+                    <div className={styles.noteSectionContent}>
+                      <p className={styles.noteSectionTitle}>HEAD CHEF NOTE</p>
+                      <NoteEntriesList
+                        notes={noteModalChefNotes}
+                        userUid={user?.uid}
+                        weekKey={noteModal.weekKey}
+                        noteEditingId={noteEditingId}
+                        noteEditingDraft={noteEditingDraft}
+                        setNoteEditingId={setNoteEditingId}
+                        setNoteEditingDraft={setNoteEditingDraft}
+                        noteOptionsId={noteOptionsId}
+                        setNoteOptionsId={setNoteOptionsId}
+                        savingNote={savingNote}
+                        onUpdate={handleUpdateNote}
+                        onDelete={handleDeleteNote}
+                      />
+                    </div>
+                  </div>
                 </div>
-              )}
-
-              {/* Empty state */}
-              {noteModalAllNotes.length === 0 && (
-                <p className={styles.noteModalEmpty}>No notes yet for this day.</p>
-              )}
               </div>
 
               {/* Input area — hidden for prev week */}

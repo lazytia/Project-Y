@@ -1064,7 +1064,41 @@
 .noteSectionBlock {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+}
+
+.noteSectionGrid {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: 12px;
+  align-items: start;
+}
+
+.noteSectionIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.noteSectionIconManager {
+  background: rgba(234, 88, 12, 0.10);
+  color: var(--color-warm);
+}
+
+.noteSectionIconChef {
+  background: rgba(126, 87, 194, 0.10);
+  color: var(--color-accent-purple, #7e57c2);
+}
+
+.noteSectionContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .noteSectionTitle {
@@ -1073,7 +1107,19 @@
   font-weight: 800;
   letter-spacing: 0.1em;
   color: var(--color-fg-muted);
-  padding: 8px 0 0 44px;
+}
+
+.noteSectionDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 2px 0;
+  flex-shrink: 0;
+}
+
+.noteEntryBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .noteEntryRow {
@@ -1100,7 +1146,7 @@
 
 .noteEntryAvatarChef {
   background: rgba(126, 87, 194, 0.10);
-  color: #7e57c2;
+  color: var(--color-accent-purple, #7e57c2);
 }
 
 .noteEntryCard {
@@ -1114,12 +1160,12 @@
 .noteEntryCardHead {
   display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-2);
-  flex-wrap: wrap;
 }
 
 .noteEntryAuthor {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-fg);
   flex: 1 1 auto;
