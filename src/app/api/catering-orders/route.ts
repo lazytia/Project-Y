@@ -5,6 +5,7 @@ import {
   createPlatterCateringOrderFromForm,
   listPlatterCateringOrders,
 } from "@/lib/catering-square";
+import { syncOrderToFirestore, syncOrdersToFirestore } from "@/lib/catering-firestore";
 import type { CateringOrderForm } from "@/lib/catering-orders";
 
 /**
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   try {
     const orders = await listPlatterCateringOrders();
+    syncOrdersToFirestore(orders);
     return NextResponse.json({ orders });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load Square orders.";
@@ -80,6 +82,7 @@ export async function POST(req: NextRequest) {
         utensilsCount: body.utensilsCount,
         paymentStatus: body.paymentStatus,
       });
+      syncOrderToFirestore(order, "created");
       return NextResponse.json({ order });
     }
     // Legacy quick-add path from the day modal.
@@ -97,6 +100,7 @@ export async function POST(req: NextRequest) {
       totalAmount: body.totalAmount,
       notes: body.notes ?? "",
     });
+    syncOrderToFirestore(order, "created");
     return NextResponse.json({ order });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to create Square order.";

@@ -5,6 +5,7 @@ import {
   getPlatterCateringOrder,
   updatePlatterCateringOrder,
 } from "@/lib/catering-square";
+import { syncOrderToFirestore } from "@/lib/catering-firestore";
 import type { CateringOrderForm } from "@/lib/catering-orders";
 
 /**
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: st
   try {
     const order = await getPlatterCateringOrder(orderId);
     if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    syncOrderToFirestore(order, "fetched");
     return NextResponse.json({ order });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load Square order.";
@@ -55,6 +57,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ orderId: 
   }
   try {
     const order = await updatePlatterCateringOrder(orderId, body);
+    syncOrderToFirestore(order, "updated");
     return NextResponse.json({ order });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to update Square order.";
@@ -73,6 +76,11 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ orderId:
   const { orderId } = await ctx.params;
   try {
     await cancelPlatterCateringOrder(orderId);
+    // Re-fetch the cancelled order to sync its final state to Firestore.
+    try {
+      const cancelled = await getPlatterCateringOrder(orderId);
+      if (cancelled) syncOrderToFirestore(cancelled, "cancelled");
+    } catch { /* best-effort */ }
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to cancel Square order.";
