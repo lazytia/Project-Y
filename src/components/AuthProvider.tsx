@@ -136,6 +136,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Chefs skip onboarding entirely — bounce them out if they land there.
+    if (user && isChef(user) && inOnboarding) {
+      router.replace(ROUTES.chefHome);
+      return;
+    }
+
     // Completed non-owner trying to visit an owner-only path → bounce to Home.
     if (user && !userIsOwnerNow && !isStaffAllowedPath(pathname)) {
       router.replace(isChef(user) ? ROUTES.chefHome : ROUTES.staffHome);
