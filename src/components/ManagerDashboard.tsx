@@ -94,7 +94,17 @@ function firstNameFromUsername(username: string): string {
   return username.charAt(0).toUpperCase() + username.slice(1);
 }
 
-export default function ManagerDashboard() {
+type DashboardProps = {
+  roleLabel?: string;
+  displayName?: string;
+  hideAttention?: boolean;
+};
+
+export default function ManagerDashboard({
+  roleLabel = "Store Manager",
+  displayName,
+  hideAttention = false,
+}: DashboardProps = {}) {
   const { user } = useAuth();
   const [firstName, setFirstName] = useState<string>("");
   const [attention, setAttention] = useState<AttentionCounts>({
@@ -121,8 +131,8 @@ export default function ManagerDashboard() {
   const dailyTarget = DAILY_TARGETS[todayDow] ?? 0;
 
   useEffect(() => {
-    setFirstName(firstNameFromUsername(emailToUsername(user?.email)));
-  }, [user]);
+    setFirstName(displayName ?? firstNameFromUsername(emailToUsername(user?.email)));
+  }, [user, displayName]);
 
   // Attention Required counts
   useEffect(() => {
@@ -255,51 +265,53 @@ export default function ManagerDashboard() {
         <h1 className={styles.greetingTitle}>
           {greeting || "Hello"}, {firstName || "there"}
         </h1>
-        <p className={styles.greetingRole}>Store Manager</p>
+        <p className={styles.greetingRole}>{roleLabel}</p>
       </header>
 
       {/* Attention Required */}
-      <section>
-        <div className={styles.sectionHead}>
-          <p className={styles.sectionLabel}>ATTENTION REQUIRED FOR SCHEDULING</p>
-          <span className={styles.attentionBadge}>{attentionTotal}</span>
-          <Link href="/attention-required" className={styles.sectionChev} aria-label="View all">›</Link>
-        </div>
-        <div className={styles.attentionCard}>
-          <Link href="/attention-required?filter=holiday" className={styles.attentionCell}>
-            <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <p className={styles.attentionValue}>{attention.holidayRequests}</p>
-            <p className={styles.attentionLabel}>Holiday<br />Requests</p>
-          </Link>
+      {!hideAttention && (
+        <section>
+          <div className={styles.sectionHead}>
+            <p className={styles.sectionLabel}>ATTENTION REQUIRED FOR SCHEDULING</p>
+            <span className={styles.attentionBadge}>{attentionTotal}</span>
+            <Link href="/attention-required" className={styles.sectionChev} aria-label="View all">›</Link>
+          </div>
+          <div className={styles.attentionCard}>
+            <Link href="/attention-required?filter=holiday" className={styles.attentionCell}>
+              <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <p className={styles.attentionValue}>{attention.holidayRequests}</p>
+              <p className={styles.attentionLabel}>Holiday<br />Requests</p>
+            </Link>
 
-          <Link href="/attention-required?filter=availability" className={styles.attentionCell}>
-            <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <circle cx="19" cy="8" r="3" />
-            </svg>
-            <p className={styles.attentionValue}>{attention.availabilityChanges}</p>
-            <p className={styles.attentionLabel}>Availability<br />Change</p>
-          </Link>
+            <Link href="/attention-required?filter=availability" className={styles.attentionCell}>
+              <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <circle cx="19" cy="8" r="3" />
+              </svg>
+              <p className={styles.attentionValue}>{attention.availabilityChanges}</p>
+              <p className={styles.attentionLabel}>Availability<br />Change</p>
+            </Link>
 
-          <Link href="/attention-required?filter=compliance" className={styles.attentionCell}>
-            <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <circle cx="9" cy="11" r="2.2" />
-              <path d="M5.5 17c0-1.6 1.6-2.7 3.5-2.7s3.5 1.1 3.5 2.7" />
-              <line x1="14" y1="9" x2="18" y2="9" />
-              <line x1="14" y1="13" x2="18" y2="13" />
-            </svg>
-            <p className={styles.attentionValue}>{attention.visaExpiring}</p>
-            <p className={styles.attentionLabel}>Visa Expiring<br />Soon</p>
-          </Link>
-        </div>
-      </section>
+            <Link href="/attention-required?filter=compliance" className={styles.attentionCell}>
+              <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <circle cx="9" cy="11" r="2.2" />
+                <path d="M5.5 17c0-1.6 1.6-2.7 3.5-2.7s3.5 1.1 3.5 2.7" />
+                <line x1="14" y1="9" x2="18" y2="9" />
+                <line x1="14" y1="13" x2="18" y2="13" />
+              </svg>
+              <p className={styles.attentionValue}>{attention.visaExpiring}</p>
+              <p className={styles.attentionLabel}>Visa Expiring<br />Soon</p>
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Today's Operations */}
       <section>

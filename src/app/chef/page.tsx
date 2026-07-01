@@ -6,7 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
-import styles from "./page.module.css";
+import ManagerDashboard from "@/components/ManagerDashboard";
 
 export default function ChefDashboardPage() {
   const router = useRouter();
@@ -22,18 +22,10 @@ export default function ChefDashboardPage() {
   if (!allowed) return null;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.greeting}>
-        <h1 className={styles.title}>Chef Dashboard</h1>
-        <p className={styles.subtitle}>Welcome, Chef</p>
-      </div>
-
-      <div className={styles.placeholder}>
-        <span className={styles.icon} aria-hidden="true">👨‍🍳</span>
-        <p className={styles.placeholderText}>
-          Chef dashboard is coming soon.
-        </p>
-      </div>
-    </div>
+    <ManagerDashboard
+      roleLabel="Head Chef"
+      displayName="Chuck"
+      hideAttention
+    />
   );
 }
