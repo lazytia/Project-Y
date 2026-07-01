@@ -83,9 +83,15 @@ function Progress({ value, max }: { value: number; max: number }) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const userIsManager = (isOwner(user) && !isStrictOwner(user)) || isChef(user);
+  const userIsChef = isChef(user);
+  const userIsManager = (isOwner(user) && !isStrictOwner(user)) || userIsChef;
   if (userIsManager) {
-    return <ManagerDashboard hideAttention />;
+    return (
+      <ManagerDashboard
+        hideAttention
+        roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
+      />
+    );
   }
   return <OwnerDashboard />;
 }
