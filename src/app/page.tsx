@@ -104,7 +104,7 @@ function OwnerDashboard() {
   const [rangeDates, setRangeDates] = useState<{ start: string; end: string } | null>(null);
   const isRangeMode = rangeDates !== null;
   const isToday = !isRangeMode && selectedDate === todayKey;
-  const dailyTarget = DAILY_TARGETS[dowOfDateKey(selectedDate)];
+  const dailyTarget = selectedDate ? (DAILY_TARGETS[dowOfDateKey(selectedDate)] ?? 0) : 0;
 
   const [stats, setStats] = useState<{
     todaySales: number;
