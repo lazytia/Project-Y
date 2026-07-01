@@ -8,7 +8,7 @@ import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import styles from "./Sidebar.module.css";
 
-type NavItem = { label: string; href: string; ownerOnly?: boolean };
+type NavItem = { label: string; href: string; ownerOnly?: boolean; chefHidden?: boolean };
 type NavGroup = {
   icon: string;
   label: string;
@@ -43,7 +43,7 @@ const NAV: NavGroup[] = [
     icon: "🍽",
     label: "Operations",
     children: [
-      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
+      { label: "Daily Sold Out", href: "/operations/daily-sold-out", chefHidden: true },
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering Orders", href: "/operations/catering-orders" },
       { label: "ARS", href: "/operations/ars", ownerOnly: true },
@@ -112,7 +112,7 @@ export default function Sidebar({ open, onClose }: Props) {
       icon: "🍽",
       label: "Operations",
       children: [
-        { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
+        { label: "Daily Sold Out", href: "/operations/daily-sold-out", chefHidden: true },
         { label: "Reservations", href: "/operations/reservations" },
         { label: "Catering Orders", href: "/operations/catering-orders" },
       ],
@@ -129,7 +129,14 @@ export default function Sidebar({ open, onClose }: Props) {
       (group) => group.href || (group.children && group.children.length > 0),
     );
 
-  const visibleNav: NavGroup[] = userIsManager ? MANAGER_NAV : ownerNav;
+  const managerNav = userIsChef
+    ? MANAGER_NAV.map((group) => ({
+        ...group,
+        children: group.children?.filter((c) => !c.chefHidden),
+      })).filter((group) => group.href || (group.children && group.children.length > 0))
+    : MANAGER_NAV;
+
+  const visibleNav: NavGroup[] = userIsManager ? managerNav : ownerNav;
 
   // Staff who haven't completed onboarding get a stripped sidebar — no nav
   // links, just brand + sign out. AuthProvider keeps them locked to
