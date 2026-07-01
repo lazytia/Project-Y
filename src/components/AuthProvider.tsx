@@ -75,7 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ).catch(() => {/* best-effort */});
 
     // Only staff need to wait for completedStep — read it in parallel.
-    if (!isOwner(user)) {
+    // Chefs skip onboarding for now, so we short-circuit to "complete".
+    if (!isOwner(user) && !isChef(user)) {
       getDoc(ref)
         .then((snap) => {
           const data = snap.data() ?? {};
@@ -85,13 +86,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .catch(() => {
           setStaffCompletedStep(0);
         });
+    } else if (isChef(user)) {
+      setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
     }
   }, [user, loading]);
 
   const userIsOwner = isOwner(user);
+  const userIsChef = isChef(user);
   const staffNeedsOnboarding =
     !!user &&
     !userIsOwner &&
+    !userIsChef &&
     staffCompletedStep !== null &&
     staffCompletedStep < TOTAL_ONBOARDING_STEPS;
 
