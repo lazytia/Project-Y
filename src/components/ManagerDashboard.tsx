@@ -2,20 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback, useMemo } from "react";
+import type { User } from "firebase/auth";
 import { collection, doc, getDocs, getDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
-import {
-  fetchCateringOrders,
-  dCountdownLabel,
-  type CateringOrder,
-} from "@/lib/catering-orders";
-import {
-  fetchReservationsForDate,
-  serviceFor,
-  type Reservation,
-} from "@/lib/reservations";
+import { dCountdownLabel } from "@/lib/catering-orders";
+import { fetchReservationsForDate, type Reservation } from "@/lib/reservations";
 import styles from "./ManagerDashboard.module.css";
 
 type AttentionCounts = {
@@ -36,7 +29,23 @@ type StaffDoc = {
   availabilityRequests?: StoredRequest[];
 };
 
+type CateringSummaryOrder = {
+  deliveryDateISO: string;
+};
+
+type DashboardCache = {
+  date: string;
+  todaySales: number | null;
+  totalPax: number | null;
+  totalBookings: number | null;
+  nextCatering: CateringSummaryOrder | null;
+  weekCateringCount: number | null;
+  kitchenStaff: number | null;
+  hallStaff: number | null;
+};
+
 const VISA_EXPIRING_WINDOW_DAYS = 60;
+const DASH_CACHE_KEY = "y.managerDash";
 
 /** day-of-week daily sales targets (0=Sun … 6=Sat) */
 const DAILY_TARGETS: Record<number, number> = {
@@ -52,7 +61,7 @@ function sydneyTodayKey(): string {
 function isoDateToMonday(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
-  const dow = (dt.getUTCDay() + 6) % 7; // Mon=0
+  const dow = (dt.getUTCDay() + 6) % 7;
   dt.setUTCDate(dt.getUTCDate() - dow);
   return dt.toISOString().slice(0, 10);
 }
@@ -89,9 +98,92 @@ function greetingForNow(): string {
 
 function firstNameFromUsername(username: string): string {
   if (!username) return "there";
-  // "yurina" → "Yuri" is the screenshot expectation but we can't infer
-  // a nickname from the username alone. Default to capitalised username.
   return username.charAt(0).toUpperCase() + username.slice(1);
+}
+
+function readDashboardCache(date: string): DashboardCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(DASH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as DashboardCache;
+    return parsed.date === date ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardCache(data: DashboardCache) {
+  try {
+    sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+async function authHeader(user: User | null | undefined): Promise<HeadersInit> {
+  if (!user) return {};
+  const idToken = await user.getIdToken();
+  return { Authorization: `Bearer ${idToken}` };
+}
+
+async function fetchRolesForUids(uids: string[]): Promise<Map<string, string>> {
+  const roleMap = new Map<string, string>();
+  if (uids.length === 0) return roleMap;
+  await Promise.all(
+    uids.map(async (uid) => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", uid));
+        roleMap.set(uid, snap.exists() ? (snap.data().role as string) ?? "staff" : "staff");
+      } catch {
+        roleMap.set(uid, "staff");
+      }
+    }),
+  );
+  return roleMap;
+}
+
+async function fetchCateringSummary(
+  user: User | null | undefined,
+  dateKey: string,
+): Promise<{ nextOrder: CateringSummaryOrder | null; weekCount: number }> {
+  const res = await fetch(`/api/catering-orders/summary?date=${encodeURIComponent(dateKey)}`, {
+    cache: "no-store",
+    headers: await authHeader(user),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { nextOrder: null, weekCount: 0 };
+  return {
+    nextOrder: data.nextOrder?.deliveryDateISO
+      ? { deliveryDateISO: data.nextOrder.deliveryDateISO as string }
+      : null,
+    weekCount: typeof data.weekCount === "number" ? data.weekCount : 0,
+  };
+}
+
+async function fetchTeamCounts(dateKey: string): Promise<{ kitchen: number; hall: number }> {
+  const weekKey = isoDateToMonday(dateKey);
+  const rSnap = await getDoc(doc(getDb(), "rosters_published", weekKey));
+  if (!rSnap.exists()) return { kitchen: 0, hall: 0 };
+
+  const rData = rSnap.data() as {
+    assignments?: Record<string, Record<string, Record<string, string>>>;
+  };
+  const dayAssign = rData.assignments?.[dateKey] ?? {};
+  const allUids = new Set<string>();
+  for (const meal of Object.values(dayAssign)) {
+    for (const uid of Object.keys(meal)) allUids.add(uid);
+  }
+
+  const roleMap = await fetchRolesForUids([...allUids]);
+  let kitchen = 0;
+  let hall = 0;
+  for (const uid of allUids) {
+    const role = roleMap.get(uid) ?? "staff";
+    if (role === "chef" || role === "kitchen") kitchen++;
+    else hall++;
+  }
+  return { kitchen, hall };
 }
 
 type DashboardProps = {
@@ -111,35 +203,56 @@ export default function ManagerDashboard({
     holidayRequests: 0, availabilityChanges: 0, newOnboarding: 0, visaExpiring: 0,
   });
 
-  // Square / system_yurica live data
-  const [todaySales, setTodaySales] = useState<number | null>(null);
-  const [reservations, setReservations] = useState<Reservation[] | null>(null);
-  const [cateringOrders, setCateringOrders] = useState<CateringOrder[] | null>(null);
-  const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
-  const [hallStaff, setHallStaff] = useState<number | null>(null);
+  const [todayKey] = useState(sydneyTodayKey);
+  const [greeting] = useState(greetingForNow);
 
-  const [todayKey, setTodayKey] = useState("");
-  const [greeting, setGreeting] = useState("");
-  useEffect(() => {
-    setTodayKey(sydneyTodayKey());
-    setGreeting(greetingForNow());
-  }, []);
-  const todayDow = todayKey ? (() => {
+  const [todaySales, setTodaySales] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    return readDashboardCache(sydneyTodayKey())?.todaySales ?? null;
+  });
+  const [reservations, setReservations] = useState<Reservation[] | null>(null);
+  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(() => {
+    if (typeof window === "undefined") return null;
+    const cached = readDashboardCache(sydneyTodayKey());
+    if (!cached || cached.totalPax === null || cached.totalBookings === null) return null;
+    return { totalPax: cached.totalPax, totalBookings: cached.totalBookings };
+  });
+  const [nextCatering, setNextCatering] = useState<CateringSummaryOrder | null>(() => {
+    if (typeof window === "undefined") return null;
+    return readDashboardCache(sydneyTodayKey())?.nextCatering ?? null;
+  });
+  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    return readDashboardCache(sydneyTodayKey())?.weekCateringCount ?? null;
+  });
+  const [kitchenStaff, setKitchenStaff] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    return readDashboardCache(sydneyTodayKey())?.kitchenStaff ?? null;
+  });
+  const [hallStaff, setHallStaff] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    return readDashboardCache(sydneyTodayKey())?.hallStaff ?? null;
+  });
+
+  const todayDow = (() => {
     const [y, m, d] = todayKey.split("-").map(Number);
     return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
-  })() : 0;
+  })();
   const dailyTarget = DAILY_TARGETS[todayDow] ?? 0;
 
   useEffect(() => {
     setFirstName(displayName ?? firstNameFromUsername(emailToUsername(user?.email)));
   }, [user, displayName]);
 
-  // Attention Required counts
   useEffect(() => {
+    if (hideAttention) return;
     (async () => {
       try {
         const snap = await getDocs(collection(getDb(), "staff_onboarding"));
-        let holidayRequests = 0, availabilityChanges = 0, newOnboarding = 0, visaExpiring = 0;
+        let holidayRequests = 0;
+        let availabilityChanges = 0;
+        let newOnboarding = 0;
+        let visaExpiring = 0;
         for (const d of snap.docs) {
           const data = d.data() as StaffDoc;
           if (data.role === "owner") continue;
@@ -152,60 +265,66 @@ export default function ManagerDashboard({
         setAttention({ holidayRequests, availabilityChanges, newOnboarding, visaExpiring });
       } catch { /* keep zeros */ }
     })();
-  }, []);
+  }, [hideAttention]);
 
-  // Square + system_yurica + roster
   const fetchLiveData = useCallback(async () => {
-    if (!todayKey) return;
-    // Square today-stats
-    try {
-      const res = await fetch(`/api/square/today-stats?date=${todayKey}`);
-      if (res.ok) {
+    const [salesResult, reservationsResult, cateringResult, teamResult] = await Promise.allSettled([
+      fetch(`/api/square/today-sales-brief?date=${encodeURIComponent(todayKey)}`).then(async (res) => {
+        if (!res.ok) return null;
         const d = await res.json();
-        setTodaySales(d.todaySales ?? null);
-      }
-    } catch { /* ignore */ }
+        return typeof d.todaySales === "number" ? d.todaySales : null;
+      }),
+      fetchReservationsForDate(user, todayKey, "northsydney"),
+      fetchCateringSummary(user, todayKey),
+      fetchTeamCounts(todayKey),
+    ]);
 
-    // Reservations (real data via Quandoo/SevenRooms)
-    try {
-      const res = await fetchReservationsForDate(user, todayKey, "northsydney");
-      setReservations(res);
-    } catch { /* ignore */ }
+    let sales: number | null = null;
+    if (salesResult.status === "fulfilled") {
+      sales = salesResult.value;
+      setTodaySales(sales);
+    }
 
-    // Catering orders (real data via Square)
-    try {
-      const orders = await fetchCateringOrders(user);
-      setCateringOrders(orders);
-    } catch { /* ignore */ }
+    let totalPax: number | null = null;
+    let totalBookings: number | null = null;
+    if (reservationsResult.status === "fulfilled") {
+      const resList = reservationsResult.value;
+      setReservations(resList);
+      const active = resList.filter((r) => r.status !== "cancelled" && r.status !== "no-show");
+      totalPax = active.reduce((s, r) => s + r.count, 0);
+      totalBookings = active.length;
+      setCachedResCounts({ totalPax, totalBookings });
+    }
 
-    // Roster: count kitchen / hall from today's rosters_published doc
-    try {
-      const weekKey = isoDateToMonday(todayKey);
-      const rSnap = await getDoc(doc(getDb(), "rosters_published", weekKey));
-      if (rSnap.exists()) {
-        const rData = rSnap.data() as {
-          assignments?: Record<string, Record<string, Record<string, string>>>;
-        };
-        const dayAssign = rData.assignments?.[todayKey] ?? {};
-        const allUids = new Set<string>();
-        for (const meal of Object.values(dayAssign)) {
-          for (const uid of Object.keys(meal)) allUids.add(uid);
-        }
-        // Fetch staff roles to split kitchen vs hall
-        const staffSnap = await getDocs(collection(getDb(), "staff_onboarding"));
-        const roleMap = new Map<string, string>();
-        for (const sd of staffSnap.docs) roleMap.set(sd.id, (sd.data().role as string) ?? "staff");
-        let kitchen = 0, hall = 0;
-        for (const uid of allUids) {
-          const role = roleMap.get(uid) ?? "staff";
-          if (role === "chef" || role === "kitchen") kitchen++;
-          else hall++;
-        }
-        setKitchenStaff(kitchen);
-        setHallStaff(hall);
-      }
-    } catch { /* ignore */ }
-  }, [todayKey]);
+    let nextOrder: CateringSummaryOrder | null = null;
+    let weekCount: number | null = null;
+    if (cateringResult.status === "fulfilled") {
+      nextOrder = cateringResult.value.nextOrder;
+      weekCount = cateringResult.value.weekCount;
+      setNextCatering(nextOrder);
+      setWeekCateringCount(weekCount);
+    }
+
+    let kitchen: number | null = null;
+    let hall: number | null = null;
+    if (teamResult.status === "fulfilled") {
+      kitchen = teamResult.value.kitchen;
+      hall = teamResult.value.hall;
+      setKitchenStaff(kitchen);
+      setHallStaff(hall);
+    }
+
+    writeDashboardCache({
+      date: todayKey,
+      todaySales: sales,
+      totalPax,
+      totalBookings,
+      nextCatering: nextOrder,
+      weekCateringCount: weekCount,
+      kitchenStaff: kitchen,
+      hallStaff: hall,
+    });
+  }, [todayKey, user]);
 
   useEffect(() => {
     fetchLiveData();
@@ -213,44 +332,18 @@ export default function ManagerDashboard({
     return () => clearInterval(id);
   }, [fetchLiveData]);
 
-  // Reservation counts from real data
   const resCounts = useMemo(() => {
-    if (!reservations) return null;
-    const active = reservations.filter(
-      (r) => r.status !== "cancelled" && r.status !== "no-show",
-    );
-    const totalPax = active.reduce((s, r) => s + r.count, 0);
-    const totalBookings = active.length;
-    return { totalPax, totalBookings };
-  }, [reservations]);
-
-  // Next upcoming catering order
-  const nextCatering = useMemo(() => {
-    if (!cateringOrders) return null;
-    const upcoming = cateringOrders
-      .filter(
-        (o) =>
-          (o.status === "CONFIRMED" || o.status === "PENDING") &&
-          o.deliveryDateISO >= todayKey,
-      )
-      .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
-    return upcoming.length > 0 ? upcoming[0] : undefined;
-  }, [cateringOrders, todayKey]);
-
-  // This week's catering orders count
-  const weekCateringCount = useMemo(() => {
-    if (!cateringOrders || !todayKey) return null;
-    const mondayKey = isoDateToMonday(todayKey);
-    const [my, mm, md] = mondayKey.split("-").map(Number);
-    const sunday = new Date(Date.UTC(my, mm - 1, md + 6));
-    const sundayKey = sunday.toISOString().slice(0, 10);
-    return cateringOrders.filter(
-      (o) =>
-        o.deliveryDateISO >= mondayKey &&
-        o.deliveryDateISO <= sundayKey &&
-        o.status !== "CANCELLED",
-    ).length;
-  }, [cateringOrders, todayKey]);
+    if (reservations) {
+      const active = reservations.filter(
+        (r) => r.status !== "cancelled" && r.status !== "no-show",
+      );
+      return {
+        totalPax: active.reduce((s, r) => s + r.count, 0),
+        totalBookings: active.length,
+      };
+    }
+    return cachedResCounts;
+  }, [reservations, cachedResCounts]);
 
   const attentionTotal =
     attention.holidayRequests + attention.availabilityChanges +
@@ -260,7 +353,6 @@ export default function ManagerDashboard({
 
   return (
     <div className={styles.page}>
-      {/* Greeting */}
       <header className={styles.greeting}>
         <h1 className={styles.greetingTitle}>
           {greeting || "Hello"}, {firstName || "there"}
@@ -268,7 +360,6 @@ export default function ManagerDashboard({
         <p className={styles.greetingRole}>{roleLabel}</p>
       </header>
 
-      {/* Attention Required */}
       {!hideAttention && (
         <section>
           <div className={styles.sectionHead}>
@@ -313,7 +404,6 @@ export default function ManagerDashboard({
         </section>
       )}
 
-      {/* Today's Operations */}
       <section>
         <p className={styles.sectionLabel}>TODAY&rsquo;S OPERATIONS</p>
         <div className={styles.opsRow}>
@@ -366,6 +456,8 @@ export default function ManagerDashboard({
                   })}
                 </p>
               </>
+            ) : weekCateringCount === null ? (
+              <p className={styles.opsLabel}>—</p>
             ) : (
               <p className={styles.opsLabel}>No upcoming orders</p>
             )}
@@ -380,7 +472,6 @@ export default function ManagerDashboard({
         </div>
       </section>
 
-      {/* Sales */}
       <section>
         <p className={styles.sectionLabel}>SALES</p>
         <div className={styles.salesCard}>
@@ -398,7 +489,6 @@ export default function ManagerDashboard({
         </div>
       </section>
 
-      {/* Today's Team */}
       <section>
         <p className={styles.sectionLabel}>TODAY&rsquo;S TEAM</p>
         <div className={styles.teamCard}>
@@ -437,7 +527,6 @@ export default function ManagerDashboard({
         </div>
       </section>
 
-      {/* Footer note */}
       <div className={styles.note}>
         <span className={styles.noteIcon} aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
