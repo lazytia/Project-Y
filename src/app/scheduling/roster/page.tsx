@@ -1406,7 +1406,7 @@ export default function ManagerRosterPage() {
       </section>}
 
       {/* ═══════════════════════════════════════════════════════
-          Notes modal — redesigned (Screenshot 1 design)
+          Notes modal — centered dialog
           ═══════════════════════════════════════════════════════ */}
       {noteModal && (
         <div
@@ -1421,9 +1421,6 @@ export default function ManagerRosterPage() {
               className={styles.noteModalSheet}
               onClick={() => setNoteOptionsId(null)}
             >
-              {/* Drag handle */}
-              <div className={styles.noteModalHandle} aria-hidden="true" />
-
               {/* Header */}
               <div className={styles.noteModalHeader}>
                 <span className={styles.noteModalDateLabel}>{noteModal.label}</span>

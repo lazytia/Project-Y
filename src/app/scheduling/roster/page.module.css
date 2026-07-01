@@ -935,71 +935,45 @@
   color: var(--color-fg);
 }
 
-/* ── Notes modal — redesigned bottom sheet ── */
+/* ── Notes modal — centered dialog ── */
 
 .noteModalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(15, 15, 20, 0.45);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 4px 4px 12px;
+  padding: var(--space-5) var(--space-4);
   z-index: 1000;
   box-sizing: border-box;
-}
-
-@media (min-width: 521px) {
-  .noteModalBackdrop {
-    align-items: center;
-    padding: var(--space-5) var(--space-4);
-  }
+  overflow-y: auto;
 }
 
 .noteModalStack {
   width: min(100%, 420px);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .noteModalSheet {
   width: 100%;
-  max-height: calc(100vh - 36px);
+  max-height: calc(100vh - 2 * var(--space-5));
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.14);
-}
-
-@media (min-width: 521px) {
-  .noteModalSheet {
-    max-height: calc(100vh - 80px);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
-  }
-}
-
-.noteModalHandle {
-  width: 34px;
-  height: 3px;
-  background: var(--color-border);
-  border-radius: 99px;
-  margin: 10px auto 8px;
-  flex-shrink: 0;
-}
-
-@media (min-width: 521px) {
-  .noteModalHandle { display: block; }
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
 }
 
 .noteModalHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-4) var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3);
   flex-shrink: 0;
 }
 
@@ -1386,10 +1360,10 @@
 .noteSaveBtn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .noteModalFooter {
-  margin: 0 4px;
-  font-size: 12px;
-  color: var(--color-fg-muted);
-  text-align: left;
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
   line-height: 1.35;
 }
 
