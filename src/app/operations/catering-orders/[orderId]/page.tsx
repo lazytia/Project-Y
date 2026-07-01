@@ -8,6 +8,8 @@ import {
   type CateringOrder,
   daysUntil,
   fetchCateringOrder,
+  fetchOwnerNote,
+  saveOwnerNote,
 } from "@/lib/catering-orders";
 import styles from "./page.module.css";
 
@@ -128,14 +130,26 @@ export default function CateringOrderDetailPage() {
   const [order, setOrder] = useState<CateringOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Owner's Note state (Firestore only)
+  const [ownerNote, setOwnerNote] = useState("");
+  const [ownerNoteOriginal, setOwnerNoteOriginal] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+
   useEffect(() => {
     if (!params?.orderId || !user) return;
     const controller = new AbortController();
     (async () => {
       try {
-        const o = await fetchCateringOrder(user, params.orderId, controller.signal);
+        const [o, note] = await Promise.all([
+          fetchCateringOrder(user, params.orderId, controller.signal),
+          fetchOwnerNote(user, params.orderId, controller.signal),
+        ]);
         if (!o) setError("Order not found.");
         setOrder(o);
+        setOwnerNote(note);
+        setOwnerNoteOriginal(note);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Could not load order.");
@@ -145,6 +159,22 @@ export default function CateringOrderDetailPage() {
     })();
     return () => controller.abort();
   }, [params?.orderId, user]);
+
+  async function handleSaveNote() {
+    if (!user || !params?.orderId) return;
+    setNoteSaving(true);
+    setNoteSaved(false);
+    try {
+      await saveOwnerNote(user, params.orderId, ownerNote);
+      setOwnerNoteOriginal(ownerNote);
+      setNoteSaved(true);
+      setTimeout(() => setNoteSaved(false), 2000);
+    } catch {
+      /* best-effort */
+    } finally {
+      setNoteSaving(false);
+    }
+  }
 
   const totalMeals = useMemo(() => {
     if (!order) return 0;
@@ -318,7 +348,7 @@ export default function CateringOrderDetailPage() {
         </div>
         <div className={styles.miniCard}>
           <span className={styles.miniIcon}><LeafIcon /></span>
-          <p className={styles.miniLabel}>SPECIAL DIETARY REQUEST</p>
+          <p className={styles.miniLabel}>DIETARY / ALLERGY</p>
           <p className={styles.miniValueSmall}>{order.dietaryNotes || "—"}</p>
         </div>
         <div className={styles.miniCard}>
@@ -338,13 +368,36 @@ export default function CateringOrderDetailPage() {
         </div>
       </div>
 
-      <Link
-        href={`/operations/catering-orders/new?editId=${encodeURIComponent(order.id)}`}
-        className={styles.editBar}
-      >
-        <EditIcon />
-        <span>Edit Order</span>
-      </Link>
+      {/* Owner's Note (editable, Firestore only) */}
+      <section className={styles.section}>
+        <div className={styles.sectionIcon}><EditIcon /></div>
+        <div className={styles.sectionBody}>
+          <p className={styles.sectionTitle}>OWNER&apos;S NOTE</p>
+          <textarea
+            className={styles.ownerNoteInput}
+            value={ownerNote}
+            onChange={(e) => { setOwnerNote(e.target.value); setNoteSaved(false); }}
+            placeholder="Add a note for this order…"
+            rows={3}
+            maxLength={500}
+          />
+          <div className={styles.ownerNoteFooter}>
+            <span className={styles.ownerNoteCount}>{ownerNote.length} / 500</span>
+            {noteSaved ? (
+              <span className={styles.ownerNoteSavedLabel}>✓ Saved</span>
+            ) : (
+              <button
+                type="button"
+                className={styles.ownerNoteSaveBtn}
+                disabled={noteSaving || ownerNote === ownerNoteOriginal}
+                onClick={handleSaveNote}
+              >
+                {noteSaving ? "Saving…" : "Save Note"}
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

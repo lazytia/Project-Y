@@ -103,6 +103,41 @@ export async function fetchCateringOrder(
   return (data?.order ?? null) as CateringOrder | null;
 }
 
+/** Fetch the owner's note for an order (stored in Firestore only). */
+export async function fetchOwnerNote(
+  user: User | null | undefined,
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await fetch(`/api/catering-orders/${encodeURIComponent(orderId)}/note`, {
+    cache: "no-store",
+    headers: await authHeader(user),
+    signal,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return "";
+  return (data?.ownerNote ?? "") as string;
+}
+
+/** Save the owner's note (Firestore only — never touches Square). */
+export async function saveOwnerNote(
+  user: User | null | undefined,
+  orderId: string,
+  note: string,
+): Promise<void> {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(await authHeader(user)),
+  };
+  const res = await fetch(`/api/catering-orders/${encodeURIComponent(orderId)}/note`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ ownerNote: note }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+}
+
 /** YYYY-MM-DD in local timezone. */
 export function todayISO(): string {
   return new Date().toLocaleDateString("en-CA");

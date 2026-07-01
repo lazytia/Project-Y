@@ -80,6 +80,46 @@ export async function syncOrderToFirestore(
 }
 
 /**
+ * Get the owner's note for a given order.
+ */
+export async function getOwnerNote(orderId: string): Promise<string> {
+  try {
+    const db = adminDb();
+    const snap = await db.collection(COLLECTION).doc(orderId).get();
+    if (!snap.exists) return "";
+    return (snap.data()?.ownerNote as string) ?? "";
+  } catch (err) {
+    console.error("[catering-firestore] getOwnerNote failed:", err);
+    return "";
+  }
+}
+
+/**
+ * Save (only) the owner's note for a given order + append to history.
+ */
+export async function saveOwnerNoteToFirestore(
+  orderId: string,
+  ownerNote: string,
+): Promise<void> {
+  const db = adminDb();
+  const ref = db.collection(COLLECTION).doc(orderId);
+
+  await ref.set(
+    {
+      ownerNote,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  await ref.collection("history").add({
+    action: "owner_note_updated",
+    ownerNote,
+    timestamp: FieldValue.serverTimestamp(),
+  });
+}
+
+/**
  * Batch-sync multiple orders (used by the list endpoint).
  */
 export async function syncOrdersToFirestore(orders: CateringOrder[]) {

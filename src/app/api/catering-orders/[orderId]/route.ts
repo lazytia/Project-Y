@@ -1,12 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
-import {
-  cancelPlatterCateringOrder,
-  getPlatterCateringOrder,
-  updatePlatterCateringOrder,
-} from "@/lib/catering-square";
+import { getPlatterCateringOrder } from "@/lib/catering-square";
 import { syncOrderToFirestore } from "@/lib/catering-firestore";
-import type { CateringOrderForm } from "@/lib/catering-orders";
 
 /**
  * GET /api/catering-orders/[orderId]
@@ -45,58 +40,5 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: st
   }
 }
 
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
-  const auth = await verifyAuth(req);
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const { orderId } = await ctx.params;
-  let body: Partial<CateringOrderForm>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
-  try {
-    const order = await updatePlatterCateringOrder(orderId, body);
-    syncOrderToFirestore(order, "updated");
-    return NextResponse.json({ order });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to update Square order.";
-    const detail =
-      err && typeof err === "object"
-        ? JSON.stringify(err, (_k, v) => (typeof v === "bigint" ? v.toString() : v))
-        : undefined;
-    console.error("[catering-orders] PATCH failed:", detail ?? msg);
-    return NextResponse.json({ error: msg, detail }, { status: 500 });
-  }
-}
-
-export async function DELETE(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
-  const auth = await verifyAuth(req);
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const { orderId } = await ctx.params;
-  try {
-    await cancelPlatterCateringOrder(orderId);
-    // Re-fetch the cancelled order to sync its final state to Firestore.
-    try {
-      const cancelled = await getPlatterCateringOrder(orderId);
-      if (cancelled) syncOrderToFirestore(cancelled, "cancelled");
-    } catch { /* best-effort */ }
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to cancel Square order.";
-    // Completed orders cannot be cancelled — return 409 with a human-readable
-    // message instead of leaking raw Square JSON as a 500.
-    const isCompleted =
-      msg.toLowerCase().includes("already completed") ||
-      (typeof err === "object" &&
-        err !== null &&
-        JSON.stringify(err).toUpperCase().includes("COMPLETED"));
-    if (isCompleted) {
-      return NextResponse.json(
-        { error: "Cannot cancel: this order is already completed." },
-        { status: 409 },
-      );
-    }
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-}
+// PATCH and DELETE removed — catering orders are now read-only from Square.
+// Owner's Note is saved via /api/catering-orders/[orderId]/note (Firestore only).
