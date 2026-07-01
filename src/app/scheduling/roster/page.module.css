@@ -940,11 +940,13 @@
 .noteModalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 15, 20, 0.45);
+  background: rgba(255, 255, 255, 0.82);
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  padding: 4px 4px 12px;
   z-index: 1000;
+  box-sizing: border-box;
 }
 
 @media (min-width: 521px) {
@@ -954,49 +956,55 @@
   }
 }
 
+.noteModalStack {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .noteModalSheet {
   width: 100%;
-  max-width: 420px;
-  max-height: 92vh;
+  max-height: calc(100vh - 36px);
   background: var(--color-bg);
-  border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 -4px 40px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.14);
 }
 
 @media (min-width: 521px) {
   .noteModalSheet {
-    border-radius: var(--radius-xl, 20px);
     max-height: calc(100vh - 80px);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
   }
 }
 
 .noteModalHandle {
-  width: 36px;
-  height: 4px;
+  width: 34px;
+  height: 3px;
   background: var(--color-border);
   border-radius: 99px;
-  margin: 10px auto 4px;
+  margin: 10px auto 8px;
   flex-shrink: 0;
 }
 
 @media (min-width: 521px) {
-  .noteModalHandle { display: none; }
+  .noteModalHandle { display: block; }
 }
 
 .noteModalHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-4) var(--space-2);
+  padding: 0 var(--space-4) var(--space-3);
   flex-shrink: 0;
 }
 
 .noteModalDateLabel {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
@@ -1005,12 +1013,13 @@
 .noteModalCloseBtn {
   width: 30px;
   height: 30px;
-  background: var(--color-surface);
+  background: transparent;
   border: none;
   border-radius: 50%;
-  font-size: 20px;
+  font-size: 26px;
+  font-weight: 300;
   line-height: 1;
-  color: var(--color-fg-muted);
+  color: var(--color-fg);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1018,19 +1027,19 @@
   flex-shrink: 0;
 }
 
-.noteModalCloseBtn:hover { background: var(--color-border); }
+.noteModalCloseBtn:hover { background: var(--color-surface); }
 
 .noteModalBanner {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
+  align-items: center;
+  gap: 10px;
   margin: 0 var(--space-4) var(--space-3);
-  padding: 10px 12px;
+  padding: 11px 12px;
   background: rgba(234, 88, 12, 0.08);
   border-radius: var(--radius-md, 8px);
-  font-size: 13px;
-  color: var(--color-warm);
-  line-height: 1.45;
+  font-size: 11px;
+  color: var(--color-fg);
+  line-height: 1.35;
   flex-shrink: 0;
 }
 
@@ -1046,16 +1055,16 @@
 .noteModalScroll {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 0 var(--space-4) var(--space-2);
+  padding: 0 var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 14px;
 }
 
 .noteSectionBlock {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 6px;
 }
 
 .noteSectionTitle {
@@ -1064,24 +1073,24 @@
   font-weight: 800;
   letter-spacing: 0.1em;
   color: var(--color-fg-muted);
-  padding: var(--space-2) 0 0;
+  padding: 8px 0 0 44px;
 }
 
 .noteEntryRow {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: 12px;
 }
 
 .noteEntryAvatar {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .noteEntryAvatarManager {
@@ -1099,7 +1108,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .noteEntryCardHead {
@@ -1110,7 +1119,7 @@
 }
 
 .noteEntryAuthor {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--color-fg);
   flex: 1 1 auto;
@@ -1125,42 +1134,44 @@
 }
 
 .noteEntryCardBody {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
+  position: relative;
+  display: block;
 }
 
 .noteEntryText {
   margin: 0;
-  flex: 1 1 auto;
-  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
   color: var(--color-fg);
-  line-height: 1.5;
+  line-height: 1.45;
   background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
-  padding: 8px 10px;
+  padding: 9px 38px 9px 10px;
+  min-height: 52px;
   word-break: break-word;
   white-space: pre-wrap;
 }
 
 .noteOptionsWrap {
-  position: relative;
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 6px;
+  position: absolute;
+  top: 9px;
+  right: 8px;
+  z-index: 2;
 }
 
 .noteOptionsBtn {
   background: transparent;
   border: none;
-  padding: 2px 6px;
+  padding: 0 4px;
   font-size: 15px;
   font-weight: 700;
-  color: var(--color-fg-muted);
+  color: var(--color-fg);
   cursor: pointer;
   border-radius: 4px;
   line-height: 1;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
 }
 
 .noteOptionsBtn:hover { background: var(--color-surface); color: var(--color-fg); }
@@ -1257,11 +1268,11 @@
 /* Input area at bottom */
 .noteInputSection {
   flex-shrink: 0;
-  padding: var(--space-3) var(--space-4) var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 10px;
 }
 
 .noteInputWrap {
@@ -1269,9 +1280,12 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  background: var(--color-surface);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
-  padding: 8px 10px;
+  padding: 11px 12px;
+  min-height: 58px;
+  box-sizing: border-box;
 }
 
 .noteInputIcon {
@@ -1293,21 +1307,24 @@
   color: var(--color-fg);
   line-height: 1.45;
   min-height: 40px;
+  padding: 0 58px 14px 0;
+  box-sizing: border-box;
 }
 
 .noteInputTextarea::placeholder { color: var(--color-fg-muted); opacity: 0.65; }
 
 .noteCharCount {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
   font-size: 10px;
   color: var(--color-fg-muted);
-  flex-shrink: 0;
-  align-self: flex-end;
   white-space: nowrap;
 }
 
 .noteSaveBtn {
   width: 100%;
-  height: 44px;
+  height: 42px;
   background: var(--color-warm);
   border: none;
   border-radius: var(--radius-md, 8px);
@@ -1323,13 +1340,11 @@
 .noteSaveBtn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .noteModalFooter {
-  flex-shrink: 0;
-  margin: 0;
-  padding: var(--space-2) var(--space-4) var(--space-4);
-  font-size: 11px;
+  margin: 0 4px;
+  font-size: 12px;
   color: var(--color-fg-muted);
-  text-align: center;
-  line-height: 1.5;
+  text-align: left;
+  line-height: 1.35;
 }
 
 /* ── Chef Staff Details Modal ── */

@@ -58,6 +58,7 @@ type StaffDoc = {
 type Meal = "lunch" | "dinner";
 
 type ShiftAssignments = Record<string, string>; // staffUid → "HH:MM" start time
+type RosterViewWeekKey = "current" | "next" | "prev";
 
 /** A single note entry stored in rosters_published notes[iso][]. */
 type NoteEntry = {
@@ -283,7 +284,7 @@ export default function ManagerRosterPage() {
 
   /* ── Notes modal state ── */
   const [noteModal, setNoteModal] = useState<{
-    label: string; iso: string; weekKey: "current" | "next" | "prev";
+    label: string; iso: string; weekKey: RosterViewWeekKey;
   } | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
@@ -293,7 +294,7 @@ export default function ManagerRosterPage() {
 
   /* ── Chef staff-details modal state ── */
   const [chefStaffModal, setChefStaffModal] = useState<{
-    label: string; assignments: ShiftAssignments;
+    label: string; iso: string; meal: Meal; weekKey: RosterViewWeekKey;
   } | null>(null);
 
   const [pendingStart, setPendingStart] = useState<string>("");
@@ -479,8 +480,13 @@ export default function ManagerRosterPage() {
     }
   }
 
-  function assignedFor(iso: string, meal: Meal, weekKey: string): ShiftAssignments {
-    const d = weekKey === nextWeekStartISO ? nextWeekDoc : weekDoc;
+  function assignedFor(iso: string, meal: Meal, weekKey: string | RosterViewWeekKey): ShiftAssignments {
+    const d =
+      weekKey === "next" || weekKey === nextWeekStartISO
+        ? nextWeekDoc
+        : weekKey === "prev" || weekKey === prevWeekStartISO
+          ? prevWeekDoc
+          : weekDoc;
     return d.assignments?.[iso]?.[meal] ?? {};
   }
 
@@ -713,7 +719,9 @@ export default function ManagerRosterPage() {
                     className={styles.gridCell}
                     onClick={() => setChefStaffModal({
                       label: `${DAY_LABELS_FULL[i]} Lunch`,
-                      assignments,
+                      iso,
+                      meal: "lunch",
+                      weekKey: "current",
                     })}
                   >
                     <DotCount n={n} />
@@ -758,7 +766,9 @@ export default function ManagerRosterPage() {
                     className={styles.gridCell}
                     onClick={() => setChefStaffModal({
                       label: `${DAY_LABELS_FULL[i]} Dinner`,
-                      assignments,
+                      iso,
+                      meal: "dinner",
+                      weekKey: "current",
                     })}
                   >
                     <DotCount n={n} />
@@ -852,7 +862,9 @@ export default function ManagerRosterPage() {
                       className={styles.gridCell}
                       onClick={() => setChefStaffModal({
                         label: `${DAY_LABELS_FULL[i]} Lunch`,
-                        assignments,
+                        iso,
+                        meal: "lunch",
+                        weekKey: "next",
                       })}
                     >
                       <DotCount n={n} />
@@ -895,7 +907,9 @@ export default function ManagerRosterPage() {
                       className={styles.gridCell}
                       onClick={() => setChefStaffModal({
                         label: `${DAY_LABELS_FULL[i]} Dinner`,
-                        assignments,
+                        iso,
+                        meal: "dinner",
+                        weekKey: "next",
                       })}
                     >
                       <DotCount n={n} />
@@ -996,7 +1010,9 @@ export default function ManagerRosterPage() {
                         className={styles.gridCell}
                         onClick={() => setChefStaffModal({
                           label: `${DAY_LABELS_FULL[i]} Lunch`,
-                          assignments,
+                          iso,
+                          meal: "lunch",
+                          weekKey: "prev",
                         })}
                       >
                         <DotCount n={n} />
@@ -1024,7 +1040,9 @@ export default function ManagerRosterPage() {
                         className={styles.gridCell}
                         onClick={() => setChefStaffModal({
                           label: `${DAY_LABELS_FULL[i]} Dinner`,
-                          assignments,
+                          iso,
+                          meal: "dinner",
+                          weekKey: "prev",
                         })}
                       >
                         <DotCount n={n} />
@@ -1044,13 +1062,6 @@ export default function ManagerRosterPage() {
                 {prevWeekDays.map((d, i) => {
                   const iso = isoDate(d);
                   const hasNotes = normalizeNotes(prevWeekDoc.notes?.[iso]).length > 0;
-                  if (!hasNotes) {
-                    return (
-                      <div key={i} className={styles.gridCellReadOnly}>
-                        <span className={styles.notePencilFaint} aria-hidden="true"><PencilIcon /></span>
-                      </div>
-                    );
-                  }
                   return (
                     <button
                       key={i}
@@ -1062,7 +1073,11 @@ export default function ManagerRosterPage() {
                       }}
                       aria-label={`View notes for ${DAY_LABELS_LONG[i]}`}
                     >
-                      <span className={styles.noteFilled} aria-hidden="true"><PencilIcon /></span>
+                      {hasNotes ? (
+                        <span className={styles.noteFilled} aria-hidden="true"><PencilIcon /></span>
+                      ) : (
+                        <span className={styles.notePencilFaint} aria-hidden="true"><PencilIcon /></span>
+                      )}
                     </button>
                   );
                 })}
@@ -1184,34 +1199,35 @@ export default function ManagerRosterPage() {
           aria-label="Notes"
           onClick={closeNoteModal}
         >
-          <div
-            className={styles.noteModalSheet}
-            onClick={(e) => { e.stopPropagation(); setNoteOptionsId(null); }}
-          >
-            {/* Drag handle */}
-            <div className={styles.noteModalHandle} aria-hidden="true" />
+          <div className={styles.noteModalStack} onClick={(e) => e.stopPropagation()}>
+            <div
+              className={styles.noteModalSheet}
+              onClick={() => setNoteOptionsId(null)}
+            >
+              {/* Drag handle */}
+              <div className={styles.noteModalHandle} aria-hidden="true" />
 
-            {/* Header */}
-            <div className={styles.noteModalHeader}>
-              <span className={styles.noteModalDateLabel}>{noteModal.label}</span>
-              <button
-                type="button"
-                className={styles.noteModalCloseBtn}
-                onClick={closeNoteModal}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
+              {/* Header */}
+              <div className={styles.noteModalHeader}>
+                <span className={styles.noteModalDateLabel}>{noteModal.label}</span>
+                <button
+                  type="button"
+                  className={styles.noteModalCloseBtn}
+                  onClick={closeNoteModal}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
 
-            {/* Info banner */}
-            <div className={styles.noteModalBanner}>
-              <span className={styles.noteModalBannerIcon}><InfoIcon /></span>
-              <span>Notes are visible to all managers and Head Chef.</span>
-            </div>
+              {/* Info banner */}
+              <div className={styles.noteModalBanner}>
+                <span className={styles.noteModalBannerIcon}><InfoIcon /></span>
+                <span>Notes are visible to all managers and Head Chef.</span>
+              </div>
 
-            {/* Scrollable note list */}
-            <div className={styles.noteModalScroll}>
+              {/* Scrollable note list */}
+              <div className={styles.noteModalScroll}>
               {/* Manager notes section */}
               {noteModalManagerNotes.length > 0 && (
                 <div className={styles.noteSectionBlock}>
@@ -1274,7 +1290,7 @@ export default function ManagerRosterPage() {
                                     aria-label="Note options"
                                     onClick={() => setNoteOptionsId(noteOptionsId === note.id ? null : note.id)}
                                   >
-                                    •••
+                                    ...
                                   </button>
                                   {noteOptionsId === note.id && (
                                     <div className={styles.noteOptionsMenu}>
@@ -1372,7 +1388,7 @@ export default function ManagerRosterPage() {
                                     aria-label="Note options"
                                     onClick={() => setNoteOptionsId(noteOptionsId === note.id ? null : note.id)}
                                   >
-                                    •••
+                                    ...
                                   </button>
                                   {noteOptionsId === note.id && (
                                     <div className={styles.noteOptionsMenu}>
@@ -1412,35 +1428,34 @@ export default function ManagerRosterPage() {
               {noteModalAllNotes.length === 0 && (
                 <p className={styles.noteModalEmpty}>No notes yet for this day.</p>
               )}
-            </div>
-
-            {/* Input area — hidden for prev week */}
-            {noteModal.weekKey !== "prev" && (
-              <div className={styles.noteInputSection}>
-                <div className={styles.noteInputWrap}>
-                  <span className={styles.noteInputIcon}><PencilIcon /></span>
-                  <textarea
-                    className={styles.noteInputTextarea}
-                    placeholder="Write your note…"
-                    value={noteDraft}
-                    maxLength={500}
-                    rows={2}
-                    onChange={(e) => setNoteDraft(e.target.value)}
-                  />
-                  <span className={styles.noteCharCount}>{noteDraft.length} / 500</span>
-                </div>
-                <button
-                  type="button"
-                  className={styles.noteSaveBtn}
-                  disabled={savingNote || !noteDraft.trim()}
-                  onClick={handleSaveNewNote}
-                >
-                  {savingNote ? "Saving…" : "Save Note"}
-                </button>
               </div>
-            )}
 
-            {/* Footer */}
+              {/* Input area — hidden for prev week */}
+              {noteModal.weekKey !== "prev" && (
+                <div className={styles.noteInputSection}>
+                  <div className={styles.noteInputWrap}>
+                    <span className={styles.noteInputIcon}><PencilIcon /></span>
+                    <textarea
+                      className={styles.noteInputTextarea}
+                      placeholder="Write your note…"
+                      value={noteDraft}
+                      maxLength={500}
+                      rows={2}
+                      onChange={(e) => setNoteDraft(e.target.value)}
+                    />
+                    <span className={styles.noteCharCount}>{noteDraft.length} / 500</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.noteSaveBtn}
+                    disabled={savingNote || !noteDraft.trim()}
+                    onClick={handleSaveNewNote}
+                  >
+                    {savingNote ? "Saving…" : "Save Note"}
+                  </button>
+                </div>
+              )}
+            </div>
             <p className={styles.noteModalFooter}>
               Tap a day&apos;s Notes icon to view all notes for that day.
             </p>
@@ -1761,10 +1776,10 @@ export default function ManagerRosterPage() {
             </header>
 
             <div className={styles.chefStaffList}>
-              {Object.keys(chefStaffModal.assignments).length === 0 ? (
+              {Object.keys(assignedFor(chefStaffModal.iso, chefStaffModal.meal, chefStaffModal.weekKey)).length === 0 ? (
                 <p className={styles.chefStaffEmpty}>No staff assigned for this shift.</p>
               ) : (
-                Object.entries(chefStaffModal.assignments)
+                Object.entries(assignedFor(chefStaffModal.iso, chefStaffModal.meal, chefStaffModal.weekKey))
                   .sort(([, a], [, b]) => a.localeCompare(b))
                   .map(([uid, startTime]) => {
                     let name: string;
