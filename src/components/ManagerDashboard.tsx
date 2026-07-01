@@ -249,7 +249,7 @@ export default function ManagerDashboard() {
 
   const attentionTotal =
     attention.holidayRequests + attention.availabilityChanges +
-    attention.newOnboarding + attention.visaExpiring;
+    attention.visaExpiring;
 
   const team = (kitchenStaff ?? 0) + (hallStaff ?? 0);
 
@@ -266,7 +266,7 @@ export default function ManagerDashboard() {
       {/* Attention Required */}
       <section>
         <div className={styles.sectionHead}>
-          <p className={styles.sectionLabel}>ATTENTION REQUIRED</p>
+          <p className={styles.sectionLabel}>ATTENTION REQUIRED FOR SCHEDULING</p>
           <span className={styles.attentionBadge}>{attentionTotal}</span>
           <Link href="/attention-required" className={styles.sectionChev} aria-label="View all">›</Link>
         </div>
@@ -290,17 +290,6 @@ export default function ManagerDashboard() {
             </svg>
             <p className={styles.attentionValue}>{attention.availabilityChanges}</p>
             <p className={styles.attentionLabel}>Availability<br />Change</p>
-          </Link>
-
-          <Link href="/attention-required?filter=onboarding" className={styles.attentionCell}>
-            <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="8.5" cy="7" r="4" />
-              <line x1="20" y1="8" x2="20" y2="14" />
-              <line x1="23" y1="11" x2="17" y2="11" />
-            </svg>
-            <p className={styles.attentionValue}>{attention.newOnboarding}</p>
-            <p className={styles.attentionLabel}>New<br />Onboarding</p>
           </Link>
 
           <Link href="/attention-required?filter=compliance" className={styles.attentionCell}>
