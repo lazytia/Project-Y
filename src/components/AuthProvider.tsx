@@ -62,6 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const ref = doc(getDb(), "staff_onboarding", user.uid);
 
     // Fire-and-forget: don't block rendering on the write.
+    // Chefs are marked onboarding-complete for now — they don't have a
+    // staff-style onboarding flow, and this keeps the Firestore doc
+    // consistent with the AttentionRequired / dashboard queries.
+    const chefOverride = isChef(user)
+      ? { completedStep: TOTAL_ONBOARDING_STEPS, status: "complete" as const }
+      : {};
     setDoc(
       ref,
       {
@@ -69,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         username,
         email: user.email ?? null,
         role,
+        ...chefOverride,
         updatedAt: serverTimestamp(),
       },
       { merge: true },
