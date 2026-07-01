@@ -88,7 +88,7 @@ export default function DashboardPage() {
   if (userIsManager) {
     return (
       <ManagerDashboard
-        hideAttention
+        hideAttention={userIsChef}
         roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
       />
     );
