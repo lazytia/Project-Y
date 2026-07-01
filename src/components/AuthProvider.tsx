@@ -118,7 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Wait until we know the staff's completedStep before routing them around
     // — otherwise we'd flash /staff before bouncing back to /onboarding.
     const userIsOwnerNow = isOwner(user);
-    if (user && !userIsOwnerNow && staffCompletedStep === null) return;
+    const userIsChefNow = isChef(user);
+    if (user && !userIsOwnerNow && !userIsChefNow && staffCompletedStep === null) return;
 
     const inOnboarding = pathname.startsWith(ROUTES.staffOnboarding);
 
@@ -150,8 +151,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Completed non-owner trying to visit an owner-only path → bounce to Home.
-    if (user && !userIsOwnerNow && !isStaffAllowedPath(pathname)) {
-      router.replace(isChef(user) ? ROUTES.chefHome : ROUTES.staffHome);
+    // Chefs have manager-level access so they are exempt from this restriction.
+    if (user && !userIsOwnerNow && !userIsChefNow && !isStaffAllowedPath(pathname)) {
+      router.replace(ROUTES.staffHome);
     }
   }, [user, loading, pathname, router, staffCompletedStep, staffNeedsOnboarding]);
 

@@ -6,7 +6,7 @@ import Sidebar from "./Sidebar";
 import Splash from "./Splash";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
-import { isOwner } from "@/lib/permissions";
+import { isOwner, isChef } from "@/lib/permissions";
 import { useBellInbox, type BellItem } from "@/hooks/useBellDot";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -33,7 +33,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Staff: wait for completedStep to load before rendering anything, so we
   // don't flash /staff before AuthProvider bounces them to /onboarding.
-  if (!isOwner(user) && staffCompletedStep === null) {
+  if (!isOwner(user) && !isChef(user) && staffCompletedStep === null) {
     return <Splash />;
   }
 
