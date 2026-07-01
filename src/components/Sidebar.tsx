@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { emailToUsername } from "@/lib/username";
-import { isOwner, isStrictOwner } from "@/lib/permissions";
+import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import styles from "./Sidebar.module.css";
 
 type NavItem = { label: string; href: string; ownerOnly?: boolean };
@@ -76,7 +76,8 @@ export default function Sidebar({ open, onClose }: Props) {
   const { user, signOut, staffNeedsOnboarding } = useAuth();
   const userIsOwner = isOwner(user);
   const userIsStrictOwner = isStrictOwner(user);
-  const userIsManager = userIsOwner && !userIsStrictOwner;
+  const userIsChef = isChef(user);
+  const userIsManager = (userIsOwner && !userIsStrictOwner) || userIsChef;
 
   // 기본값: 모두 닫힘. 한 번에 하나만 열림.
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -150,7 +151,7 @@ export default function Sidebar({ open, onClose }: Props) {
   }
 
   // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
-  if (!userIsOwner) {
+  if (!userIsOwner && !userIsChef) {
     const staffNav: NavGroup[] = [
       { icon: "🏠", label: "Home", href: "/staff" },
       { icon: "📋", label: "Onboarding", href: "/onboarding" },
