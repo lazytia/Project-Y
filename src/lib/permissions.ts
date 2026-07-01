@@ -22,7 +22,7 @@ export const STRICT_OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yuri
  * Chef accounts — kitchen leadership with their own dashboard.
  * Chefs see a dedicated Chef Dashboard instead of the regular staff page.
  */
-export const CHEF_USERNAMES: ReadonlySet<string> = new Set(["chinglam"]);
+export const CHEF_USERNAMES: ReadonlySet<string> = new Set(["chinglam", "chuck"]);
 
 /** True if the given user has owner-level permissions (owner or manager). */
 export function isOwner(user: User | null | undefined): boolean {
