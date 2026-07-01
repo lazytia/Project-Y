@@ -182,7 +182,8 @@ export default function NewCateringOrderPage() {
   const router = useRouter();
   const search = useSearchParams();
   const presetDate = search?.get("date") || todayISO();
-  const editId = search?.get("editId") ?? null;
+  // Edit mode removed — orders are read-only once created.
+  const editId = null;
 
   // Form state
   const [clientName, setClientName] = useState("");

@@ -303,6 +303,14 @@ function DayModal({
             ))}
           </ul>
         ) : null}
+        {orders.length === 0 && (
+          <Link
+            href={`/operations/catering-orders/new?date=${encodeURIComponent(day)}`}
+            className={styles.modalPrimary}
+          >
+            Create order
+          </Link>
+        )}
       </div>
     </div>
   );
