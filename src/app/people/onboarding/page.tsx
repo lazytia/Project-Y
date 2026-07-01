@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { collection, getDocs, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { registerFcmToken } from "@/lib/fcm";
 import Splash from "@/components/Splash";
@@ -132,7 +132,7 @@ function statusLabel(row: StaffOnboarding): string {
 export default function ManagerOnboardingPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  const allowed = isOwner(user) || isChef(user);
 
   const [rows, setRows] = useState<StaffOnboarding[] | null>(null);
   const [error, setError] = useState<string | null>(null);
