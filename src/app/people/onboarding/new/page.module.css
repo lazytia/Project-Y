@@ -272,8 +272,28 @@
 
 /* ── Required asterisk ── */
 .required {
-  color: #e53e3e;
-  font-weight: 700;
+  color: var(--color-warm);
+}
+
+/* ── Date row (side by side) ── */
+.dateRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+/* ── Picker placeholder ── */
+.pickerPlaceholder {
+  color: var(--color-fg-muted);
+  opacity: 0.55;
+}
+
+/* ── Hint icon ── */
+.hintIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
 }
 
 /* ── Mobile number ── */
@@ -330,9 +350,12 @@
 }
 
 .fieldHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--font-size-xs);
   color: var(--color-fg-muted);
-  line-height: 1.4;
+  margin-top: -4px;
 }
 
 /* ── Textarea ── */

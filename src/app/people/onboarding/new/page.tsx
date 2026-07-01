@@ -65,16 +65,17 @@ export default function NewEmployeePage() {
   }, [authLoading, allowed, router]);
 
   const [fullName, setFullName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [position, setPosition] = useState<Position>("Hall Staff");
   const [startDate, setStartDate] = useState("");
+  const [visaExpiry, setVisaExpiry] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
   const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>("First 2 Weeks");
   const [afterTrainingRate, setAfterTrainingRate] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
   const [notes, setNotes] = useState("");
 
   const [rateFocused, setRateFocused] = useState(false);
-  const [calOpen, setCalOpen] = useState(false);
+  const [calOpen, setCalOpen] = useState<"start" | "visa" | null>(null);
   const [periodSheetOpen, setPeriodSheetOpen] = useState(false);
   const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>("First 2 Weeks");
 
@@ -99,14 +100,15 @@ export default function NewEmployeePage() {
     try {
       await addDoc(collection(getDb(), "staff_onboarding"), {
         fullName: fullName.trim(),
+        mobileNumber: mobileNumber.trim(),
         position,
         startDate,
+        visaExpiry: visaExpiry || null,
         trainingRate: parseFloat(trainingRate),
         trainingPeriod,
         afterTrainingRate: afterTrainingRate.trim()
           ? parseFloat(afterTrainingRate)
           : null,
-        mobileNumber: mobileNumber.trim(),
         notes: notes.trim(),
         status: DEFAULT_STATUS,
         role: "staff",
@@ -133,18 +135,7 @@ export default function NewEmployeePage() {
           onClick={() => router.push("/people/onboarding")}
           aria-label="Back to onboarding"
         >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+          <ChevronLeft />
         </button>
         <div className={styles.headerTitles}>
           <span className={styles.eyebrow}>Onboarding</span>
@@ -169,6 +160,35 @@ export default function NewEmployeePage() {
         />
       </div>
 
+      {/* Mobile number */}
+      <div className={styles.field}>
+        <label className={styles.fieldLabel}>
+          MOBILE NUMBER <span className={styles.required}>*</span>
+        </label>
+        <div className={styles.mobileWrap}>
+          <span className={styles.countryCode}>+61</span>
+          <span className={styles.mobileDivider} />
+          <input
+            type="tel"
+            inputMode="tel"
+            className={styles.mobileInput}
+            placeholder="e.g. 412 345 678"
+            value={mobileNumber}
+            onChange={(e) => setMobileNumber(e.target.value)}
+            maxLength={15}
+          />
+        </div>
+      </div>
+
+      {/* Mobile info box */}
+      <div className={styles.infoBox}>
+        <InfoIcon className={styles.infoIcon} />
+        <p className={styles.infoText}>
+          Mobile number is required. We will send the employee their Clock In ID
+          and Project Y login details via SMS.
+        </p>
+      </div>
+
       {/* Position */}
       <div className={styles.field}>
         <label className={styles.fieldLabel} htmlFor="position">
@@ -187,65 +207,44 @@ export default function NewEmployeePage() {
               </option>
             ))}
           </select>
-          <svg
-            className={styles.selectChev}
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <ChevronDown className={styles.selectChev} />
         </div>
       </div>
 
-      {/* Start date */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>START DATE</label>
-        <button
-          type="button"
-          className={styles.pickerBtn}
-          onClick={() => setCalOpen(true)}
-        >
-          <svg
-            className={styles.pickerLeadIcon}
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+      {/* Start date + Visa expiry (side by side) */}
+      <div className={styles.dateRow}>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel}>START DATE</label>
+          <button
+            type="button"
+            className={styles.pickerBtn}
+            onClick={() => setCalOpen("start")}
           >
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
-          <span className={styles.pickerValue}>{fmtIsoShort(startDate)}</span>
-          <svg
-            className={styles.selectChev}
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+            <CalendarIcon className={styles.pickerLeadIcon} />
+            <span className={styles.pickerValue}>{fmtIsoShort(startDate)}</span>
+            <ChevronDown className={styles.selectChev} />
+          </button>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel}>
+            VISA EXPIRY DATE <span className={styles.required}>*</span>
+          </label>
+          <button
+            type="button"
+            className={styles.pickerBtn}
+            onClick={() => setCalOpen("visa")}
           >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
+            <CalendarIcon className={styles.pickerLeadIcon} />
+            <span className={`${styles.pickerValue} ${!visaExpiry ? styles.pickerPlaceholder : ""}`}>
+              {visaExpiry ? fmtIsoShort(visaExpiry) : "Select date"}
+            </span>
+            <ChevronDown className={styles.selectChev} />
+          </button>
+        </div>
       </div>
+      <span className={styles.fieldHint}>
+        <InfoIcon className={styles.hintIcon} /> We&rsquo;ll remind you before this date.
+      </span>
 
       {/* Training rate */}
       <div className={styles.field}>
@@ -287,41 +286,13 @@ export default function NewEmployeePage() {
           }}
         >
           <span className={styles.pickerValue}>{trainingPeriod}</span>
-          <svg
-            className={styles.selectChev}
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+          <ChevronDown className={styles.selectChev} />
         </button>
       </div>
 
       {/* Info box */}
       <div className={styles.infoBox}>
-        <svg
-          className={styles.infoIcon}
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="16" x2="12" y2="12" />
-          <line x1="12" y1="8" x2="12.01" y2="8" />
-        </svg>
+        <InfoIcon className={styles.infoIcon} />
         <p className={styles.infoText}>
           This rate will apply for the selected training period above.
         </p>
@@ -346,53 +317,6 @@ export default function NewEmployeePage() {
           />
           <span className={styles.rateSuffix}>/ hour</span>
         </div>
-      </div>
-
-      {/* Mobile number info box */}
-      <div className={styles.infoBox}>
-        <svg
-          className={styles.infoIcon}
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="16" x2="12" y2="12" />
-          <line x1="12" y1="8" x2="12.01" y2="8" />
-        </svg>
-        <p className={styles.infoText}>
-          Mobile number is required. We will send the employee their Clock In ID
-          and Project Y login details via SMS.
-        </p>
-      </div>
-
-      {/* Mobile number */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>
-          MOBILE NUMBER <span className={styles.required}>*</span>
-        </label>
-        <div className={styles.mobileWrap}>
-          <span className={styles.countryCode}>+61</span>
-          <span className={styles.mobileDivider} />
-          <input
-            type="tel"
-            inputMode="tel"
-            className={styles.mobileInput}
-            placeholder="e.g. 412 345 678"
-            value={mobileNumber}
-            onChange={(e) => setMobileNumber(e.target.value)}
-            maxLength={15}
-          />
-        </div>
-        <span className={styles.fieldHint}>
-          Used to send Clock In ID and Project Y login details via SMS.
-        </span>
       </div>
 
       {/* Notes */}
@@ -425,18 +349,19 @@ export default function NewEmployeePage() {
 
       {/* Calendar bottom sheet */}
       {calOpen && (
-        <div className={styles.calOverlay} onClick={() => setCalOpen(false)}>
+        <div className={styles.calOverlay} onClick={() => setCalOpen(null)}>
           <div className={styles.calSheet} onClick={(e) => e.stopPropagation()}>
             <CalendarPicker
-              value={startDate || todayIso()}
+              value={(calOpen === "visa" ? visaExpiry : startDate) || todayIso()}
               maxDate={FAR_FUTURE}
               singleOnly
               onChange={(dateKey) => {
-                setStartDate(dateKey);
-                setCalOpen(false);
+                if (calOpen === "visa") setVisaExpiry(dateKey);
+                else setStartDate(dateKey);
+                setCalOpen(null);
               }}
               onRangeChange={() => {}}
-              onClose={() => setCalOpen(false)}
+              onClose={() => setCalOpen(null)}
             />
           </div>
         </div>
@@ -500,5 +425,87 @@ export default function NewEmployeePage() {
         />
       )}
     </div>
+  );
+}
+
+/* ── Inline SVG icons ── */
+
+function ChevronLeft() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function ChevronDown({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function InfoIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
   );
 }
