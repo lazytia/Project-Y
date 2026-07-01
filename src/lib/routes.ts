@@ -4,6 +4,7 @@ export const ROUTES = {
   staffOnboarding: "/onboarding",
   staffOnboardingComplete: "/onboarding/complete",
   staffHome: "/staff",
+  chefHome: "/chef",
   staffSchedule: "/staff/schedule",
   staffScheduleRoster: "/staff/schedule/roster",
   staffScheduleRequestHoliday: "/staff/schedule/request-holiday",
@@ -25,6 +26,7 @@ export function isStaffAllowedPath(pathname: string): boolean {
   return (
     pathname.startsWith(ROUTES.staffOnboarding) ||
     pathname.startsWith(ROUTES.staffHome) ||
+    pathname.startsWith(ROUTES.chefHome) ||
     pathname.startsWith(ROUTES.reservations)
   );
 }

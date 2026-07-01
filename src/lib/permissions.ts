@@ -18,6 +18,12 @@ export const OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica", "y
  */
 export const STRICT_OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica"]);
 
+/**
+ * Chef accounts — kitchen leadership with their own dashboard.
+ * Chefs see a dedicated Chef Dashboard instead of the regular staff page.
+ */
+export const CHEF_USERNAMES: ReadonlySet<string> = new Set(["chinglam"]);
+
 /** True if the given user has owner-level permissions (owner or manager). */
 export function isOwner(user: User | null | undefined): boolean {
   if (!user) return false;
@@ -28,4 +34,10 @@ export function isOwner(user: User | null | undefined): boolean {
 export function isStrictOwner(user: User | null | undefined): boolean {
   if (!user) return false;
   return STRICT_OWNER_USERNAMES.has(emailToUsername(user.email).toLowerCase());
+}
+
+/** True if the given user is a chef. */
+export function isChef(user: User | null | undefined): boolean {
+  if (!user) return false;
+  return CHEF_USERNAMES.has(emailToUsername(user.email).toLowerCase());
 }

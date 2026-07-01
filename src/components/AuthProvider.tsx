@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth, getDb } from "@/lib/firebase";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
-import { isOwner } from "@/lib/permissions";
+import { isOwner, isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 
 const TOTAL_ONBOARDING_STEPS = 7;
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading || !user) return;
     const username = emailToUsername(user.email ?? "").toLowerCase();
-    const role = isOwner(user) ? "owner" : "staff";
+    const role = isOwner(user) ? "owner" : isChef(user) ? "chef" : "staff";
     const ref = doc(getDb(), "staff_onboarding", user.uid);
 
     // Fire-and-forget: don't block rendering on the write.
@@ -115,8 +115,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // everyone else goes to their Home / Dashboard.
       if (staffNeedsOnboarding) {
         router.replace(ROUTES.staffOnboarding);
+      } else if (userIsOwnerNow) {
+        router.replace(ROUTES.home);
+      } else if (isChef(user)) {
+        router.replace(ROUTES.chefHome);
       } else {
-        router.replace(userIsOwnerNow ? ROUTES.home : ROUTES.staffHome);
+        router.replace(ROUTES.staffHome);
       }
       return;
     }
@@ -129,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Completed non-owner trying to visit an owner-only path → bounce to Home.
     if (user && !userIsOwnerNow && !isStaffAllowedPath(pathname)) {
-      router.replace(ROUTES.staffHome);
+      router.replace(isChef(user) ? ROUTES.chefHome : ROUTES.staffHome);
     }
   }, [user, loading, pathname, router, staffCompletedStep, staffNeedsOnboarding]);
 
