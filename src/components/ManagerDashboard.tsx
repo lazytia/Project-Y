@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { collection, doc, getDocs, getDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
+import { fetchCateringOrders, type CateringOrder } from "@/lib/catering-orders";
+import {
+  fetchReservationsForDate,
+  serviceFor,
+  type Reservation,
+} from "@/lib/reservations";
 import styles from "./ManagerDashboard.module.css";
 
 type AttentionCounts = {
@@ -93,7 +99,8 @@ export default function ManagerDashboard() {
 
   // Square / system_yurica live data
   const [todaySales, setTodaySales] = useState<number | null>(null);
-  const [totalPax, setTotalPax] = useState<number | null>(null);
+  const [reservations, setReservations] = useState<Reservation[] | null>(null);
+  const [cateringOrders, setCateringOrders] = useState<CateringOrder[] | null>(null);
   const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
   const [hallStaff, setHallStaff] = useState<number | null>(null);
 
@@ -139,14 +146,16 @@ export default function ManagerDashboard() {
       }
     } catch { /* ignore */ }
 
-    // system_yurica pax counts
+    // Reservations (real data via Quandoo/SevenRooms)
     try {
-      const res = await fetch(`/api/system-yurica/today-counts?date=${todayKey}`);
-      if (res.ok) {
-        const d = await res.json();
-        const pax = (d.lunchPax ?? 0) + (d.dinnerPax ?? 0);
-        setTotalPax(pax);
-      }
+      const res = await fetchReservationsForDate(user, todayKey, "northsydney");
+      setReservations(res);
+    } catch { /* ignore */ }
+
+    // Catering orders (real data via Square)
+    try {
+      const orders = await fetchCateringOrders(user);
+      setCateringOrders(orders);
     } catch { /* ignore */ }
 
     // Roster: count kitchen / hall from today's rosters_published doc
@@ -183,6 +192,25 @@ export default function ManagerDashboard() {
     const id = setInterval(fetchLiveData, 60_000);
     return () => clearInterval(id);
   }, [fetchLiveData]);
+
+  // Reservation counts from real data
+  const resCounts = useMemo(() => {
+    if (!reservations) return null;
+    const active = reservations.filter(
+      (r) => r.status !== "cancelled" && r.status !== "no-show",
+    );
+    const totalPax = active.reduce((s, r) => s + r.count, 0);
+    const totalBookings = active.length;
+    return { totalPax, totalBookings };
+  }, [reservations]);
+
+  // Today's catering orders count
+  const todayCateringCount = useMemo(() => {
+    if (!cateringOrders) return null;
+    return cateringOrders.filter(
+      (o) => o.deliveryDateISO === todayKey && o.status !== "CANCELLED",
+    ).length;
+  }, [cateringOrders, todayKey]);
 
   const attentionTotal =
     attention.holidayRequests + attention.availabilityChanges +
@@ -267,10 +295,10 @@ export default function ManagerDashboard() {
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
             <p className={styles.opsValue}>
-              {totalPax ?? "—"}
-              {totalPax !== null && <span className={styles.opsUnit}> Pax</span>}
+              {resCounts ? resCounts.totalPax : "—"}
+              {resCounts !== null && <span className={styles.opsUnit}> Pax</span>}
             </p>
-            <p className={styles.opsLabel}>Reservations</p>
+            <p className={styles.opsLabel}>{resCounts ? `${resCounts.totalBookings} Reservations` : "Reservations"}</p>
           </Link>
 
           <Link href="/operations/catering-orders" className={styles.opsCard}>
@@ -280,7 +308,9 @@ export default function ManagerDashboard() {
               <circle cx="12" cy="6" r="1.6" />
               <line x1="12" y1="7.6" x2="12" y2="9" />
             </svg>
-            <p className={styles.opsValue}>—</p>
+            <p className={styles.opsValue}>
+              {todayCateringCount !== null ? todayCateringCount : "—"}
+            </p>
             <p className={styles.opsLabel}>Catering Orders</p>
           </Link>
         </div>
