@@ -107,6 +107,92 @@
   opacity: 0.55;
 }
 
+/* ── Required asterisk ── */
+.required {
+  color: var(--color-warm);
+}
+
+/* ── Mobile number ── */
+.mobileWrap {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.mobileWrap:focus-within {
+  border-color: var(--color-warm);
+}
+
+.countryCode {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-fg);
+  flex-shrink: 0;
+}
+
+.mobileDivider {
+  width: 1px;
+  height: 24px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+.mobileInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--space-3);
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-fg);
+  outline: none;
+}
+
+.mobileInput::placeholder {
+  color: var(--color-fg-muted);
+  opacity: 0.55;
+}
+
+/* ── Date row (side by side) ── */
+.dateRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+/* ── Field hint ── */
+.fieldHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+  margin-top: -4px;
+}
+
+.hintIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+/* ── Picker placeholder ── */
+.pickerPlaceholder {
+  color: var(--color-fg-muted);
+  opacity: 0.55;
+}
+
 /* ── Select ── */
 .selectWrap {
   position: relative;

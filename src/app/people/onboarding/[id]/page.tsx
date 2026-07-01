@@ -111,15 +111,17 @@ export default function EditEmployeePage() {
   const [notFound, setNotFound] = useState(false);
 
   const [fullName, setFullName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [position, setPosition] = useState<Position>("Hall Staff");
   const [startDate, setStartDate] = useState(todayIso());
+  const [visaExpiry, setVisaExpiry] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
   const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>("First 2 Weeks");
   const [afterTrainingRate, setAfterTrainingRate] = useState("");
   const [notes, setNotes] = useState("");
 
   const [rateFocused, setRateFocused] = useState(false);
-  const [calOpen, setCalOpen] = useState(false);
+  const [calOpen, setCalOpen] = useState<"start" | "visa" | null>(null);
   const [periodSheetOpen, setPeriodSheetOpen] = useState(false);
   const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>("First 2 Weeks");
 
@@ -143,8 +145,14 @@ export default function EditEmployeePage() {
         }
         const raw = snap.data() as Record<string, unknown>;
         setFullName((raw.fullName as string | undefined) ?? "");
+        setMobileNumber((raw.mobileNumber as string | undefined) ?? "");
         setPosition(normalisePosition(raw.position));
         setStartDate(toIso(raw.startDate));
+        if (raw.documents && typeof raw.documents === "object") {
+          const docs = raw.documents as Record<string, unknown>;
+          if (docs.visaExpiry) setVisaExpiry(toIso(docs.visaExpiry));
+        }
+        if (raw.visaExpiry) setVisaExpiry(toIso(raw.visaExpiry));
         setTrainingRate(
           typeof raw.trainingRate === "number" ? String(raw.trainingRate) : "",
         );
@@ -177,8 +185,10 @@ export default function EditEmployeePage() {
     try {
       await updateDoc(doc(getDb(), "staff_onboarding", id), {
         fullName: fullName.trim(),
+        mobileNumber: mobileNumber.trim(),
         position,
         startDate,
+        visaExpiry: visaExpiry || null,
         trainingRate: parseFloat(trainingRate),
         trainingPeriod,
         afterTrainingRate: afterTrainingRate.trim()
@@ -271,6 +281,35 @@ export default function EditEmployeePage() {
         />
       </div>
 
+      {/* Mobile number */}
+      <div className={styles.field}>
+        <label className={styles.fieldLabel}>
+          MOBILE NUMBER <span className={styles.required}>*</span>
+        </label>
+        <div className={styles.mobileWrap}>
+          <span className={styles.countryCode}>+61</span>
+          <span className={styles.mobileDivider} />
+          <input
+            type="tel"
+            inputMode="tel"
+            className={styles.mobileInput}
+            placeholder="e.g. 412 345 678"
+            value={mobileNumber}
+            onChange={(e) => setMobileNumber(e.target.value)}
+            maxLength={15}
+          />
+        </div>
+      </div>
+
+      {/* Mobile info box */}
+      <div className={styles.infoBox}>
+        <InfoIcon className={styles.infoIcon} />
+        <p className={styles.infoText}>
+          Mobile number is required. We will send the employee their Clock In ID
+          and Project Y login details via SMS.
+        </p>
+      </div>
+
       {/* Position */}
       <div className={styles.field}>
         <label className={styles.fieldLabel} htmlFor="position">
@@ -293,19 +332,40 @@ export default function EditEmployeePage() {
         </div>
       </div>
 
-      {/* Start date */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>START DATE</label>
-        <button
-          type="button"
-          className={styles.pickerBtn}
-          onClick={() => setCalOpen(true)}
-        >
-          <CalendarIcon className={styles.pickerLeadIcon} />
-          <span className={styles.pickerValue}>{fmtIsoShort(startDate)}</span>
-          <ChevronDown className={styles.selectChev} />
-        </button>
+      {/* Start date + Visa expiry (side by side) */}
+      <div className={styles.dateRow}>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel}>START DATE</label>
+          <button
+            type="button"
+            className={styles.pickerBtn}
+            onClick={() => setCalOpen("start")}
+          >
+            <CalendarIcon className={styles.pickerLeadIcon} />
+            <span className={styles.pickerValue}>{fmtIsoShort(startDate)}</span>
+            <ChevronDown className={styles.selectChev} />
+          </button>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel}>
+            VISA EXPIRY DATE <span className={styles.required}>*</span>
+          </label>
+          <button
+            type="button"
+            className={styles.pickerBtn}
+            onClick={() => setCalOpen("visa")}
+          >
+            <CalendarIcon className={styles.pickerLeadIcon} />
+            <span className={`${styles.pickerValue} ${!visaExpiry ? styles.pickerPlaceholder : ""}`}>
+              {visaExpiry ? fmtIsoShort(visaExpiry) : "Select date"}
+            </span>
+            <ChevronDown className={styles.selectChev} />
+          </button>
+        </div>
       </div>
+      <span className={styles.fieldHint}>
+        <InfoIcon className={styles.hintIcon} /> We&rsquo;ll remind you before this date.
+      </span>
 
       {/* Training rate */}
       <div className={styles.field}>
@@ -444,18 +504,19 @@ export default function EditEmployeePage() {
 
       {/* Calendar bottom sheet */}
       {calOpen && (
-        <div className={styles.calOverlay} onClick={() => setCalOpen(false)}>
+        <div className={styles.calOverlay} onClick={() => setCalOpen(null)}>
           <div className={styles.calSheet} onClick={(e) => e.stopPropagation()}>
             <CalendarPicker
-              value={startDate || todayIso()}
+              value={(calOpen === "visa" ? visaExpiry : startDate) || todayIso()}
               maxDate={FAR_FUTURE}
               singleOnly
               onChange={(dateKey) => {
-                setStartDate(dateKey);
-                setCalOpen(false);
+                if (calOpen === "visa") setVisaExpiry(dateKey);
+                else setStartDate(dateKey);
+                setCalOpen(null);
               }}
               onRangeChange={() => {}}
-              onClose={() => setCalOpen(false)}
+              onClose={() => setCalOpen(null)}
             />
           </div>
         </div>
