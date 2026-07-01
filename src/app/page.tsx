@@ -5,7 +5,7 @@ import styles from "./page.module.css";
 import CalendarPicker from "@/components/CalendarPicker";
 import ManagerDashboard from "@/components/ManagerDashboard";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner, isStrictOwner } from "@/lib/permissions";
+import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import {
   type Reservation,
   fetchReservationsForDate,
@@ -83,7 +83,7 @@ function Progress({ value, max }: { value: number; max: number }) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const userIsManager = isOwner(user) && !isStrictOwner(user);
+  const userIsManager = (isOwner(user) && !isStrictOwner(user)) || isChef(user);
   if (userIsManager) {
     return <ManagerDashboard hideAttention />;
   }
