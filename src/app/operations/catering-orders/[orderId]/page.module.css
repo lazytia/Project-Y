@@ -98,112 +98,6 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
-/* ── 2-up cards ── */
-.twoUp {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: stretch;
-  gap: var(--space-3);
-  padding: 0 var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.infoCard {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  height: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-
-.infoIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-warm);
-  flex-shrink: 0;
-}
-
-.infoBody { flex: 1; min-width: 0; }
-
-.infoLabel {
-  margin: 0 0 4px 0;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--color-fg);
-}
-
-.infoDate {
-  margin: 0;
-  font-size: 12px;
-  color: var(--color-fg-muted);
-}
-
-.infoTime {
-  margin: 2px 0 0 0;
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--color-fg);
-}
-
-/* Ready-by variant */
-.readyByCard {
-  background: var(--color-warm-bg);
-  border-color: rgba(255, 106, 19, 0.15);
-}
-
-.readyByIcon {
-  color: var(--color-warm);
-}
-
-.readyByHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  margin-bottom: 4px;
-}
-
-.readyByLabel {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: var(--color-warm);
-  white-space: nowrap;
-}
-
-.readyByPill {
-  font-size: 7px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: var(--color-warm);
-  background: var(--color-bg);
-  border-radius: 999px;
-  padding: 2px 5px;
-  border: 1px solid var(--color-warm);
-  white-space: nowrap;
-}
-
-.readyByTime {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--color-warm);
-  letter-spacing: -0.01em;
-}
-
-.readyByHint {
-  margin: 4px 0 0 0;
-  font-size: 11px;
-  color: var(--color-warm);
-}
-
 /* ── Section card ── */
 .section {
   display: flex;
@@ -241,6 +135,21 @@
   color: var(--color-fg);
 }
 
+/* ── Pickup / Delivery ── */
+.pickupDate {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.pickupTime {
+  margin: 2px 0 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+/* ── Contact ── */
 .contactName {
   margin: 0;
   font-size: 14px;
@@ -272,21 +181,39 @@
   text-decoration: none;
 }
 
-/* ── Address ── */
-.addressLine {
-  margin: 0;
-  font-size: 13px;
-  color: var(--color-fg);
-  line-height: 1.4;
-}
-
-.addressBuilding {
-  flex-shrink: 0;
+/* ── Payment Status ── */
+.paymentPill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.paymentPaid {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.paymentPartial {
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+.paymentUnpaid {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--color-negative);
+}
+
+.paymentAmount {
+  flex-shrink: 0;
+  font-size: 22px;
+  font-weight: 800;
   color: var(--color-fg);
-  text-decoration: none;
+  align-self: center;
 }
 
 /* ── Order details list ── */
@@ -321,14 +248,6 @@
   padding-left: var(--space-3);
 }
 
-.totalMeals {
-  margin: var(--space-3) 0 0 0;
-  text-align: right;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--color-fg);
-}
-
 .orderTotalRow {
   display: flex;
   align-items: baseline;
@@ -356,120 +275,27 @@
   color: var(--color-fg);
 }
 
-/* ── Customer note ── */
-.customerNote {
-  margin-top: var(--space-3);
+/* ── Note box (Customer Note) ── */
+.noteBox {
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface);
   border-radius: var(--radius-md);
 }
 
-.customerNoteLabel {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--color-fg-muted);
-  text-transform: uppercase;
-  margin: 0 0 var(--space-1);
-}
-
-.customerNoteText {
+.noteText {
   font-size: 14px;
   line-height: 1.5;
   color: var(--color-fg);
   margin: 0;
 }
 
-.customerNoteEmpty {
+.noteEmpty {
   font-size: 13px;
   color: var(--color-fg-muted);
   margin: 0;
 }
 
-/* ── 3-up bottom mini cards ── */
-.threeUp {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--space-2);
-  padding: 0 var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.miniCard {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.miniIcon {
-  display: inline-flex;
-  align-items: center;
-  color: var(--color-fg-muted);
-}
-
-.miniLabel {
-  margin: 0;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--color-fg-muted);
-  line-height: 1.2;
-}
-
-.miniValueLarge {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--color-fg);
-}
-
-.miniUnit {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-fg-muted);
-}
-
-.miniValueSmall {
-  margin: 0;
-  font-size: 11px;
-  color: var(--color-fg);
-  line-height: 1.4;
-  white-space: pre-wrap;
-}
-
-.paymentPill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  align-self: flex-start;
-}
-
-.paymentPaid {
-  background: var(--color-fg);
-  color: var(--color-bg);
-}
-
-.paymentPartial {
-  background: var(--color-warm-bg);
-  color: var(--color-warm);
-}
-
-.paymentUnpaid {
-  background: rgba(220, 38, 38, 0.1);
-  color: var(--color-negative);
-}
-
-/* ── Owner's Note ── */
+/* ── Internal Note (editable) ── */
 .ownerNoteInput {
   width: 100%;
   padding: var(--space-3);

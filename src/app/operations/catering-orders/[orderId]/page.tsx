@@ -15,7 +15,6 @@ import styles from "./page.module.css";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const KITCHEN_PREP_MINUTES = 45;
 
 function fmtMoney(n: number): string {
   return `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -25,23 +24,6 @@ function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-").map((x) => parseInt(x, 10));
   const dt = new Date(y, m - 1, d);
   return `${d} ${MONTH_SHORT[m - 1]} ${y} (${WEEKDAY_SHORT[dt.getDay()]})`;
-}
-
-function formatTimeMinusMinutes(time: string, minus: number): string {
-  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(time.trim());
-  if (!m) return "—";
-  let h = parseInt(m[1], 10);
-  const mins = parseInt(m[2], 10);
-  const ampm = m[3]?.toUpperCase();
-  if (ampm === "PM" && h !== 12) h += 12;
-  if (ampm === "AM" && h === 12) h = 0;
-  const totalMin = h * 60 + mins - minus;
-  const wrapped = (totalMin + 24 * 60) % (24 * 60);
-  const hh = Math.floor(wrapped / 60);
-  const mm = wrapped % 60;
-  const display12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
-  const meridian = hh < 12 ? "AM" : "PM";
-  return `${display12}:${String(mm).padStart(2, "0")} ${meridian}`;
 }
 
 function prettyPayment(s: string | undefined): string {
@@ -92,9 +74,6 @@ function methodLabel(m: string | undefined): string {
 function CalIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
 }
-function StopwatchIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8" /><polyline points="12 9 12 13 14 14" /><line x1="9" y1="2" x2="15" y2="2" /></svg>;
-}
 function UserIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
 }
@@ -104,23 +83,14 @@ function PhoneIcon() {
 function MailIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>;
 }
-function PinIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>;
-}
-function BuildingIcon() {
-  return <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="1" /><line x1="9" y1="6" x2="9" y2="6" /><line x1="9" y1="10" x2="9" y2="10" /><line x1="9" y1="14" x2="9" y2="14" /><line x1="15" y1="6" x2="15" y2="6" /><line x1="15" y1="10" x2="15" y2="10" /><line x1="15" y1="14" x2="15" y2="14" /><path d="M10 22v-4h4v4" /></svg>;
+function CardIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>;
 }
 function ClipboardIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="4" width="14" height="18" rx="2" /><path d="M9 4V2h6v2" /><line x1="9" y1="10" x2="15" y2="10" /><line x1="9" y1="14" x2="15" y2="14" /><line x1="9" y1="18" x2="13" y2="18" /></svg>;
 }
-function ForkKnifeIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2v8a2 2 0 0 0 2 2h0v10M10 2v8M8 2v6" /><path d="M16 2c-1.5 0-3 2-3 5s1.5 5 3 5v10" /></svg>;
-}
-function LeafIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 4 13c0-6 5-10 17-10 0 8-4 16-10 17a7 7 0 0 1-7-7" /><path d="M2 22c4-4 7-7 17-12" /></svg>;
-}
-function CardIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>;
+function ChatIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>;
 }
 
 export default function CateringOrderDetailPage() {
@@ -131,7 +101,7 @@ export default function CateringOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Owner's Note state (Firestore only)
+  // Internal Note state (Firestore only)
   const [ownerNote, setOwnerNote] = useState("");
   const [ownerNoteOriginal, setOwnerNoteOriginal] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
@@ -198,7 +168,6 @@ export default function CateringOrderDetailPage() {
   const heroIcon = isDelivery ? <TruckIcon /> : <BagIcon />;
   const fulfillmentLabel = isDelivery ? "Delivery" : "Pickup";
   const dCount = daysUntil(order.deliveryDateISO);
-  const readyBy = order.readyByTime || formatTimeMinusMinutes(order.deliveryTime, KITCHEN_PREP_MINUTES);
 
   return (
     <div className={styles.page}>
@@ -229,28 +198,15 @@ export default function CateringOrderDetailPage() {
         </div>
       </header>
 
-      {/* 2-up: Delivery + Ready By */}
-      <div className={styles.twoUp}>
-        <div className={styles.infoCard}>
-          <div className={styles.infoIcon}><CalIcon /></div>
-          <div className={styles.infoBody}>
-            <p className={styles.infoLabel}>{fulfillmentLabel.toUpperCase()}</p>
-            <p className={styles.infoDate}>{fmtDate(order.deliveryDateISO)}</p>
-            <p className={styles.infoTime}>{order.deliveryTime}</p>
-          </div>
+      {/* Pickup / Delivery */}
+      <section className={styles.section}>
+        <div className={styles.sectionIcon}><CalIcon /></div>
+        <div className={styles.sectionBody}>
+          <p className={styles.sectionTitle}>{fulfillmentLabel.toUpperCase()}</p>
+          <p className={styles.pickupDate}>{fmtDate(order.deliveryDateISO)}</p>
+          <p className={styles.pickupTime}>{order.deliveryTime}</p>
         </div>
-        <div className={`${styles.infoCard} ${styles.readyByCard}`}>
-          <div className={`${styles.infoIcon} ${styles.readyByIcon}`}><StopwatchIcon /></div>
-          <div className={styles.infoBody}>
-            <div className={styles.readyByHead}>
-              <span className={styles.readyByLabel}>READY BY</span>
-              <span className={styles.readyByPill}>KITCHEN DEADLINE</span>
-            </div>
-            <p className={styles.readyByTime}>{readyBy}</p>
-            <p className={styles.readyByHint}>Order must be ready by this time</p>
-          </div>
-        </div>
-      </div>
+      </section>
 
       {/* Contact */}
       <section className={styles.section}>
@@ -276,27 +232,25 @@ export default function CateringOrderDetailPage() {
         </div>
       </section>
 
-      {/* Delivery Address */}
-      {order.deliveryAddressLines.length > 0 && (
-        <section className={styles.section}>
-          <div className={styles.sectionIcon}><PinIcon /></div>
-          <div className={styles.sectionBody}>
-            <p className={styles.sectionTitle}>DELIVERY ADDRESS</p>
-            {order.deliveryAddressLines.map((line, idx) => (
-              <p key={idx} className={styles.addressLine}>{line}</p>
-            ))}
-          </div>
-          <a
-            href={`https://maps.google.com/?q=${encodeURIComponent(order.deliveryAddressLines.join(", "))}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.addressBuilding}
-            aria-label="Open in maps"
+      {/* Payment Status */}
+      <section className={styles.section}>
+        <div className={styles.sectionIcon}><CardIcon /></div>
+        <div className={styles.sectionBody}>
+          <p className={styles.sectionTitle}>PAYMENT STATUS</p>
+          <span
+            className={`${styles.paymentPill} ${
+              order.paymentStatus === "PAID"
+                ? styles.paymentPaid
+                : order.paymentStatus === "PARTIALLY_PAID"
+                  ? styles.paymentPartial
+                  : styles.paymentUnpaid
+            }`}
           >
-            <BuildingIcon />
-          </a>
-        </section>
-      )}
+            {prettyPayment(order.paymentStatus)}
+          </span>
+        </div>
+        <span className={styles.paymentAmount}>{fmtMoney(order.totalAmount)}</span>
+      </section>
 
       {/* Order Details */}
       <section className={styles.section}>
@@ -324,55 +278,33 @@ export default function CateringOrderDetailPage() {
             </span>
             <span className={styles.orderTotalValue}>{fmtMoney(order.totalAmount)}</span>
           </div>
-          <div className={styles.customerNote}>
-            <p className={styles.customerNoteLabel}>Customer Note</p>
-            {order.notes.length > 0 ? (
-              order.notes.map((n, i) => (
-                <p key={i} className={styles.customerNoteText}>{n}</p>
-              ))
-            ) : (
-              <p className={styles.customerNoteEmpty}>No notes from customer.</p>
-            )}
-          </div>
         </div>
       </section>
 
-      {/* 3-up bottom */}
-      <div className={styles.threeUp}>
-        <div className={styles.miniCard}>
-          <span className={styles.miniIcon}><ForkKnifeIcon /></span>
-          <p className={styles.miniLabel}>TOTAL UTENSILS QTY</p>
-          <p className={styles.miniValueLarge}>
-            {order.utensilsCount ?? 0}<span className={styles.miniUnit}> Sets</span>
-          </p>
+      {/* Customer Note */}
+      <section className={styles.section}>
+        <div className={styles.sectionIcon}><ChatIcon /></div>
+        <div className={styles.sectionBody}>
+          <p className={styles.sectionTitle}>CUSTOMER NOTE</p>
+          {order.notes.length > 0 ? (
+            <div className={styles.noteBox}>
+              {order.notes.map((n, i) => (
+                <p key={i} className={styles.noteText}>{n}</p>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.noteBox}>
+              <p className={styles.noteEmpty}>No notes from customer.</p>
+            </div>
+          )}
         </div>
-        <div className={styles.miniCard}>
-          <span className={styles.miniIcon}><LeafIcon /></span>
-          <p className={styles.miniLabel}>DIETARY / ALLERGY</p>
-          <p className={styles.miniValueSmall}>{order.dietaryNotes || "—"}</p>
-        </div>
-        <div className={styles.miniCard}>
-          <span className={styles.miniIcon}><CardIcon /></span>
-          <p className={styles.miniLabel}>PAYMENT STATUS</p>
-          <span
-            className={`${styles.paymentPill} ${
-              order.paymentStatus === "PAID"
-                ? styles.paymentPaid
-                : order.paymentStatus === "PARTIALLY_PAID"
-                  ? styles.paymentPartial
-                  : styles.paymentUnpaid
-            }`}
-          >
-            {prettyPayment(order.paymentStatus)}
-          </span>
-        </div>
-      </div>
+      </section>
 
-      {/* Owner's Note (editable, Firestore only) */}
+      {/* Internal Note (editable, Firestore only) */}
       <section className={styles.section}>
         <div className={styles.sectionIcon}><EditIcon /></div>
         <div className={styles.sectionBody}>
-          <p className={styles.sectionTitle}>OWNER&apos;S NOTE</p>
+          <p className={styles.sectionTitle}>INTERNAL NOTE</p>
           <textarea
             className={styles.ownerNoteInput}
             value={ownerNote}
