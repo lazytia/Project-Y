@@ -263,7 +263,7 @@ export default function ManagerDashboard({
       {/* Greeting */}
       <header className={styles.greeting}>
         <h1 className={styles.greetingTitle}>
-          {greeting || "Hello"}, {firstName || "there"}
+          {greeting || "Hello"}, {firstName || "there"}{roleLabel !== "Store Manager" ? ` ${roleLabel}` : ""}
         </h1>
         <p className={styles.greetingRole}>{roleLabel}</p>
       </header>
