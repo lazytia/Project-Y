@@ -10,6 +10,38 @@ import { isOwner, isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 
 const TOTAL_ONBOARDING_STEPS = 7;
+const STAFF_STEP_CACHE_KEY = "y.staffStep";
+
+type StaffStepCache = { uid: string; step: number };
+
+function readStaffStepCache(uid: string): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(STAFF_STEP_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StaffStepCache;
+    if (parsed.uid !== uid || typeof parsed.step !== "number") return null;
+    return parsed.step;
+  } catch {
+    return null;
+  }
+}
+
+function writeStaffStepCache(uid: string, step: number) {
+  try {
+    sessionStorage.setItem(STAFF_STEP_CACHE_KEY, JSON.stringify({ uid, step }));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function clearStaffStepCache() {
+  try {
+    sessionStorage.removeItem(STAFF_STEP_CACHE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 type AuthContextValue = {
   user: User | null;
@@ -47,7 +79,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsub = onAuthStateChanged(getAuth(), (u) => {
       setUser(u);
       setLoading(false);
-      if (!u) setStaffCompletedStep(null);
+      if (!u) {
+        setStaffCompletedStep(null);
+        clearStaffStepCache();
+        return;
+      }
+      if (isOwner(u)) {
+        setStaffCompletedStep(null);
+      } else if (isChef(u)) {
+        setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
+      } else {
+        const cached = readStaffStepCache(u.uid);
+        if (cached !== null) setStaffCompletedStep(cached);
+      }
     });
     return () => unsub();
   }, []);
@@ -88,10 +132,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .then((snap) => {
           const data = snap.data() ?? {};
           const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
+          writeStaffStepCache(user.uid, completed);
           setStaffCompletedStep(completed);
         })
         .catch(() => {
-          setStaffCompletedStep(0);
+          const fallback = readStaffStepCache(user.uid) ?? 0;
+          setStaffCompletedStep(fallback);
         });
     } else if (isChef(user)) {
       setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
@@ -158,6 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, loading, pathname, router, staffCompletedStep, staffNeedsOnboarding]);
 
   const signOut = async () => {
+    clearStaffStepCache();
     await fbSignOut(getAuth());
     router.replace(ROUTES.login);
   };
