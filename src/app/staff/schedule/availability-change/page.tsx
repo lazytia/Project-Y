@@ -111,7 +111,15 @@ function fmtEffective(d: Date): string {
 export default function AvailabilityChangePage() {
   const router = useRouter();
   const { user } = useAuth();
-  const effectiveDate = useMemo(nextMondayAfter3Weeks, []);
+  const [effectiveDate, setEffectiveDate] = useState<Date>(() => {
+    const d = new Date(0);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+
+  useEffect(() => {
+    setEffectiveDate(nextMondayAfter3Weeks());
+  }, []);
 
   const [current, setCurrent] = useState<AvailabilityMap>(DEFAULT_AVAILABILITY);
   const [proposed, setProposed] = useState<AvailabilityMap>(DEFAULT_AVAILABILITY);

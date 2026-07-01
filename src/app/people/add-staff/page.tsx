@@ -21,11 +21,16 @@ export default function AddStaffPage() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [startDate, setStartDate] = useState<string>(todayKey());
+  const [startDate, setStartDate] = useState<string>("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
+
+  // Defer date initialization to avoid hydration mismatch
+  useEffect(() => {
+    setStartDate(todayKey());
+  }, []);
 
   // Owner-only page.
   useEffect(() => {

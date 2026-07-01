@@ -86,7 +86,7 @@ export default function NoticeGivenEditPage({
   const [selectedUid, setSelectedUid] = useState("");
 
   /* ── Notice Details ── */
-  const [noticeGivenDate, setNoticeGivenDate] = useState(todayIso());
+  const [noticeGivenDate, setNoticeGivenDate] = useState("");
   const [lastWorkingDay, setLastWorkingDay] = useState("");
   const [reasonForLeaving, setReasonForLeaving] = useState("");
   const [reasonForLeavingOther, setReasonForLeavingOther] = useState("");
@@ -111,6 +111,11 @@ export default function NoticeGivenEditPage({
     if (authLoading) return;
     if (!allowed) router.replace(ROUTES.home);
   }, [authLoading, allowed, router]);
+
+  // Defer date initialization to avoid hydration mismatch
+  useEffect(() => {
+    setNoticeGivenDate(todayIso());
+  }, []);
 
   /* ── Resolve params and load document ── */
   useEffect(() => {

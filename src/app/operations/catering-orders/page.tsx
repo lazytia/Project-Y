@@ -61,9 +61,14 @@ export default function CateringOrdersPage() {
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cursor, setCursor] = useState<Date>(() => new Date());
+  const [cursor, setCursor] = useState<Date | null>(null);
   const [modalDay, setModalDay] = useState<string | null>(null);
-  const today = todayISO();
+  const [today, setToday] = useState("");
+
+  useEffect(() => {
+    setCursor(new Date());
+    setToday(todayISO());
+  }, []);
 
   async function reload(signal?: AbortSignal) {
     if (!user) return;
@@ -96,19 +101,21 @@ export default function CateringOrdersPage() {
   }, [orders]);
 
   const thisWeekCount = useMemo(() => {
-    const start = startOfWeek(new Date());
+    if (!cursor) return 0;
+    const start = startOfWeek(cursor);
     const end = new Date(start);
     end.setDate(end.getDate() + 7);
     const startISO = isoOf(start);
     const endISO = isoOf(end);
     return orders.filter((o) => o.deliveryDateISO >= startISO && o.deliveryDateISO < endISO).length;
-  }, [orders]);
+  }, [orders, cursor]);
 
   const nextOrder = useMemo(() => {
     return orders.find((o) => daysUntil(o.deliveryDateISO) >= 0) ?? null;
   }, [orders]);
 
   const monthGrid = useMemo(() => {
+    if (!cursor) return [];
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const gridStart = startOfWeek(first);
     const cells: Array<{ date: Date; iso: string; inMonth: boolean }> = [];
@@ -125,8 +132,10 @@ export default function CateringOrdersPage() {
   }, [cursor]);
 
   function gotoMonth(delta: number) {
-    setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
+    setCursor((c) => c ? new Date(c.getFullYear(), c.getMonth() + delta, 1) : new Date());
   }
+
+  if (!cursor) return <div className={styles.page}><p className={styles.empty}>Loading…</p></div>;
 
   return (
     <div className={styles.page}>

@@ -92,8 +92,12 @@ function ChevronIcon() {
 }
 
 export default function DailySoldOutPage() {
-  const today = new Date().toLocaleDateString("en-CA");
+  const [today, setToday] = useState("");
   const { user } = useAuth();
+
+  useEffect(() => {
+    setToday(new Date().toLocaleDateString("en-CA"));
+  }, []);
 
   const [soldOutIds, setSoldOutIds] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -102,6 +106,7 @@ export default function DailySoldOutPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!today) return;
     const db = getDb();
     const ref = doc(db, "sold_out_daily", today);
     const unsub = onSnapshot(ref, (snap) => {

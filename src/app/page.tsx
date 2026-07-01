@@ -92,8 +92,14 @@ export default function DashboardPage() {
 
 function OwnerDashboard() {
   const { user } = useAuth();
-  const todayKey = useMemo(sydneyTodayKey, []);
-  const [selectedDate, setSelectedDate] = useState<string>(todayKey);
+  const [todayKey, setTodayKey] = useState("");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+
+  useEffect(() => {
+    const key = sydneyTodayKey();
+    setTodayKey(key);
+    setSelectedDate(key);
+  }, []);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [rangeDates, setRangeDates] = useState<{ start: string; end: string } | null>(null);
   const isRangeMode = rangeDates !== null;
@@ -163,6 +169,7 @@ function OwnerDashboard() {
 
   // Reset displayed values on date change so we don't briefly show stale numbers.
   useEffect(() => {
+    if (!selectedDate) return;
     setStats(null);
     setReservations(null);
     setLastUpdated(null);
@@ -227,9 +234,10 @@ function OwnerDashboard() {
 
   // This week's catering orders count
   const weekCateringCount = useMemo(() => {
-    if (!cateringOrders) return null;
-    // Get Monday of this week
-    const today = new Date();
+    if (!cateringOrders || !todayKey) return null;
+    // Get Monday of this week from todayKey (avoids new Date() during render)
+    const [y, m, d] = todayKey.split("-").map(Number);
+    const today = new Date(y, m - 1, d);
     const dayOfWeek = today.getDay();
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const monday = new Date(today);
@@ -244,7 +252,7 @@ function OwnerDashboard() {
         o.deliveryDateISO <= sundayKey &&
         o.status !== "CANCELLED",
     ).length;
-  }, [cateringOrders]);
+  }, [cateringOrders, todayKey]);
 
   const todaySales     = stats?.todaySales ?? null;
   const weeklyProgress = stats?.weeklyProgress ?? null;

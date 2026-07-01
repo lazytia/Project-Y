@@ -86,7 +86,10 @@ export default function CalendarPicker({ value, maxDate, minDate, singleOnly = f
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const todayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
+  const [todayKey, setTodayKey] = useState("");
+  useEffect(() => {
+    setTodayKey(new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" }));
+  }, []);
 
   function handleDay(day: number) {
     const k = buildKey(viewYear, viewMonth, day);

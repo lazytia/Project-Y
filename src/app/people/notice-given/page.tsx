@@ -155,9 +155,15 @@ export default function NoticeGivenPage() {
     })();
   }, [authLoading, allowed, router]);
 
-  const today = todayIso();
-  const endWeek = endOfWeekIso();
-  const next30 = next30Iso();
+  const [today, setToday] = useState("");
+  const [endWeek, setEndWeek] = useState("");
+  const [next30, setNext30] = useState("");
+
+  useEffect(() => {
+    setToday(todayIso());
+    setEndWeek(endOfWeekIso());
+    setNext30(next30Iso());
+  }, []);
 
   const filtered = useMemo(() => {
     switch (tab) {

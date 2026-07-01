@@ -144,8 +144,13 @@ export default function ActiveEmployeeDetailsPage() {
   const [paymentType, setPaymentType] = useState<PaymentType | "">("");
   const [amountStr, setAmountStr] = useState("");
   const [reason, setReason] = useState("");
-  const [paymentDate, setPaymentDate] = useState(todayIso());
+  const [paymentDate, setPaymentDate] = useState("");
   const [calOpen, setCalOpen] = useState(false);
+
+  // Defer date initialization to avoid hydration mismatch
+  useEffect(() => {
+    setPaymentDate(todayIso());
+  }, []);
 
   // Hydrate from sessionStorage (back-navigation)
   useEffect(() => {

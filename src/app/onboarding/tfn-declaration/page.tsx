@@ -71,8 +71,13 @@ export default function TfnDeclarationPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  const todayKey = new Date().toLocaleDateString("en-CA");
-  const declarationDate = getTodayDisplay();
+  const [todayKey, setTodayKey] = useState("");
+  const [declarationDate, setDeclarationDate] = useState("");
+
+  useEffect(() => {
+    setTodayKey(new Date().toLocaleDateString("en-CA"));
+    setDeclarationDate(getTodayDisplay());
+  }, []);
 
   // Restore previously saved values when revisiting this step. Save uses a
   // nested `tfn: {…}` object, so we read from there first and fall back to

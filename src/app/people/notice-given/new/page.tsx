@@ -72,6 +72,11 @@ export default function NoticeGivenNewPage() {
     if (!allowed) router.replace(ROUTES.home);
   }, [authLoading, allowed, router]);
 
+  // Defer date initialization to avoid hydration mismatch
+  useEffect(() => {
+    setNoticeGivenDate(todayIso());
+  }, []);
+
   /* ── Staff picker ── */
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
@@ -126,7 +131,7 @@ export default function NoticeGivenNewPage() {
     : staff;
 
   /* ── Notice Details ── */
-  const [noticeGivenDate, setNoticeGivenDate] = useState(todayIso());
+  const [noticeGivenDate, setNoticeGivenDate] = useState("");
   const [lastWorkingDay, setLastWorkingDay] = useState("");
   const [reasonForLeaving, setReasonForLeaving] = useState("");
   const [reasonForLeavingOther, setReasonForLeavingOther] = useState("");

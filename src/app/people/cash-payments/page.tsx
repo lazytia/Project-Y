@@ -151,8 +151,16 @@ export default function CashPaymentsPage() {
     })();
   }, [authLoading, allowed, router]);
 
+  const [todayKey, setTodayKey] = useState("");
+
+  useEffect(() => {
+    setTodayKey(new Date().toLocaleDateString("en-CA"));
+  }, []);
+
   const monthSummary = useMemo(() => {
-    const now = new Date();
+    if (!todayKey) return { total: 0, count: 0 };
+    const [y, m] = todayKey.split("-").map(Number);
+    const now = new Date(y, m - 1, 1);
     let total = 0;
     let count = 0;
     for (const p of payments) {
@@ -162,7 +170,7 @@ export default function CashPaymentsPage() {
       }
     }
     return { total, count };
-  }, [payments]);
+  }, [payments, todayKey]);
 
   if (authLoading || loading) return <Splash />;
   if (!allowed) return null;

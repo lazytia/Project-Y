@@ -120,10 +120,16 @@ export default function StaffRosterPage() {
   const [loading, setLoading] = useState(true);
   const [rosterDoc, setRosterDoc] = useState<RosterDoc | null>(null);
 
-  const today = useMemo(() => {
-    const d = new Date();
+  const [today, setTodayDate] = useState<Date>(() => {
+    const d = new Date(0);
     d.setHours(0, 0, 0, 0);
     return d;
+  });
+
+  useEffect(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    setTodayDate(d);
   }, []);
   const weekStart = useMemo(() => startOfWeek(today), [today]);
   const weekStartISO = useMemo(() => isoDate(weekStart), [weekStart]);
@@ -163,7 +169,8 @@ export default function StaffRosterPage() {
   }, [rosterDoc, weekDays]);
 
   const nextShift = useMemo(() => {
-    const now = new Date();
+    if (!today.getTime()) return null;
+    const now = today;
     const allShifts = dayEntries.flatMap((de) =>
       de.shifts.map((s) => {
         const [h, m] = s.start.split(":").map(Number);
@@ -176,7 +183,7 @@ export default function StaffRosterPage() {
       .filter((s) => s.startDate.getTime() >= now.getTime())
       .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
     return upcoming[0] ?? allShifts.sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0] ?? null;
-  }, [dayEntries]);
+  }, [dayEntries, today]);
 
   const totalShifts = useMemo(
     () => dayEntries.reduce((sum, de) => sum + de.shifts.length, 0),

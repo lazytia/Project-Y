@@ -275,18 +275,29 @@ export default function InsightsPage() {
   }, [authLoading, allowed, router]);
 
   // Week anchors
-  const today = useMemo(() => {
-    const d = new Date();
+  const [today, setTodayDate] = useState<Date>(() => {
+    const d = new Date(0);
     d.setHours(0, 0, 0, 0);
     return d;
-  }, []);
+  });
   const todayWeekStart = useMemo(() => startOfWeekMon(today), [today]);
 
-  const [selectedWeekISO, setSelectedWeekISO] = useState<string>(() => isoDate(addDays(startOfWeekMon(new Date()), -7)));
+  const [selectedWeekISO, setSelectedWeekISO] = useState<string>("");
   // Free-form range the user picked via the calendar. Starts seeded to the
   // selected week's Mon–Sat span; once they pick a custom range we trust it.
-  const [rangeStartISO, setRangeStartISO] = useState<string>(() => isoDate(addDays(startOfWeekMon(new Date()), -7)));
-  const [rangeEndISO, setRangeEndISO] = useState<string>(() => isoDate(addDays(addDays(startOfWeekMon(new Date()), -7), 6)));
+  const [rangeStartISO, setRangeStartISO] = useState<string>("");
+  const [rangeEndISO, setRangeEndISO] = useState<string>("");
+
+  // Defer date initialization to avoid hydration mismatch
+  useEffect(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    setTodayDate(d);
+    const prevWeekStart = isoDate(addDays(startOfWeekMon(new Date()), -7));
+    setSelectedWeekISO(prevWeekStart);
+    setRangeStartISO(prevWeekStart);
+    setRangeEndISO(isoDate(addDays(addDays(startOfWeekMon(new Date()), -7), 6)));
+  }, []);
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -924,8 +935,18 @@ function RangeCalendarPicker({
     return new Date(y, m - 1, d);
   }, [rangeEndISO]);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const [today, setLocalToday] = useState<Date>(() => {
+    const d = new Date(0);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+
+  useEffect(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    setLocalToday(d);
+  }, []);
+
   const todayISOStr = isoDate(today);
   // Any week whose Monday >= todayWeekStart is disabled (current week + future).
   const todayWeekStart = startOfWeekMon(today);

@@ -117,7 +117,7 @@ export default function ManagerDashboard() {
   const todayDow = todayKey ? (() => {
     const [y, m, d] = todayKey.split("-").map(Number);
     return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
-  })() : new Date().getUTCDay();
+  })() : 0;
   const dailyTarget = DAILY_TARGETS[todayDow] ?? 0;
 
   useEffect(() => {
@@ -229,23 +229,18 @@ export default function ManagerDashboard() {
 
   // This week's catering orders count
   const weekCateringCount = useMemo(() => {
-    if (!cateringOrders) return null;
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + mondayOffset);
-    const mondayKey = monday.toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    const sundayKey = sunday.toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
+    if (!cateringOrders || !todayKey) return null;
+    const mondayKey = isoDateToMonday(todayKey);
+    const [my, mm, md] = mondayKey.split("-").map(Number);
+    const sunday = new Date(Date.UTC(my, mm - 1, md + 6));
+    const sundayKey = sunday.toISOString().slice(0, 10);
     return cateringOrders.filter(
       (o) =>
         o.deliveryDateISO >= mondayKey &&
         o.deliveryDateISO <= sundayKey &&
         o.status !== "CANCELLED",
     ).length;
-  }, [cateringOrders]);
+  }, [cateringOrders, todayKey]);
 
   const attentionTotal =
     attention.holidayRequests + attention.availabilityChanges +

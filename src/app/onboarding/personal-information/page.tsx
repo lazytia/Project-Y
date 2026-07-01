@@ -43,7 +43,11 @@ export default function PersonalInformationPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  const todayKey = new Date().toLocaleDateString("en-CA");
+  const [todayKey, setTodayKey] = useState("");
+
+  useEffect(() => {
+    setTodayKey(new Date().toLocaleDateString("en-CA"));
+  }, []);
 
   // Load any previously saved values so navigating back to this step doesn't
   // erase the user's input.

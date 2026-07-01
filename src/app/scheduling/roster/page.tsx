@@ -254,10 +254,16 @@ export default function ManagerRosterPage() {
   const [savingShift, setSavingShift] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
-  const today = useMemo(() => {
-    const d = new Date();
+  const [today, setTodayDate] = useState<Date>(() => {
+    const d = new Date(0);
     d.setHours(0, 0, 0, 0);
     return d;
+  });
+
+  useEffect(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    setTodayDate(d);
   }, []);
   const weekStart = useMemo(() => startOfWeek(today), [today]);
   const weekStartISO = useMemo(() => isoDate(weekStart), [weekStart]);

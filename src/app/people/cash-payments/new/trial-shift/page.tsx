@@ -85,12 +85,17 @@ export default function TrialShiftDetailsPage() {
   const [email, setEmail] = useState("");
   const [idType, setIdType] = useState<IdType>("Driver Licence");
   const [idPhotoDataUrl, setIdPhotoDataUrl] = useState("");
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("11:00");
   const [finishTime, setFinishTime] = useState("14:00");
   const [position, setPosition] = useState<Position>("Hall Staff");
   const [ratePerHour, setRatePerHour] = useState("25");
   const [outcome, setOutcome] = useState<Outcome>("not-hired");
+
+  // Defer date initialization to avoid hydration mismatch
+  useEffect(() => {
+    setDate(todayIso());
+  }, []);
 
   // Hydrate from sessionStorage if the user came back from step 2.
   useEffect(() => {

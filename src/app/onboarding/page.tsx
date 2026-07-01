@@ -56,7 +56,7 @@ export default function OnboardingPage() {
   // inProgressStep: step they were last WORKING on (including partial Save & Exit)
   const [inProgressStep, setInProgressStep] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [startDate, setStartDate] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -118,7 +118,7 @@ export default function OnboardingPage() {
   const continueStep = ALL_STEPS[inProgressStep] ?? nextStep;
   const remainingSteps = ALL_STEPS.slice(nextStepIndex + 1);
 
-  const payrollCutoff = getPayrollCutoff(startDate);
+  const payrollCutoff = startDate ? getPayrollCutoff(startDate) : null;
 
   // Keep the splash visible for completed staff so the overview UI never
   // flashes before the router.replace above lands on /onboarding/complete.
@@ -144,14 +144,14 @@ export default function OnboardingPage() {
               <span className={styles.dateIcon}>📅</span>
               <div>
                 <p className={styles.dateLabel}>Start Date</p>
-                <p className={styles.dateValue}>{fmtDate(startDate)}</p>
+                <p className={styles.dateValue}>{startDate ? fmtDate(startDate) : "—"}</p>
               </div>
             </div>
             <div className={styles.dateRow}>
               <span className={styles.dateIcon}>🕐</span>
               <div>
                 <p className={styles.dateLabel}>Payroll Cut-off</p>
-                <p className={styles.dateValue}>{fmtDate(payrollCutoff)}</p>
+                <p className={styles.dateValue}>{payrollCutoff ? fmtDate(payrollCutoff) : "—"}</p>
                 <p className={styles.dateSub}>
                   Submit by this date to be paid in the following week.
                 </p>
