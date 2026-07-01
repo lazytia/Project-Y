@@ -66,7 +66,7 @@ export default function NewEmployeePage() {
 
   const [fullName, setFullName] = useState("");
   const [position, setPosition] = useState<Position>("Hall Staff");
-  const [startDate, setStartDate] = useState(todayIso());
+  const [startDate, setStartDate] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
   const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>("First 2 Weeks");
   const [afterTrainingRate, setAfterTrainingRate] = useState("");
@@ -80,6 +80,11 @@ export default function NewEmployeePage() {
 
   const [saving, setSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);
+
+  // Set default start date on mount (avoids SSR/client hydration mismatch).
+  useEffect(() => {
+    if (!startDate) setStartDate(todayIso());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canSave =
     fullName.trim().length > 0 &&

@@ -113,7 +113,7 @@ export default function EditEmployeePage() {
   const [fullName, setFullName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [position, setPosition] = useState<Position>("Hall Staff");
-  const [startDate, setStartDate] = useState(todayIso());
+  const [startDate, setStartDate] = useState("");
   const [visaExpiry, setVisaExpiry] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
   const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>("First 2 Weeks");
