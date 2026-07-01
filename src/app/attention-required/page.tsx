@@ -415,7 +415,7 @@ export default function AttentionRequiredPage() {
 
       {/* Filter chips */}
       <div className={styles.filterRow} role="tablist" aria-label="Filter">
-        {(["all", "holiday", "availability", "onboarding", "compliance"] as Filter[]).map((k) => (
+        {(["all", "holiday", "availability", "compliance"] as Filter[]).map((k) => (
           <button
             key={k}
             type="button"

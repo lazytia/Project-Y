@@ -85,7 +85,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const userIsManager = isOwner(user) && !isStrictOwner(user);
   if (userIsManager) {
-    return <ManagerDashboard />;
+    return <ManagerDashboard hideAttention />;
   }
   return <OwnerDashboard />;
 }
