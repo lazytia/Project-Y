@@ -11,6 +11,7 @@ import {
   type Decision,
   type PublishShift,
 } from "@/lib/manager-actions";
+import { isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -227,6 +228,7 @@ function DotCount({ n }: { n: number }) {
 
 export default function ManagerRosterPage() {
   const { user } = useAuth();
+  const isChefUser = isChef(user);
   const [staffDocs, setStaffDocs] = useState<StaffDoc[]>([]);
   const [weekDoc, setWeekDoc] = useState<RosterWeekDoc>({});
   const [loading, setLoading] = useState(true);
@@ -577,14 +579,16 @@ export default function ManagerRosterPage() {
           <h1 className={styles.title}>Roster</h1>
           <p className={styles.subtitle}>{fmtRange(weekStart, weekEnd)}</p>
         </div>
-        <button
-          type="button"
-          className={styles.publishBtn}
-          onClick={publishWeek}
-          disabled={publishing}
-        >
-          {publishing ? "Publishing…" : "Publish"}
-        </button>
+        {!isChefUser && (
+          <button
+            type="button"
+            className={styles.publishBtn}
+            onClick={publishWeek}
+            disabled={publishing}
+          >
+            {publishing ? "Publishing…" : "Publish"}
+          </button>
+        )}
       </header>
 
       {/* Week strip with Lunch / Dinner rows */}
@@ -610,6 +614,13 @@ export default function ManagerRosterPage() {
           {weekDays.map((d, i) => {
             const iso = isoDate(d);
             const n = Object.keys(weekDoc.assignments?.[iso]?.lunch ?? {}).length;
+            if (isChefUser) {
+              return (
+                <div key={i} className={styles.gridCellReadOnly}>
+                  <DotCount n={n} />
+                </div>
+              );
+            }
             return (
               <button
                 key={i}
@@ -632,6 +643,13 @@ export default function ManagerRosterPage() {
           {weekDays.map((d, i) => {
             const iso = isoDate(d);
             const n = Object.keys(weekDoc.assignments?.[iso]?.dinner ?? {}).length;
+            if (isChefUser) {
+              return (
+                <div key={i} className={styles.gridCellReadOnly}>
+                  <DotCount n={n} />
+                </div>
+              );
+            }
             return (
               <button
                 key={i}
@@ -715,6 +733,13 @@ export default function ManagerRosterPage() {
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
               const n = Object.keys(nextWeekDoc.assignments?.[iso]?.lunch ?? {}).length;
+              if (isChefUser) {
+                return (
+                  <div key={i} className={styles.gridCellReadOnly}>
+                    <DotCount n={n} />
+                  </div>
+                );
+              }
               return (
                 <button
                   key={i}
@@ -735,6 +760,13 @@ export default function ManagerRosterPage() {
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
               const n = Object.keys(nextWeekDoc.assignments?.[iso]?.dinner ?? {}).length;
+              if (isChefUser) {
+                return (
+                  <div key={i} className={styles.gridCellReadOnly}>
+                    <DotCount n={n} />
+                  </div>
+                );
+              }
               return (
                 <button
                   key={i}
@@ -899,8 +931,8 @@ export default function ManagerRosterPage() {
         )}
       </section>
 
-      {/* Holiday Requests */}
-      <section className={styles.card}>
+      {/* Holiday Requests — hidden for chef */}
+      {!isChefUser && <section className={styles.card}>
         <div className={styles.cardHead}>
           <span className={styles.cardIcon}><CalIcon /></span>
           <p className={styles.cardTitle}>Holiday Requests</p>
@@ -948,10 +980,10 @@ export default function ManagerRosterPage() {
             ))}
           </ul>
         )}
-      </section>
+      </section>}
 
-      {/* Availability Change Requests */}
-      <section className={styles.card}>
+      {/* Availability Change Requests — hidden for chef */}
+      {!isChefUser && <section className={styles.card}>
         <div className={styles.cardHead}>
           <span className={styles.cardIcon}><CalIcon /></span>
           <p className={styles.cardTitle}>Availability Change Requests</p>
@@ -998,7 +1030,7 @@ export default function ManagerRosterPage() {
             ))}
           </ul>
         )}
-      </section>
+      </section>}
 
       {/* Note full-text modal */}
       {noteModal && (
@@ -1075,8 +1107,8 @@ export default function ManagerRosterPage() {
         </div>
       )}
 
-      {/* Day-meal assignment modal */}
-      {modalCell && (() => {
+      {/* Day-meal assignment modal — hidden for chef */}
+      {!isChefUser && modalCell && (() => {
         const cellDate = (() => {
           const [y, m, d] = modalCell.iso.split("-").map(Number);
           return new Date(y, m - 1, d);
@@ -1365,8 +1397,8 @@ export default function ManagerRosterPage() {
         );
       })()}
 
-      {/* Availability Overview (collapsible) */}
-      <section className={styles.card}>
+      {/* Availability Overview (collapsible) — hidden for chef */}
+      {!isChefUser && <section className={styles.card}>
         <button
           type="button"
           className={styles.cardHeadBtn}
@@ -1414,7 +1446,7 @@ export default function ManagerRosterPage() {
             </ul>
           )
         )}
-      </section>
+      </section>}
     </div>
   );
 }
