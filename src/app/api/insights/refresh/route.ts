@@ -182,44 +182,45 @@ export async function POST(req: NextRequest) {
     xero?: { gross: number; super: number; payRunID: string | null; perWeek: { iso: string; gross: number; super: number }[] } | { error: string } | null;
   } = { week: mondayKey };
 
+  // Sync Square + Payroll in parallel. Each week's Square sync is also
+  // fanned out — 4 weeks was serial before and dominated the refresh
+  // latency. Payroll still shares one cached Sheet fetch.
+  cachedTotals = null;
+
+  const squareSettled = await Promise.allSettled(
+    weeksToSync.map((w) => syncSquareWeek(w.iso).then((r) => ({ iso: w.iso, ...r }))),
+  );
   const sqResults: { iso: string; grossSales: number; days: number }[] = [];
   let sqError: string | null = null;
-  for (const w of weeksToSync) {
-    try {
-      const r = await syncSquareWeek(w.iso);
-      sqResults.push({ iso: w.iso, ...r });
-    } catch (err) {
-      sqError = err instanceof Error ? err.message : "Square sync failed.";
-      break;
-    }
+  for (const s of squareSettled) {
+    if (s.status === "fulfilled") sqResults.push(s.value);
+    else if (!sqError) sqError = s.reason instanceof Error ? s.reason.message : "Square sync failed.";
   }
-  if (sqError) {
+  if (sqError && sqResults.length === 0) {
     out.square = { error: sqError };
   } else if (sqResults.length > 0) {
     const selected = sqResults.find((r) => r.iso === mondayKey) ?? sqResults[0];
     out.square = { grossSales: selected.grossSales, days: selected.days, perWeek: sqResults };
   }
 
-  // Reset the cache so this POST does exactly one Sheet fetch.
-  cachedTotals = null;
+  const paySettled = await Promise.allSettled(
+    weeksToSync.map(async (w) => {
+      const r = await syncPayrollWeekFromSheet(w.date);
+      return r ? { iso: w.iso, gross: r.gross, super: r.super } : null;
+    }),
+  );
   const payResults: { iso: string; gross: number; super: number }[] = [];
   let payError: string | null = null;
-  let anyPay = false;
-  for (const w of weeksToSync) {
-    try {
-      const r = await syncPayrollWeekFromSheet(w.date);
-      if (r) {
-        payResults.push({ iso: w.iso, gross: r.gross, super: r.super });
-        anyPay = true;
-      }
-    } catch (err) {
-      payError = err instanceof Error ? err.message : "Payroll sync failed.";
-      break;
+  for (const p of paySettled) {
+    if (p.status === "fulfilled") {
+      if (p.value) payResults.push(p.value);
+    } else if (!payError) {
+      payError = p.reason instanceof Error ? p.reason.message : "Payroll sync failed.";
     }
   }
-  if (payError) {
+  if (payError && payResults.length === 0) {
     out.xero = { error: payError };
-  } else if (anyPay) {
+  } else if (payResults.length > 0) {
     const selected = payResults.find((r) => r.iso === mondayKey) ?? payResults[0];
     out.xero = { gross: selected.gross, super: selected.super, payRunID: null, perWeek: payResults };
   } else {

@@ -129,21 +129,18 @@ export async function fetchWeeklyPayrollTotals(): Promise<Record<string, WeeklyP
     }
     if (totalIncSuperCol === -1) continue;
 
-    // Walk down until the next Pay History header, collecting every row
-    // whose first few cells label it as some kind of "Total". If the
-    // block has both a subtotal "Total" and a "Grand Total" (common
-    // export shape), we want the Grand Total. If it only has "Total",
-    // we take the LAST one — a "Total" that appears after employee rows
-    // added below an earlier subtotal will hold the corrected sum.
-    //
-    // "Total" may live in the first or second cell depending on whether
-    // the sheet uses an empty leading column, so scan the first few.
-    const TOTAL_RE = /^\s*total\s*:?\s*$/i;
-    const GRAND_TOTAL_RE = /^\s*grand\s*total\s*:?\s*$/i;
-    const totalRows: { row: unknown[]; isGrand: boolean }[] = [];
+    // Walk down until the next Pay History header. Sum every numeric
+    // value in the "Total Inc Super" column that belongs to an EMPLOYEE
+    // row — skip any "Total" / "Grand Total" summary row so we don't
+    // double count. Summing individual rows makes us immune to sheets
+    // where the built-in Total row is stale (e.g. an employee was added
+    // below an earlier subtotal without the sum being re-run).
+    const TOTAL_RE = /^\s*(grand\s+)?total\s*:?\s*$/i;
+    let employeeSum = 0;
+    let sawAny = false;
     for (let j = colHeaderIdx + 1; j < rows.length; j += 1) {
       const r = rows[j] ?? [];
-      // Stop when the next Pay History header shows up.
+      // Stop at the next Pay History header.
       let hitNext = false;
       for (const cell of r) {
         if (typeof cell === "string" && HEADER_RE.test(cell)) {
@@ -153,23 +150,23 @@ export async function fetchWeeklyPayrollTotals(): Promise<Record<string, WeeklyP
       }
       if (hitNext) break;
 
-      let isGrand = false;
-      let isTotal = false;
+      // Skip summary rows (Total / Grand Total).
+      let isSummary = false;
       for (let k = 0; k < Math.min(3, r.length); k += 1) {
         const cell = r[k];
-        if (typeof cell !== "string") continue;
-        if (GRAND_TOTAL_RE.test(cell)) { isGrand = true; break; }
-        if (TOTAL_RE.test(cell)) { isTotal = true; break; }
+        if (typeof cell === "string" && TOTAL_RE.test(cell)) { isSummary = true; break; }
       }
-      if (isGrand || isTotal) totalRows.push({ row: r, isGrand });
-    }
-    // Prefer Grand Total if present; otherwise the last plain Total.
-    const grand = totalRows.find((t) => t.isGrand);
-    const totalRow = grand?.row ?? totalRows[totalRows.length - 1]?.row ?? null;
-    if (!totalRow) continue;
+      if (isSummary) continue;
 
-    const totalIncSuper = parseMoney(totalRow[totalIncSuperCol]);
-    if (totalIncSuper === null) continue;
+      const val = parseMoney(r[totalIncSuperCol]);
+      if (val === null) continue;
+      employeeSum += val;
+      sawAny = true;
+    }
+    if (!sawAny) continue;
+    // Round to cents — floating-point sums drift by 1e-13 which then
+    // renders as ugly $10,279.079999... in the UI.
+    const totalIncSuper = Math.round(employeeSum * 100) / 100;
 
     out[weekStartISO] = { weekStartISO, weekEndISO, totalIncSuper };
   }
