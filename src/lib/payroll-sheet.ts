@@ -129,44 +129,58 @@ export async function fetchWeeklyPayrollTotals(): Promise<Record<string, WeeklyP
     }
     if (totalIncSuperCol === -1) continue;
 
-    // Walk down until the next Pay History header. Sum every numeric
-    // value in the "Total Inc Super" column that belongs to an EMPLOYEE
-    // row — skip any "Total" / "Grand Total" summary row so we don't
-    // double count. Summing individual rows makes us immune to sheets
-    // where the built-in Total row is stale (e.g. an employee was added
-    // below an earlier subtotal without the sum being re-run).
+    // Walk down until the next Pay History header, collecting both
+    //   (a) the running sum of Total Inc Super across employee rows, and
+    //   (b) the Total-row value (if any) for the same column.
+    //
+    // Some pay-week blocks fill Total Inc Super for every employee — in
+    // that case the employee sum is authoritative and self-corrects if
+    // the sheet's Total cell is stale. Other blocks leave the column
+    // blank per employee and only populate the Total row — in that case
+    // we fall back to the Total row's value. Trying both means we no
+    // longer depend on the sheet's shape being consistent week-to-week.
     const TOTAL_RE = /^\s*(grand\s+)?total\s*:?\s*$/i;
     let employeeSum = 0;
-    let sawAny = false;
+    let employeeSumCount = 0;
+    const totalRows: { row: unknown[]; isGrand: boolean }[] = [];
     for (let j = colHeaderIdx + 1; j < rows.length; j += 1) {
       const r = rows[j] ?? [];
-      // Stop at the next Pay History header.
       let hitNext = false;
       for (const cell of r) {
-        if (typeof cell === "string" && HEADER_RE.test(cell)) {
-          hitNext = true;
-          break;
-        }
+        if (typeof cell === "string" && HEADER_RE.test(cell)) { hitNext = true; break; }
       }
       if (hitNext) break;
 
-      // Skip summary rows (Total / Grand Total).
       let isSummary = false;
+      let isGrand = false;
       for (let k = 0; k < Math.min(3, r.length); k += 1) {
         const cell = r[k];
-        if (typeof cell === "string" && TOTAL_RE.test(cell)) { isSummary = true; break; }
+        if (typeof cell !== "string") continue;
+        if (/^\s*grand\s+total\s*:?\s*$/i.test(cell)) { isSummary = true; isGrand = true; break; }
+        if (TOTAL_RE.test(cell)) { isSummary = true; break; }
       }
-      if (isSummary) continue;
+      if (isSummary) {
+        totalRows.push({ row: r, isGrand });
+        continue;
+      }
 
       const val = parseMoney(r[totalIncSuperCol]);
       if (val === null) continue;
       employeeSum += val;
-      sawAny = true;
+      employeeSumCount += 1;
     }
-    if (!sawAny) continue;
-    // Round to cents — floating-point sums drift by 1e-13 which then
-    // renders as ugly $10,279.079999... in the UI.
-    const totalIncSuper = Math.round(employeeSum * 100) / 100;
+
+    let totalIncSuper: number | null = null;
+    if (employeeSumCount > 0) {
+      // Round to cents — floating-point sums drift by 1e-13 which then
+      // renders as ugly $10,279.079999... in the UI.
+      totalIncSuper = Math.round(employeeSum * 100) / 100;
+    } else if (totalRows.length > 0) {
+      const grand = totalRows.find((t) => t.isGrand);
+      const totalRow = grand?.row ?? totalRows[totalRows.length - 1].row;
+      totalIncSuper = parseMoney(totalRow[totalIncSuperCol]);
+    }
+    if (totalIncSuper === null) continue;
 
     out[weekStartISO] = { weekStartISO, weekEndISO, totalIncSuper };
   }
