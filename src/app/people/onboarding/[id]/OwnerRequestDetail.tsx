@@ -7,6 +7,7 @@ import {
   getDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   serverTimestamp,
   type Timestamp,
 } from "firebase/firestore";
@@ -204,6 +205,39 @@ export default function OwnerRequestDetail() {
     }
   }
 
+  async function handleUnapprove() {
+    if (!docData || !docData.approved || busy) return;
+    if (!window.confirm("Revert this request to Pending Approval?")) return;
+    setBusy(true);
+    try {
+      await updateDoc(doc(getDb(), "staff_onboarding", id), {
+        status: "Waiting for Documents",
+        approvedAt: deleteField(),
+        approvedByUid: deleteField(),
+        approvedByName: deleteField(),
+        addedToScheduling: false,
+        accountCreated: false,
+        updatedAt: serverTimestamp(),
+      });
+      setDocData((prev) =>
+        prev
+          ? {
+              ...prev,
+              approved: false,
+              status: "Waiting for Documents",
+              addedToScheduling: false,
+              accountCreated: false,
+            }
+          : prev,
+      );
+      setToast({ title: "Reverted to pending", message: "The request can be approved again." });
+    } catch {
+      alert("Failed to revert. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleDecline() {
     if (busy) return;
     setBusy(true);
@@ -357,6 +391,19 @@ export default function OwnerRequestDetail() {
           <span className={`${styles.checkItem} ${docData.accountCreated ? styles.checkDone : ""}`}>
             {docData.accountCreated ? "✓" : "○"} Account Created
           </span>
+        </div>
+      )}
+
+      {docData.approved && (
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.declineBtn}
+            disabled={busy}
+            onClick={() => void handleUnapprove()}
+          >
+            Revert to Pending Approval
+          </button>
         </div>
       )}
 
