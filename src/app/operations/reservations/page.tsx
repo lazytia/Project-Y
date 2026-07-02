@@ -21,6 +21,7 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function fmtHeaderDate(iso: string): string {
+  if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   return `${WEEKDAYS[dt.getDay()]} ${d} ${MONTH_SHORT[m - 1]}`;
@@ -103,7 +104,14 @@ function MoonIcon() {
 
 export default function ReservationsPage() {
   const { user } = useAuth();
-  const [dateISO, setDateISO] = useState<string>(todayISO());
+  // Defer todayISO() to the first client effect so SSR renders an empty
+  // string and hydration matches. Otherwise server (UTC-ish) and client
+  // (Sydney) can pick different dates around midnight UTC and the page
+  // crashes with "Application error: a client-side exception has occurred".
+  const [dateISO, setDateISO] = useState<string>("");
+  useEffect(() => {
+    if (!dateISO) setDateISO(todayISO());
+  }, [dateISO]);
   const [branch] = useState<ReservationBranch>("northsydney");
   const [list, setList] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +156,7 @@ export default function ReservationsPage() {
   }
 
   async function reload() {
-    if (!user) return;
+    if (!user || !dateISO) return;
     setLoading(true);
     try {
       const docs = await fetchReservationsForDate(user, dateISO, branch);
