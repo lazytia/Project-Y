@@ -120,6 +120,7 @@ export default function StaffDetailPage() {
   const [extras, setExtras] = useState<ShiftFromApi[]>([]);
   const [editingField, setEditingField] = useState<{ shiftId: string; field: "start" | "end" } | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [recentlySaved, setRecentlySaved] = useState<Set<string>>(new Set());
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -277,6 +278,16 @@ export default function StaffDetailPage() {
       );
       setEdits((prev) => ({ ...prev, [shift.id]: patch }));
       setEditingField(null);
+      // Flash a "Saved to Firebase" pill for 2 s so the owner can see
+      // the write went through.
+      setRecentlySaved((prev) => new Set(prev).add(shift.id));
+      setTimeout(() => {
+        setRecentlySaved((prev) => {
+          const next = new Set(prev);
+          next.delete(shift.id);
+          return next;
+        });
+      }, 2000);
     } catch (err) {
       console.error("[timesheet_edits] save failed:", err);
       setEditError(err instanceof Error ? err.message : "Save failed.");
@@ -426,6 +437,9 @@ export default function StaffDetailPage() {
               <div className={styles.shiftFooter}>
                 <span className={styles.hoursText}>{fmtHours(s.hours)}</span>
                 {isSaving && <span className={styles.savingHint}>Saving…</span>}
+                {!isSaving && recentlySaved.has(s.id) && (
+                  <span className={styles.savedPill}>Saved to Firebase ✓</span>
+                )}
               </div>
             </li>
           );

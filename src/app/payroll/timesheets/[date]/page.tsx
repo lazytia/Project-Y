@@ -106,9 +106,9 @@ export default function DayDetailsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [dateOpen, setDateOpen] = useState(false);
   const [edits, setEdits] = useState<Record<string, EditDoc>>({});
-  const [editingField, setEditingField] = useState<{ shiftId: string; field: "start" | "end" } | null>(null);
-  const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<{ shiftId: string; field: "start" | "end" } | null>(null);  const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [recentlySaved, setRecentlySaved] = useState<Set<string>>(new Set());
   const [extraShifts, setExtraShifts] = useState<ShiftFromApi[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState<{ teamMemberId: string; startHHMM: string; endHHMM: string }>({

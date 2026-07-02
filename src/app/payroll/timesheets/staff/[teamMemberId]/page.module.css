@@ -226,6 +226,23 @@
   color: var(--color-warm);
 }
 .savingHint { font-size: 11px; color: var(--color-fg-muted); }
+.savedPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  animation: savedFade 2s ease-out forwards;
+}
+@keyframes savedFade {
+  0% { opacity: 0; transform: translateY(4px); }
+  10% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
 .empty { padding: 24px; text-align: center; color: var(--color-fg-muted); font-size: 13px; }
 
 /* ── other staff quick switch ── */

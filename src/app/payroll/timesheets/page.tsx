@@ -413,7 +413,7 @@ export default function TimesheetsPage() {
       <div className={styles.summaryHeader}>
         <p className={styles.sectionEyebrow}>BY {view === "day" ? "DAY" : "STAFF"} SUMMARY</p>
         <Link href="/scheduling/roster" className={styles.viewCalLink}>
-          <CalIconSm /> View calendar
+          <CalIconSm /> View roster
         </Link>
       </div>
 
