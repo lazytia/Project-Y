@@ -1,0 +1,300 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-7);
+  max-width: 640px;
+  position: relative;
+}
+
+.backBtn {
+  position: absolute;
+  top: -8px;
+  left: 0;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.header { padding-top: 28px; }
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--color-warm);
+  margin: 0;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-fg);
+  margin: 4px 0 0;
+  letter-spacing: -0.01em;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  margin: 4px 0 0;
+}
+
+/* ── selected staff summary card ── */
+.summaryCard {
+  background: #0f0f0f;
+  color: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.summaryHead { display: flex; align-items: center; gap: 12px; }
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.summaryName {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+}
+.summarySub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  margin: 2px 0 0;
+}
+.summaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  padding-top: 14px;
+}
+.summaryLabel {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.7);
+  margin: 0 0 4px;
+}
+.summaryValueOrange {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-warm);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* ── banners ── */
+.errorBanner {
+  margin: 0;
+  padding: 10px 14px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.busyBanner {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+/* ── shift cards ── */
+.shiftsHeading {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+  margin: 0;
+}
+.shiftList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.shiftCard {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.shiftDate {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+  margin: 0;
+}
+.timeRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.timeChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.timeChip:hover { border-color: var(--color-warm); background: var(--color-warm-bg); }
+.timeMain {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+.timeAmpm { font-size: 11px; color: var(--color-fg-muted); font-weight: 600; }
+.timeSep { color: var(--color-fg-muted); }
+.timeInput {
+  padding: 4px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-warm);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  min-width: 100px;
+}
+.editedNote {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.editedBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  border-radius: 4px;
+}
+.noEditsNote {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  margin: 0;
+}
+.shiftFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hoursText {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-warm);
+}
+.savingHint { font-size: 11px; color: var(--color-fg-muted); }
+.empty { padding: 24px; text-align: center; color: var(--color-fg-muted); font-size: 13px; }
+
+/* ── other staff quick switch ── */
+.otherHeading {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+  margin: 10px 0 0;
+}
+.otherList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.otherRow {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+.otherRow:hover { background: var(--color-surface); }
+.otherList li:last-child .otherRow { border-bottom: none; }
+.otherAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.otherName {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+  margin: 0;
+}
+.otherMeta { font-size: 11px; color: var(--color-fg-muted); margin: 2px 0 0; }
+.otherHours {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+/* ── footer note ── */
+.footNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--color-fg-muted);
+  font-size: 11px;
+  background: var(--color-warm-bg);
+  border-radius: 10px;
+}

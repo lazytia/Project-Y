@@ -79,20 +79,29 @@ export async function GET(req: NextRequest) {
       cursor = page.cursor;
     } while (cursor);
 
-    // 2) Team members — one call, keyed by id.
-    type SquareTeamMember = { id?: string; givenName?: string; familyName?: string };
+    // 2) Team members — one call, keyed by id. Skip INACTIVE members so
+    //    the "Add shift" dropdown doesn't surface anyone who left.
+    type SquareTeamMember = {
+      id?: string;
+      givenName?: string;
+      familyName?: string;
+      status?: "ACTIVE" | "INACTIVE" | string;
+    };
     const teamMembers: Record<string, { firstName?: string; lastName?: string }> = {};
     try {
       let tCursor: string | undefined;
       do {
         const res = await squareClient.teamMembers.search({
-          query: { filter: { locationIds: [locationId] } },
+          query: {
+            filter: { locationIds: [locationId], status: "ACTIVE" as never },
+          },
           cursor: tCursor,
           limit: 200,
         });
         const page = (res as unknown as { teamMembers?: SquareTeamMember[]; cursor?: string });
         for (const m of page.teamMembers ?? []) {
           if (!m.id) continue;
+          if (m.status && m.status !== "ACTIVE") continue;
           teamMembers[m.id] = { firstName: m.givenName, lastName: m.familyName };
         }
         tCursor = page.cursor;
