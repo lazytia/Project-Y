@@ -129,30 +129,43 @@ export async function fetchWeeklyPayrollTotals(): Promise<Record<string, WeeklyP
     }
     if (totalIncSuperCol === -1) continue;
 
-    // Walk down until we find the "Total" row. "Total" may live in the
-    // first or second cell depending on whether the sheet uses an empty
-    // leading column, so check the first few cells.
-    let totalRow: unknown[] | null = null;
+    // Walk down until the next Pay History header, collecting every row
+    // whose first few cells label it as some kind of "Total". If the
+    // block has both a subtotal "Total" and a "Grand Total" (common
+    // export shape), we want the Grand Total. If it only has "Total",
+    // we take the LAST one — a "Total" that appears after employee rows
+    // added below an earlier subtotal will hold the corrected sum.
+    //
+    // "Total" may live in the first or second cell depending on whether
+    // the sheet uses an empty leading column, so scan the first few.
+    const TOTAL_RE = /^\s*total\s*:?\s*$/i;
+    const GRAND_TOTAL_RE = /^\s*grand\s*total\s*:?\s*$/i;
+    const totalRows: { row: unknown[]; isGrand: boolean }[] = [];
     for (let j = colHeaderIdx + 1; j < rows.length; j += 1) {
       const r = rows[j] ?? [];
+      // Stop when the next Pay History header shows up.
+      let hitNext = false;
+      for (const cell of r) {
+        if (typeof cell === "string" && HEADER_RE.test(cell)) {
+          hitNext = true;
+          break;
+        }
+      }
+      if (hitNext) break;
+
+      let isGrand = false;
       let isTotal = false;
       for (let k = 0; k < Math.min(3, r.length); k += 1) {
         const cell = r[k];
-        if (typeof cell === "string" && /^\s*total\s*:?\s*$/i.test(cell)) {
-          isTotal = true;
-          break;
-        }
+        if (typeof cell !== "string") continue;
+        if (GRAND_TOTAL_RE.test(cell)) { isGrand = true; break; }
+        if (TOTAL_RE.test(cell)) { isTotal = true; break; }
       }
-      if (isTotal) { totalRow = r; break; }
-      // Bail out if we run into the next "Pay History (" header before
-      // finding a Total row.
-      for (const cell of r) {
-        if (typeof cell === "string" && HEADER_RE.test(cell)) {
-          j = rows.length; // stop outer loop
-          break;
-        }
-      }
+      if (isGrand || isTotal) totalRows.push({ row: r, isGrand });
     }
+    // Prefer Grand Total if present; otherwise the last plain Total.
+    const grand = totalRows.find((t) => t.isGrand);
+    const totalRow = grand?.row ?? totalRows[totalRows.length - 1]?.row ?? null;
     if (!totalRow) continue;
 
     const totalIncSuper = parseMoney(totalRow[totalIncSuperCol]);

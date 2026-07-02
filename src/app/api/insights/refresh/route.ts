@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { OWNER_USERNAMES } from "@/lib/permissions";
+import { OWNER_USERNAMES, CHEF_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { fetchWeeklyPayrollTotals } from "@/lib/payroll-sheet";
 import {
@@ -30,7 +30,7 @@ import {
 
 const ORDER_STATES = ["OPEN", "COMPLETED"];
 
-async function verifyOwner(req: NextRequest): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+async function verifyOwnerOrChef(req: NextRequest): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   const header = req.headers.get("authorization") ?? "";
   const idToken = header.replace(/^Bearer\s+/i, "");
   if (!idToken) return { ok: false, status: 401, error: "Missing bearer token." };
@@ -43,11 +43,14 @@ async function verifyOwner(req: NextRequest): Promise<{ ok: true } | { ok: false
   }
   const email = decoded.email ?? "";
   const username = emailToUsername(email).toLowerCase();
-  if (!OWNER_USERNAMES.has(username)) {
+  // Chefs read Roster Insights, so they need to be able to force a resync
+  // from the same ↻ button owners use. All writes here are idempotent
+  // (they overwrite Firestore with a fresh Square/Sheet snapshot).
+  if (!OWNER_USERNAMES.has(username) && !CHEF_USERNAMES.has(username)) {
     return {
       ok: false,
       status: 403,
-      error: `Forbidden — owner only (signed in as "${email || decoded.uid}").`,
+      error: `Forbidden — owner/chef only (signed in as "${email || decoded.uid}").`,
     };
   }
   return { ok: true };
@@ -152,7 +155,7 @@ async function syncPayrollWeekFromSheet(
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await verifyOwner(req);
+  const auth = await verifyOwnerOrChef(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const url = new URL(req.url);
