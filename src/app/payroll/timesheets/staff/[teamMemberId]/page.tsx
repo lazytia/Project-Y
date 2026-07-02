@@ -428,8 +428,10 @@ export default function StaffDetailPage() {
               </div>
               {isEdited && origStart && origEnd ? (
                 <p className={styles.editedNote}>
-                  <span className={styles.editedBadge}>EDITED</span>{" "}
-                  · was {origStart.hhmm} {origStart.ampm} – {origEnd.hhmm} {origEnd.ampm}
+                  <span className={styles.editedBadge}>EDITED</span>
+                  <span className={styles.editedWas}>
+                    {" "}· was {origStart.hhmm} {origStart.ampm} – {origEnd.hhmm} {origEnd.ampm}
+                  </span>
                 </p>
               ) : (
                 <p className={styles.noEditsNote}>Store time (Australia/Sydney) · 5-minute steps</p>

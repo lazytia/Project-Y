@@ -191,6 +191,9 @@
   letter-spacing: 0.08em;
   border-radius: 4px;
 }
+.editedWas {
+  color: var(--color-warm);
+}
 
 /* ── Add-shift modal ── */
 .modalBackdrop {

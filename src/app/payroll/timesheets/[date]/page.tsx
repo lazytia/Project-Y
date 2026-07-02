@@ -494,12 +494,14 @@ export default function DayDetailsPage() {
                   </div>
                   {isEdited && original ? (
                     <p className={styles.editedNote}>
-                      <span className={styles.editedBadge}>EDITED</span>{" "}
-                      · was {(() => {
+                      <span className={styles.editedBadge}>EDITED</span>
+                      <span className={styles.editedWas}>
+                        {" "}· was {(() => {
                         const os = fmtClockTime(editRec.originalStartAt || original.startAt);
                         const oe = fmtClockTime(editRec.originalEndAt || original.endAt);
                         return `${os.hhmm} ${os.ampm} – ${oe.hhmm} ${oe.ampm}`;
                       })()}
+                      </span>
                     </p>
                   ) : (
                     <p className={styles.editNote}>No edits{isSaving ? " · saving…" : ""}</p>
