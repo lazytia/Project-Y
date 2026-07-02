@@ -6,520 +6,413 @@
   max-width: 640px;
 }
 
-/* ── DATE PICKER ── */
-.datePickerBar {
+/* ── HEADER ── */
+.pageHeader {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+}
+.pageTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.pageSubtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  margin: 4px 0 0;
+}
+.datePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-2) var(--space-3);
-}
-
-/* 날짜 텍스트 버튼 — 클릭하면 캘린더 오픈 */
-.dateCenter {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  background: transparent;
-  border: none;
+  border-radius: 12px;
+  font-family: inherit;
   cursor: pointer;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-md);
   transition: background 0.15s;
   -webkit-tap-highlight-color: transparent;
-  font-family: inherit;
 }
-
-.dateCenter:hover {
-  background: var(--color-surface);
-}
-
-.dateLabel {
-  font-family: var(--font-display);
-  font-size: var(--font-size-md);
+.datePill:hover { background: var(--color-surface); }
+.datePillIcon { color: var(--color-fg-muted); display: inline-flex; }
+.datePillLabel {
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-fg);
-  letter-spacing: 0.01em;
 }
+.datePillChevron { color: var(--color-fg-muted); font-size: 10px; }
 
-.calendarIcon {
-  font-size: 16px;
-  line-height: 1;
-}
-
-.todayBadge {
+/* ── SHARED LABELS ── */
+.sectionLabel {
   font-family: var(--font-display);
   font-size: 11px;
-  font-weight: 600;
-  color: var(--color-warm);
-  background: var(--color-warm-bg);
-  border-radius: var(--radius-sm);
-  padding: 2px 7px;
-  letter-spacing: 0.03em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
 }
-
-.rangeBadge {
+.sectionLabelOnDark {
   font-family: var(--font-display);
   font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.7);
+}
+.miniLabel {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+  margin: 0 0 6px;
+}
+.miniLabelOnDark {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 6px;
+}
+.mutedSmall { color: var(--color-fg-muted); font-size: var(--font-size-sm); margin: 0; }
+
+.viewLink, .viewLinkSm {
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  color: #ffffff;
-  background: var(--color-warm);
-  border-radius: var(--radius-sm);
-  padding: 2px 7px;
-  letter-spacing: 0.03em;
+  color: var(--color-brand);
+  text-decoration: none;
 }
+.viewLink:hover, .viewLinkSm:hover { text-decoration: underline; }
 
-.dateNavBtn {
-  width: 36px;
-  height: 36px;
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-fg);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.dateNavBtn:hover:not(:disabled) {
-  background: var(--color-surface-hover);
-}
-
-.dateNavBtn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-/* ── 공통 카드 ── */
-.card {
+/* ── TODAY CARD ── */
+.todayCard {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
+  border-radius: 14px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
-
-.cardTopRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.todayHeader { display: flex; align-items: center; justify-content: space-between; }
+.todayBody {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-3);
+  align-items: stretch;
 }
-
-.cardLabel {
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-fg-muted);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin: 0;
-  flex: 1;
-}
-
-.lastUpdated {
-  font-size: var(--font-size-xs);
-  color: var(--color-fg-subtle);
-  margin: 0;
-}
-
-.errorBadge {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--color-negative);
-  background: rgba(220, 38, 38, 0.08);
-  border-radius: var(--radius-sm);
-  padding: 2px var(--space-2);
-  margin: 0;
-}
-
-.salesLoading {
-  opacity: 0.35;
-}
-
-/* ── TODAY SALES ── */
+.todayLeft { min-width: 0; }
+.todayRight { display: flex; flex-direction: column; gap: 14px; }
+.todayDivider { width: 1px; background: var(--color-border); }
 .salesAmount {
   font-family: var(--font-display);
-  font-size: 34px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  color: #111111;
-  line-height: 42px;
-  margin: var(--space-1) 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-fg);
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
 }
+.targetSub { font-size: var(--font-size-sm); color: var(--color-fg-muted); margin: 4px 0 8px; }
+.targetSubOnDark { font-size: var(--font-size-sm); color: rgba(255,255,255,0.7); margin: 4px 0 8px; }
+.strong { color: var(--color-fg); font-weight: 700; }
+.loading { color: var(--color-fg-muted); }
 
-/* Supporting Text */
-.targetLabel {
+.mealRow { display: flex; align-items: flex-start; gap: 10px; }
+.mealIcon { font-size: 18px; line-height: 1; margin-top: 2px; }
+.mealCol { display: flex; flex-direction: column; gap: 2px; }
+.mealTitle {
   font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   color: var(--color-fg-muted);
   margin: 0;
 }
-
-/* ── 프로그레스 바 ── */
-.progressRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-1);
+.mealValue {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-brand);
+  margin: 0;
+  letter-spacing: -0.01em;
 }
+.mealUnit { font-size: 12px; color: var(--color-fg-muted); font-weight: 600; letter-spacing: 0.08em; }
+.mealSub { font-size: 12px; color: var(--color-fg-muted); margin: 0; display: flex; align-items: center; gap: 4px; }
 
+.errorBadge {
+  align-self: flex-start;
+  font-size: 11px;
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin: 0;
+}
+.updatedTiny { font-size: 11px; color: var(--color-fg-muted); margin: 0; }
+
+/* ── PROGRESS ── */
+.progressRow { display: flex; align-items: center; gap: 8px; }
 .progressTrack {
   flex: 1;
   height: 8px;
-  background: var(--color-surface-hover);
-  border-radius: 99px;
+  background: var(--color-surface);
+  border-radius: 999px;
   overflow: hidden;
 }
-
+.progressTrackOnDark {
+  background: rgba(255, 255, 255, 0.15);
+}
 .progressFill {
   height: 100%;
-  background: var(--color-warm);
-  border-radius: 99px;
-  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--color-brand);
+  border-radius: 999px;
+  transition: width 0.35s ease;
 }
-
 .progressPct {
-  font-size: var(--font-size-md);
+  font-size: 12px;
   font-weight: 700;
-  color: var(--color-warm);
-  flex-shrink: 0;
-  min-width: 40px;
+  color: var(--color-brand);
+  min-width: 32px;
   text-align: right;
 }
 
-/* ── RESTAURANT / PLATTER — TODAY SALES 카드 내부 ── */
-.salesBreakRow {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 0;
-  border-top: 1px solid var(--color-border);
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-}
-
-.salesBreakDivider {
-  width: 1px;
-  align-self: stretch;
-  background: var(--color-border);
-  margin: 0 var(--space-3);
-}
-
-.salesBreakItem {
+/* ── WEEK CARD (dark) ── */
+.weekCard {
+  background: #0f0f0f;
+  color: #fff;
+  border-radius: 16px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;     /* allow grid column to shrink — prevents icon overflow */
-}
-
-/* Secondary KPI */
-.salesBreakAmount {
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 600;
-  min-width: 0;
-  white-space: nowrap;
-  letter-spacing: -0.02em;
-  color: #111111;
-  margin: 0;
-  line-height: 1;
-}
-
-/* ── SECTION TITLE ── */
-.sectionTitle {
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-fg);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin: var(--space-2) 0 0;
-}
-
-/* ── TODAY'S OPERATIONS ── */
-.splitRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: var(--space-3);
 }
+.weekHeader { display: flex; align-items: baseline; gap: 12px; }
+.weekRange { font-size: var(--font-size-sm); color: rgba(255,255,255,0.7); }
+.weekBody {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+.weekLeft { min-width: 0; }
+.weekRight { min-width: 0; display: flex; flex-direction: column; }
+.weekDivider { width: 1px; background: rgba(255,255,255,0.12); }
+.weekAmount {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+.weekVs { font-size: var(--font-size-sm); color: rgba(255,255,255,0.7); margin: 8px 0 0; }
+.deltaPos { color: #4ade80; font-weight: 700; }
+.deltaNeg { color: #f87171; font-weight: 700; }
 
+.payrollPct {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--color-brand);
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+.badgeOnTarget {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(74, 222, 128, 0.16);
+  color: #4ade80;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-top: 4px;
+}
+.badgeOverTarget {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(248, 113, 113, 0.16);
+  color: #f87171;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-top: 4px;
+}
+
+/* ── CATERING ROW ── */
+.splitRow { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .splitCard {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
+  border-radius: 14px;
+  padding: var(--space-3) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 6px;
 }
-
-.opsIconRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.opsIcon {
-  display: flex;
+.splitBody { display: flex; align-items: center; gap: 12px; }
+.cateringIcon {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-fg-muted);
-  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(255, 138, 76, 0.14);
+  color: var(--color-brand);
 }
-
-.opsLabel {
+.cateringCount {
   font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 800;
   color: var(--color-fg);
-}
-
-.opsValue {
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--color-fg);
-  margin: var(--space-1) 0 0;
-  line-height: 1.1;
-}
-
-.opsUnit {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--color-fg-muted);
-}
-
-.opsSub {
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-fg-muted);
   margin: 0;
-  line-height: 1.5;
 }
-
-.opsCountdown {
+.cateringUnit { font-size: 14px; color: var(--color-fg-muted); font-weight: 500; }
+.cateringCountdown {
   font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--color-warm);
-  margin: var(--space-1) 0 0;
-  line-height: 1.1;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-brand);
+  margin: 0;
 }
-
-.opsCateringDate {
+.cateringDate {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 500;
+  gap: 6px;
+  font-size: var(--font-size-sm);
   color: var(--color-fg-muted);
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
-  padding: 3px 8px;
-  margin: 2px 0;
-  width: fit-content;
+  margin: 4px 0 0;
 }
 
-.opsDivider {
-  height: 1px;
-  background: var(--color-border);
-  margin: var(--space-1) 0;
-}
-
-.opsView {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-warm);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.opsView:hover {
-  opacity: 0.8;
-}
-
-/* ── WEEKLY PROGRESS ── */
-/* Main KPI */
-.weeklyAmount {
-  font-family: var(--font-display);
-  font-size: 34px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  color: #111111;
-  margin: var(--space-1) 0 0;
-  line-height: 42px;
-}
-
-/* Supporting Text */
-.weeklyTarget {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-fg-muted);
-}
-
-/* ── STATS — 단일 카드, 세로 구분선 ── */
-.statsCard {
+/* ── REVIEW CARD ── */
+.reviewCard {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: 14px;
   padding: var(--space-4);
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr;
-  align-items: start;
-}
-
-.statCol {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 0 var(--space-2);
+  gap: var(--space-3);
+}
+.reviewHeader { display: flex; align-items: center; justify-content: space-between; }
+.editBtn {
+  display: inline-flex;
   align-items: center;
-  text-align: center;
-}
-
-.statColDivider {
-  width: 1px;
-  align-self: stretch;
-  background: var(--color-border);
-}
-
-/* Card Title */
-.statLabel {
-  font-family: var(--font-display);
-  font-size: 12px;
+  gap: 4px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  color: var(--color-fg-muted);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  line-height: 1.4;
-  margin: 0 0 var(--space-2);
+  color: var(--color-brand);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-family: inherit;
 }
-
-/* Secondary KPI */
-.statValue {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 600;
-  color: #111111;
-  letter-spacing: -0.02em;
+.reviewBody {
+  font-family: "Kalam", "Comic Sans MS", cursive;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #2a2a2a;
+  background: rgba(255, 138, 76, 0.06);
+  padding: var(--space-3);
+  border-radius: 10px;
+  white-space: pre-wrap;
   margin: 0;
-  line-height: 1;
 }
-
-/* Secondary KPI (orange) */
-.statValueWarm {
-  font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--color-warm);
-  letter-spacing: -0.01em;
-  margin: 0;
-  line-height: 1.3;
-}
-
-.statDivider {
-  height: 1px;
-  width: 60%;
-  background: var(--color-border);
-  margin: var(--space-2) auto;
-}
-
-/* Supporting Text */
-.statSub {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-fg-muted);
-  margin: 0 0 2px;
-}
-
-.statSubValue {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
+.reviewEmpty {
+  font-size: var(--font-size-sm);
   color: var(--color-fg-muted);
   margin: 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: 10px;
 }
-
-.statSubPos {
-  font-family: var(--font-display);
-  font-size: 14px;
+.reviewTextarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: var(--space-3);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  resize: vertical;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+.reviewTextarea:focus { outline: 2px solid var(--color-brand); outline-offset: -1px; }
+.reviewActions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.reviewActionsRight { display: flex; gap: 8px; }
+.btnDanger {
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 10px;
   font-weight: 600;
-  color: var(--color-positive);
-  margin: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
-
-.statSubNeg {
-  font-family: var(--font-display);
-  font-size: 14px;
+.btnDanger:hover { background: #fee2e2; }
+.btnDanger:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnGhost {
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
   font-weight: 600;
-  color: var(--color-negative);
-  margin: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
+.btnGhost:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnPrimary {
+  padding: 8px 14px;
+  background: var(--color-brand);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnPrimary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── BEST SELLERS ── */
-.sellerList {
-  list-style: none;
-  margin: var(--space-2) 0 0;
-  padding: 0;
+.bestCard {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
-
-.sellerItem {
+.bestHeader { display: flex; align-items: center; justify-content: space-between; }
+.bestList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: 12px;
 }
-
-.sellerRank {
-  width: 24px;
-  height: 24px;
-  border-radius: 99px;
-  background: var(--color-warm);
-  color: #ffffff;
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  display: flex;
+.bestItem { display: flex; align-items: center; gap: 12px; }
+.bestRank {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 138, 76, 0.16);
+  color: var(--color-brand);
+  font-weight: 800;
+  font-size: 13px;
   flex-shrink: 0;
 }
-
-.sellerName {
-  flex: 1;
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
-  color: #111111;
-}
-
-.sellerSales {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
-  color: #111111;
-}
+.bestName { flex: 1; color: var(--color-fg); font-size: var(--font-size-sm); }
+.bestSales { color: var(--color-fg); font-weight: 700; font-size: var(--font-size-sm); }
