@@ -534,12 +534,14 @@ function OwnerDashboard() {
               {weekCateringCount ?? "—"} <span className={styles.cateringUnit}>Orders</span>
             </p>
           </div>
-          <span className={styles.splitCardView}>
-            View <span aria-hidden="true">→</span>
-          </span>
         </Link>
         <Link href="/operations/catering-orders" className={styles.splitCard}>
-          <p className={styles.miniLabel}>NEXT CATERING</p>
+          <div className={styles.splitCardHead}>
+            <p className={styles.miniLabel}>NEXT CATERING</p>
+            <span className={styles.splitCardView}>
+              View <span aria-hidden="true">→</span>
+            </span>
+          </div>
           {nextCatering ? (
             <>
               <p className={styles.cateringCountdown}>{dCountdownLabel(nextCatering.deliveryDateISO)}</p>
@@ -560,9 +562,6 @@ function OwnerDashboard() {
           ) : (
             <p className={styles.mutedSmall}>No upcoming orders</p>
           )}
-          <span className={styles.splitCardView}>
-            View <span aria-hidden="true">→</span>
-          </span>
         </Link>
       </div>
 

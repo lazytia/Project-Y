@@ -262,9 +262,13 @@
   -webkit-tap-highlight-color: transparent;
 }
 .splitCard:hover { border-color: var(--color-warm); background: rgba(255, 106, 19, 0.03); }
+.splitCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .splitCardView {
-  margin-top: auto;
-  padding-top: 8px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
