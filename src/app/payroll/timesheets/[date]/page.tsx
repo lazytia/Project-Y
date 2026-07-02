@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import Splash from "@/components/Splash";
+import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
 
 /*
@@ -70,6 +71,18 @@ function initials(name: string): string {
   return (a + b) || "??";
 }
 
+// Stable colour per team member id — matches the palette used on the
+// roster page so the same person shows up in the same tint everywhere.
+const STAFF_COLORS = [
+  "#e91e63", "#9c27b0", "#ff7043", "#26a69a", "#42a5f5",
+  "#ffb300", "#ec407a", "#26c6da", "#7e57c2", "#66bb6a",
+];
+function colorForMemberId(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return STAFF_COLORS[h % STAFF_COLORS.length];
+}
+
 /* ── page ────────────────────────────────────────────────────────── */
 
 export default function DayDetailsPage() {
@@ -86,6 +99,8 @@ export default function DayDetailsPage() {
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMemberFromApi>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [view, setView] = useState<"day" | "staff">("day");
+  const [dateOpen, setDateOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!dateISO) return;
@@ -132,6 +147,34 @@ export default function DayDetailsPage() {
     [visibleShifts],
   );
 
+  // Roll shifts up per team member for the Staff view.
+  type StaffRow = {
+    teamMemberId: string;
+    name: string;
+    shifts: number;
+    hours: number;
+    firstStart: string | null;
+    lastEnd: string | null;
+  };
+  const byStaff = useMemo<StaffRow[]>(() => {
+    const agg: Record<string, StaffRow> = {};
+    for (const s of visibleShifts) {
+      const row = (agg[s.teamMemberId] ??= {
+        teamMemberId: s.teamMemberId,
+        name: nameOfTeamMember(s.teamMemberId, teamMembers[s.teamMemberId]),
+        shifts: 0,
+        hours: 0,
+        firstStart: null,
+        lastEnd: null,
+      });
+      row.shifts += 1;
+      row.hours += s.hours;
+      if (!row.firstStart || s.startAt < row.firstStart) row.firstStart = s.startAt;
+      if (s.endAt && (!row.lastEnd || s.endAt > row.lastEnd)) row.lastEnd = s.endAt;
+    }
+    return Object.values(agg).sort((a, b) => b.hours - a.hours);
+  }, [visibleShifts, teamMembers]);
+
   if (authLoading || loading) return <Splash />;
   if (!allowed) return <div className={styles.page}><p>Owner access only.</p></div>;
 
@@ -149,16 +192,122 @@ export default function DayDetailsPage() {
       </button>
 
       <header className={styles.header}>
-        <p className={styles.eyebrow}>DAY DETAILS</p>
+        <p className={styles.eyebrow}>{view === "day" ? "DAY DETAILS" : "STAFF"}</p>
         <div className={styles.titleRow}>
           <h1 className={styles.title}>{dateISO ? fmtDayTitle(dateISO) : ""}</h1>
-          <span className={styles.hoursPill}>{fmtHours(totalHours)}</span>
+          <button
+            type="button"
+            className={styles.datePickBtn}
+            onClick={() => setDateOpen(true)}
+            aria-label="Pick another day"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <span aria-hidden="true">▾</span>
+          </button>
+          {view === "day" && <span className={styles.hoursPill}>{fmtHours(totalHours)}</span>}
         </div>
       </header>
+
+      {dateOpen && (
+        <CalendarPicker
+          value={dateISO}
+          maxDate={new Date().toISOString().slice(0, 10)}
+          singleOnly
+          onChange={(d) => router.push(`/payroll/timesheets/${d}`)}
+          onRangeChange={() => { /* single only */ }}
+          onClose={() => setDateOpen(false)}
+        />
+      )}
+
+      {/* Day/Staff toggle + Add shift + Refresh */}
+      <div className={styles.actionRow}>
+        <div className={styles.viewToggle} role="tablist" aria-label="View mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "day"}
+            className={`${styles.toggleBtn} ${view === "day" ? styles.toggleBtnActive : ""}`}
+            onClick={() => setView("day")}
+          >
+            Day
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "staff"}
+            className={`${styles.toggleBtn} ${view === "staff" ? styles.toggleBtnActive : ""}`}
+            onClick={() => setView("staff")}
+          >
+            Staff
+          </button>
+        </div>
+        <button
+          type="button"
+          className={styles.addShiftInlineBtn}
+          onClick={() => alert("Add-shift is not wired to Square Labor yet.")}
+        >
+          <span aria-hidden="true">+</span> Add shift
+        </button>
+        <button
+          type="button"
+          className={styles.refreshBtn}
+          onClick={() => void load()}
+          disabled={busy}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>{" "}
+          Refresh
+        </button>
+      </div>
 
       {fetchError && <p className={styles.errorBanner}>Square Labor: {fetchError}</p>}
       {busy && !fetchError && <p className={styles.busyBanner}>Refreshing…</p>}
 
+      {view === "staff" ? (
+        <>
+          <div className={styles.staffColHeader}>
+            <span>STAFF</span>
+            <span>HOURS</span>
+            <span>SHIFTS</span>
+            <span />
+          </div>
+          <ul className={styles.staffList}>
+            {byStaff.length === 0 && !busy && (
+              <li className={styles.emptyRow}>No shifts recorded for this day.</li>
+            )}
+            {byStaff.map((s) => {
+              const startClock = fmtClockTime(s.firstStart);
+              const endClock = fmtClockTime(s.lastEnd);
+              return (
+                <li key={s.teamMemberId} className={styles.staffRow}>
+                  <span className={styles.avatarColor} style={{ background: colorForMemberId(s.teamMemberId) }} aria-hidden="true">
+                    {initials(s.name)}
+                  </span>
+                  <div className={styles.staffBody}>
+                    <p className={styles.staffName}>{s.name}</p>
+                  </div>
+                  <div className={styles.staffHoursCol}>
+                    <p className={styles.staffHoursMain}>{fmtHours(s.hours)}</p>
+                    <p className={styles.staffHoursSub}>
+                      {startClock.hhmm} {startClock.ampm} – {endClock.hhmm} {endClock.ampm}
+                    </p>
+                  </div>
+                  <span className={styles.staffShiftsCol}>{s.shifts}</span>
+                  <span className={styles.rowChev} aria-hidden="true">›</span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : (
       <ul className={styles.shiftList}>
         {visibleShifts.length === 0 && !busy ? (
           <li className={styles.emptyRow}>No shifts recorded for this day.</li>
@@ -204,14 +353,17 @@ export default function DayDetailsPage() {
           })
         )}
       </ul>
+      )}
 
-      <button
-        type="button"
-        className={styles.addShiftBtn}
-        onClick={() => alert("Add-shift is not wired to Square Labor yet.")}
-      >
-        <span aria-hidden="true">+</span> Add shift
-      </button>
+      {view === "day" && (
+        <button
+          type="button"
+          className={styles.addShiftBtn}
+          onClick={() => alert("Add-shift is not wired to Square Labor yet.")}
+        >
+          <span aria-hidden="true">+</span> Add shift
+        </button>
+      )}
 
       <div className={styles.footNote}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -200,3 +200,148 @@
   background: var(--color-warm-bg);
   border-radius: 10px;
 }
+
+/* Small calendar-dropdown button next to the title. Opens CalendarPicker. */
+.datePickBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  -webkit-tap-highlight-color: transparent;
+}
+.datePickBtn:hover { color: var(--color-fg); border-color: var(--color-warm); }
+
+/* Day/Staff toggle + inline Add shift + Refresh row. */
+.actionRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.viewToggle {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--color-surface);
+  border-radius: 999px;
+}
+.toggleBtn {
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  color: var(--color-fg-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.toggleBtnActive { background: #111; color: #fff; }
+.addShiftInlineBtn {
+  padding: 8px 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg);
+  cursor: pointer;
+  font-family: inherit;
+  justify-self: center;
+}
+.refreshBtn {
+  padding: 8px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+  font-family: inherit;
+}
+.refreshBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Staff view */
+.staffColHeader {
+  display: grid;
+  grid-template-columns: 40px 1fr auto auto 18px;
+  gap: 12px;
+  padding: 0 14px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--color-fg-muted);
+}
+.staffList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.staffRow {
+  display: grid;
+  grid-template-columns: 40px 1fr auto auto 18px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+.staffRow:last-child { border-bottom: none; }
+.avatarColor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.staffBody { min-width: 0; }
+.staffName {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-fg);
+  margin: 0;
+}
+.staffHoursCol { text-align: right; }
+.staffHoursMain {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+  margin: 0;
+}
+.staffHoursSub {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.staffShiftsCol {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-fg);
+  text-align: center;
+  min-width: 24px;
+}
+.rowChev { color: var(--color-fg-muted); font-size: 18px; }

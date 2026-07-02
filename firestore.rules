@@ -122,6 +122,13 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
+    // Local overrides for Square Labor shifts — owner-edited start/end
+    // times that stay in Firestore only (never pushed back to Square).
+    // Doc id matches the Square shift id so we can join in the client.
+    match /timesheet_edits/{shiftId} {
+      allow read, write: if isOwner();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;
