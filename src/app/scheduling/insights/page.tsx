@@ -9,7 +9,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -186,7 +186,10 @@ function aggregateWeek(weekStart: Date, doc: WeekDoc | undefined, rates: Record<
 export default function InsightsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  // Chefs get the same read access as owners/managers — the sidebar shows
+  // Roster + Roster Insights under their manager-tier nav, so gating this
+  // page to owners only would land them on a bounce.
+  const allowed = isOwner(user) || isChef(user);
 
   const [docs, setDocs] = useState<Record<string, WeekDoc>>({});
   const [payroll, setPayroll] = useState<Record<string, WeeklyPayroll>>({});
