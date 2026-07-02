@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import Splash from "@/components/Splash";
+import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
 
 /*
@@ -176,6 +177,7 @@ export default function TimesheetsPage() {
   const [view, setView] = useState<ViewMode>("day");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState<null | "start" | "end">(null);
   const [rosters, setRosters] = useState<Record<string, AssignmentDoc>>({});
   const [staffMap, setStaffMap] = useState<Record<string, StaffDoc>>({});
 
@@ -334,32 +336,34 @@ export default function TimesheetsPage() {
 
       <section className={styles.filterCard}>
         <div className={styles.rangeGrid}>
-          <label className={styles.rangeField}>
+          <div className={styles.rangeField}>
             <span className={styles.rangeLabel}>Start</span>
-            <span className={styles.rangeInput}>
+            <button
+              type="button"
+              className={styles.rangeInput}
+              onClick={() => setPickerOpen("start")}
+              aria-label="Pick start date"
+            >
               <CalIconSm />
-              <input
-                type="date"
-                value={startISO}
-                onChange={(e) => setStartISO(e.target.value)}
-                aria-label="Start date"
-              />
-              <span className={styles.rangeInputText}>{startISO ? fmtDayLabel(startISO) + " " + startISO.slice(0, 4) : "—"}</span>
-            </span>
-          </label>
-          <label className={styles.rangeField}>
+              <span className={styles.rangeInputText}>
+                {startISO ? `${fmtDayLabel(startISO)} ${startISO.slice(0, 4)}` : "—"}
+              </span>
+            </button>
+          </div>
+          <div className={styles.rangeField}>
             <span className={styles.rangeLabel}>End</span>
-            <span className={styles.rangeInput}>
+            <button
+              type="button"
+              className={styles.rangeInput}
+              onClick={() => setPickerOpen("end")}
+              aria-label="Pick end date"
+            >
               <CalIconSm />
-              <input
-                type="date"
-                value={endISO}
-                onChange={(e) => setEndISO(e.target.value)}
-                aria-label="End date"
-              />
-              <span className={styles.rangeInputText}>{endISO ? fmtDayLabel(endISO) + " " + endISO.slice(0, 4) : "—"}</span>
-            </span>
-          </label>
+              <span className={styles.rangeInputText}>
+                {endISO ? `${fmtDayLabel(endISO)} ${endISO.slice(0, 4)}` : "—"}
+              </span>
+            </button>
+          </div>
           <button
             type="button"
             className={styles.applyBtn}
@@ -370,6 +374,21 @@ export default function TimesheetsPage() {
           </button>
         </div>
       </section>
+
+      {pickerOpen && (
+        <CalendarPicker
+          value={pickerOpen === "start" ? startISO : endISO}
+          minDate={pickerOpen === "end" ? startISO : undefined}
+          maxDate={pickerOpen === "start" && endISO ? endISO : undefined}
+          singleOnly
+          onChange={(d) => {
+            if (pickerOpen === "start") setStartISO(d);
+            else setEndISO(d);
+          }}
+          onRangeChange={() => { /* range mode disabled via singleOnly */ }}
+          onClose={() => setPickerOpen(null)}
+        />
+      )}
 
       <div className={styles.summaryHeader}>
         <p className={styles.sectionEyebrow}>BY {view === "day" ? "DAY" : "STAFF"} SUMMARY</p>

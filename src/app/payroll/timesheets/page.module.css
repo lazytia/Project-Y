@@ -113,27 +113,22 @@
   font-weight: 600;
 }
 .rangeInput {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   color: var(--color-fg-muted);
-}
-.rangeInput input[type="date"] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  border: none;
-  padding: 0;
   cursor: pointer;
   font-family: inherit;
-  color: transparent;
-  background: transparent;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
+.rangeInput:hover { border-color: var(--color-warm); background: rgba(255, 106, 19, 0.03); }
 .rangeInputText { font-size: 13px; color: var(--color-fg); font-weight: 500; }
 .applyBtn {
   padding: 10px 16px;
