@@ -374,6 +374,45 @@
 }
 .empty { padding: 24px; text-align: center; color: var(--color-fg-muted); font-size: 13px; margin: 0; }
 
+/* ── Add-shift modal ── */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+.modal {
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-bg);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+.modalHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.modalTitle { font-family: var(--font-display); font-size: 18px; font-weight: 800; color: var(--color-fg); margin: 0; }
+.modalSub { font-size: 12px; color: var(--color-fg-muted); margin: 4px 0 0; }
+.modalClose { background: transparent; border: none; color: var(--color-fg-muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.modalClose:hover { background: var(--color-surface); color: var(--color-fg); }
+.formLabel { display: block; font-size: 12px; font-weight: 700; color: var(--color-fg); margin: 4px 0 4px; }
+.formInput { width: 100%; padding: 10px 12px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 10px; font-family: inherit; font-size: 14px; color: var(--color-fg); }
+.formInput:focus { outline: 2px solid var(--color-warm); outline-offset: -1px; }
+.formInput:disabled { opacity: 0.6; }
+.formGrid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modalError { margin: 4px 0 0; padding: 8px 12px; background: #fee2e2; color: #b91c1c; border-radius: 8px; font-size: 12px; }
+.modalActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.modalCancelBtn { padding: 10px 18px; background: transparent; border: 1px solid var(--color-border); border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 700; color: var(--color-fg); cursor: pointer; }
+.modalCancelBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.modalPrimaryBtn { padding: 10px 18px; background: #111; color: #fff; border: none; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.modalPrimaryBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* ── footer note ── */
 .footNote {
   display: flex;

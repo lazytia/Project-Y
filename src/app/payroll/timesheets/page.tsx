@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import Splash from "@/components/Splash";
@@ -180,6 +182,15 @@ export default function TimesheetsPage() {
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState<null | "start" | "end">(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState<{
+    teamMemberId: string;
+    dateISO: string;
+    startHHMM: string;
+    endHHMM: string;
+  }>({ teamMemberId: "", dateISO: "", startHHMM: "10:00", endHHMM: "14:30" });
+  const [savingAdd, setSavingAdd] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const [shifts, setShifts] = useState<ShiftFromApi[]>([]);
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMemberFromApi>>({});
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -427,7 +438,17 @@ export default function TimesheetsPage() {
             Staff
           </button>
         </div>
-        <Link href="/scheduling/roster" className={styles.addShiftBtn}>+ Add shift</Link>
+        <button
+          type="button"
+          className={styles.addShiftBtn}
+          onClick={() => {
+            setAddError(null);
+            setAddForm((p) => ({ ...p, dateISO: startISO || endISO || "" }));
+            setAddOpen(true);
+          }}
+        >
+          + Add shift
+        </button>
         <button
           type="button"
           className={styles.refreshBtn}
@@ -487,7 +508,10 @@ export default function TimesheetsPage() {
               );
               return (
                 <li key={s.teamMemberId} className={styles.rowBlock}>
-                  <div className={`${styles.row} ${styles.rowStaff}`}>
+                  <Link
+                    href={`/payroll/timesheets/staff/${encodeURIComponent(s.teamMemberId)}?start=${startISO}&end=${endISO}`}
+                    className={`${styles.row} ${styles.rowStaff}`}
+                  >
                     <span
                       className={styles.avatarColor}
                       style={{ background: colorForMemberId(s.teamMemberId) }}
@@ -511,7 +535,7 @@ export default function TimesheetsPage() {
                     </div>
                     <span className={styles.staffShiftsCol}>{s.shifts}</span>
                     <span className={styles.rowChev} aria-hidden="true">›</span>
-                  </div>
+                  </Link>
                 </li>
               );
             })}
@@ -523,6 +547,139 @@ export default function TimesheetsPage() {
       <div className={styles.footNote}>
         <InfoIcon /> Hours are Square Labor paid hours — clock-in to clock-out with recorded breaks subtracted. Live figures update as staff clock out.
       </div>
+
+      {addOpen && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={(e) => { if (e.target === e.currentTarget) setAddOpen(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add shift"
+        >
+          <div className={styles.modal}>
+            <div className={styles.modalHead}>
+              <div>
+                <h2 className={styles.modalTitle}>Add shift</h2>
+                <p className={styles.modalSub}>Back-fill a missed clock-in / clock-out. Saved in-app only, not pushed to Square.</p>
+              </div>
+              <button type="button" className={styles.modalClose} onClick={() => setAddOpen(false)} aria-label="Close">×</button>
+            </div>
+
+            <label className={styles.formLabel}>Staff</label>
+            <select
+              className={styles.formInput}
+              value={addForm.teamMemberId}
+              onChange={(e) => setAddForm((p) => ({ ...p, teamMemberId: e.target.value }))}
+              disabled={savingAdd}
+            >
+              <option value="">Select a staff member…</option>
+              {Object.entries(teamMembers)
+                .map(([id, tm]) => ({ id, name: nameOfTeamMember(id, tm) }))
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(({ id, name }) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+            </select>
+
+            <label className={styles.formLabel}>Date</label>
+            <input
+              className={styles.formInput}
+              type="date"
+              value={addForm.dateISO}
+              onChange={(e) => setAddForm((p) => ({ ...p, dateISO: e.target.value }))}
+              disabled={savingAdd}
+              min={startISO || undefined}
+              max={endISO || undefined}
+            />
+
+            <div className={styles.formGrid2}>
+              <div>
+                <label className={styles.formLabel}>Start (HH:MM)</label>
+                <input
+                  className={styles.formInput}
+                  type="time"
+                  value={addForm.startHHMM}
+                  onChange={(e) => setAddForm((p) => ({ ...p, startHHMM: e.target.value }))}
+                  disabled={savingAdd}
+                />
+              </div>
+              <div>
+                <label className={styles.formLabel}>End (HH:MM)</label>
+                <input
+                  className={styles.formInput}
+                  type="time"
+                  value={addForm.endHHMM}
+                  onChange={(e) => setAddForm((p) => ({ ...p, endHHMM: e.target.value }))}
+                  disabled={savingAdd}
+                />
+              </div>
+            </div>
+
+            {addError && <p className={styles.modalError}>{addError}</p>}
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalCancelBtn}
+                onClick={() => setAddOpen(false)}
+                disabled={savingAdd}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.modalPrimaryBtn}
+                onClick={async () => {
+                  if (!user) return;
+                  if (!addForm.teamMemberId) { setAddError("Pick a staff member."); return; }
+                  if (!addForm.dateISO) { setAddError("Pick a date."); return; }
+                  if (!/^\d{2}:\d{2}$/.test(addForm.startHHMM) || !/^\d{2}:\d{2}$/.test(addForm.endHHMM)) {
+                    setAddError("Enter times in HH:MM format.");
+                    return;
+                  }
+                  // Use the location offset from an existing shift on that
+                  // day if we have one, otherwise fall back to +10:00.
+                  const dayShift = shifts.find((s) => s.dateISO === addForm.dateISO);
+                  const offMatch = dayShift ? /([+-]\d{2}:\d{2})$/.exec(dayShift.startAt) : null;
+                  const offset = offMatch ? offMatch[1] : "+10:00";
+                  const startAt = `${addForm.dateISO}T${addForm.startHHMM}:00${offset}`;
+                  const endAt = `${addForm.dateISO}T${addForm.endHHMM}:00${offset}`;
+                  const hours = Math.round(
+                    ((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100,
+                  ) / 100;
+                  if (hours <= 0) { setAddError("End time must be after start time."); return; }
+                  setSavingAdd(true);
+                  setAddError(null);
+                  try {
+                    await addDoc(collection(getDb(), "timesheet_extra_shifts"), {
+                      teamMemberId: addForm.teamMemberId,
+                      dateISO: addForm.dateISO,
+                      startAt,
+                      endAt,
+                      hours,
+                      hourlyRateCents: null,
+                      source: "app-local",
+                      createdAt: serverTimestamp(),
+                      createdBy: user.uid,
+                    });
+                    setAddOpen(false);
+                    setAddForm({ teamMemberId: "", dateISO: "", startHHMM: "10:00", endHHMM: "14:30" });
+                    void load();
+                  } catch (err) {
+                    console.error("[timesheet_extra_shifts] add failed:", err);
+                    setAddError(err instanceof Error ? err.message : "Save failed.");
+                  } finally {
+                    setSavingAdd(false);
+                  }
+                }}
+                disabled={savingAdd || !addForm.teamMemberId}
+              >
+                <span aria-hidden="true">+</span> {savingAdd ? "Saving…" : "Add shift"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
