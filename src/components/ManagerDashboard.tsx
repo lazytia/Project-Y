@@ -203,36 +203,41 @@ export default function ManagerDashboard({
     holidayRequests: 0, availabilityChanges: 0, newOnboarding: 0, visaExpiring: 0,
   });
 
-  const [todayKey] = useState(sydneyTodayKey);
-  const [greeting] = useState(greetingForNow);
+  // Both start empty so SSR and hydration match. Filled in a client-only
+  // effect below — greetingForNow() reads local hours (UTC on the server,
+  // Sydney on the client) and would otherwise trigger React #418.
+  const [todayKey, setTodayKey] = useState("");
+  const [greeting, setGreeting] = useState("");
+  useEffect(() => {
+    setTodayKey(sydneyTodayKey());
+    setGreeting(greetingForNow());
+  }, []);
 
-  const [todaySales, setTodaySales] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    return readDashboardCache(sydneyTodayKey())?.todaySales ?? null;
-  });
+  // All dashboard metrics start null so SSR and hydration produce the same
+  // "—" placeholders. The sessionStorage cache is applied in the effect
+  // below, after hydration finishes — otherwise a cache hit would render
+  // real numbers on the client while the server rendered dashes and React
+  // would throw hydration error #418.
+  const [todaySales, setTodaySales] = useState<number | null>(null);
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
-  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(() => {
-    if (typeof window === "undefined") return null;
+  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(null);
+  const [nextCatering, setNextCatering] = useState<CateringSummaryOrder | null>(null);
+  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(null);
+  const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
+  const [hallStaff, setHallStaff] = useState<number | null>(null);
+
+  useEffect(() => {
     const cached = readDashboardCache(sydneyTodayKey());
-    if (!cached || cached.totalPax === null || cached.totalBookings === null) return null;
-    return { totalPax: cached.totalPax, totalBookings: cached.totalBookings };
-  });
-  const [nextCatering, setNextCatering] = useState<CateringSummaryOrder | null>(() => {
-    if (typeof window === "undefined") return null;
-    return readDashboardCache(sydneyTodayKey())?.nextCatering ?? null;
-  });
-  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    return readDashboardCache(sydneyTodayKey())?.weekCateringCount ?? null;
-  });
-  const [kitchenStaff, setKitchenStaff] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    return readDashboardCache(sydneyTodayKey())?.kitchenStaff ?? null;
-  });
-  const [hallStaff, setHallStaff] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    return readDashboardCache(sydneyTodayKey())?.hallStaff ?? null;
-  });
+    if (!cached) return;
+    setTodaySales(cached.todaySales);
+    if (cached.totalPax !== null && cached.totalBookings !== null) {
+      setCachedResCounts({ totalPax: cached.totalPax, totalBookings: cached.totalBookings });
+    }
+    setNextCatering(cached.nextCatering);
+    setWeekCateringCount(cached.weekCateringCount);
+    setKitchenStaff(cached.kitchenStaff);
+    setHallStaff(cached.hallStaff);
+  }, []);
 
   const todayDow = (() => {
     const [y, m, d] = todayKey.split("-").map(Number);
@@ -327,10 +332,11 @@ export default function ManagerDashboard({
   }, [todayKey, user]);
 
   useEffect(() => {
+    if (!todayKey) return;
     fetchLiveData();
     const id = setInterval(fetchLiveData, 60_000);
     return () => clearInterval(id);
-  }, [fetchLiveData]);
+  }, [fetchLiveData, todayKey]);
 
   const resCounts = useMemo(() => {
     if (reservations) {
