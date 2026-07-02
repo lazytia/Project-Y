@@ -33,7 +33,7 @@
 }
 
 /* ── summary cards ── */
-.summaryRow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.summaryRow { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .summaryCard {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
