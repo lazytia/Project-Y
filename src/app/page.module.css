@@ -85,7 +85,7 @@
 .viewLink, .viewLinkSm {
   font-size: var(--font-size-sm);
   font-weight: 600;
-  color: var(--color-brand);
+  color: var(--color-warm);
   text-decoration: none;
 }
 .viewLink:hover, .viewLinkSm:hover { text-decoration: underline; }
@@ -138,7 +138,7 @@
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 800;
-  color: var(--color-brand);
+  color: var(--color-warm);
   margin: 0;
   letter-spacing: -0.01em;
 }
@@ -161,23 +161,26 @@
 .progressTrack {
   flex: 1;
   height: 8px;
-  background: var(--color-surface);
+  /* --color-surface is nearly white against the white card and reads
+     as invisible; use a slightly darker gray so the empty portion of
+     the bar is actually visible. */
+  background: #E5E5E7;
   border-radius: 999px;
   overflow: hidden;
 }
 .progressTrackOnDark {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.22);
 }
 .progressFill {
   height: 100%;
-  background: var(--color-brand);
+  background: var(--color-warm);
   border-radius: 999px;
   transition: width 0.35s ease;
 }
 .progressPct {
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-brand);
+  color: var(--color-warm);
   min-width: 32px;
   text-align: right;
 }
@@ -218,7 +221,7 @@
   font-family: var(--font-display);
   font-size: 32px;
   font-weight: 800;
-  color: var(--color-brand);
+  color: var(--color-warm);
   margin: 0 0 4px;
   letter-spacing: -0.01em;
 }
@@ -262,8 +265,8 @@
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  background: rgba(255, 138, 76, 0.14);
-  color: var(--color-brand);
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
 }
 .cateringCount {
   font-family: var(--font-display);
@@ -277,7 +280,7 @@
   font-family: var(--font-display);
   font-size: 26px;
   font-weight: 800;
-  color: var(--color-brand);
+  color: var(--color-warm);
   margin: 0;
 }
 .cateringDate {
@@ -306,7 +309,7 @@
   gap: 4px;
   font-size: var(--font-size-sm);
   font-weight: 600;
-  color: var(--color-brand);
+  color: var(--color-warm);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -318,7 +321,7 @@
   font-size: 16px;
   line-height: 1.6;
   color: #2a2a2a;
-  background: rgba(255, 138, 76, 0.06);
+  background: var(--color-warm-bg);
   padding: var(--space-3);
   border-radius: 10px;
   white-space: pre-wrap;
@@ -344,7 +347,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
 }
-.reviewTextarea:focus { outline: 2px solid var(--color-brand); outline-offset: -1px; }
+.reviewTextarea:focus { outline: 2px solid var(--color-warm); outline-offset: -1px; }
 .reviewActions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .reviewActionsRight { display: flex; gap: 8px; }
 .btnDanger {
@@ -371,7 +374,7 @@
 .btnGhost:disabled { opacity: 0.5; cursor: not-allowed; }
 .btnPrimary {
   padding: 8px 14px;
-  background: var(--color-brand);
+  background: var(--color-warm);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -408,8 +411,8 @@
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: rgba(255, 138, 76, 0.16);
-  color: var(--color-brand);
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
   font-weight: 800;
   font-size: 13px;
   flex-shrink: 0;
