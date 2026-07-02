@@ -517,9 +517,9 @@ function OwnerDashboard() {
         </div>
       </section>
 
-      {/* CATERING ROW */}
+      {/* CATERING ROW — whole card is a link to /operations/catering-orders */}
       <div className={styles.splitRow}>
-        <section className={styles.splitCard}>
+        <Link href="/operations/catering-orders" className={styles.splitCard}>
           <p className={styles.miniLabel}>CATERING THIS WEEK</p>
           <div className={styles.splitBody}>
             <span className={styles.cateringIcon} aria-hidden="true">
@@ -534,8 +534,11 @@ function OwnerDashboard() {
               {weekCateringCount ?? "—"} <span className={styles.cateringUnit}>Orders</span>
             </p>
           </div>
-        </section>
-        <section className={styles.splitCard}>
+          <span className={styles.splitCardView}>
+            View <span aria-hidden="true">→</span>
+          </span>
+        </Link>
+        <Link href="/operations/catering-orders" className={styles.splitCard}>
           <p className={styles.miniLabel}>NEXT CATERING</p>
           {nextCatering ? (
             <>
@@ -557,7 +560,10 @@ function OwnerDashboard() {
           ) : (
             <p className={styles.mutedSmall}>No upcoming orders</p>
           )}
-        </section>
+          <span className={styles.splitCardView}>
+            View <span aria-hidden="true">→</span>
+          </span>
+        </Link>
       </div>
 
       {/* TODAY'S SALES REVIEW */}
