@@ -317,10 +317,10 @@
   font-family: inherit;
 }
 .reviewBody {
-  font-family: "Kalam", "Comic Sans MS", cursive;
-  font-size: 16px;
-  line-height: 1.6;
-  color: #2a2a2a;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--color-fg);
   background: var(--color-warm-bg);
   padding: var(--space-3);
   border-radius: 10px;
