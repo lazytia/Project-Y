@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import Splash from "@/components/Splash";
@@ -11,51 +9,46 @@ import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
 
 /*
- * Timesheets — labour hours + estimated gross pay across a date range.
+ * Timesheets — pulls live Square Labor shifts (real clock-in / clock-out
+ * records with break subtraction) from /api/square/timesheets. Aggregates
+ * per calendar day and per team member; owner can also open individual
+ * days/staff to see raw shift times.
  *
- * Data model:
- *   rosters_published/{weekMondayISO}.assignments[dateISO][meal][uid] = "HH:MM"
- *   staff_onboarding/{uid}.hourlyRate | .weekRate | .weeklyRate
- *
- * The roster only stores shift START times, not durations, so we treat
- * each meal as a fixed-length block:
- *   LUNCH   → 4 hours
- *   DINNER  → 5 hours
- * Anything else falls back to LUNCH_HOURS. If the business later moves
- * to true clock-in/clock-out logging these constants can go.
+ * Legacy path: an earlier version read rosters_published and estimated
+ * lunch=4h/dinner=5h. The Square feed replaces that estimate with the
+ * actual paid hours the location recorded.
  */
 
 const SYDNEY_TZ = "Australia/Sydney";
-const LUNCH_HOURS = 4;
-const DINNER_HOURS = 5;
-const WEEK_TO_HOURS = 38; // used only when a weekly rate exists
 
-type AssignmentDoc = {
-  assignments?: Record<string, Record<string, Record<string, string>>>;
+type ShiftFromApi = {
+  id: string;
+  teamMemberId: string;
+  dateISO: string;
+  startAt: string;
+  endAt: string | null;
+  hours: number;
+  hourlyRateCents: number | null;
 };
 
-type StaffDoc = {
-  firstName?: string;
-  lastName?: string;
-  hourlyRate?: number;
-  weekRate?: number;
-  weeklyRate?: number;
-};
+type TeamMemberFromApi = { firstName?: string; lastName?: string };
 
-type DayRow = {
+type DayAgg = {
   dateISO: string;
   staff: number;
   shifts: number;
   hours: number;
   gross: number;
+  entries: ShiftFromApi[];
 };
 
-type StaffRow = {
-  uid: string;
+type StaffAgg = {
+  teamMemberId: string;
   name: string;
   shifts: number;
   hours: number;
   gross: number;
+  entries: ShiftFromApi[];
 };
 
 /* ── date helpers ────────────────────────────────────────────────── */
@@ -74,7 +67,7 @@ function addDaysISO(iso: string, n: number): string {
 function isoMondayOf(dateISO: string): string {
   const [y, m, d] = dateISO.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
-  const dow = (dt.getUTCDay() + 6) % 7; // Mon = 0
+  const dow = (dt.getUTCDay() + 6) % 7;
   dt.setUTCDate(dt.getUTCDate() - dow);
   return dt.toISOString().slice(0, 10);
 }
@@ -91,17 +84,6 @@ function eachDayISO(startISO: string, endISO: string): string[] {
     cur = addDaysISO(cur, 1);
   }
   return out;
-}
-
-function fmtLongDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-AU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
 }
 
 function fmtDayChip(iso: string): { dow: string; day: string } {
@@ -128,20 +110,7 @@ function fmtRangeSubtitle(startISO: string, endISO: string): string {
   const [ey, em, ed] = endISO.split("-").map(Number);
   const start = new Date(Date.UTC(sy, sm - 1, sd, 12));
   const end = new Date(Date.UTC(ey, em - 1, ed, 12));
-  const startLabel = start.toLocaleDateString("en-AU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-  const endLabel = end.toLocaleDateString("en-AU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-  return `${startLabel} – ${endLabel}`;
+  return `${start.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })} – ${end.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`;
 }
 
 function fmtHours(h: number): string {
@@ -152,16 +121,35 @@ function fmtMoney(n: number): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/* ── rate resolver ───────────────────────────────────────────────── */
+/**
+ * Format the clock-in / clock-out portion of a Square-returned ISO like
+ * "2026-06-22T09:30:00+10:00" as a compact 12h string ("9:30 AM").
+ * Falls back gracefully if the string is missing.
+ */
+function fmtClockTime(iso: string | null): string {
+  if (!iso) return "…";
+  const t = iso.slice(11, 16); // "HH:MM"
+  const [hStr, mStr] = t.split(":");
+  let h = parseInt(hStr, 10);
+  if (Number.isNaN(h)) return t;
+  const period = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${mStr} ${period}`;
+}
 
-function hourlyRateOf(s: StaffDoc | undefined): number {
-  if (!s) return 0;
-  if (typeof s.hourlyRate === "number" && s.hourlyRate > 0) return s.hourlyRate;
-  const weekly =
-    (typeof s.weekRate === "number" ? s.weekRate : undefined) ??
-    (typeof s.weeklyRate === "number" ? s.weeklyRate : undefined);
-  if (typeof weekly === "number" && weekly > 0) return weekly / WEEK_TO_HOURS;
-  return 0;
+function nameOfTeamMember(id: string, tm: TeamMemberFromApi | undefined): string {
+  const first = (tm?.firstName ?? "").trim();
+  const last = (tm?.lastName ?? "").trim();
+  if (first || last) return `${first}${last ? " " + last : ""}`;
+  return id.slice(0, 6);
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const a = (parts[0]?.[0] ?? "?").toUpperCase();
+  const b = (parts[1]?.[0] ?? "").toUpperCase();
+  return (a + b) || "??";
 }
 
 /* ── page ────────────────────────────────────────────────────────── */
@@ -178,11 +166,11 @@ export default function TimesheetsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState<null | "start" | "end">(null);
-  const [rosters, setRosters] = useState<Record<string, AssignmentDoc>>({});
-  const [staffMap, setStaffMap] = useState<Record<string, StaffDoc>>({});
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [shifts, setShifts] = useState<ShiftFromApi[]>([]);
+  const [teamMembers, setTeamMembers] = useState<Record<string, TeamMemberFromApi>>({});
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Default range on mount: current Sydney week Mon → Sun. Owner overrides
-  // via the Start / End date pickers.
   useEffect(() => {
     const today = sydneyTodayISO();
     const mon = isoMondayOf(today);
@@ -193,33 +181,26 @@ export default function TimesheetsPage() {
   const load = useCallback(async () => {
     if (!startISO || !endISO) return;
     setBusy(true);
+    setFetchError(null);
     try {
-      // Pull every roster week that overlaps the selected range. The
-      // week key is the Monday ISO of the first day the doc covers.
-      const startMon = isoMondayOf(startISO);
-      const endMon = isoMondayOf(endISO);
-      const weekKeys: string[] = [];
-      let cur = startMon;
-      while (cur <= endMon) {
-        weekKeys.push(cur);
-        cur = addDaysISO(cur, 7);
-      }
-      const rosterEntries = await Promise.all(
-        weekKeys.map(async (k) => {
-          const snap = await getDoc(doc(getDb(), "rosters_published", k));
-          return [k, snap.exists() ? (snap.data() as AssignmentDoc) : {}] as const;
-        }),
+      const res = await fetch(
+        `/api/square/timesheets?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`,
+        { cache: "no-store" },
       );
-      const rosterMap: Record<string, AssignmentDoc> = {};
-      for (const [k, v] of rosterEntries) rosterMap[k] = v;
-      setRosters(rosterMap);
-
-      // Staff rates + names — one collection scan is cheap enough given
-      // the staff table is small.
-      const staffSnap = await getDocs(collection(getDb(), "staff_onboarding"));
-      const sMap: Record<string, StaffDoc> = {};
-      for (const d of staffSnap.docs) sMap[d.id] = d.data() as StaffDoc;
-      setStaffMap(sMap);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Fetch failed (${res.status})`);
+      setShifts(Array.isArray(data.shifts) ? (data.shifts as ShiftFromApi[]) : []);
+      setTeamMembers(
+        data.teamMembers && typeof data.teamMembers === "object"
+          ? (data.teamMembers as Record<string, TeamMemberFromApi>)
+          : {},
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Square unreachable.";
+      console.error("[timesheets] fetch failed:", err);
+      setFetchError(msg);
+      setShifts([]);
+      setTeamMembers({});
     } finally {
       setBusy(false);
       setLoading(false);
@@ -231,56 +212,65 @@ export default function TimesheetsPage() {
     void load();
   }, [authLoading, allowed, load]);
 
-  // Fold assignments into per-day and per-staff aggregates.
+  /* Filter shifts down to the requested range (the API pads by a day on
+     each side to catch overnight shifts) and fold into per-day + per-
+     staff aggregates. */
   const { days, byStaff, totalHours, totalGross, totalShifts, totalStaff } = useMemo(() => {
-    const days: DayRow[] = [];
-    const staffAgg: Record<string, StaffRow> = {};
+    const days: DayAgg[] = [];
+    const staffAgg: Record<string, StaffAgg> = {};
     let totalHours = 0;
     let totalGross = 0;
     let totalShifts = 0;
-    const allStaffUids = new Set<string>();
+    const allTMs = new Set<string>();
 
     if (!startISO || !endISO) {
-      return { days, byStaff: [] as StaffRow[], totalHours, totalGross, totalShifts, totalStaff: 0 };
+      return { days, byStaff: [] as StaffAgg[], totalHours, totalGross, totalShifts, totalStaff: 0 };
     }
 
-    for (const dateISO of eachDayISO(startISO, endISO)) {
-      const weekKey = isoMondayOf(dateISO);
-      const dayAssignments = rosters[weekKey]?.assignments?.[dateISO] ?? {};
-      let dShifts = 0;
-      let dHours = 0;
-      let dGross = 0;
-      const dStaff = new Set<string>();
+    const byDate: Record<string, DayAgg> = {};
+    for (const iso of eachDayISO(startISO, endISO)) {
+      byDate[iso] = { dateISO: iso, staff: 0, shifts: 0, hours: 0, gross: 0, entries: [] };
+    }
 
-      for (const [meal, uids] of Object.entries(dayAssignments)) {
-        const key = meal.toLowerCase();
-        const perShift = key.includes("dinner") ? DINNER_HOURS : LUNCH_HOURS;
-        for (const uid of Object.keys(uids)) {
-          const rate = hourlyRateOf(staffMap[uid]);
-          const gross = perShift * rate;
-          dShifts += 1;
-          dHours += perShift;
-          dGross += gross;
-          dStaff.add(uid);
-          allStaffUids.add(uid);
+    for (const s of shifts) {
+      if (!byDate[s.dateISO]) continue; // outside the requested range
+      const rate = typeof s.hourlyRateCents === "number" ? s.hourlyRateCents / 100 : 0;
+      const gross = s.hours * rate;
 
-          const row = (staffAgg[uid] ??= {
-            uid,
-            name: nameOfStaff(uid, staffMap[uid]),
-            shifts: 0,
-            hours: 0,
-            gross: 0,
-          });
-          row.shifts += 1;
-          row.hours += perShift;
-          row.gross += gross;
-        }
-      }
+      const day = byDate[s.dateISO];
+      day.entries.push(s);
+      day.shifts += 1;
+      day.hours += s.hours;
+      day.gross += gross;
 
-      days.push({ dateISO, staff: dStaff.size, shifts: dShifts, hours: dHours, gross: dGross });
-      totalShifts += dShifts;
-      totalHours += dHours;
-      totalGross += dGross;
+      const st = (staffAgg[s.teamMemberId] ??= {
+        teamMemberId: s.teamMemberId,
+        name: nameOfTeamMember(s.teamMemberId, teamMembers[s.teamMemberId]),
+        shifts: 0,
+        hours: 0,
+        gross: 0,
+        entries: [],
+      });
+      st.entries.push(s);
+      st.shifts += 1;
+      st.hours += s.hours;
+      st.gross += gross;
+
+      totalShifts += 1;
+      totalHours += s.hours;
+      totalGross += gross;
+      allTMs.add(s.teamMemberId);
+    }
+
+    // Post-process staff count per day.
+    for (const iso of Object.keys(byDate)) {
+      const set = new Set(byDate[iso].entries.map((e) => e.teamMemberId));
+      byDate[iso].staff = set.size;
+      byDate[iso].entries.sort((a, b) => a.startAt.localeCompare(b.startAt));
+      days.push(byDate[iso]);
+    }
+    for (const uid of Object.keys(staffAgg)) {
+      staffAgg[uid].entries.sort((a, b) => a.startAt.localeCompare(b.startAt));
     }
 
     return {
@@ -289,9 +279,9 @@ export default function TimesheetsPage() {
       totalHours,
       totalGross,
       totalShifts,
-      totalStaff: allStaffUids.size,
+      totalStaff: allTMs.size,
     };
-  }, [rosters, staffMap, startISO, endISO]);
+  }, [shifts, teamMembers, startISO, endISO]);
 
   if (authLoading || loading) return <Splash />;
   if (!allowed) return <div className={styles.page}><p>Owner access only.</p></div>;
@@ -309,27 +299,21 @@ export default function TimesheetsPage() {
 
       <section className={styles.summaryRow}>
         <div className={styles.summaryCard}>
-          <span className={styles.summaryIcon}>
-            <ClockIcon />
-          </span>
+          <span className={styles.summaryIcon}><ClockIcon /></span>
           <div>
             <p className={styles.summaryLabel}>TOTAL PAID HOURS</p>
             <p className={styles.summaryValue}>
               {totalHours.toFixed(2)} <span className={styles.summaryUnit}>h</span>
             </p>
-            <p className={styles.summarySub}>
-              {totalStaff} staff · {totalShifts} shifts
-            </p>
+            <p className={styles.summarySub}>{totalStaff} staff · {totalShifts} shifts</p>
           </div>
         </div>
         <div className={styles.summaryCard}>
-          <span className={styles.summaryIcon}>
-            <DollarIcon />
-          </span>
+          <span className={styles.summaryIcon}><DollarIcon /></span>
           <div>
             <p className={styles.summaryLabel}>EST. GROSS PAY</p>
             <p className={styles.summaryValue}>{fmtMoney(totalGross)}</p>
-            <p className={styles.summarySub}>Shift rate × paid hours</p>
+            <p className={styles.summarySub}>Square wage × paid hours</p>
           </div>
         </div>
       </section>
@@ -390,6 +374,10 @@ export default function TimesheetsPage() {
         />
       )}
 
+      {fetchError && (
+        <p className={styles.errorBanner}>Square Labor: {fetchError}</p>
+      )}
+
       <div className={styles.summaryHeader}>
         <p className={styles.sectionEyebrow}>BY {view === "day" ? "DAY" : "STAFF"} SUMMARY</p>
         <Link href="/scheduling/roster" className={styles.viewCalLink}>
@@ -404,7 +392,7 @@ export default function TimesheetsPage() {
             role="tab"
             aria-selected={view === "day"}
             className={`${styles.toggleBtn} ${view === "day" ? styles.toggleBtnActive : ""}`}
-            onClick={() => setView("day")}
+            onClick={() => { setView("day"); setExpandedRow(null); }}
           >
             Day
           </button>
@@ -413,15 +401,18 @@ export default function TimesheetsPage() {
             role="tab"
             aria-selected={view === "staff"}
             className={`${styles.toggleBtn} ${view === "staff" ? styles.toggleBtnActive : ""}`}
-            onClick={() => setView("staff")}
+            onClick={() => { setView("staff"); setExpandedRow(null); }}
           >
             Staff
           </button>
         </div>
-        <Link href="/scheduling/roster" className={styles.addShiftBtn}>
-          + Add shift
-        </Link>
-        <button type="button" className={styles.refreshBtn} onClick={() => void load()} disabled={busy}>
+        <Link href="/scheduling/roster" className={styles.addShiftBtn}>+ Add shift</Link>
+        <button
+          type="button"
+          className={styles.refreshBtn}
+          onClick={() => void load()}
+          disabled={busy}
+        >
           <RefreshIcon /> Refresh
         </button>
       </div>
@@ -430,20 +421,47 @@ export default function TimesheetsPage() {
         <ul className={styles.list}>
           {days.map((d) => {
             const chip = fmtDayChip(d.dateISO);
+            const isOpen = expandedRow === d.dateISO;
             return (
-              <li key={d.dateISO} className={styles.row}>
-                <span className={styles.dayChip}>
-                  <span className={styles.dayChipDow}>{chip.dow}</span>
-                  <span className={styles.dayChipNum}>{chip.day}</span>
-                </span>
-                <div className={styles.rowBody}>
-                  <p className={styles.rowTitle}>{fmtDayLabel(d.dateISO)}</p>
-                  <p className={styles.rowMeta}>
-                    {d.staff} staff · {d.shifts} shifts
-                  </p>
-                </div>
-                <span className={styles.rowValue}>{fmtHours(d.hours)}</span>
-                <span className={styles.rowChev} aria-hidden="true">›</span>
+              <li key={d.dateISO} className={styles.rowBlock}>
+                <button
+                  type="button"
+                  className={styles.row}
+                  onClick={() => setExpandedRow(isOpen ? null : d.dateISO)}
+                  aria-expanded={isOpen}
+                >
+                  <span className={styles.dayChip}>
+                    <span className={styles.dayChipDow}>{chip.dow}</span>
+                    <span className={styles.dayChipNum}>{chip.day}</span>
+                  </span>
+                  <div className={styles.rowBody}>
+                    <p className={styles.rowTitle}>{fmtDayLabel(d.dateISO)}</p>
+                    <p className={styles.rowMeta}>
+                      {d.staff} staff · {d.shifts} shifts
+                    </p>
+                  </div>
+                  <span className={styles.rowValue}>{fmtHours(d.hours)}</span>
+                  <span className={`${styles.rowChev} ${isOpen ? styles.rowChevOpen : ""}`} aria-hidden="true">›</span>
+                </button>
+                {isOpen && (
+                  <ul className={styles.shiftList}>
+                    {d.entries.length === 0 ? (
+                      <li className={styles.shiftEmpty}>No shifts recorded.</li>
+                    ) : (
+                      d.entries.map((s) => (
+                        <li key={s.id} className={styles.shiftRow}>
+                          <span className={styles.shiftName}>
+                            {nameOfTeamMember(s.teamMemberId, teamMembers[s.teamMemberId])}
+                          </span>
+                          <span className={styles.shiftTime}>
+                            {fmtClockTime(s.startAt)} → {fmtClockTime(s.endAt)}
+                          </span>
+                          <span className={styles.shiftHours}>{fmtHours(s.hours)}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
               </li>
             );
           })}
@@ -451,46 +469,51 @@ export default function TimesheetsPage() {
         </ul>
       ) : (
         <ul className={styles.list}>
-          {byStaff.map((s) => (
-            <li key={s.uid} className={styles.row}>
-              <span className={styles.avatar} aria-hidden="true">
-                {initials(s.name)}
-              </span>
-              <div className={styles.rowBody}>
-                <p className={styles.rowTitle}>{s.name}</p>
-                <p className={styles.rowMeta}>
-                  {s.shifts} shifts · {fmtMoney(s.gross)}
-                </p>
-              </div>
-              <span className={styles.rowValue}>{fmtHours(s.hours)}</span>
-              <span className={styles.rowChev} aria-hidden="true">›</span>
-            </li>
-          ))}
+          {byStaff.map((s) => {
+            const isOpen = expandedRow === s.teamMemberId;
+            return (
+              <li key={s.teamMemberId} className={styles.rowBlock}>
+                <button
+                  type="button"
+                  className={styles.row}
+                  onClick={() => setExpandedRow(isOpen ? null : s.teamMemberId)}
+                  aria-expanded={isOpen}
+                >
+                  <span className={styles.avatar} aria-hidden="true">{initials(s.name)}</span>
+                  <div className={styles.rowBody}>
+                    <p className={styles.rowTitle}>{s.name}</p>
+                    <p className={styles.rowMeta}>
+                      {s.shifts} shifts · {fmtMoney(s.gross)}
+                    </p>
+                  </div>
+                  <span className={styles.rowValue}>{fmtHours(s.hours)}</span>
+                  <span className={`${styles.rowChev} ${isOpen ? styles.rowChevOpen : ""}`} aria-hidden="true">›</span>
+                </button>
+                {isOpen && (
+                  <ul className={styles.shiftList}>
+                    {s.entries.map((e) => (
+                      <li key={e.id} className={styles.shiftRow}>
+                        <span className={styles.shiftName}>{fmtDayLabel(e.dateISO)}</span>
+                        <span className={styles.shiftTime}>
+                          {fmtClockTime(e.startAt)} → {fmtClockTime(e.endAt)}
+                        </span>
+                        <span className={styles.shiftHours}>{fmtHours(e.hours)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
           {byStaff.length === 0 && <p className={styles.empty}>No staff shifts in this range.</p>}
         </ul>
       )}
 
       <div className={styles.footNote}>
-        <InfoIcon /> Hours shown are estimated paid hours (lunch = {LUNCH_HOURS}h, dinner = {DINNER_HOURS}h). Breaks are excluded.
+        <InfoIcon /> Hours are Square Labor paid hours — clock-in to clock-out with recorded breaks subtracted. Live figures update as staff clock out.
       </div>
     </div>
   );
-}
-
-/* ── helpers ─────────────────────────────────────────────────────── */
-
-function nameOfStaff(uid: string, s: StaffDoc | undefined): string {
-  const first = (s?.firstName ?? "").trim();
-  const last = (s?.lastName ?? "").trim();
-  if (first || last) return `${first}${last ? " " + last : ""}`;
-  return uid.slice(0, 6);
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  const a = (parts[0]?.[0] ?? "?").toUpperCase();
-  const b = (parts[1]?.[0] ?? "").toUpperCase();
-  return (a + b) || "??";
 }
 
 /* ── icons ───────────────────────────────────────────────────────── */

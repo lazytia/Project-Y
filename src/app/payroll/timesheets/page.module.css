@@ -215,7 +215,7 @@
 }
 .refreshBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ── day list ── */
+/* ── day/staff list ── */
 .list {
   list-style: none;
   padding: 0;
@@ -225,15 +225,23 @@
   border-radius: 14px;
   overflow: hidden;
 }
+.rowBlock { border-bottom: 1px solid var(--color-border); }
+.rowBlock:last-child { border-bottom: none; }
 .row {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
   gap: 12px;
   align-items: center;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--color-border);
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
 }
-.row:last-child { border-bottom: none; }
+.row:hover { background: var(--color-surface); }
 .dayChip {
   display: flex;
   flex-direction: column;
@@ -275,7 +283,42 @@
   font-weight: 700;
   color: var(--color-fg);
 }
-.rowChev { color: var(--color-fg-muted); font-size: 18px; }
+.rowChev { color: var(--color-fg-muted); font-size: 18px; transition: transform 0.15s; }
+.rowChevOpen { transform: rotate(90deg); }
+
+/* Expanded shift breakdown under each day/staff row */
+.shiftList {
+  list-style: none;
+  margin: 0;
+  padding: 6px 14px 14px 66px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--color-surface);
+}
+.shiftRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--color-fg);
+}
+.shiftName { font-weight: 600; }
+.shiftTime { color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+.shiftHours { font-weight: 700; font-variant-numeric: tabular-nums; }
+.shiftEmpty { font-size: 12px; color: var(--color-fg-muted); }
+
+/* Fetch error banner (Square API failure) */
+.errorBanner {
+  margin: 0;
+  padding: 10px 14px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
 .empty { padding: 24px; text-align: center; color: var(--color-fg-muted); font-size: 13px; margin: 0; }
 
 /* ── footer note ── */
