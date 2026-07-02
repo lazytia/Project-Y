@@ -145,13 +145,6 @@ function nameOfTeamMember(id: string, tm: TeamMemberFromApi | undefined): string
   return id.slice(0, 6);
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  const a = (parts[0]?.[0] ?? "?").toUpperCase();
-  const b = (parts[1]?.[0] ?? "").toUpperCase();
-  return (a + b) || "??";
-}
-
 /* ── page ────────────────────────────────────────────────────────── */
 
 type ViewMode = "day" | "staff";
@@ -461,11 +454,10 @@ export default function TimesheetsPage() {
               <li key={s.teamMemberId} className={styles.rowBlock}>
                 <button
                   type="button"
-                  className={styles.row}
+                  className={`${styles.row} ${styles.rowStaff}`}
                   onClick={() => setExpandedRow(isOpen ? null : s.teamMemberId)}
                   aria-expanded={isOpen}
                 >
-                  <span className={styles.avatar} aria-hidden="true">{initials(s.name)}</span>
                   <div className={styles.rowBody}>
                     <p className={styles.rowTitle}>{s.name}</p>
                     <p className={styles.rowMeta}>

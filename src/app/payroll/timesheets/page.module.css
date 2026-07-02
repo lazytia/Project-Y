@@ -242,6 +242,9 @@
   -webkit-tap-highlight-color: transparent;
 }
 .row:hover { background: var(--color-surface); }
+/* Staff rows drop the leading avatar column, so name flows all the way
+   to the left edge. */
+.rowStaff { grid-template-columns: 1fr auto auto; }
 .dayChip {
   display: flex;
   flex-direction: column;
