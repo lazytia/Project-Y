@@ -112,6 +112,16 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // Daily gross sales snapshot — keyed by YYYY-MM-DD. Populated by the
+    // Square sync cron (server admin bypass) AND by the owner dashboard
+    // whenever it fetches fresh stats, so past days keep their number
+    // even if Square is unreachable later. Signed-in read (Insights
+    // dashboard consumes it too), owner-only write from the client.
+    match /sales_daily/{dateISO} {
+      allow read: if request.auth != null;
+      allow write: if isOwner();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

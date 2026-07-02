@@ -154,6 +154,10 @@ function OwnerDashboard() {
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsError, setStatsError] = useState(false);
+  // Firestore snapshot of the day's gross sales — shown instantly on load
+  // (so past dates don't need to wait for Square), and refreshed to
+  // Firestore whenever the live Square call returns a fresh number.
+  const [savedDaySales, setSavedDaySales] = useState<number | null>(null);
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
   const [cateringOrders, setCateringOrders] = useState<CateringOrder[] | null>(null);
   const [lunchStaff, setLunchStaff] = useState<number | null>(null);
@@ -178,9 +182,35 @@ function OwnerDashboard() {
       setStats(data);
       setStatsError(false);
       setLastUpdated(new Date());
+      // Persist the day's gross sales to Firestore so past days keep
+      // their number even if Square becomes unreachable later. Fire-
+      // and-forget — a failed write must not tank the render path.
+      if (typeof data.todaySales === "number") {
+        setDoc(
+          doc(getDb(), "sales_daily", dateKey),
+          {
+            dateISO: dateKey,
+            grossSales: data.todaySales,
+            source: "dashboard-snapshot",
+            syncedAt: serverTimestamp(),
+          },
+          { merge: true },
+        ).catch((err) => console.error("[sales_daily] snapshot write failed:", err));
+        setSavedDaySales(data.todaySales);
+      }
     } catch (err) {
       console.error("[Square] fetch error:", err);
       setStatsError(true);
+    }
+  }, []);
+
+  const fetchSavedDaySales = useCallback(async (dateKey: string) => {
+    try {
+      const snap = await getDoc(doc(getDb(), "sales_daily", dateKey));
+      const data = snap.exists() ? (snap.data() as { grossSales?: number }) : null;
+      setSavedDaySales(typeof data?.grossSales === "number" ? data.grossSales : null);
+    } catch {
+      setSavedDaySales(null);
     }
   }, []);
 
@@ -284,6 +314,8 @@ function OwnerDashboard() {
     setLastUpdated(null);
     setLunchStaff(null);
     setDinnerStaff(null);
+    setSavedDaySales(null);
+    fetchSavedDaySales(selectedDate);
     fetchStats(selectedDate);
     fetchReservations(selectedDate);
     fetchCatering();
@@ -296,7 +328,7 @@ function OwnerDashboard() {
     const id1 = setInterval(() => fetchStats(selectedDate), POLL_INTERVAL_MS);
     const id2 = setInterval(() => fetchReservations(selectedDate), POLL_INTERVAL_MS);
     return () => { clearInterval(id1); clearInterval(id2); };
-  }, [selectedDate, isToday, prevMondayISO, weekMondayISO, fetchStats, fetchReservations, fetchCatering, fetchRosterStaff, fetchPrevWeekSales, fetchWeekSales, fetchWeeklyPayroll, fetchReviewNote]);
+  }, [selectedDate, isToday, prevMondayISO, weekMondayISO, fetchStats, fetchSavedDaySales, fetchReservations, fetchCatering, fetchRosterStaff, fetchPrevWeekSales, fetchWeekSales, fetchWeeklyPayroll, fetchReviewNote]);
 
   const resCounts = useMemo(() => {
     if (!reservations) return null;
@@ -434,13 +466,24 @@ function OwnerDashboard() {
         <div className={styles.todayBody}>
           <div className={styles.todayLeft}>
             <p className={styles.miniLabel}>TODAY SALES</p>
-            <p className={`${styles.salesAmount} ${stats?.todaySales === undefined ? styles.loading : ""}`}>
-              {stats?.todaySales !== undefined ? fmtCurrency(stats.todaySales) : "—"}
-            </p>
-            <p className={styles.targetSub}>
-              Target <span className={styles.strong}>{fmtCurrencyWhole(dailyTarget)}</span>
-            </p>
-            <Progress value={stats?.todaySales ?? 0} max={dailyTarget} pctRight />
+            {(() => {
+              // Prefer the live Square figure when we have it; otherwise
+              // fall back to whatever the Firestore snapshot holds so
+              // past dates render immediately and don't go blank when
+              // Square is unreachable.
+              const shown = stats?.todaySales ?? savedDaySales;
+              return (
+                <>
+                  <p className={`${styles.salesAmount} ${shown === null || shown === undefined ? styles.loading : ""}`}>
+                    {typeof shown === "number" ? fmtCurrency(shown) : "—"}
+                  </p>
+                  <p className={styles.targetSub}>
+                    Target <span className={styles.strong}>{fmtCurrencyWhole(dailyTarget)}</span>
+                  </p>
+                  <Progress value={typeof shown === "number" ? shown : 0} max={dailyTarget} pctRight />
+                </>
+              );
+            })()}
           </div>
           <div className={styles.todayDivider} aria-hidden="true" />
           <div className={styles.todayRight}>
