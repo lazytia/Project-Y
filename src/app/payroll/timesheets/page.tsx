@@ -363,7 +363,15 @@ export default function TimesheetsPage() {
         <CalendarPicker
           value={pickerOpen === "start" ? startISO : endISO}
           minDate={pickerOpen === "end" ? startISO : undefined}
-          maxDate={pickerOpen === "start" && endISO ? endISO : undefined}
+          /* CalendarPicker requires a maxDate — when picking End we cap
+             at one year past today so future scheduling is possible;
+             when picking Start we cap at the current End so we can't
+             pick a start after the end. */
+          maxDate={
+            pickerOpen === "start"
+              ? (endISO || addDaysISO(sydneyTodayISO(), 365))
+              : addDaysISO(sydneyTodayISO(), 365)
+          }
           singleOnly
           onChange={(d) => {
             if (pickerOpen === "start") setStartISO(d);
@@ -421,14 +429,11 @@ export default function TimesheetsPage() {
         <ul className={styles.list}>
           {days.map((d) => {
             const chip = fmtDayChip(d.dateISO);
-            const isOpen = expandedRow === d.dateISO;
             return (
               <li key={d.dateISO} className={styles.rowBlock}>
-                <button
-                  type="button"
+                <Link
+                  href={`/payroll/timesheets/${d.dateISO}`}
                   className={styles.row}
-                  onClick={() => setExpandedRow(isOpen ? null : d.dateISO)}
-                  aria-expanded={isOpen}
                 >
                   <span className={styles.dayChip}>
                     <span className={styles.dayChipDow}>{chip.dow}</span>
@@ -441,27 +446,8 @@ export default function TimesheetsPage() {
                     </p>
                   </div>
                   <span className={styles.rowValue}>{fmtHours(d.hours)}</span>
-                  <span className={`${styles.rowChev} ${isOpen ? styles.rowChevOpen : ""}`} aria-hidden="true">›</span>
-                </button>
-                {isOpen && (
-                  <ul className={styles.shiftList}>
-                    {d.entries.length === 0 ? (
-                      <li className={styles.shiftEmpty}>No shifts recorded.</li>
-                    ) : (
-                      d.entries.map((s) => (
-                        <li key={s.id} className={styles.shiftRow}>
-                          <span className={styles.shiftName}>
-                            {nameOfTeamMember(s.teamMemberId, teamMembers[s.teamMemberId])}
-                          </span>
-                          <span className={styles.shiftTime}>
-                            {fmtClockTime(s.startAt)} → {fmtClockTime(s.endAt)}
-                          </span>
-                          <span className={styles.shiftHours}>{fmtHours(s.hours)}</span>
-                        </li>
-                      ))
-                    )}
-                  </ul>
-                )}
+                  <span className={styles.rowChev} aria-hidden="true">›</span>
+                </Link>
               </li>
             );
           })}
