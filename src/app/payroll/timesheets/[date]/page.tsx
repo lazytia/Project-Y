@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import Splash from "@/components/Splash";
@@ -27,6 +29,20 @@ type ShiftFromApi = {
 };
 
 type TeamMemberFromApi = { firstName?: string; lastName?: string };
+
+/**
+ * A per-shift override document stored in Firestore. We NEVER push these
+ * values back to Square — Square Labor stays authoritative for the
+ * underlying record. This just lets the owner tidy up the local view.
+ */
+type EditDoc = {
+  shiftId: string;
+  dateISO: string;
+  originalStartAt: string;
+  originalEndAt: string | null;
+  startAt: string;
+  endAt: string | null;
+};
 
 /* ── formatting ──────────────────────────────────────────────────── */
 
@@ -89,12 +105,17 @@ export default function DayDetailsPage() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [dateOpen, setDateOpen] = useState(false);
+  const [edits, setEdits] = useState<Record<string, EditDoc>>({});
+  const [editingField, setEditingField] = useState<{ shiftId: string; field: "start" | "end" } | null>(null);
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!dateISO) return;
     setBusy(true);
     setFetchError(null);
     try {
+      // Square Labor shifts + team members.
       const res = await fetch(
         `/api/square/timesheets?startDate=${encodeURIComponent(dateISO)}&endDate=${encodeURIComponent(dateISO)}`,
         { cache: "no-store" },
@@ -107,6 +128,19 @@ export default function DayDetailsPage() {
           ? (data.teamMembers as Record<string, TeamMemberFromApi>)
           : {},
       );
+
+      // Local time overrides for this day. Keyed by shift id.
+      try {
+        const snap = await getDocs(
+          query(collection(getDb(), "timesheet_edits"), where("dateISO", "==", dateISO)),
+        );
+        const map: Record<string, EditDoc> = {};
+        for (const d of snap.docs) map[d.id] = { shiftId: d.id, ...(d.data() as Omit<EditDoc, "shiftId">) };
+        setEdits(map);
+      } catch (err) {
+        console.warn("[day-details] edits fetch failed:", err);
+        setEdits({});
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Square unreachable.";
       console.error("[day-details] fetch failed:", err);
@@ -130,10 +164,74 @@ export default function DayDetailsPage() {
       .sort((a, b) => a.startAt.localeCompare(b.startAt));
   }, [shifts, dismissed, dateISO]);
 
+  /** Effective (possibly-edited) shift used by the render code. */
+  function withEdit(s: ShiftFromApi): ShiftFromApi {
+    const e = edits[s.id];
+    if (!e) return s;
+    const startAt = e.startAt;
+    const endAt = e.endAt;
+    // Recompute hours from the edited start/end. We drop break subtraction
+    // when times are overridden — otherwise the two numbers stop matching
+    // what the owner just typed.
+    let hours = s.hours;
+    if (startAt && endAt) {
+      hours = Math.round(((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100) / 100;
+      if (hours < 0) hours = 0;
+    }
+    return { ...s, startAt, endAt, hours };
+  }
+
+  const effectiveShifts = useMemo(() => visibleShifts.map(withEdit), [visibleShifts, edits]);
   const totalHours = useMemo(
-    () => visibleShifts.reduce((sum, s) => sum + s.hours, 0),
-    [visibleShifts],
+    () => effectiveShifts.reduce((sum, s) => sum + s.hours, 0),
+    [effectiveShifts],
   );
+
+  /**
+   * Replace the HH:MM portion of a Square-returned ISO like
+   * "2026-06-29T10:01:00+10:00" with a new "HH:MM" from an <input type="time">.
+   * Preserves date and TZ offset so the resulting instant is unambiguous.
+   */
+  function replaceHHMM(iso: string, hhmm: string): string {
+    return iso.slice(0, 11) + hhmm + iso.slice(16);
+  }
+
+  async function saveTimeEdit(shift: ShiftFromApi, field: "start" | "end", newHHMM: string) {
+    if (!user) return;
+    if (!/^\d{2}:\d{2}$/.test(newHHMM)) return;
+    const existing = edits[shift.id];
+    const currentStart = existing?.startAt ?? shift.startAt;
+    const currentEnd = existing?.endAt ?? shift.endAt;
+    const newStart = field === "start" ? replaceHHMM(currentStart, newHHMM) : currentStart;
+    const newEnd =
+      field === "end" && currentEnd ? replaceHHMM(currentEnd, newHHMM) : currentEnd;
+
+    const patch: EditDoc = {
+      shiftId: shift.id,
+      dateISO: shift.dateISO,
+      originalStartAt: existing?.originalStartAt ?? shift.startAt,
+      originalEndAt: existing?.originalEndAt ?? shift.endAt,
+      startAt: newStart,
+      endAt: newEnd,
+    };
+
+    setSavingEditId(shift.id);
+    setEditError(null);
+    try {
+      await setDoc(
+        doc(getDb(), "timesheet_edits", shift.id),
+        { ...patch, updatedAt: serverTimestamp(), updatedBy: user.uid },
+        { merge: true },
+      );
+      setEdits((prev) => ({ ...prev, [shift.id]: patch }));
+      setEditingField(null);
+    } catch (err) {
+      console.error("[timesheet_edits] save failed:", err);
+      setEditError(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setSavingEditId(null);
+    }
+  }
 
 
   if (authLoading || loading) return <Splash />;
@@ -212,31 +310,99 @@ export default function DayDetailsPage() {
       {fetchError && <p className={styles.errorBanner}>Square Labor: {fetchError}</p>}
       {busy && !fetchError && <p className={styles.busyBanner}>Refreshing…</p>}
 
+      {editError && <p className={styles.errorBanner}>{editError}</p>}
+
       <ul className={styles.shiftList}>
-        {visibleShifts.length === 0 && !busy ? (
+        {effectiveShifts.length === 0 && !busy ? (
           <li className={styles.emptyRow}>No shifts recorded for this day.</li>
         ) : (
-          visibleShifts.map((s) => {
+          effectiveShifts.map((s) => {
+            const original = visibleShifts.find((v) => v.id === s.id);
             const name = nameOfTeamMember(s.teamMemberId, teamMembers[s.teamMemberId]);
             const start = fmtClockTime(s.startAt);
             const end = fmtClockTime(s.endAt);
+            const editRec = edits[s.id];
+            const isEdited = !!editRec;
+            const isSaving = savingEditId === s.id;
+            const editingStart = editingField?.shiftId === s.id && editingField.field === "start";
+            const editingEnd = editingField?.shiftId === s.id && editingField.field === "end";
+
             return (
               <li key={s.id} className={styles.shiftCard}>
                 <span className={styles.avatar} aria-hidden="true">{initials(name)}</span>
                 <div className={styles.shiftBody}>
                   <p className={styles.shiftName}>{name}</p>
                   <div className={styles.timeRow}>
-                    <span className={styles.timeChip}>
-                      <span className={styles.timeChipMain}>{start.hhmm}</span>
-                      <span className={styles.timeChipAmpm}>{start.ampm}</span>
-                    </span>
+                    {editingStart ? (
+                      <input
+                        type="time"
+                        className={styles.timeInput}
+                        defaultValue={s.startAt.slice(11, 16)}
+                        autoFocus
+                        disabled={isSaving}
+                        onBlur={(e) => {
+                          const v = e.currentTarget.value;
+                          if (v && v !== s.startAt.slice(11, 16)) void saveTimeEdit(s, "start", v);
+                          else setEditingField(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                          if (e.key === "Escape") setEditingField(null);
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.timeChip}
+                        onClick={() => setEditingField({ shiftId: s.id, field: "start" })}
+                        aria-label="Edit start time"
+                      >
+                        <span className={styles.timeChipMain}>{start.hhmm}</span>
+                        <span className={styles.timeChipAmpm}>{start.ampm}</span>
+                      </button>
+                    )}
                     <span className={styles.timeSep}>—</span>
-                    <span className={styles.timeChip}>
-                      <span className={styles.timeChipMain}>{end.hhmm}</span>
-                      <span className={styles.timeChipAmpm}>{end.ampm}</span>
-                    </span>
+                    {editingEnd ? (
+                      <input
+                        type="time"
+                        className={styles.timeInput}
+                        defaultValue={s.endAt ? s.endAt.slice(11, 16) : ""}
+                        autoFocus
+                        disabled={isSaving}
+                        onBlur={(e) => {
+                          const v = e.currentTarget.value;
+                          if (v && (!s.endAt || v !== s.endAt.slice(11, 16))) void saveTimeEdit(s, "end", v);
+                          else setEditingField(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                          if (e.key === "Escape") setEditingField(null);
+                        }}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.timeChip}
+                        onClick={() => setEditingField({ shiftId: s.id, field: "end" })}
+                        aria-label="Edit end time"
+                      >
+                        <span className={styles.timeChipMain}>{end.hhmm}</span>
+                        <span className={styles.timeChipAmpm}>{end.ampm}</span>
+                      </button>
+                    )}
                   </div>
-                  <p className={styles.editNote}>No edits</p>
+                  {isEdited && original ? (
+                    <p className={styles.editedNote}>
+                      <span className={styles.editedBadge}>EDITED</span>{" "}
+                      · was {(() => {
+                        const os = fmtClockTime(editRec.originalStartAt || original.startAt);
+                        const oe = fmtClockTime(editRec.originalEndAt || original.endAt);
+                        return `${os.hhmm} ${os.ampm} – ${oe.hhmm} ${oe.ampm}`;
+                      })()}
+                    </p>
+                  ) : (
+                    <p className={styles.editNote}>No edits{isSaving ? " · saving…" : ""}</p>
+                  )}
                 </div>
                 <span className={styles.hoursBadge}>{fmtHours(s.hours)}</span>
                 <button

@@ -135,6 +135,24 @@
   border: 1px solid var(--color-border);
   border-radius: 8px;
   font-variant-numeric: tabular-nums;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.timeChip:hover { border-color: var(--color-warm); background: var(--color-warm-bg); }
+.timeInput {
+  padding: 4px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-warm);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  min-width: 100px;
 }
 .timeChipMain {
   font-family: var(--font-display);
@@ -152,6 +170,26 @@
   font-size: 11px;
   color: var(--color-fg-muted);
   margin: 0;
+}
+.editedNote {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.editedBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  border-radius: 4px;
 }
 .hoursBadge {
   display: inline-flex;
