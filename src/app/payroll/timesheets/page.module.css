@@ -245,13 +245,13 @@
 /* Staff rows have colour avatar + name/subtitle + hours column + shifts
    count + chevron, matching the day-details Staff view layout. */
 .rowStaff {
-  grid-template-columns: 40px 1fr auto auto 18px;
+  grid-template-columns: 1fr auto auto 18px;
   text-decoration: none;
   color: inherit;
 }
 .staffColHeader {
   display: grid;
-  grid-template-columns: 40px 1fr auto auto 18px;
+  grid-template-columns: 1fr auto auto 18px;
   gap: 12px;
   padding: 4px 14px 0;
   font-family: var(--font-display);

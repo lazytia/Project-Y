@@ -490,7 +490,6 @@ export default function TimesheetsPage() {
       ) : (
         <>
           <div className={styles.staffColHeader}>
-            <span />
             <span>STAFF</span>
             <span>HOURS</span>
             <span>SHIFTS</span>
@@ -512,13 +511,6 @@ export default function TimesheetsPage() {
                     href={`/payroll/timesheets/staff/${encodeURIComponent(s.teamMemberId)}?start=${startISO}&end=${endISO}`}
                     className={`${styles.row} ${styles.rowStaff}`}
                   >
-                    <span
-                      className={styles.avatarColor}
-                      style={{ background: colorForMemberId(s.teamMemberId) }}
-                      aria-hidden="true"
-                    >
-                      {initialsOf(s.name)}
-                    </span>
                     <div className={styles.rowBody}>
                       <p className={styles.rowTitle}>{s.name}</p>
                       <p className={styles.rowMeta}>
