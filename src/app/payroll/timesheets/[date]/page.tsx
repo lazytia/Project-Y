@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
@@ -109,6 +109,15 @@ export default function DayDetailsPage() {
   const [editingField, setEditingField] = useState<{ shiftId: string; field: "start" | "end" } | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [extraShifts, setExtraShifts] = useState<ShiftFromApi[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState<{ teamMemberId: string; startHHMM: string; endHHMM: string }>({
+    teamMemberId: "",
+    startHHMM: "10:00",
+    endHHMM: "14:30",
+  });
+  const [savingAdd, setSavingAdd] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!dateISO) return;
@@ -141,6 +150,31 @@ export default function DayDetailsPage() {
         console.warn("[day-details] edits fetch failed:", err);
         setEdits({});
       }
+
+      // App-local backfilled shifts (not in Square Labor). We store them
+      // shaped the same as Square rows so the render code doesn't care.
+      try {
+        const snap = await getDocs(
+          query(collection(getDb(), "timesheet_extra_shifts"), where("dateISO", "==", dateISO)),
+        );
+        const extras: ShiftFromApi[] = snap.docs.map((d) => {
+          const data = d.data() as Partial<ShiftFromApi>;
+          return {
+            id: d.id,
+            teamMemberId: data.teamMemberId ?? "",
+            dateISO: data.dateISO ?? dateISO,
+            startAt: data.startAt ?? "",
+            endAt: data.endAt ?? null,
+            hours: typeof data.hours === "number" ? data.hours : 0,
+            hourlyRateCents:
+              typeof data.hourlyRateCents === "number" ? data.hourlyRateCents : null,
+          };
+        });
+        setExtraShifts(extras);
+      } catch (err) {
+        console.warn("[day-details] extra shifts fetch failed:", err);
+        setExtraShifts([]);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Square unreachable.";
       console.error("[day-details] fetch failed:", err);
@@ -159,10 +193,11 @@ export default function DayDetailsPage() {
   }, [authLoading, allowed, load]);
 
   const visibleShifts = useMemo(() => {
-    return shifts
+    const merged = [...shifts, ...extraShifts];
+    return merged
       .filter((s) => s.dateISO === dateISO && !dismissed.has(s.id))
       .sort((a, b) => a.startAt.localeCompare(b.startAt));
-  }, [shifts, dismissed, dateISO]);
+  }, [shifts, extraShifts, dismissed, dateISO]);
 
   /** Effective (possibly-edited) shift used by the render code. */
   function withEdit(s: ShiftFromApi): ShiftFromApi {
@@ -194,6 +229,72 @@ export default function DayDetailsPage() {
    */
   function replaceHHMM(iso: string, hhmm: string): string {
     return iso.slice(0, 11) + hhmm + iso.slice(16);
+  }
+
+  /** Grab the +HH:MM offset off an existing Square shift for this day so
+   *  new backfill entries share the same local-time semantics. Falls back
+   *  to Sydney standard time (+10:00) when there are none. */
+  function localOffsetOfDay(): string {
+    const first = shifts[0];
+    if (first?.startAt) {
+      const match = /([+-]\d{2}:\d{2})$/.exec(first.startAt);
+      if (match) return match[1];
+    }
+    return "+10:00";
+  }
+
+  async function submitAddShift() {
+    if (!user) return;
+    if (!addForm.teamMemberId) { setAddError("Pick a staff member."); return; }
+    if (!/^\d{2}:\d{2}$/.test(addForm.startHHMM) || !/^\d{2}:\d{2}$/.test(addForm.endHHMM)) {
+      setAddError("Enter times in HH:MM format.");
+      return;
+    }
+    const offset = localOffsetOfDay();
+    const startAt = `${dateISO}T${addForm.startHHMM}:00${offset}`;
+    const endAt = `${dateISO}T${addForm.endHHMM}:00${offset}`;
+    const hours = Math.round(
+      ((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100,
+    ) / 100;
+    if (hours <= 0) {
+      setAddError("End time must be after start time.");
+      return;
+    }
+
+    setSavingAdd(true);
+    setAddError(null);
+    try {
+      const ref = await addDoc(collection(getDb(), "timesheet_extra_shifts"), {
+        teamMemberId: addForm.teamMemberId,
+        dateISO,
+        startAt,
+        endAt,
+        hours,
+        hourlyRateCents: null,
+        source: "app-local",
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+      });
+      setExtraShifts((prev) => [
+        ...prev,
+        {
+          id: ref.id,
+          teamMemberId: addForm.teamMemberId,
+          dateISO,
+          startAt,
+          endAt,
+          hours,
+          hourlyRateCents: null,
+        },
+      ]);
+      setAddOpen(false);
+      setAddForm({ teamMemberId: "", startHHMM: "10:00", endHHMM: "14:30" });
+    } catch (err) {
+      console.error("[timesheet_extra_shifts] add failed:", err);
+      setAddError(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setSavingAdd(false);
+    }
   }
 
   async function saveTimeEdit(shift: ShiftFromApi, field: "start" | "end", newHHMM: string) {
@@ -288,7 +389,7 @@ export default function DayDetailsPage() {
         <button
           type="button"
           className={styles.addShiftInlineBtn}
-          onClick={() => alert("Add-shift is not wired to Square Labor yet.")}
+          onClick={() => { setAddError(null); setAddOpen(true); }}
         >
           <span aria-hidden="true">+</span> Add shift
         </button>
@@ -427,7 +528,7 @@ export default function DayDetailsPage() {
       <button
         type="button"
         className={styles.addShiftBtn}
-        onClick={() => alert("Add-shift is not wired to Square Labor yet.")}
+        onClick={() => { setAddError(null); setAddOpen(true); }}
       >
         <span aria-hidden="true">+</span> Add shift
       </button>
@@ -440,6 +541,100 @@ export default function DayDetailsPage() {
         </svg>
         Hours shown are paid hours. Breaks are excluded.
       </div>
+
+      {addOpen && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={(e) => { if (e.target === e.currentTarget) setAddOpen(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add shift"
+        >
+          <div className={styles.modal}>
+            <div className={styles.modalHead}>
+              <div>
+                <h2 className={styles.modalTitle}>Add shift</h2>
+                <p className={styles.modalSub}>Back-fill a missed clock-in / clock-out. Saved in-app only, not pushed to Square.</p>
+              </div>
+              <button
+                type="button"
+                className={styles.modalClose}
+                aria-label="Close"
+                onClick={() => setAddOpen(false)}
+              >×</button>
+            </div>
+
+            <label className={styles.formLabel}>Staff</label>
+            <select
+              className={styles.formInput}
+              value={addForm.teamMemberId}
+              onChange={(e) => setAddForm((p) => ({ ...p, teamMemberId: e.target.value }))}
+              disabled={savingAdd}
+            >
+              <option value="">Select a staff member…</option>
+              {Object.entries(teamMembers)
+                .map(([id, tm]) => ({ id, name: nameOfTeamMember(id, tm) }))
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(({ id, name }) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+            </select>
+
+            <label className={styles.formLabel}>Date</label>
+            <input
+              className={styles.formInput}
+              type="date"
+              value={dateISO}
+              readOnly
+              disabled
+            />
+
+            <div className={styles.formGrid2}>
+              <div>
+                <label className={styles.formLabel}>Start (HH:MM)</label>
+                <input
+                  className={styles.formInput}
+                  type="time"
+                  value={addForm.startHHMM}
+                  onChange={(e) => setAddForm((p) => ({ ...p, startHHMM: e.target.value }))}
+                  disabled={savingAdd}
+                />
+              </div>
+              <div>
+                <label className={styles.formLabel}>End (HH:MM)</label>
+                <input
+                  className={styles.formInput}
+                  type="time"
+                  value={addForm.endHHMM}
+                  onChange={(e) => setAddForm((p) => ({ ...p, endHHMM: e.target.value }))}
+                  disabled={savingAdd}
+                />
+              </div>
+            </div>
+
+            {addError && <p className={styles.modalError}>{addError}</p>}
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalCancelBtn}
+                onClick={() => setAddOpen(false)}
+                disabled={savingAdd}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.modalPrimaryBtn}
+                onClick={() => void submitAddShift()}
+                disabled={savingAdd || !addForm.teamMemberId}
+              >
+                <span aria-hidden="true">+</span> {savingAdd ? "Saving…" : "Add shift"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

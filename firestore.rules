@@ -129,6 +129,13 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // App-local shifts backfilled by the owner when Square Labor missed
+    // a clock-in / clock-out. These are NEVER pushed to Square either;
+    // they appear alongside the Square feed in the timesheets UI only.
+    match /timesheet_extra_shifts/{docId} {
+      allow read, write: if isOwner();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;
