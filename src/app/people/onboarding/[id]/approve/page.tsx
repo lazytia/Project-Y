@@ -397,6 +397,14 @@ export default function CreateLoginDetailsPage() {
           <InfoIcon />
           The employee will receive their Staff ID and Project Y login details via SMS.
         </p>
+        <button
+          type="button"
+          className={styles.revertBtn}
+          disabled={busy}
+          onClick={() => router.push(`/people/onboarding/${requestId}`)}
+        >
+          Revert
+        </button>
       </div>
 
       {toast && (

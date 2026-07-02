@@ -325,6 +325,33 @@
   cursor: not-allowed;
 }
 
+.revertBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  margin-top: var(--space-1);
+  background: transparent;
+  color: var(--color-fg-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.revertBtn:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-fg);
+}
+
+.revertBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .footerNote {
   display: flex;
   align-items: flex-start;
