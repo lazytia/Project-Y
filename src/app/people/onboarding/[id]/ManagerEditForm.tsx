@@ -1,23 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { useRouter, useParams } from "next/navigation";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  type Timestamp,
+} from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
-import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
 import CalendarPicker from "@/components/CalendarPicker";
-import styles from "./page.module.css";
+import styles from "./ManagerEditForm.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Onboarding → New Employee (manager view).
- * Adds a record to the `staff_onboarding` collection so the new employee
- * appears on the /people/onboarding list with a "Waiting for Documents"
- * status pill.
+ * Onboarding → Edit Employee (manager view).
+ * Pre-fills from the `staff_onboarding/{id}` Firestore document and allows
+ * the manager to update or delete the record.
  * ────────────────────────────────────────────────────────────────────────── */
 
 const POSITIONS = ["Hall Staff", "Kitchen Staff"] as const;
@@ -33,7 +38,6 @@ const TRAINING_PERIODS = [
 ] as const;
 type TrainingPeriod = (typeof TRAINING_PERIODS)[number]["value"];
 
-const DEFAULT_STATUS = "Waiting for Documents";
 const FAR_FUTURE = "2030-12-31";
 const NOTES_MAX = 500;
 
@@ -42,15 +46,6 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate(),
   ).padStart(2, "0")}`;
-}
-
-function requesterDisplayName(email: string | null | undefined): string {
-  const u = emailToUsername(email).toLowerCase();
-  if (u === "yurina") return "Yurina";
-  if (u === "yurica") return "Yurica";
-  if (u === "tia") return "Tia";
-  if (!u) return "Manager";
-  return u.charAt(0).toUpperCase() + u.slice(1);
 }
 
 function fmtIsoShort(iso: string): string {
@@ -64,8 +59,46 @@ function fmtIsoShort(iso: string): string {
   });
 }
 
-export default function NewEmployeePage() {
+function toIso(v: unknown): string {
+  if (!v) return todayIso();
+  if (typeof v === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const parsed = new Date(v);
+    if (!Number.isNaN(parsed.getTime())) {
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+    }
+    return todayIso();
+  }
+  if (typeof v === "object" && v !== null && "toDate" in v) {
+    try {
+      const d = (v as Timestamp).toDate();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    } catch {
+      return todayIso();
+    }
+  }
+  return todayIso();
+}
+
+function normalisePosition(raw: unknown): Position {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (s === "kitchen" || s === "kitchen_staff" || s === "kitchen staff")
+    return "Kitchen Staff";
+  return "Hall Staff";
+}
+
+function normaliseTrainingPeriod(raw: unknown): TrainingPeriod {
+  const s = String(raw ?? "").trim();
+  if (s === "First 3 Weeks") return "First 3 Weeks";
+  if (s === "Until Fully Trained") return "Until Fully Trained";
+  return "First 2 Weeks";
+}
+
+export default function ManagerEditForm() {
   const router = useRouter();
+  const params = useParams();
+  const id = typeof params.id === "string" ? params.id : (params.id?.[0] ?? "");
+
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
 
@@ -73,6 +106,9 @@ export default function NewEmployeePage() {
     if (authLoading) return;
     if (!allowed) router.replace(ROUTES.home);
   }, [authLoading, allowed, router]);
+
+  const [loadingDoc, setLoadingDoc] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
@@ -90,25 +126,64 @@ export default function NewEmployeePage() {
   const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>("First 2 Weeks");
 
   const [saving, setSaving] = useState(false);
-  const [showToast, setShowToast] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
 
-  // Set default start date on mount (avoids SSR/client hydration mismatch).
+  // Load existing document
   useEffect(() => {
-    if (!startDate) setStartDate(todayIso());
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!allowed || !id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", id));
+        if (cancelled) return;
+        if (!snap.exists()) {
+          setNotFound(true);
+          setLoadingDoc(false);
+          return;
+        }
+        const raw = snap.data() as Record<string, unknown>;
+        setFullName((raw.fullName as string | undefined) ?? "");
+        setMobileNumber((raw.mobileNumber as string | undefined) ?? "");
+        setPosition(normalisePosition(raw.position));
+        setStartDate(toIso(raw.startDate));
+        if (raw.documents && typeof raw.documents === "object") {
+          const docs = raw.documents as Record<string, unknown>;
+          if (docs.visaExpiry) setVisaExpiry(toIso(docs.visaExpiry));
+        }
+        if (raw.visaExpiry) setVisaExpiry(toIso(raw.visaExpiry));
+        setTrainingRate(
+          typeof raw.trainingRate === "number" ? String(raw.trainingRate) : "",
+        );
+        setTrainingPeriod(normaliseTrainingPeriod(raw.trainingPeriod));
+        setAfterTrainingRate(
+          typeof raw.afterTrainingRate === "number"
+            ? String(raw.afterTrainingRate)
+            : "",
+        );
+        setNotes((raw.notes as string | undefined) ?? "");
+        setLoadingDoc(false);
+      } catch {
+        if (!cancelled) setLoadingDoc(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed, id]);
 
   const canSave =
     fullName.trim().length > 0 &&
     !!startDate &&
     !!trainingRate.trim() &&
-    !Number.isNaN(parseFloat(trainingRate)) &&
-    mobileNumber.trim().length > 0;
+    !Number.isNaN(parseFloat(trainingRate));
 
   async function handleSave() {
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      await addDoc(collection(getDb(), "staff_onboarding"), {
+      await updateDoc(doc(getDb(), "staff_onboarding", id), {
         fullName: fullName.trim(),
         mobileNumber: mobileNumber.trim(),
         position,
@@ -120,22 +195,56 @@ export default function NewEmployeePage() {
           ? parseFloat(afterTrainingRate)
           : null,
         notes: notes.trim(),
-        status: DEFAULT_STATUS,
-        role: "staff",
-        requestedByUid: user?.uid ?? null,
-        requestedByName: requesterDisplayName(user?.email),
-        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
-      setShowToast(true);
+      setToast({ title: "Changes saved", message: "Employee record has been updated." });
       window.setTimeout(() => router.push("/people/onboarding"), 900);
     } catch {
       setSaving(false);
-      alert("Failed to create employee. Please try again.");
+      alert("Failed to save changes. Please try again.");
+    }
+  }
+
+  async function handleDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(getDb(), "staff_onboarding", id));
+      setConfirmDelete(false);
+      setToast({ title: "Employee removed", message: "The onboarding record has been deleted." });
+      window.setTimeout(() => router.push("/people/onboarding"), 900);
+    } catch {
+      setDeleting(false);
+      alert("Failed to delete employee. Please try again.");
     }
   }
 
   if (authLoading) return <Splash />;
   if (!allowed) return null;
+  if (loadingDoc) return <Splash />;
+
+  if (notFound) {
+    return (
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <button
+            type="button"
+            className={styles.backBtn}
+            onClick={() => router.push("/people/onboarding")}
+            aria-label="Back to onboarding"
+          >
+            <ChevronLeft />
+          </button>
+          <div className={styles.headerTitles}>
+            <span className={styles.eyebrow}>Onboarding</span>
+            <h1 className={styles.title}>Not Found</h1>
+          </div>
+          <span className={styles.headerSpacer} />
+        </header>
+        <p className={styles.notFoundMsg}>This employee record no longer exists.</p>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -151,7 +260,7 @@ export default function NewEmployeePage() {
         </button>
         <div className={styles.headerTitles}>
           <span className={styles.eyebrow}>Onboarding</span>
-          <h1 className={styles.title}>New Employee</h1>
+          <h1 className={styles.title}>Edit Employee</h1>
         </div>
         <span className={styles.headerSpacer} />
       </header>
@@ -349,15 +458,49 @@ export default function NewEmployeePage() {
         />
       </div>
 
-      {/* Submit */}
+      {/* Save */}
       <button
         type="button"
         className={styles.submitBtn}
         disabled={!canSave || saving}
         onClick={handleSave}
       >
-        {saving ? "Creating…" : "Create Employee"}
+        {saving ? "Saving…" : "Save Changes"}
       </button>
+
+      {/* Delete */}
+      {!confirmDelete ? (
+        <button
+          type="button"
+          className={styles.deleteBtn}
+          onClick={() => setConfirmDelete(true)}
+        >
+          Delete Employee
+        </button>
+      ) : (
+        <div className={styles.confirmWrap}>
+          <p className={styles.confirmText}>
+            Are you sure? This will permanently remove the onboarding record.
+          </p>
+          <div className={styles.confirmRow}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={() => setConfirmDelete(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={styles.confirmDeleteBtn}
+              disabled={deleting}
+              onClick={handleDelete}
+            >
+              {deleting ? "Deleting…" : "Yes, Delete"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Calendar bottom sheet */}
       {calOpen && (
@@ -429,11 +572,11 @@ export default function NewEmployeePage() {
         </div>
       )}
 
-      {showToast && (
+      {toast && (
         <Toast
-          title="Employee created"
-          message="They now appear in your onboarding list."
-          onClose={() => setShowToast(false)}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast(null)}
         />
       )}
     </div>
