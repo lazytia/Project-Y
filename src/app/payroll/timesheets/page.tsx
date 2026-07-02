@@ -544,9 +544,17 @@ export default function TimesheetsPage() {
         </>
       )}
 
-      <div className={styles.footNote}>
-        <InfoIcon /> Hours are Square Labor paid hours — clock-in to clock-out with recorded breaks subtracted. Live figures update as staff clock out.
-      </div>
+      <button
+        type="button"
+        className={styles.pushBtn}
+        onClick={() => alert("Push to Google Sheets is not wired yet.")}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v14" />
+          <polyline points="19 12 12 19 5 12" />
+        </svg>
+        Push to Google
+      </button>
 
       {addOpen && (
         <div
@@ -728,15 +736,6 @@ function RefreshIcon() {
       <polyline points="23 4 23 10 17 10" />
       <polyline points="1 20 1 14 7 14" />
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  );
-}
-function InfoIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="16" x2="12" y2="12" />
-      <line x1="12" y1="8" x2="12.01" y2="8" />
     </svg>
   );
 }

@@ -413,12 +413,23 @@
 .modalPrimaryBtn { padding: 10px 18px; background: #111; color: #fff; border: none; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .modalPrimaryBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ── footer note ── */
-.footNote {
-  display: flex;
+/* ── Push to Google button ── */
+.pushBtn {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 12px;
-  color: var(--color-fg-muted);
-  font-size: 11px;
+  padding: 14px 18px;
+  background: #111;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  align-self: stretch;
+  transition: background 0.15s;
 }
+.pushBtn:hover { background: #2b2b2b; }
+.pushBtn:disabled { opacity: 0.5; cursor: not-allowed; }
