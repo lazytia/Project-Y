@@ -168,6 +168,7 @@ function OwnerDashboard() {
   const [reviewEditing, setReviewEditing] = useState(false);
   const [reviewDraft, setReviewDraft] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const fetchStats = useCallback(async (dateKey: string) => {
     try {
@@ -344,6 +345,7 @@ function OwnerDashboard() {
   const saveReview = async () => {
     if (reviewSaving) return;
     setReviewSaving(true);
+    setReviewError(null);
     try {
       await setDoc(
         doc(getDb(), "sales_reviews", selectedDate),
@@ -352,6 +354,9 @@ function OwnerDashboard() {
       );
       setReviewNote(reviewDraft);
       setReviewEditing(false);
+    } catch (err) {
+      console.error("[sales_reviews] save failed:", err);
+      setReviewError(err instanceof Error ? err.message : "Save failed.");
     } finally {
       setReviewSaving(false);
     }
@@ -366,11 +371,15 @@ function OwnerDashboard() {
     if (reviewSaving) return;
     if (!window.confirm("Delete this day's sales review?")) return;
     setReviewSaving(true);
+    setReviewError(null);
     try {
       await deleteDoc(doc(getDb(), "sales_reviews", selectedDate));
       setReviewNote("");
       setReviewDraft("");
       setReviewEditing(false);
+    } catch (err) {
+      console.error("[sales_reviews] delete failed:", err);
+      setReviewError(err instanceof Error ? err.message : "Delete failed.");
     } finally {
       setReviewSaving(false);
     }
@@ -409,8 +418,9 @@ function OwnerDashboard() {
         <CalendarPicker
           value={selectedDate}
           maxDate={todayKey}
+          singleOnly
           onChange={(d) => setSelectedDate(d)}
-          onRangeChange={() => { /* range mode not used on this dashboard */ }}
+          onRangeChange={() => { /* range mode disabled via singleOnly */ }}
           onClose={() => setCalendarOpen(false)}
         />
       )}
@@ -604,6 +614,7 @@ function OwnerDashboard() {
         ) : (
           <p className={styles.reviewEmpty}>No notes for this day yet. Tap Edit to add.</p>
         )}
+        {reviewError && <p className={styles.reviewErrorMsg}>{reviewError}</p>}
       </section>
 
       {/* BEST SELLERS */}

@@ -362,6 +362,14 @@
 }
 .btnDanger:hover { background: #fee2e2; }
 .btnDanger:disabled { opacity: 0.5; cursor: not-allowed; }
+.reviewErrorMsg {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #b91c1c;
+  background: #fee2e2;
+  border-radius: 8px;
+}
 .btnGhost {
   padding: 8px 14px;
   background: transparent;
