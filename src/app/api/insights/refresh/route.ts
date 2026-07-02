@@ -130,12 +130,7 @@ async function syncPayrollWeekFromSheet(
   weekStart: Date,
 ): Promise<{ gross: number; super: number } | null> {
   if (!cachedTotals) {
-    try {
-      cachedTotals = await fetchWeeklyPayrollTotals();
-    } catch (err) {
-      // Don't kill the whole request if the Sheet read fails.
-      throw err;
-    }
+    cachedTotals = await fetchWeeklyPayrollTotals();
   }
   const key = isoOf(weekStart);
   const row = cachedTotals[key];
