@@ -185,24 +185,9 @@ export default function OwnerRequestDetail() {
     };
   }, [id]);
 
-  async function handleApprove() {
+  function handleApprove() {
     if (!docData || docData.approved || busy) return;
-    setBusy(true);
-    try {
-      await updateDoc(doc(getDb(), "staff_onboarding", id), {
-        status: "approved",
-        approvedAt: serverTimestamp(),
-        approvedByUid: user?.uid ?? null,
-        approvedByName: requesterFallback(user?.email),
-        updatedAt: serverTimestamp(),
-      });
-      setDocData((prev) => (prev ? { ...prev, approved: true, status: "approved" } : prev));
-      setToast({ title: "Request approved", message: "The employee profile will be set up next." });
-    } catch {
-      alert("Failed to approve. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+    router.push(`/people/onboarding/${id}/approve`);
   }
 
   async function handleUnapprove() {
