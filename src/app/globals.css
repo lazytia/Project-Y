@@ -99,6 +99,13 @@ button {
   background: var(--color-bg);
 }
 
+/* Set by BootSplashDismiss once auth restore finishes. We hide instead of
+   removing the node so React can keep managing it — .remove() from an
+   effect blows up the reconciler on the next commit. */
+.bootSplashHidden {
+  display: none !important;
+}
+
 .bootSplashLogo {
   width: 72px;
   height: 72px;

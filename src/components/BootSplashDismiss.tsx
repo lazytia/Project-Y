@@ -7,10 +7,21 @@ import { PUBLIC_ROUTES } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 
 /**
- * Removes the static #boot-splash from layout once the app is ready to paint
+ * Hides the static #boot-splash from layout once the app is ready to paint
  * real UI. Keeps the splash visible through auth restore so users never see
  * a blank/black screen between HTML parse and React hydration.
+ *
+ * Important: we DO NOT .remove() the node — React rendered it from
+ * RootLayout, so ripping it out of the DOM leaves React's reconciler with a
+ * stale fiber pointer. The next commit that touches a sibling then throws
+ * "Failed to execute 'insertBefore' / 'removeChild'". Hiding via a class
+ * keeps the node in place so React can continue managing it.
  */
+function hideBootSplash() {
+  const el = document.getElementById("boot-splash");
+  if (el) el.classList.add("bootSplashHidden");
+}
+
 export default function BootSplashDismiss() {
   const { user, loading, staffCompletedStep } = useAuth();
   const pathname = usePathname();
@@ -20,17 +31,17 @@ export default function BootSplashDismiss() {
 
     const isPublic = PUBLIC_ROUTES.has(pathname);
     if (isPublic) {
-      document.getElementById("boot-splash")?.remove();
+      hideBootSplash();
       return;
     }
 
     if (!user) {
-      document.getElementById("boot-splash")?.remove();
+      hideBootSplash();
       return;
     }
 
     if (isOwner(user) || isChef(user) || staffCompletedStep !== null) {
-      document.getElementById("boot-splash")?.remove();
+      hideBootSplash();
     }
   }, [user, loading, pathname, staffCompletedStep]);
 
