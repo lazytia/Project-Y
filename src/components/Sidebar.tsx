@@ -18,55 +18,60 @@ type NavGroup = {
   ownerOnly?: boolean;
 };
 
+// Owner nav (Tia / Yurica). Managers (Yurina) and chefs use MANAGER_NAV
+// below — this list is intentionally broader and owner-shaped.
 const NAV: NavGroup[] = [
   { icon: "🏠", label: "Dashboard", href: "/" },
-  {
-    icon: "👥",
-    label: "People",
-    children: [
-      { label: "Staff +", href: "/people/add-staff", ownerOnly: true },
-      { label: "New Staff Request", href: "/people/onboarding", ownerOnly: true },
-      { label: "Notice Given", href: "/people/notice-given" },
-      { label: "HR Notes", href: "/people/hr-notes" },
-      { label: "Cash Payments", href: "/people/cash-payments" },
-    ],
-  },
-  {
-    icon: "📅",
-    label: "Scheduling",
-    children: [
-      { label: "Roster", href: "/scheduling/roster" },
-      { label: "Insights", href: "/scheduling/insights" },
-    ],
-  },
   {
     icon: "🍽",
     label: "Operations",
     children: [
-      { label: "Daily Sold Out", href: "/operations/daily-sold-out", chefHidden: true },
       { label: "Reservations", href: "/operations/reservations" },
-      { label: "Catering Orders", href: "/operations/catering-orders" },
-      { label: "ARS", href: "/operations/ars", ownerOnly: true },
+      { label: "Catering", href: "/operations/catering-orders" },
+      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
+      { label: "Roster", href: "/scheduling/roster" },
+      { label: "Timesheets", href: "/payroll/timesheets" },
     ],
   },
   {
-    icon: "💵",
-    label: "Payroll",
-    ownerOnly: true,
+    icon: "👥",
+    label: "People",
     children: [
-      { label: "Payroll", href: "/payroll/payroll" },
-      { label: "Timesheets", href: "/payroll/timesheets" },
+      { label: "New Employees", href: "/people/onboarding" },
+      { label: "Active Employees", href: "/people/active" },
+      { label: "Notice Given", href: "/people/notice-given" },
+      { label: "Terminated", href: "/people/terminated" },
+      { label: "HR Notes", href: "/people/hr-notes" },
+      { label: "Cash Payments", href: "/people/cash-payments" },
     ],
   },
   {
     icon: "📦",
     label: "Inventory",
     children: [
-      { label: "Inventory", href: "/inventory/inventory" },
+      { label: "Stock Levels", href: "/inventory/inventory" },
       { label: "Suppliers", href: "/inventory/suppliers" },
     ],
   },
-  { icon: "🧪", label: "Test", href: "/onboarding", ownerOnly: true },
+  {
+    icon: "💵",
+    label: "Money",
+    children: [
+      { label: "Sales", href: "/money/sales" },
+      { label: "Payroll", href: "/payroll/payroll" },
+      { label: "Suppliers", href: "/money/suppliers" },
+      { label: "Utilities", href: "/money/utilities" },
+      { label: "Maintenance", href: "/money/maintenance" },
+    ],
+  },
+  {
+    icon: "⚙️",
+    label: "System",
+    children: [
+      { label: "Settings", href: "/system/settings" },
+      { label: "Notifications", href: "/system/notifications" },
+    ],
+  },
 ];
 
 type Props = { open: boolean; onClose?: () => void };
