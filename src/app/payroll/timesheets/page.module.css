@@ -242,9 +242,59 @@
   -webkit-tap-highlight-color: transparent;
 }
 .row:hover { background: var(--color-surface); }
-/* Staff rows drop the leading avatar column, so name flows all the way
-   to the left edge. */
-.rowStaff { grid-template-columns: 1fr auto auto; }
+/* Staff rows have colour avatar + name/subtitle + hours column + shifts
+   count + chevron, matching the day-details Staff view layout. */
+.rowStaff {
+  grid-template-columns: 40px 1fr auto auto 18px;
+  text-decoration: none;
+  color: inherit;
+}
+.staffColHeader {
+  display: grid;
+  grid-template-columns: 40px 1fr auto auto 18px;
+  gap: 12px;
+  padding: 4px 14px 0;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--color-fg-muted);
+}
+.avatarColor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.staffHoursCol { text-align: right; }
+.staffHoursMain {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+  margin: 0;
+}
+.staffHoursSub {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.staffShiftsCol {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-fg);
+  text-align: center;
+  min-width: 24px;
+}
 .dayChip {
   display: flex;
   flex-direction: column;

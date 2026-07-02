@@ -145,6 +145,26 @@ function nameOfTeamMember(id: string, tm: TeamMemberFromApi | undefined): string
   return id.slice(0, 6);
 }
 
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const a = (parts[0]?.[0] ?? "?").toUpperCase();
+  const b = (parts[1]?.[0] ?? "").toUpperCase();
+  return (a + b) || "??";
+}
+
+// Stable colour per team member id — matches the palette used on the
+// roster page + day-details Staff view, so the same person always shows
+// up in the same tint across the app.
+const STAFF_COLORS = [
+  "#e91e63", "#9c27b0", "#ff7043", "#26a69a", "#42a5f5",
+  "#ffb300", "#ec407a", "#26c6da", "#7e57c2", "#66bb6a",
+];
+function colorForMemberId(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return STAFF_COLORS[h % STAFF_COLORS.length];
+}
+
 /* ── page ────────────────────────────────────────────────────────── */
 
 type ViewMode = "day" | "staff";
@@ -447,44 +467,57 @@ export default function TimesheetsPage() {
           {days.length === 0 && <p className={styles.empty}>No shifts in this range.</p>}
         </ul>
       ) : (
-        <ul className={styles.list}>
-          {byStaff.map((s) => {
-            const isOpen = expandedRow === s.teamMemberId;
-            return (
-              <li key={s.teamMemberId} className={styles.rowBlock}>
-                <button
-                  type="button"
-                  className={`${styles.row} ${styles.rowStaff}`}
-                  onClick={() => setExpandedRow(isOpen ? null : s.teamMemberId)}
-                  aria-expanded={isOpen}
-                >
-                  <div className={styles.rowBody}>
-                    <p className={styles.rowTitle}>{s.name}</p>
-                    <p className={styles.rowMeta}>
-                      {s.shifts} shifts · {fmtMoney(s.gross)}
-                    </p>
+        <>
+          <div className={styles.staffColHeader}>
+            <span />
+            <span>STAFF</span>
+            <span>HOURS</span>
+            <span>SHIFTS</span>
+            <span />
+          </div>
+          <ul className={styles.list}>
+            {byStaff.map((s) => {
+              const firstStart = s.entries.reduce<string | null>(
+                (a, b) => (a === null || b.startAt < a ? b.startAt : a),
+                null,
+              );
+              const lastEnd = s.entries.reduce<string | null>(
+                (a, b) => (b.endAt && (a === null || b.endAt > a) ? b.endAt : a),
+                null,
+              );
+              return (
+                <li key={s.teamMemberId} className={styles.rowBlock}>
+                  <div className={`${styles.row} ${styles.rowStaff}`}>
+                    <span
+                      className={styles.avatarColor}
+                      style={{ background: colorForMemberId(s.teamMemberId) }}
+                      aria-hidden="true"
+                    >
+                      {initialsOf(s.name)}
+                    </span>
+                    <div className={styles.rowBody}>
+                      <p className={styles.rowTitle}>{s.name}</p>
+                      <p className={styles.rowMeta}>
+                        {s.shifts} shifts · {fmtMoney(s.gross)}
+                      </p>
+                    </div>
+                    <div className={styles.staffHoursCol}>
+                      <p className={styles.staffHoursMain}>{fmtHours(s.hours)}</p>
+                      {firstStart && (
+                        <p className={styles.staffHoursSub}>
+                          {fmtClockTime(firstStart)} – {fmtClockTime(lastEnd)}
+                        </p>
+                      )}
+                    </div>
+                    <span className={styles.staffShiftsCol}>{s.shifts}</span>
+                    <span className={styles.rowChev} aria-hidden="true">›</span>
                   </div>
-                  <span className={styles.rowValue}>{fmtHours(s.hours)}</span>
-                  <span className={`${styles.rowChev} ${isOpen ? styles.rowChevOpen : ""}`} aria-hidden="true">›</span>
-                </button>
-                {isOpen && (
-                  <ul className={styles.shiftList}>
-                    {s.entries.map((e) => (
-                      <li key={e.id} className={styles.shiftRow}>
-                        <span className={styles.shiftName}>{fmtDayLabel(e.dateISO)}</span>
-                        <span className={styles.shiftTime}>
-                          {fmtClockTime(e.startAt)} → {fmtClockTime(e.endAt)}
-                        </span>
-                        <span className={styles.shiftHours}>{fmtHours(e.hours)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-          {byStaff.length === 0 && <p className={styles.empty}>No staff shifts in this range.</p>}
-        </ul>
+                </li>
+              );
+            })}
+            {byStaff.length === 0 && <p className={styles.empty}>No staff shifts in this range.</p>}
+          </ul>
+        </>
       )}
 
       <div className={styles.footNote}>
