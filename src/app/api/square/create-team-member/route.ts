@@ -82,33 +82,66 @@ export async function POST(req: NextRequest) {
   // the Square dashboard.
   const familyName = parts.length > 1 ? parts.slice(1).join(" ") : givenName;
 
-  // Resolve the job title to a jobId — Square's create-team-member
-  // rejects raw job titles and demands a job_id from the Labor Jobs
-  // list. Look up an existing job by title; create one on the fly if
-  // none exists. Skip the wage setting entirely on lookup/create
-  // failure so the base team member still lands.
-  let resolvedJobId: string | null = null;
-  if (jobTitle) {
+  // CreateTeamMember wage_setting requires job_id — resolve via Team Jobs API
+  // (not Labor). wageSetting.update accepts jobTitle directly, so we always
+  // call that after create to pre-fill Primary job / Hourly / training rate.
+  async function resolveJobId(title: string): Promise<string | null> {
     try {
-      const jobsRes = await squareClient.labor.jobs.list({ limit: 200 });
-      const jobsPage = jobsRes as unknown as { jobs?: Array<{ id?: string; title?: string }> };
-      const match = (jobsPage.jobs ?? []).find(
-        (j) => (j.title ?? "").trim().toLowerCase() === jobTitle.toLowerCase(),
-      );
-      if (match?.id) {
-        resolvedJobId = match.id;
-      } else {
-        const created = await squareClient.labor.jobs.create({
-          idempotencyKey: crypto.randomUUID(),
-          job: { title: jobTitle, isTipEligible: true },
-        });
-        const createdPage = created as unknown as { job?: { id?: string } };
-        resolvedJobId = createdPage.job?.id ?? null;
-      }
+      let cursor: string | undefined;
+      do {
+        const jobsRes = await squareClient.team.listJobs({ cursor, limit: 200 });
+        const jobsPage = jobsRes as unknown as {
+          jobs?: Array<{ id?: string; title?: string }>;
+          cursor?: string;
+        };
+        const match = (jobsPage.jobs ?? []).find(
+          (j) => (j.title ?? "").trim().toLowerCase() === title.toLowerCase(),
+        );
+        if (match?.id) return match.id;
+        cursor = jobsPage.cursor;
+      } while (cursor);
+
+      const created = await squareClient.team.createJob({
+        idempotencyKey: crypto.randomUUID(),
+        job: { title, isTipEligible: true },
+      });
+      const createdPage = created as unknown as { job?: { id?: string } };
+      return createdPage.job?.id ?? null;
     } catch (err) {
       console.warn("[square/create-team-member] job resolve failed:", err);
+      return null;
     }
   }
+
+  async function applyWageSetting(teamMemberId: string): Promise<void> {
+    if (!jobTitle) return;
+    try {
+      await squareClient.teamMembers.wageSetting.update({
+        teamMemberId,
+        wageSetting: {
+          jobAssignments: [
+            {
+              jobTitle,
+              payType: "HOURLY",
+              ...(hourlyRateCents
+                ? {
+                    hourlyRate: {
+                      amount: BigInt(hourlyRateCents),
+                      currency: "AUD" as const,
+                    },
+                  }
+                : {}),
+            },
+          ],
+          isOvertimeExempt: false,
+        },
+      });
+    } catch (err) {
+      console.warn("[square/create-team-member] wage setting update failed:", err);
+    }
+  }
+
+  const resolvedJobId = jobTitle ? await resolveJobId(jobTitle) : null;
 
   const wageSetting = resolvedJobId
     ? {
@@ -158,6 +191,9 @@ export async function POST(req: NextRequest) {
     if (!id) {
       return NextResponse.json({ error: "Square did not return a team member id." }, { status: 502 });
     }
+
+    await applyWageSetting(id);
+
     return NextResponse.json({ ok: true, id });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Square unreachable.";
