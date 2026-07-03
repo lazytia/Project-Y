@@ -57,17 +57,6 @@ export function payHistoryTitle(startISO: string, endISO: string): string {
   return `Pay History (${isoToSheetDate(startISO)} - ${isoToSheetDate(endISO)})`;
 }
 
-function colLetter(index: number): string {
-  let n = index + 1;
-  let s = "";
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    s = String.fromCharCode(65 + rem) + s;
-    n = Math.floor((n - 1) / 26);
-  }
-  return s;
-}
-
 function isTotalRow(row: unknown[]): boolean {
   const first = row[0];
   return typeof first === "string" && /^\s*total\s*:?\s*$/i.test(first);
@@ -156,10 +145,6 @@ export function matchSheetEmployee(displayName: string, sheetEmployees: string[]
   return null;
 }
 
-function a1(tab: string, row1: number, col0: number): string {
-  return `'${tab}'!${colLetter(col0)}${row1}`;
-}
-
 export async function pushPayHistoryToSheet(
   startISO: string,
   endISO: string,
@@ -193,75 +178,53 @@ export async function pushPayHistoryToSheet(
   const tabMeta = sheetMeta.data.sheets?.find((s) => s.properties?.title === tab);
   const sheetId = tabMeta?.properties?.sheetId ?? DEFAULT_TAB_GID;
 
-  const newTitleRow = rows.length + 2;
-  const newHeaderRow = newTitleRow + 1;
-  const firstEmpRow = newHeaderRow + 1;
+  // Blank row, then title — immediately after the previous block's Total row.
+  const newTitleRow = lastBlock.totalRow + 3;
+  const firstEmpRow = newTitleRow + 2;
+  const blockHeight = lastBlock.totalRow - lastBlock.titleRow + 1;
+  const destStartIndex = newTitleRow - 1;
 
   const employeesToWrite = lastBlock.employees.map((emp) => {
     const h = hoursBySheetEmployee.get(emp.name);
     return {
-      templateRow: emp.row + 1,
       name: emp.name,
       weekHours: h?.weekHours ?? 0,
       premiumHours: h?.premiumHours ?? 0,
     };
   });
 
-  const newTotalRow = firstEmpRow + employeesToWrite.length;
-  const requests: sheets_v4.Schema$Request[] = [];
-
-  requests.push({
-    copyPaste: {
-      source: {
-        sheetId,
-        startRowIndex: lastBlock.headerRow,
-        endRowIndex: lastBlock.headerRow + 1,
-        startColumnIndex: 0,
-        endColumnIndex: 15,
-      },
-      destination: {
-        sheetId,
-        startRowIndex: newHeaderRow - 1,
-        endRowIndex: newHeaderRow,
-        startColumnIndex: 0,
-        endColumnIndex: 15,
-      },
-      pasteType: "PASTE_NORMAL",
-    },
-  });
-
-  for (let i = 0; i < employeesToWrite.length; i += 1) {
-    const emp = employeesToWrite[i];
-    const destRow = firstEmpRow + i;
-    requests.push({
-      copyPaste: {
-        source: {
-          sheetId,
-          startRowIndex: emp.templateRow - 1,
-          endRowIndex: emp.templateRow,
-          startColumnIndex: 0,
-          endColumnIndex: 15,
-        },
-        destination: {
-          sheetId,
-          startRowIndex: destRow - 1,
-          endRowIndex: destRow,
-          startColumnIndex: 0,
-          endColumnIndex: 15,
-        },
-        pasteType: "PASTE_NORMAL",
-      },
-    });
-  }
-
+  // Copy the entire previous Pay History block (title merge, header colours,
+  // alternating employee row fills, total-row peach background, formulas).
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
-    requestBody: { requests },
+    requestBody: {
+      requests: [
+        {
+          copyPaste: {
+            source: {
+              sheetId,
+              startRowIndex: lastBlock.titleRow,
+              endRowIndex: lastBlock.totalRow + 1,
+              startColumnIndex: 0,
+              endColumnIndex: 15,
+            },
+            destination: {
+              sheetId,
+              startRowIndex: destStartIndex,
+              endRowIndex: destStartIndex + blockHeight,
+              startColumnIndex: 0,
+              endColumnIndex: 15,
+            },
+            pasteType: "PASTE_NORMAL",
+          },
+        },
+      ],
+    },
   });
 
   const hourUpdates: sheets_v4.Schema$ValueRange[] = [
     {
-      range: a1(tab, newTitleRow, 3),
+      range: `'${tab}'!A${newTitleRow}`,
       values: [[title]],
     },
   ];
@@ -274,30 +237,6 @@ export async function pushPayHistoryToSheet(
       values: [[emp.weekHours || 0, emp.premiumHours || 0]],
     });
   }
-
-  const first = firstEmpRow;
-  const last = newTotalRow - 1;
-  const totalFormulas = [
-    "Total",
-    "",
-    `=SUM(C${first}:C${last})`,
-    `=SUM(D${first}:D${last})`,
-    `=SUM(E${first}:E${last})`,
-    `=SUM(F${first}:F${last})`,
-    `=SUM(G${first}:G${last})`,
-    `=SUM(H${first}:H${last})`,
-    `=SUM(I${first}:I${last})`,
-    `=SUM(J${first}:J${last})`,
-    `=SUM(K${first}:K${last})`,
-    `=SUM(L${first}:L${last})`,
-    `=SUM(M${first}:M${last})`,
-    `=H${newTotalRow}+M${newTotalRow}`,
-    "",
-  ];
-  hourUpdates.push({
-    range: `'${tab}'!A${newTotalRow}:O${newTotalRow}`,
-    values: [totalFormulas],
-  });
 
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId,
