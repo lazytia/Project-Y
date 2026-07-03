@@ -185,9 +185,46 @@ export default function OwnerRequestDetail() {
     };
   }, [id]);
 
-  function handleApprove() {
+  async function handleApprove() {
     if (!docData || docData.approved || busy) return;
-    router.push(`/people/onboarding/${id}/approve`);
+    // First, provision the Square team member so the Job & pay panel is
+    // pre-filled by the time the owner gets to the credentials screen.
+    // Failure here doesn't block the flow — the approve page still has
+    // a "Send to Square" button as a manual retry.
+    setBusy(true);
+    try {
+      const idToken = await user?.getIdToken();
+      const res = await fetch("/api/square/create-team-member", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          fullName: docData.fullName,
+          phone: docData.mobileNumber,
+          jobTitle: docData.position,
+          hourlyRateCents:
+            docData.trainingRate && docData.trainingRate > 0
+              ? Math.round(docData.trainingRate * 100)
+              : null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.id) {
+        await updateDoc(doc(getDb(), "staff_onboarding", id), {
+          squareTeamMemberId: data.id,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        console.warn("[approve] Square create-team-member failed:", data?.error);
+      }
+    } catch (err) {
+      console.warn("[approve] Square create-team-member threw:", err);
+    } finally {
+      setBusy(false);
+      router.push(`/people/onboarding/${id}/approve`);
+    }
   }
 
   async function handleUnapprove() {
