@@ -191,6 +191,37 @@ export default function CreateLoginDetailsPage() {
       });
 
       const mobileDigits = mobileLocal.replace(/\D/g, "");
+
+      // Create the Square team member up front so we have a clock-in ID
+      // to store on the onboarding doc. If the owner already typed one,
+      // trust that entry; otherwise ask Square to mint a new one. On
+      // failure we surface but don't block the invitation — the login
+      // still works, the owner can attach the ID later.
+      let resolvedSquareStaffId = squareStaffId.trim() || null;
+      let squareCreateError: string | null = null;
+      if (invite && !resolvedSquareStaffId) {
+        try {
+          const idToken = await user?.getIdToken();
+          const res = await fetch("/api/square/create-team-member", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+            },
+            body: JSON.stringify({
+              fullName: request.fullName,
+              phone: mobileDigits,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.error ?? `Square create failed (${res.status})`);
+          resolvedSquareStaffId = data.id ?? null;
+        } catch (err) {
+          squareCreateError = err instanceof Error ? err.message : "Square create failed.";
+          console.error("[approve] square team-member create failed:", err);
+        }
+      }
+
       await setDoc(
         doc(getDb(), "staff_onboarding", uid),
         {
@@ -201,7 +232,7 @@ export default function CreateLoginDetailsPage() {
           fullName: request.fullName,
           position: request.position,
           mobileNumber: mobileDigits,
-          squareStaffId: squareStaffId.trim() || null,
+          squareStaffId: resolvedSquareStaffId,
           useSquareStaffIdForClockIn: useSquareClockIn,
           status: "approved",
           approvedAt: serverTimestamp(),
@@ -224,7 +255,10 @@ export default function CreateLoginDetailsPage() {
         // Fire the SMS through our Vonage proxy. Failure is surfaced to
         // the owner but doesn't roll back the account creation — the
         // login is already usable; they can retry the SMS manually.
-        const smsText = `Hi ${request.fullName.split(" ")[0]}, YURICA employee login: ${username} / temporary password: ${password}.`;
+        const squareLine = resolvedSquareStaffId
+          ? ` Square staff ID: ${resolvedSquareStaffId}.`
+          : "";
+        const smsText = `Hi ${request.fullName.split(" ")[0]}, YURICA employee login: ${username} / temporary password: ${password}.${squareLine}`;
         try {
           const idToken = await user?.getIdToken();
           const res = await fetch("/api/vonage/send-sms", {
@@ -237,9 +271,14 @@ export default function CreateLoginDetailsPage() {
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data?.error ?? `SMS failed (${res.status})`);
+          const squareNote = squareCreateError
+            ? ` (Square staff ID create failed: ${squareCreateError}; set it manually.)`
+            : resolvedSquareStaffId
+              ? ` Square staff ID ${resolvedSquareStaffId} created.`
+              : "";
           setToast({
             title: "Invitation sent",
-            message: `Login details texted to +61 ${fmtMobileDisplay(mobileLocal)}.`,
+            message: `Login details texted to +61 ${fmtMobileDisplay(mobileLocal)}.${squareNote}`,
           });
         } catch (err) {
           setToast({
