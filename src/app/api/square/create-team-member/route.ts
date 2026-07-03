@@ -4,25 +4,27 @@ import { OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { squareClient, squareEnv } from "@/lib/square";
 
+/** Always assign new hires to this Square location (Access → Locations). */
+const NS_LOCATION_NAME = "Yurica Japnaese Kitchen NS";
+
 /**
  * POST /api/square/create-team-member
  * Header: Authorization: Bearer <Firebase ID token of an owner>
  * Body:   {
  *           fullName: "Test User",
+ *           givenName?: "Test",
+ *           familyName?: "User",
  *           phone?: "0450...",
  *           email?: "...",
  *           jobTitle?: "Hall Staff" | "Kitchen Staff",
  *           hourlyRateCents?: 2500
  *         }
  *
- * Creates an ACTIVE Team Member on Square, pinned to the configured
- * restaurant location, with an optional wage-setting (job title +
- * hourly rate). Returns { id } — the Square team_member id (TMxxxx).
- *
- * Square doesn't expose the 4-digit POS passcode via API — that value
- * is generated in the Square dashboard when the owner opens the new
- * team member's Access → Passcode section. The owner still has to
- * grab that 4-digit code and enter it into the app manually.
+ * Creates an ACTIVE Team Member on Square at Yurica Japnaese Kitchen NS,
+ * with wage setting (Primary job / Hourly / training rate). Returns
+ * { id, passcode, permissionSetName } — passcode is a generated 4-digit
+ * Staff ID pre-filled into Create Login Details; use the same code in
+ * Square → Access → Passcode (Square has no API for permission sets).
  */
 
 function normaliseAuMobile(raw: string): string | undefined {
@@ -32,6 +34,57 @@ function normaliseAuMobile(raw: string): string | undefined {
   if (digits.startsWith("0")) return "+61" + digits.slice(1);
   if (digits.length === 9) return "+61" + digits;
   return "+" + digits;
+}
+
+function permissionSetNameForJob(jobTitle?: string): string | undefined {
+  if (!jobTitle) return undefined;
+  const p = jobTitle.trim().toLowerCase();
+  if (p.includes("kitchen")) return "Kitchen Staff";
+  if (p.includes("hall")) return "Hall Staff";
+  return jobTitle.trim();
+}
+
+async function resolveNsLocationId(fallback?: string): Promise<string> {
+  try {
+    const res = await squareClient.locations.list();
+    const match = (res.locations ?? []).find((l) => (l.name ?? "").trim() === NS_LOCATION_NAME);
+    if (match?.id) return match.id;
+  } catch (err) {
+    console.warn("[square/create-team-member] location lookup failed:", err);
+  }
+  if (fallback) return fallback;
+  throw new Error(`Square location "${NS_LOCATION_NAME}" not found.`);
+}
+
+async function generateUniquePasscode(): Promise<string> {
+  const used = new Set<string>();
+  try {
+    let cursor: string | undefined;
+    do {
+      const res = await squareClient.teamMembers.search({
+        query: { filter: { status: "ACTIVE" } },
+        cursor,
+        limit: 200,
+      });
+      const page = res as unknown as {
+        teamMembers?: Array<{ referenceId?: string | null }>;
+        cursor?: string;
+      };
+      for (const tm of page.teamMembers ?? []) {
+        const ref = (tm.referenceId ?? "").trim();
+        if (/^\d{4}$/.test(ref)) used.add(ref);
+      }
+      cursor = page.cursor;
+    } while (cursor);
+  } catch (err) {
+    console.warn("[square/create-team-member] passcode scan failed:", err);
+  }
+
+  for (let i = 0; i < 100; i++) {
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+    if (!used.has(code)) return code;
+  }
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 async function verifyOwner(
@@ -59,11 +112,6 @@ export async function POST(req: NextRequest) {
   const auth = await verifyOwner(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { locationId } = squareEnv;
-  if (!locationId) {
-    return NextResponse.json({ error: "SQUARE_LOCATION_ID not set" }, { status: 500 });
-  }
-
   const body = await req.json().catch(() => ({}));
   const fullName = String(body?.fullName ?? "").trim();
   const phone = body?.phone ? normaliseAuMobile(String(body.phone)) : undefined;
@@ -75,12 +123,24 @@ export async function POST(req: NextRequest) {
       : undefined;
   if (!fullName) return NextResponse.json({ error: "fullName is required." }, { status: 400 });
 
+  let locationId: string;
+  try {
+    locationId = await resolveNsLocationId(squareEnv.locationId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "NS location not found.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
+  const bodyGiven = String(body?.givenName ?? "").trim();
+  const bodyFamily = String(body?.familyName ?? "").trim();
   const parts = fullName.split(/\s+/);
-  const givenName = parts[0];
+  const givenName = bodyGiven || parts[0];
   // Square rejects an empty family_name — fall back to the given name
   // when the request only carries a single word. Owner can tidy up in
   // the Square dashboard.
-  const familyName = parts.length > 1 ? parts.slice(1).join(" ") : givenName;
+  const familyName = bodyFamily || (parts.length > 1 ? parts.slice(1).join(" ") : givenName);
+  const permissionSetName = permissionSetNameForJob(jobTitle);
+  const passcode = await generateUniquePasscode();
 
   // CreateTeamMember wage_setting requires job_id — resolve via Team Jobs API
   // (not Labor). wageSetting.update accepts jobTitle directly, so we always
@@ -166,6 +226,7 @@ export async function POST(req: NextRequest) {
       teamMember: {
         givenName,
         familyName,
+        referenceId: passcode,
         emailAddress: email,
         phoneNumber: phone,
         status: "ACTIVE",
@@ -194,7 +255,14 @@ export async function POST(req: NextRequest) {
 
     await applyWageSetting(id);
 
-    return NextResponse.json({ ok: true, id });
+    return NextResponse.json({
+      ok: true,
+      id,
+      passcode,
+      permissionSetName,
+      locationName: NS_LOCATION_NAME,
+      squareAccessUrl: `https://squareup.com/dashboard/team/team-members/${id}/access`,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Square unreachable.";
     console.error("[square/create-team-member] failed:", err);

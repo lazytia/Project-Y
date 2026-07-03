@@ -107,6 +107,8 @@ export default function CreateLoginDetailsPage() {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [squareTeamMemberId, setSquareTeamMemberId] = useState<string | null>(null);
+  const [squarePermissionSet, setSquarePermissionSet] = useState("");
+  const [squareAccessUrl, setSquareAccessUrl] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [mobileLocal, setMobileLocal] = useState("");
 
@@ -148,7 +150,15 @@ export default function CreateLoginDetailsPage() {
         });
         setLoginId(loginIdFromName(fullName));
         setMobileLocal(toMobileLocal(String(raw.mobileNumber ?? "")));
-        setSquareStaffId(String(raw.squareStaffId ?? ""));
+        const staffId = String(raw.squareStaffId ?? "").replace(/\D/g, "").slice(0, 4);
+        setSquareStaffId(staffId);
+        if (/^\d{4}$/.test(staffId)) setPassword(`${staffId}00`);
+        setSquarePermissionSet(
+          String(raw.squarePermissionSet ?? positionLabel(String(raw.position ?? ""))),
+        );
+        setSquareAccessUrl(
+          typeof raw.squareAccessUrl === "string" ? (raw.squareAccessUrl as string) : null,
+        );
         setSquareTeamMemberId(
           typeof raw.squareTeamMemberId === "string" ? (raw.squareTeamMemberId as string) : null,
         );
@@ -351,6 +361,15 @@ export default function CreateLoginDetailsPage() {
           }}
           disabled={busy}
         />
+        <p className={styles.fieldHint}>
+          In Square Access: Permission set → {squarePermissionSet || request.position}, Location →
+          Yurica Japnaese Kitchen NS, Passcode → enter the same 4 digits above (not Generate).
+        </p>
+        {squareAccessUrl && (
+          <a className={styles.squareLink} href={squareAccessUrl} target="_blank" rel="noopener noreferrer">
+            Open Square Access
+          </a>
+        )}
       </section>
 
       <section className={styles.card}>

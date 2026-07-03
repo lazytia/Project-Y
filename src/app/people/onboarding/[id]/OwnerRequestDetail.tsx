@@ -20,6 +20,8 @@ import styles from "./OwnerRequestDetail.module.css";
 
 type RequestDoc = {
   fullName: string;
+  givenName: string;
+  familyName: string;
   position: string;
   startDate: string;
   trainingRate: number | null;
@@ -159,6 +161,8 @@ export default function OwnerRequestDetail() {
         }
         setDocData({
           fullName: String(raw.fullName ?? "").trim() || "Unnamed",
+          givenName: String(raw.givenName ?? "").trim(),
+          familyName: String(raw.familyName ?? "").trim(),
           position: positionLabel(String(raw.position ?? "")),
           startDate: toIsoDate(raw.startDate),
           trainingRate: typeof raw.trainingRate === "number" ? raw.trainingRate : null,
@@ -202,6 +206,8 @@ export default function OwnerRequestDetail() {
         },
         body: JSON.stringify({
           fullName: docData.fullName,
+          givenName: docData.givenName || undefined,
+          familyName: docData.familyName || undefined,
           phone: docData.mobileNumber,
           jobTitle: docData.position,
           hourlyRateCents:
@@ -214,6 +220,10 @@ export default function OwnerRequestDetail() {
       if (res.ok && data?.id) {
         await updateDoc(doc(getDb(), "staff_onboarding", id), {
           squareTeamMemberId: data.id,
+          squareStaffId: typeof data.passcode === "string" ? data.passcode : null,
+          squarePermissionSet:
+            typeof data.permissionSetName === "string" ? data.permissionSetName : docData.position,
+          squareAccessUrl: typeof data.squareAccessUrl === "string" ? data.squareAccessUrl : null,
           updatedAt: serverTimestamp(),
         });
       } else {
