@@ -3,13 +3,7 @@ import { adminAuth } from "@/lib/firebase-admin";
 import { OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { squareClient, squareEnv } from "@/lib/square";
-import {
-  NS_LOCATION_NAME,
-  passcodeFromMobile,
-  permissionSetNameForJob,
-  provisionTeamAccess,
-  resolveNsLocationId,
-} from "@/lib/square-team-access";
+import { resolveNsLocationId } from "@/lib/square-team-access";
 
 /**
  * POST /api/square/create-team-member
@@ -25,9 +19,7 @@ import {
  *         }
  *
  * Creates an ACTIVE Team Member on Square at Yurica Japnaese Kitchen NS,
- * with wage setting (Primary job / Hourly / training rate). Passcode =
- * mobile last 4 digits. Also returns Access field values for Square
- * Dashboard (permission set, location, passcode).
+ * with wage setting (Primary job / Hourly / training rate).
  */
 
 function normaliseAuMobile(raw: string): string | undefined {
@@ -75,14 +67,6 @@ export async function POST(req: NextRequest) {
       ? Math.round(body.hourlyRateCents)
       : undefined;
   if (!fullName) return NextResponse.json({ error: "fullName is required." }, { status: 400 });
-
-  const passcode = passcodeFromMobile(phoneRaw);
-  if (!passcode) {
-    return NextResponse.json(
-      { error: "Mobile number must have at least 4 digits for Staff ID passcode." },
-      { status: 400 },
-    );
-  }
   if (!phone) {
     return NextResponse.json({ error: "A valid mobile number is required." }, { status: 400 });
   }
@@ -100,7 +84,6 @@ export async function POST(req: NextRequest) {
   const parts = fullName.split(/\s+/);
   const givenName = bodyGiven || parts[0];
   const familyName = bodyFamily || (parts.length > 1 ? parts.slice(1).join(" ") : givenName);
-  const permissionSetName = permissionSetNameForJob(jobTitle);
 
   async function resolveJobId(title: string): Promise<string | null> {
     try {
@@ -183,7 +166,6 @@ export async function POST(req: NextRequest) {
       teamMember: {
         givenName,
         familyName,
-        referenceId: passcode,
         emailAddress: email,
         phoneNumber: phone,
         status: "ACTIVE",
@@ -211,22 +193,8 @@ export async function POST(req: NextRequest) {
     }
 
     await applyWageSetting(id);
-    const access = await provisionTeamAccess({
-      teamMemberId: id,
-      permissionSetName,
-      passcode,
-      locationId,
-    });
 
-    return NextResponse.json({
-      ok: true,
-      id,
-      passcode,
-      permissionSetName,
-      locationName: NS_LOCATION_NAME,
-      squareAccessUrl: access.squareAccessUrl,
-      access,
-    });
+    return NextResponse.json({ ok: true, id });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Square unreachable.";
     console.error("[square/create-team-member] failed:", err);

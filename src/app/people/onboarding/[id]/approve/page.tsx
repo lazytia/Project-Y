@@ -107,8 +107,6 @@ export default function CreateLoginDetailsPage() {
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [squareTeamMemberId, setSquareTeamMemberId] = useState<string | null>(null);
-  const [squarePermissionSet, setSquarePermissionSet] = useState("");
-  const [squareAccessUrl, setSquareAccessUrl] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [mobileLocal, setMobileLocal] = useState("");
 
@@ -150,19 +148,7 @@ export default function CreateLoginDetailsPage() {
         });
         setLoginId(loginIdFromName(fullName));
         setMobileLocal(toMobileLocal(String(raw.mobileNumber ?? "")));
-        const mobileDigits = String(raw.mobileNumber ?? "").replace(/\D/g, "");
-        const staffIdFromMobile = mobileDigits.length >= 4 ? mobileDigits.slice(-4) : "";
-        const staffId = (String(raw.squareStaffId ?? "") || staffIdFromMobile)
-          .replace(/\D/g, "")
-          .slice(0, 4);
-        setSquareStaffId(staffId);
-        if (/^\d{4}$/.test(staffId)) setPassword(`${staffId}00`);
-        setSquarePermissionSet(
-          String(raw.squarePermissionSet ?? positionLabel(String(raw.position ?? ""))),
-        );
-        setSquareAccessUrl(
-          typeof raw.squareAccessUrl === "string" ? (raw.squareAccessUrl as string) : null,
-        );
+        setSquareStaffId(String(raw.squareStaffId ?? "").replace(/\D/g, "").slice(0, 4));
         setSquareTeamMemberId(
           typeof raw.squareTeamMemberId === "string" ? (raw.squareTeamMemberId as string) : null,
         );
@@ -176,45 +162,6 @@ export default function CreateLoginDetailsPage() {
       cancelled = true;
     };
   }, [allowed, requestId, router]);
-
-  useEffect(() => {
-    if (!allowed || !squareTeamMemberId || !request?.mobileNumber) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const idToken = await user?.getIdToken();
-        const res = await fetch("/api/square/provision-team-access", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-          },
-          body: JSON.stringify({
-            teamMemberId: squareTeamMemberId,
-            phone: request.mobileNumber,
-            jobTitle: request.position,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (cancelled || !res.ok) return;
-        if (typeof data.passcode === "string" && /^\d{4}$/.test(data.passcode)) {
-          setSquareStaffId(data.passcode);
-          setPassword(`${data.passcode}00`);
-        }
-        if (typeof data.permissionSetName === "string") {
-          setSquarePermissionSet(data.permissionSetName);
-        }
-        if (typeof data.squareAccessUrl === "string") {
-          setSquareAccessUrl(data.squareAccessUrl);
-        }
-      } catch {
-        /* non-blocking */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [allowed, squareTeamMemberId, request?.mobileNumber, request?.position, user]);
 
   const canSubmit = useMemo(() => {
     return (
@@ -374,37 +321,6 @@ export default function CreateLoginDetailsPage() {
         </div>
         <span className={styles.invitePill}>Pending Invitation</span>
       </div>
-
-      <section className={styles.card}>
-        <h2 className={styles.cardTitle}>SQUARE ACCESS</h2>
-        <p className={styles.accessLead}>
-          Open Square Access and enter these values — passcode is the mobile last 4 digits (not
-          Generate).
-        </p>
-        <div>
-          <p className={styles.fieldLabel}>Permission set</p>
-          <div className={styles.accessField}>{squarePermissionSet || request.position}</div>
-        </div>
-        <div>
-          <p className={styles.fieldLabel}>Locations</p>
-          <div className={styles.accessField}>Yurica Japnaese Kitchen NS</div>
-        </div>
-        <div>
-          <p className={styles.fieldLabel}>Passcode</p>
-          <div className={styles.passcodeRow} aria-label={`Passcode ${squareStaffId || "pending"}`}>
-            {(squareStaffId.padEnd(4, " ").split("") as string[]).map((digit, i) => (
-              <span key={i} className={styles.passcodeDigit}>
-                {/\d/.test(digit) ? digit : "—"}
-              </span>
-            ))}
-          </div>
-        </div>
-        {squareAccessUrl && (
-          <a className={styles.squareLink} href={squareAccessUrl} target="_blank" rel="noopener noreferrer">
-            Open Square Access
-          </a>
-        )}
-      </section>
 
       <section className={styles.card}>
         <h2 className={styles.cardTitle}>SQUARE STAFF ID</h2>

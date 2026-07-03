@@ -220,10 +220,6 @@ export default function OwnerRequestDetail() {
       if (res.ok && data?.id) {
         await updateDoc(doc(getDb(), "staff_onboarding", id), {
           squareTeamMemberId: data.id,
-          squareStaffId: typeof data.passcode === "string" ? data.passcode : null,
-          squarePermissionSet:
-            typeof data.permissionSetName === "string" ? data.permissionSetName : docData.position,
-          squareAccessUrl: typeof data.squareAccessUrl === "string" ? data.squareAccessUrl : null,
           updatedAt: serverTimestamp(),
         });
       } else {
