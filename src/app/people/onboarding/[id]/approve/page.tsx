@@ -192,36 +192,6 @@ export default function CreateLoginDetailsPage() {
 
       const mobileDigits = mobileLocal.replace(/\D/g, "");
 
-      // Create the Square team member up front so we have a clock-in ID
-      // to store on the onboarding doc. If the owner already typed one,
-      // trust that entry; otherwise ask Square to mint a new one. On
-      // failure we surface but don't block the invitation — the login
-      // still works, the owner can attach the ID later.
-      let resolvedSquareStaffId = squareStaffId.trim() || null;
-      let squareCreateError: string | null = null;
-      if (invite && !resolvedSquareStaffId) {
-        try {
-          const idToken = await user?.getIdToken();
-          const res = await fetch("/api/square/create-team-member", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-            },
-            body: JSON.stringify({
-              fullName: request.fullName,
-              phone: mobileDigits,
-            }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data?.error ?? `Square create failed (${res.status})`);
-          resolvedSquareStaffId = data.id ?? null;
-        } catch (err) {
-          squareCreateError = err instanceof Error ? err.message : "Square create failed.";
-          console.error("[approve] square team-member create failed:", err);
-        }
-      }
-
       await setDoc(
         doc(getDb(), "staff_onboarding", uid),
         {
@@ -232,7 +202,7 @@ export default function CreateLoginDetailsPage() {
           fullName: request.fullName,
           position: request.position,
           mobileNumber: mobileDigits,
-          squareStaffId: resolvedSquareStaffId,
+          squareStaffId: squareStaffId.trim() || null,
           useSquareStaffIdForClockIn: useSquareClockIn,
           status: "approved",
           approvedAt: serverTimestamp(),
@@ -255,8 +225,9 @@ export default function CreateLoginDetailsPage() {
         // Fire the SMS through our Vonage proxy. Failure is surfaced to
         // the owner but doesn't roll back the account creation — the
         // login is already usable; they can retry the SMS manually.
-        const squareLine = resolvedSquareStaffId
-          ? ` Square staff ID: ${resolvedSquareStaffId}.`
+        const trimmedStaffId = squareStaffId.trim();
+        const squareLine = trimmedStaffId
+          ? ` Square staff ID: ${trimmedStaffId}.`
           : "";
         const smsText = `Hi ${request.fullName.split(" ")[0]}, YURICA employee login: ${username} / temporary password: ${password}.${squareLine}`;
         try {
@@ -271,14 +242,9 @@ export default function CreateLoginDetailsPage() {
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data?.error ?? `SMS failed (${res.status})`);
-          const squareNote = squareCreateError
-            ? ` (Square staff ID create failed: ${squareCreateError}; set it manually.)`
-            : resolvedSquareStaffId
-              ? ` Square staff ID ${resolvedSquareStaffId} created.`
-              : "";
           setToast({
             title: "Invitation sent",
-            message: `Login details texted to +61 ${fmtMobileDisplay(mobileLocal)}.${squareNote}`,
+            message: `Login details texted to +61 ${fmtMobileDisplay(mobileLocal)}.`,
           });
         } catch (err) {
           setToast({
@@ -365,9 +331,19 @@ export default function CreateLoginDetailsPage() {
         <input
           className={styles.input}
           type="text"
-          placeholder="Enter Square Staff ID"
+          inputMode="numeric"
+          pattern="\d*"
+          maxLength={4}
+          placeholder="Enter Square Staff ID (4 digits)"
           value={squareStaffId}
-          onChange={(e) => setSquareStaffId(e.target.value)}
+          onChange={(e) => {
+            const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+            setSquareStaffId(digits);
+            // Business rule: the Project Y password is the Square 4-digit
+            // passcode with "00" tacked on the end, so we auto-populate
+            // the password field once the owner has typed the full PIN.
+            if (digits.length === 4) setPassword(`${digits}00`);
+          }}
           disabled={busy}
         />
       </section>
