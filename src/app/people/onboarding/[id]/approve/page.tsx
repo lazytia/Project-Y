@@ -106,7 +106,6 @@ export default function CreateLoginDetailsPage() {
   const [useSquareClockIn, setUseSquareClockIn] = useState(true);
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
-  const [sendingToSquare, setSendingToSquare] = useState(false);
   const [squareTeamMemberId, setSquareTeamMemberId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [mobileLocal, setMobileLocal] = useState("");
@@ -172,48 +171,6 @@ export default function CreateLoginDetailsPage() {
       !validateUsername(loginId)
     );
   }, [loginId, password, mobileLocal]);
-
-  async function sendToSquare() {
-    if (!user || !request || sendingToSquare || squareTeamMemberId) return;
-    setSendingToSquare(true);
-    setError(null);
-    try {
-      const idToken = await user.getIdToken();
-      // Rate is optional — pull it off the request doc if it exists;
-      // Square is happy to accept a wage setting with just a job title.
-      const rawRate =
-        typeof rawRequest?.hourlyRate === "number"
-          ? (rawRequest.hourlyRate as number)
-          : typeof rawRequest?.weekRate === "number"
-            ? (rawRequest.weekRate as number)
-            : null;
-      const res = await fetch("/api/square/create-team-member", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          fullName: request.fullName,
-          phone: mobileLocal.replace(/\D/g, ""),
-          jobTitle: request.position,
-          hourlyRateCents: rawRate ? Math.round(rawRate * 100) : null,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? `Square create failed (${res.status})`);
-      const id = data.id as string;
-      setSquareTeamMemberId(id);
-      setToast({
-        title: "Sent to Square",
-        message: `Team member created (${id}). Open Square dashboard → Access → Passcode to grab the 4-digit clock-in code.`,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Send to Square failed.");
-    } finally {
-      setSendingToSquare(false);
-    }
-  }
 
   async function persist(invite: boolean) {
     if (!request || !rawRequest || !canSubmit || busy) return;
@@ -459,23 +416,6 @@ export default function CreateLoginDetailsPage() {
       </section>
 
       {error && <p className={styles.error}>{error}</p>}
-
-      <button
-        type="button"
-        className={styles.sendSquareBtn}
-        disabled={sendingToSquare || busy || !!squareTeamMemberId}
-        onClick={() => void sendToSquare()}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13" />
-          <polygon points="22 2 15 22 11 13 2 9 22 2" />
-        </svg>
-        {squareTeamMemberId
-          ? `Sent to Square (${squareTeamMemberId})`
-          : sendingToSquare
-            ? "Sending to Square…"
-            : "Send to Square"}
-      </button>
 
       <div className={styles.actions}>
         <button
