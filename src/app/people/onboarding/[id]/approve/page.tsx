@@ -150,7 +150,11 @@ export default function CreateLoginDetailsPage() {
         });
         setLoginId(loginIdFromName(fullName));
         setMobileLocal(toMobileLocal(String(raw.mobileNumber ?? "")));
-        const staffId = String(raw.squareStaffId ?? "").replace(/\D/g, "").slice(0, 4);
+        const mobileDigits = String(raw.mobileNumber ?? "").replace(/\D/g, "");
+        const staffIdFromMobile = mobileDigits.length >= 4 ? mobileDigits.slice(-4) : "";
+        const staffId = (String(raw.squareStaffId ?? "") || staffIdFromMobile)
+          .replace(/\D/g, "")
+          .slice(0, 4);
         setSquareStaffId(staffId);
         if (/^\d{4}$/.test(staffId)) setPassword(`${staffId}00`);
         setSquarePermissionSet(
@@ -363,7 +367,7 @@ export default function CreateLoginDetailsPage() {
         />
         <p className={styles.fieldHint}>
           In Square Access: Permission set → {squarePermissionSet || request.position}, Location →
-          Yurica Japnaese Kitchen NS, Passcode → enter the same 4 digits above (not Generate).
+          Yurica Japnaese Kitchen NS, Passcode → mobile last 4 digits (same as above, not Generate).
         </p>
         {squareAccessUrl && (
           <a className={styles.squareLink} href={squareAccessUrl} target="_blank" rel="noopener noreferrer">

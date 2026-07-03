@@ -22,9 +22,9 @@ const NS_LOCATION_NAME = "Yurica Japnaese Kitchen NS";
  *
  * Creates an ACTIVE Team Member on Square at Yurica Japnaese Kitchen NS,
  * with wage setting (Primary job / Hourly / training rate). Returns
- * { id, passcode, permissionSetName } — passcode is a generated 4-digit
- * Staff ID pre-filled into Create Login Details; use the same code in
- * Square → Access → Passcode (Square has no API for permission sets).
+ * { id, passcode, permissionSetName } — passcode is the last 4 digits of
+ * the employee mobile number, pre-filled into Create Login Details; enter
+ * the same code in Square → Access → Passcode.
  */
 
 function normaliseAuMobile(raw: string): string | undefined {
@@ -56,35 +56,11 @@ async function resolveNsLocationId(fallback?: string): Promise<string> {
   throw new Error(`Square location "${NS_LOCATION_NAME}" not found.`);
 }
 
-async function generateUniquePasscode(): Promise<string> {
-  const used = new Set<string>();
-  try {
-    let cursor: string | undefined;
-    do {
-      const res = await squareClient.teamMembers.search({
-        query: { filter: { status: "ACTIVE" } },
-        cursor,
-        limit: 200,
-      });
-      const page = res as unknown as {
-        teamMembers?: Array<{ referenceId?: string | null }>;
-        cursor?: string;
-      };
-      for (const tm of page.teamMembers ?? []) {
-        const ref = (tm.referenceId ?? "").trim();
-        if (/^\d{4}$/.test(ref)) used.add(ref);
-      }
-      cursor = page.cursor;
-    } while (cursor);
-  } catch (err) {
-    console.warn("[square/create-team-member] passcode scan failed:", err);
-  }
-
-  for (let i = 0; i < 100; i++) {
-    const code = String(Math.floor(1000 + Math.random() * 9000));
-    if (!used.has(code)) return code;
-  }
-  return String(Math.floor(1000 + Math.random() * 9000));
+/** Last 4 digits of the mobile number — used as Square Staff ID / passcode. */
+function passcodeFromMobile(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 4) return null;
+  return digits.slice(-4);
 }
 
 async function verifyOwner(
@@ -114,7 +90,8 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const fullName = String(body?.fullName ?? "").trim();
-  const phone = body?.phone ? normaliseAuMobile(String(body.phone)) : undefined;
+  const phoneRaw = body?.phone ? String(body.phone) : "";
+  const phone = phoneRaw ? normaliseAuMobile(phoneRaw) : undefined;
   const email = body?.email ? String(body.email).trim() : undefined;
   const jobTitle = body?.jobTitle ? String(body.jobTitle).trim() : undefined;
   const hourlyRateCents =
@@ -122,6 +99,17 @@ export async function POST(req: NextRequest) {
       ? Math.round(body.hourlyRateCents)
       : undefined;
   if (!fullName) return NextResponse.json({ error: "fullName is required." }, { status: 400 });
+
+  const passcode = passcodeFromMobile(phoneRaw);
+  if (!passcode) {
+    return NextResponse.json(
+      { error: "Mobile number must have at least 4 digits for Staff ID passcode." },
+      { status: 400 },
+    );
+  }
+  if (!phone) {
+    return NextResponse.json({ error: "A valid mobile number is required." }, { status: 400 });
+  }
 
   let locationId: string;
   try {
@@ -140,7 +128,6 @@ export async function POST(req: NextRequest) {
   // the Square dashboard.
   const familyName = bodyFamily || (parts.length > 1 ? parts.slice(1).join(" ") : givenName);
   const permissionSetName = permissionSetNameForJob(jobTitle);
-  const passcode = await generateUniquePasscode();
 
   // CreateTeamMember wage_setting requires job_id — resolve via Team Jobs API
   // (not Labor). wageSetting.update accepts jobTitle directly, so we always
