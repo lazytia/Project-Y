@@ -282,6 +282,36 @@
   margin-top: var(--space-2);
 }
 
+/* "Send to Square" — sits between the mobile card and the invite
+   button. Warm-tinted so the owner sees it as the pre-flight step
+   distinct from the black "Invite" action button below. */
+.sendSquareBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 48px;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  border: 1px solid var(--color-warm);
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: var(--space-2);
+  transition: background 0.15s, opacity 0.15s;
+}
+.sendSquareBtn:hover:not(:disabled) {
+  background: var(--color-warm);
+  color: #fff;
+}
+.sendSquareBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .inviteBtn {
   display: flex;
   align-items: center;
