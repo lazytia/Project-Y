@@ -34,3 +34,13 @@ env:
   # Bearer token guarding the nightly Daily Sold Out reset endpoint.
   - variable: SOLD_OUT_RESET_SHARED_TOKEN
     secret: SOLD_OUT_RESET_SHARED_TOKEN
+  # Vonage SMS — used by /api/vonage/send-sms to text new staff their
+  # login details on approval. Never sent to the browser.
+  - variable: VONAGE_API_KEY
+    secret: VONAGE_API_KEY
+  - variable: VONAGE_API_SECRET
+    secret: VONAGE_API_SECRET
+  - variable: VONAGE_SENDER_ID
+    secret: VONAGE_SENDER_ID
+  - variable: VONAGE_FROM_NUMBER
+    secret: VONAGE_FROM_NUMBER

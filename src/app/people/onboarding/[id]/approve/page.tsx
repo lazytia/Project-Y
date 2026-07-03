@@ -221,17 +221,39 @@ export default function CreateLoginDetailsPage() {
       }
 
       if (invite) {
-        setToast({
-          title: "Details saved",
-          message: "SMS invite is not wired yet — login credentials were saved.",
-        });
+        // Fire the SMS through our Vonage proxy. Failure is surfaced to
+        // the owner but doesn't roll back the account creation — the
+        // login is already usable; they can retry the SMS manually.
+        const smsText = `Hi ${request.fullName.split(" ")[0]}, YURICA employee login: ${username} / temporary password: ${password}.`;
+        try {
+          const idToken = await user?.getIdToken();
+          const res = await fetch("/api/vonage/send-sms", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+            },
+            body: JSON.stringify({ to: mobileDigits, text: smsText }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.error ?? `SMS failed (${res.status})`);
+          setToast({
+            title: "Invitation sent",
+            message: `Login details texted to +61 ${fmtMobileDisplay(mobileLocal)}.`,
+          });
+        } catch (err) {
+          setToast({
+            title: "Login saved, SMS failed",
+            message: err instanceof Error ? err.message : "Vonage send failed.",
+          });
+        }
       } else {
         setToast({
           title: "Details saved",
           message: "Employee login has been created.",
         });
       }
-      window.setTimeout(() => router.push("/people/onboarding"), invite ? 1200 : 900);
+      window.setTimeout(() => router.push("/people/onboarding"), invite ? 1600 : 900);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save login details.");
       setBusy(false);
