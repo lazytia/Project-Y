@@ -556,6 +556,9 @@ export default function TimesheetsPage() {
             setPushMessage(
               `${data.title ?? "Pay History"} written to Google Sheets (${data.matchedStaff ?? 0} staff, ${data.shiftCount ?? 0} shifts).${unmatched}`,
             );
+            if (typeof data.sheetUrl === "string" && data.sheetUrl.startsWith("https://")) {
+              window.open(data.sheetUrl, "_blank", "noopener,noreferrer");
+            }
           } catch (err) {
             setPushMessage(err instanceof Error ? err.message : "Push to Google failed.");
           } finally {

@@ -250,7 +250,7 @@ export async function pushPayHistoryToSheet(
     title,
     startRow: newTitleRow,
     employeeCount: employeesToWrite.length,
-    sheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}`,
+    sheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${newTitleRow}`,
   };
 }
 
