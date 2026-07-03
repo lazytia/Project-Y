@@ -29,6 +29,20 @@ export type PushPayHistoryResult = {
   sheetUrl: string;
 };
 
+/** Owner rows — always the same each pay week (not driven by Square timesheets). */
+const FIXED_EMPLOYEE_ROWS: Record<string, { weekHours: number; premiumHours: number; tax: number }> = {
+  "Yurica (Yuri Oh)": { weekHours: 34.5, premiumHours: 0, tax: 94 },
+  Eddie: { weekHours: 16, premiumHours: 0, tax: 6 },
+};
+
+function fixedPayrollRow(sheetName: string): (typeof FIXED_EMPLOYEE_ROWS)[string] | null {
+  if (FIXED_EMPLOYEE_ROWS[sheetName]) return FIXED_EMPLOYEE_ROWS[sheetName];
+  const lower = sheetName.trim().toLowerCase();
+  if (lower.startsWith("yurica")) return FIXED_EMPLOYEE_ROWS["Yurica (Yuri Oh)"];
+  if (lower === "eddie") return FIXED_EMPLOYEE_ROWS.Eddie;
+  return null;
+}
+
 function sheetAuth(write: boolean) {
   const scope = write
     ? "https://www.googleapis.com/auth/spreadsheets"
@@ -190,15 +204,16 @@ export async function pushPayHistoryToSheet(
   const destStartIndex = newTitleRow - 1;
 
   const employeesToWrite = lastBlock.employees.map((emp) => {
+    const fixed = fixedPayrollRow(emp.name);
     const h = hoursBySheetEmployee.get(emp.name);
     const templateRow = rows[emp.row] ?? [];
     const visaType = String(templateRow[1] ?? "Resident");
     const weekRate = parseSheetMoney(templateRow[2]);
     const premiumRate = parseSheetMoney(templateRow[3]);
-    const weekHours = h?.weekHours ?? 0;
-    const premiumHours = h?.premiumHours ?? 0;
+    const weekHours = fixed?.weekHours ?? h?.weekHours ?? 0;
+    const premiumHours = fixed?.premiumHours ?? h?.premiumHours ?? 0;
     const gross = grossPayFromHours(weekRate, premiumRate, weekHours, premiumHours);
-    const tax = calculateWeeklyPaygTax(visaType, gross);
+    const tax = fixed?.tax ?? calculateWeeklyPaygTax(visaType, gross);
     return {
       name: emp.name,
       weekHours,
