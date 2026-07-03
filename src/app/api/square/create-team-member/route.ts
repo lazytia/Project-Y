@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     try {
       let cursor: string | undefined;
       do {
-        const jobsRes = await squareClient.team.listJobs({ cursor, limit: 200 });
+        const jobsRes = await squareClient.team.listJobs({ cursor });
         const jobsPage = jobsRes as unknown as {
           jobs?: Array<{ id?: string; title?: string }>;
           cursor?: string;
