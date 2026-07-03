@@ -77,16 +77,44 @@ export async function POST(req: NextRequest) {
 
   const parts = fullName.split(/\s+/);
   const givenName = parts[0];
-  const familyName = parts.length > 1 ? parts.slice(1).join(" ") : undefined;
+  // Square rejects an empty family_name — fall back to the given name
+  // when the request only carries a single word. Owner can tidy up in
+  // the Square dashboard.
+  const familyName = parts.length > 1 ? parts.slice(1).join(" ") : givenName;
 
-  // Attach a wage setting when we have at least a job title — this
-  // populates the team member's Job & pay section in the Square
-  // dashboard so the owner doesn't have to fill it in twice.
-  const wageSetting = jobTitle
+  // Resolve the job title to a jobId — Square's create-team-member
+  // rejects raw job titles and demands a job_id from the Labor Jobs
+  // list. Look up an existing job by title; create one on the fly if
+  // none exists. Skip the wage setting entirely on lookup/create
+  // failure so the base team member still lands.
+  let resolvedJobId: string | null = null;
+  if (jobTitle) {
+    try {
+      const jobsRes = await squareClient.labor.jobs.list({ limit: 200 });
+      const jobsPage = jobsRes as unknown as { jobs?: Array<{ id?: string; title?: string }> };
+      const match = (jobsPage.jobs ?? []).find(
+        (j) => (j.title ?? "").trim().toLowerCase() === jobTitle.toLowerCase(),
+      );
+      if (match?.id) {
+        resolvedJobId = match.id;
+      } else {
+        const created = await squareClient.labor.jobs.create({
+          idempotencyKey: crypto.randomUUID(),
+          job: { title: jobTitle, isTipEligible: true },
+        });
+        const createdPage = created as unknown as { job?: { id?: string } };
+        resolvedJobId = createdPage.job?.id ?? null;
+      }
+    } catch (err) {
+      console.warn("[square/create-team-member] job resolve failed:", err);
+    }
+  }
+
+  const wageSetting = resolvedJobId
     ? {
         jobAssignments: [
           {
-            jobTitle,
+            jobId: resolvedJobId,
             payType: "HOURLY" as const,
             ...(hourlyRateCents
               ? {
