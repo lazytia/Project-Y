@@ -433,3 +433,13 @@
 }
 .pushBtn:hover { background: #2b2b2b; }
 .pushBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.pushBanner {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  background: var(--color-warm-bg);
+  color: var(--color-fg);
+}

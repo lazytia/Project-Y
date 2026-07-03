@@ -194,6 +194,8 @@ export default function TimesheetsPage() {
   const [shifts, setShifts] = useState<ShiftFromApi[]>([]);
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMemberFromApi>>({});
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const today = sydneyTodayISO();
@@ -525,16 +527,47 @@ export default function TimesheetsPage() {
         </>
       )}
 
+      {pushMessage && <p className={styles.pushBanner}>{pushMessage}</p>}
+
       <button
         type="button"
         className={styles.pushBtn}
-        onClick={() => alert("Push to Google Sheets is not wired yet.")}
+        disabled={pushBusy || busy || !startISO || !endISO || totalShifts === 0}
+        onClick={async () => {
+          if (!user || !startISO || !endISO) return;
+          setPushBusy(true);
+          setPushMessage(null);
+          try {
+            const idToken = await user.getIdToken();
+            const res = await fetch("/api/payroll/push", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({ startDate: startISO, endDate: endISO }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error ?? `Push failed (${res.status})`);
+            const unmatched =
+              Array.isArray(data.unmatchedStaff) && data.unmatchedStaff.length > 0
+                ? ` Unmatched: ${data.unmatchedStaff.join(", ")}.`
+                : "";
+            setPushMessage(
+              `${data.title ?? "Pay History"} written to Google Sheets (${data.matchedStaff ?? 0} staff, ${data.shiftCount ?? 0} shifts).${unmatched}`,
+            );
+          } catch (err) {
+            setPushMessage(err instanceof Error ? err.message : "Push to Google failed.");
+          } finally {
+            setPushBusy(false);
+          }
+        }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 5v14" />
           <polyline points="19 12 12 19 5 12" />
         </svg>
-        Push to Google
+        {pushBusy ? "Pushing…" : "Push to Google"}
       </button>
 
       {addOpen && (
