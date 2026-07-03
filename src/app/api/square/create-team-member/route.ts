@@ -3,9 +3,13 @@ import { adminAuth } from "@/lib/firebase-admin";
 import { OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { squareClient, squareEnv } from "@/lib/square";
-
-/** Always assign new hires to this Square location (Access → Locations). */
-const NS_LOCATION_NAME = "Yurica Japnaese Kitchen NS";
+import {
+  NS_LOCATION_NAME,
+  passcodeFromMobile,
+  permissionSetNameForJob,
+  provisionTeamAccess,
+  resolveNsLocationId,
+} from "@/lib/square-team-access";
 
 /**
  * POST /api/square/create-team-member
@@ -21,10 +25,9 @@ const NS_LOCATION_NAME = "Yurica Japnaese Kitchen NS";
  *         }
  *
  * Creates an ACTIVE Team Member on Square at Yurica Japnaese Kitchen NS,
- * with wage setting (Primary job / Hourly / training rate). Returns
- * { id, passcode, permissionSetName } — passcode is the last 4 digits of
- * the employee mobile number, pre-filled into Create Login Details; enter
- * the same code in Square → Access → Passcode.
+ * with wage setting (Primary job / Hourly / training rate). Passcode =
+ * mobile last 4 digits. Also returns Access field values for Square
+ * Dashboard (permission set, location, passcode).
  */
 
 function normaliseAuMobile(raw: string): string | undefined {
@@ -34,33 +37,6 @@ function normaliseAuMobile(raw: string): string | undefined {
   if (digits.startsWith("0")) return "+61" + digits.slice(1);
   if (digits.length === 9) return "+61" + digits;
   return "+" + digits;
-}
-
-function permissionSetNameForJob(jobTitle?: string): string | undefined {
-  if (!jobTitle) return undefined;
-  const p = jobTitle.trim().toLowerCase();
-  if (p.includes("kitchen")) return "Kitchen Staff";
-  if (p.includes("hall")) return "Hall Staff";
-  return jobTitle.trim();
-}
-
-async function resolveNsLocationId(fallback?: string): Promise<string> {
-  try {
-    const res = await squareClient.locations.list();
-    const match = (res.locations ?? []).find((l) => (l.name ?? "").trim() === NS_LOCATION_NAME);
-    if (match?.id) return match.id;
-  } catch (err) {
-    console.warn("[square/create-team-member] location lookup failed:", err);
-  }
-  if (fallback) return fallback;
-  throw new Error(`Square location "${NS_LOCATION_NAME}" not found.`);
-}
-
-/** Last 4 digits of the mobile number — used as Square Staff ID / passcode. */
-function passcodeFromMobile(raw: string): string | null {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length < 4) return null;
-  return digits.slice(-4);
 }
 
 async function verifyOwner(
@@ -123,15 +99,9 @@ export async function POST(req: NextRequest) {
   const bodyFamily = String(body?.familyName ?? "").trim();
   const parts = fullName.split(/\s+/);
   const givenName = bodyGiven || parts[0];
-  // Square rejects an empty family_name — fall back to the given name
-  // when the request only carries a single word. Owner can tidy up in
-  // the Square dashboard.
   const familyName = bodyFamily || (parts.length > 1 ? parts.slice(1).join(" ") : givenName);
   const permissionSetName = permissionSetNameForJob(jobTitle);
 
-  // CreateTeamMember wage_setting requires job_id — resolve via Team Jobs API
-  // (not Labor). wageSetting.update accepts jobTitle directly, so we always
-  // call that after create to pre-fill Primary job / Hourly / training rate.
   async function resolveJobId(title: string): Promise<string | null> {
     try {
       let cursor: string | undefined;
@@ -241,6 +211,12 @@ export async function POST(req: NextRequest) {
     }
 
     await applyWageSetting(id);
+    const access = await provisionTeamAccess({
+      teamMemberId: id,
+      permissionSetName,
+      passcode,
+      locationId,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -248,7 +224,8 @@ export async function POST(req: NextRequest) {
       passcode,
       permissionSetName,
       locationName: NS_LOCATION_NAME,
-      squareAccessUrl: `https://squareup.com/dashboard/team/team-members/${id}/access`,
+      squareAccessUrl: access.squareAccessUrl,
+      access,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Square unreachable.";
