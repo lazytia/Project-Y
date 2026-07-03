@@ -74,7 +74,8 @@ export default function NewEmployeePage() {
     if (!allowed) router.replace(ROUTES.home);
   }, [authLoading, allowed, router]);
 
-  const [fullName, setFullName] = useState("");
+  const [givenName, setGivenName] = useState("");
+  const [familyName, setFamilyName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [position, setPosition] = useState<Position>("Hall Staff");
   const [startDate, setStartDate] = useState("");
@@ -98,7 +99,8 @@ export default function NewEmployeePage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canSave =
-    fullName.trim().length > 0 &&
+    givenName.trim().length > 0 &&
+    familyName.trim().length > 0 &&
     !!startDate &&
     !!trainingRate.trim() &&
     !Number.isNaN(parseFloat(trainingRate)) &&
@@ -108,8 +110,12 @@ export default function NewEmployeePage() {
     if (!canSave || saving) return;
     setSaving(true);
     try {
+      const g = givenName.trim();
+      const f = familyName.trim();
       await addDoc(collection(getDb(), "staff_onboarding"), {
-        fullName: fullName.trim(),
+        givenName: g,
+        familyName: f,
+        fullName: `${g} ${f}`,
         mobileNumber: mobileNumber.trim(),
         position,
         startDate,
@@ -156,20 +162,36 @@ export default function NewEmployeePage() {
         <span className={styles.headerSpacer} />
       </header>
 
-      {/* Full name */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel} htmlFor="fullName">
-          FULL NAME
-        </label>
-        <input
-          id="fullName"
-          type="text"
-          className={styles.input}
-          placeholder="e.g. Sakura Tanaka"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          maxLength={80}
-        />
+      {/* Given / family name */}
+      <div className={styles.dateRow}>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel} htmlFor="givenName">
+            GIVEN NAME <span className={styles.required}>*</span>
+          </label>
+          <input
+            id="givenName"
+            type="text"
+            className={styles.input}
+            placeholder="e.g. Sakura"
+            value={givenName}
+            onChange={(e) => setGivenName(e.target.value)}
+            maxLength={40}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel} htmlFor="familyName">
+            FAMILY NAME <span className={styles.required}>*</span>
+          </label>
+          <input
+            id="familyName"
+            type="text"
+            className={styles.input}
+            placeholder="e.g. Tanaka"
+            value={familyName}
+            onChange={(e) => setFamilyName(e.target.value)}
+            maxLength={40}
+          />
+        </div>
       </div>
 
       {/* Mobile number */}
