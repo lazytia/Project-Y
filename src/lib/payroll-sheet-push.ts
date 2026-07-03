@@ -3,6 +3,11 @@
  */
 import { existsSync } from "node:fs";
 import { google, sheets_v4 } from "googleapis";
+import {
+  calculateWeeklyPaygTax,
+  grossPayFromHours,
+  parseSheetMoney,
+} from "@/lib/au-payg-tax";
 
 export const DEFAULT_SHEET_ID = "14HlHX24fN8GcryjIaBRvjZtmAGuQK7dElAcV4JXr1Qk";
 export const DEFAULT_TAB_NAME = "Tax Calculator";
@@ -186,10 +191,19 @@ export async function pushPayHistoryToSheet(
 
   const employeesToWrite = lastBlock.employees.map((emp) => {
     const h = hoursBySheetEmployee.get(emp.name);
+    const templateRow = rows[emp.row] ?? [];
+    const visaType = String(templateRow[1] ?? "Resident");
+    const weekRate = parseSheetMoney(templateRow[2]);
+    const premiumRate = parseSheetMoney(templateRow[3]);
+    const weekHours = h?.weekHours ?? 0;
+    const premiumHours = h?.premiumHours ?? 0;
+    const gross = grossPayFromHours(weekRate, premiumRate, weekHours, premiumHours);
+    const tax = calculateWeeklyPaygTax(visaType, gross);
     return {
       name: emp.name,
-      weekHours: h?.weekHours ?? 0,
-      premiumHours: h?.premiumHours ?? 0,
+      weekHours,
+      premiumHours,
+      tax,
     };
   });
 
@@ -235,6 +249,10 @@ export async function pushPayHistoryToSheet(
     hourUpdates.push({
       range: `'${tab}'!E${row}:F${row}`,
       values: [[emp.weekHours || 0, emp.premiumHours || 0]],
+    });
+    hourUpdates.push({
+      range: `'${tab}'!J${row}`,
+      values: [[emp.tax]],
     });
   }
 
