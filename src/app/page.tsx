@@ -37,6 +37,54 @@ const DAILY_TARGETS: Record<number, number> = {
 
 const POLL_INTERVAL_MS = 30_000;
 
+/**
+ * sessionStorage-backed cache for the owner dashboard. Keyed by date so
+ * flipping days is instant and returning to today skips the fetch-flash.
+ * Every field is optional — a stale/missing value just means "we'll show
+ * "—" until the live fetch fills it".
+ */
+type DashCache = Partial<{
+  todaySales: number;
+  restaurantSales: number;
+  platterSales: number;
+  weeklyProgress: number;
+  bestSellers: { name: string; sales: number; quantity: number }[];
+  savedDaySales: number;
+  lunchPax: number;
+  dinnerPax: number;
+  lunchStaff: number;
+  dinnerStaff: number;
+  prevWeekSales: number;
+  weekSalesDoc: number;
+  weeklyPayroll: number;
+  reviewNote: string;
+  nextCateringISO: string;
+  weekCateringCount: number;
+}>;
+
+const DASH_CACHE_KEY = "y.ownerDash";
+
+function readDashCache(dateKey: string): DashCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(`${DASH_CACHE_KEY}.${dateKey}`);
+    return raw ? (JSON.parse(raw) as DashCache) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashCache(dateKey: string, patch: DashCache) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = `${DASH_CACHE_KEY}.${dateKey}`;
+    const prev = readDashCache(dateKey) ?? {};
+    sessionStorage.setItem(key, JSON.stringify({ ...prev, ...patch }));
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
 function sydneyTodayKey(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
 }
@@ -182,6 +230,13 @@ function OwnerDashboard() {
       setStats(data);
       setStatsError(false);
       setLastUpdated(new Date());
+      writeDashCache(dateKey, {
+        todaySales: data.todaySales,
+        restaurantSales: data.restaurantSales,
+        platterSales: data.platterSales,
+        weeklyProgress: data.weeklyProgress,
+        bestSellers: data.bestSellers,
+      });
       // Persist the day's gross sales to Firestore so past days keep
       // their number even if Square becomes unreachable later. Fire-
       // and-forget — a failed write must not tank the render path.
@@ -197,6 +252,7 @@ function OwnerDashboard() {
           { merge: true },
         ).catch((err) => console.error("[sales_daily] snapshot write failed:", err));
         setSavedDaySales(data.todaySales);
+        writeDashCache(dateKey, { savedDaySales: data.todaySales });
       }
     } catch (err) {
       console.error("[Square] fetch error:", err);
@@ -208,9 +264,11 @@ function OwnerDashboard() {
     try {
       const snap = await getDoc(doc(getDb(), "sales_daily", dateKey));
       const data = snap.exists() ? (snap.data() as { grossSales?: number }) : null;
-      setSavedDaySales(typeof data?.grossSales === "number" ? data.grossSales : null);
+      const v = typeof data?.grossSales === "number" ? data.grossSales : null;
+      setSavedDaySales(v);
+      if (v !== null) writeDashCache(dateKey, { savedDaySales: v });
     } catch {
-      setSavedDaySales(null);
+      /* keep previous value on failure */
     }
   }, []);
 
@@ -218,6 +276,14 @@ function OwnerDashboard() {
     try {
       const data = await fetchReservationsForDate(user, dateKey, "northsydney");
       setReservations(data);
+      const active = data.filter((r) => r.status !== "cancelled" && r.status !== "no-show");
+      const lunchPax = active
+        .filter((r) => serviceFor(r.time) === "LUNCH")
+        .reduce((s, r) => s + r.count, 0);
+      const dinnerPax = active
+        .filter((r) => serviceFor(r.time) === "DINNER")
+        .reduce((s, r) => s + r.count, 0);
+      writeDashCache(dateKey, { lunchPax, dinnerPax });
     } catch (err) {
       console.error("[reservations] fetch error:", err);
     }
@@ -239,6 +305,7 @@ function OwnerDashboard() {
       if (!rSnap.exists()) {
         setLunchStaff(0);
         setDinnerStaff(0);
+        writeDashCache(dateKey, { lunchStaff: 0, dinnerStaff: 0 });
         return;
       }
       const rData = rSnap.data() as { assignments?: Record<string, Record<string, Record<string, string>>> };
@@ -252,34 +319,39 @@ function OwnerDashboard() {
       }
       setLunchStaff(lunch.size);
       setDinnerStaff(dinner.size);
+      writeDashCache(dateKey, { lunchStaff: lunch.size, dinnerStaff: dinner.size });
     } catch (err) {
       console.error("[roster] fetch error:", err);
     }
   }, []);
 
-  const fetchPrevWeekSales = useCallback(async (prevMonday: string) => {
+  const fetchPrevWeekSales = useCallback(async (prevMonday: string, dateKey: string) => {
     if (!prevMonday) return;
     try {
       const snap = await getDoc(doc(getDb(), "sales_weekly", prevMonday));
       const data = snap.exists() ? snap.data() as { grossSales?: number } : null;
-      setPrevWeekSales(typeof data?.grossSales === "number" ? data.grossSales : null);
+      const v = typeof data?.grossSales === "number" ? data.grossSales : null;
+      setPrevWeekSales(v);
+      if (v !== null) writeDashCache(dateKey, { prevWeekSales: v });
     } catch {
-      setPrevWeekSales(null);
+      /* keep previous */
     }
   }, []);
 
-  const fetchWeekSales = useCallback(async (monday: string) => {
+  const fetchWeekSales = useCallback(async (monday: string, dateKey: string) => {
     if (!monday) return;
     try {
       const snap = await getDoc(doc(getDb(), "sales_weekly", monday));
       const data = snap.exists() ? snap.data() as { grossSales?: number } : null;
-      setWeekSalesDoc(typeof data?.grossSales === "number" ? data.grossSales : null);
+      const v = typeof data?.grossSales === "number" ? data.grossSales : null;
+      setWeekSalesDoc(v);
+      if (v !== null) writeDashCache(dateKey, { weekSalesDoc: v });
     } catch {
-      setWeekSalesDoc(null);
+      /* keep previous */
     }
   }, []);
 
-  const fetchWeeklyPayroll = useCallback(async (monday: string) => {
+  const fetchWeeklyPayroll = useCallback(async (monday: string, dateKey: string) => {
     if (!monday) return;
     try {
       const snap = await getDoc(doc(getDb(), "payroll_weekly", monday));
@@ -288,9 +360,11 @@ function OwnerDashboard() {
       const total = typeof data.totalIncSuper === "number"
         ? data.totalIncSuper
         : (data.gross ?? 0) + (data.super ?? 0);
-      setWeeklyPayroll(total || null);
+      const v = total || null;
+      setWeeklyPayroll(v);
+      if (v !== null) writeDashCache(dateKey, { weeklyPayroll: v });
     } catch {
-      setWeeklyPayroll(null);
+      /* keep previous */
     }
   }, []);
 
@@ -300,29 +374,60 @@ function OwnerDashboard() {
       const text = snap.exists() ? (snap.data() as { text?: string }).text ?? "" : "";
       setReviewNote(text);
       setReviewDraft(text);
+      writeDashCache(dateKey, { reviewNote: text });
     } catch {
       setReviewNote("");
       setReviewDraft("");
     }
   }, []);
 
-  // Fetch everything when the selected date changes; poll only on "today".
+  // On selected-date change: hydrate from sessionStorage cache instantly,
+  // then kick off the live fetches. We DON'T blank state here — showing
+  // slightly-stale numbers while the fresh ones arrive feels much
+  // snappier than the blink-to-empty-then-fill sequence.
   useEffect(() => {
     if (!selectedDate) return;
-    setStats(null);
-    setReservations(null);
-    setLastUpdated(null);
-    setLunchStaff(null);
-    setDinnerStaff(null);
-    setSavedDaySales(null);
+    const cached = readDashCache(selectedDate);
+    if (cached) {
+      if (
+        typeof cached.todaySales === "number" ||
+        typeof cached.restaurantSales === "number" ||
+        typeof cached.platterSales === "number" ||
+        typeof cached.weeklyProgress === "number"
+      ) {
+        setStats((prev) => ({
+          todaySales: cached.todaySales ?? prev?.todaySales ?? 0,
+          transactions: prev?.transactions ?? 0,
+          transactionsChange: prev?.transactionsChange ?? 0,
+          avgSpendPerTable: prev?.avgSpendPerTable ?? 0,
+          avgSpendChange: prev?.avgSpendChange ?? 0,
+          restaurantSales: cached.restaurantSales ?? prev?.restaurantSales ?? 0,
+          platterSales: cached.platterSales ?? prev?.platterSales ?? 0,
+          weeklyProgress: cached.weeklyProgress ?? prev?.weeklyProgress ?? 0,
+          peakHour: prev?.peakHour ?? null,
+          peakHourOrders: prev?.peakHourOrders ?? 0,
+          bestSellers: cached.bestSellers ?? prev?.bestSellers ?? [],
+        }));
+      }
+      if (typeof cached.savedDaySales === "number") setSavedDaySales(cached.savedDaySales);
+      if (typeof cached.lunchStaff === "number") setLunchStaff(cached.lunchStaff);
+      if (typeof cached.dinnerStaff === "number") setDinnerStaff(cached.dinnerStaff);
+      if (typeof cached.prevWeekSales === "number") setPrevWeekSales(cached.prevWeekSales);
+      if (typeof cached.weekSalesDoc === "number") setWeekSalesDoc(cached.weekSalesDoc);
+      if (typeof cached.weeklyPayroll === "number") setWeeklyPayroll(cached.weeklyPayroll);
+      if (typeof cached.reviewNote === "string") {
+        setReviewNote(cached.reviewNote);
+        setReviewDraft(cached.reviewNote);
+      }
+    }
     fetchSavedDaySales(selectedDate);
     fetchStats(selectedDate);
     fetchReservations(selectedDate);
     fetchCatering();
     fetchRosterStaff(selectedDate);
-    fetchPrevWeekSales(prevMondayISO);
-    fetchWeekSales(weekMondayISO);
-    fetchWeeklyPayroll(weekMondayISO);
+    fetchPrevWeekSales(prevMondayISO, selectedDate);
+    fetchWeekSales(weekMondayISO, selectedDate);
+    fetchWeeklyPayroll(weekMondayISO, selectedDate);
     fetchReviewNote(selectedDate);
     if (!isToday) return;
     const id1 = setInterval(() => fetchStats(selectedDate), POLL_INTERVAL_MS);
