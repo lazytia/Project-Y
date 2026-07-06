@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
 import CalendarPicker from "@/components/CalendarPicker";
 import ManagerDashboard from "@/components/ManagerDashboard";
+import Splash from "@/components/Splash";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import {
@@ -221,6 +222,7 @@ function OwnerDashboard() {
   const [reviewDraft, setReviewDraft] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
 
   const fetchStats = useCallback(async (dateKey: string) => {
     try {
@@ -381,59 +383,73 @@ function OwnerDashboard() {
     }
   }, []);
 
-  // On selected-date change: hydrate from sessionStorage cache instantly,
-  // then kick off the live fetches. We DON'T blank state here — showing
-  // slightly-stale numbers while the fresh ones arrive feels much
-  // snappier than the blink-to-empty-then-fill sequence.
+  function hydrateFromCache(dateKey: string) {
+    const cached = readDashCache(dateKey);
+    if (!cached) return;
+    if (
+      typeof cached.todaySales === "number" ||
+      typeof cached.restaurantSales === "number" ||
+      typeof cached.platterSales === "number" ||
+      typeof cached.weeklyProgress === "number"
+    ) {
+      setStats((prev) => ({
+        todaySales: cached.todaySales ?? prev?.todaySales ?? 0,
+        transactions: prev?.transactions ?? 0,
+        transactionsChange: prev?.transactionsChange ?? 0,
+        avgSpendPerTable: prev?.avgSpendPerTable ?? 0,
+        avgSpendChange: prev?.avgSpendChange ?? 0,
+        restaurantSales: cached.restaurantSales ?? prev?.restaurantSales ?? 0,
+        platterSales: cached.platterSales ?? prev?.platterSales ?? 0,
+        weeklyProgress: cached.weeklyProgress ?? prev?.weeklyProgress ?? 0,
+        peakHour: prev?.peakHour ?? null,
+        peakHourOrders: prev?.peakHourOrders ?? 0,
+        bestSellers: cached.bestSellers ?? prev?.bestSellers ?? [],
+      }));
+    }
+    if (typeof cached.savedDaySales === "number") setSavedDaySales(cached.savedDaySales);
+    if (typeof cached.lunchStaff === "number") setLunchStaff(cached.lunchStaff);
+    if (typeof cached.dinnerStaff === "number") setDinnerStaff(cached.dinnerStaff);
+    if (typeof cached.prevWeekSales === "number") setPrevWeekSales(cached.prevWeekSales);
+    if (typeof cached.weekSalesDoc === "number") setWeekSalesDoc(cached.weekSalesDoc);
+    if (typeof cached.weeklyPayroll === "number") setWeeklyPayroll(cached.weeklyPayroll);
+    if (typeof cached.reviewNote === "string") {
+      setReviewNote(cached.reviewNote);
+      setReviewDraft(cached.reviewNote);
+    }
+  }
+
+  // Load every metric in parallel, then reveal the dashboard. Polling
+  // refreshes happen in the background without re-showing the splash.
   useEffect(() => {
     if (!selectedDate) return;
-    const cached = readDashCache(selectedDate);
-    if (cached) {
-      if (
-        typeof cached.todaySales === "number" ||
-        typeof cached.restaurantSales === "number" ||
-        typeof cached.platterSales === "number" ||
-        typeof cached.weeklyProgress === "number"
-      ) {
-        setStats((prev) => ({
-          todaySales: cached.todaySales ?? prev?.todaySales ?? 0,
-          transactions: prev?.transactions ?? 0,
-          transactionsChange: prev?.transactionsChange ?? 0,
-          avgSpendPerTable: prev?.avgSpendPerTable ?? 0,
-          avgSpendChange: prev?.avgSpendChange ?? 0,
-          restaurantSales: cached.restaurantSales ?? prev?.restaurantSales ?? 0,
-          platterSales: cached.platterSales ?? prev?.platterSales ?? 0,
-          weeklyProgress: cached.weeklyProgress ?? prev?.weeklyProgress ?? 0,
-          peakHour: prev?.peakHour ?? null,
-          peakHourOrders: prev?.peakHourOrders ?? 0,
-          bestSellers: cached.bestSellers ?? prev?.bestSellers ?? [],
-        }));
-      }
-      if (typeof cached.savedDaySales === "number") setSavedDaySales(cached.savedDaySales);
-      if (typeof cached.lunchStaff === "number") setLunchStaff(cached.lunchStaff);
-      if (typeof cached.dinnerStaff === "number") setDinnerStaff(cached.dinnerStaff);
-      if (typeof cached.prevWeekSales === "number") setPrevWeekSales(cached.prevWeekSales);
-      if (typeof cached.weekSalesDoc === "number") setWeekSalesDoc(cached.weekSalesDoc);
-      if (typeof cached.weeklyPayroll === "number") setWeeklyPayroll(cached.weeklyPayroll);
-      if (typeof cached.reviewNote === "string") {
-        setReviewNote(cached.reviewNote);
-        setReviewDraft(cached.reviewNote);
-      }
-    }
-    fetchSavedDaySales(selectedDate);
-    fetchStats(selectedDate);
-    fetchReservations(selectedDate);
-    fetchCatering();
-    fetchRosterStaff(selectedDate);
-    fetchPrevWeekSales(prevMondayISO, selectedDate);
-    fetchWeekSales(weekMondayISO, selectedDate);
-    fetchWeeklyPayroll(weekMondayISO, selectedDate);
-    fetchReviewNote(selectedDate);
-    if (!isToday) return;
+    let cancelled = false;
+
+    (async () => {
+      setDataLoading(true);
+      hydrateFromCache(selectedDate);
+      await Promise.allSettled([
+        fetchSavedDaySales(selectedDate),
+        fetchStats(selectedDate),
+        fetchReservations(selectedDate),
+        fetchCatering(),
+        fetchRosterStaff(selectedDate),
+        fetchPrevWeekSales(prevMondayISO, selectedDate),
+        fetchWeekSales(weekMondayISO, selectedDate),
+        fetchWeeklyPayroll(weekMondayISO, selectedDate),
+        fetchReviewNote(selectedDate),
+      ]);
+      if (!cancelled) setDataLoading(false);
+    })();
+
+    return () => { cancelled = true; };
+  }, [selectedDate, prevMondayISO, weekMondayISO, fetchStats, fetchSavedDaySales, fetchReservations, fetchCatering, fetchRosterStaff, fetchPrevWeekSales, fetchWeekSales, fetchWeeklyPayroll, fetchReviewNote]);
+
+  useEffect(() => {
+    if (!selectedDate || !isToday) return;
     const id1 = setInterval(() => fetchStats(selectedDate), POLL_INTERVAL_MS);
     const id2 = setInterval(() => fetchReservations(selectedDate), POLL_INTERVAL_MS);
     return () => { clearInterval(id1); clearInterval(id2); };
-  }, [selectedDate, isToday, prevMondayISO, weekMondayISO, fetchStats, fetchSavedDaySales, fetchReservations, fetchCatering, fetchRosterStaff, fetchPrevWeekSales, fetchWeekSales, fetchWeeklyPayroll, fetchReviewNote]);
+  }, [selectedDate, isToday, fetchStats, fetchReservations]);
 
   const resCounts = useMemo(() => {
     if (!reservations) return null;
@@ -521,6 +537,10 @@ function OwnerDashboard() {
       setReviewSaving(false);
     }
   };
+
+  if (dataLoading || !selectedDate) {
+    return <Splash label="Loading dashboard…" />;
+  }
 
   return (
     <div className={styles.page}>
