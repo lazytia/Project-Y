@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth, getDb } from "@/lib/firebase";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
@@ -101,8 +101,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // On auth-state change: backfill role/username on the staff_onboarding doc
-  // AND read back the user's completedStep so we know whether they still
-  // owe us an onboarding flow.
+  // AND subscribe to it so completedStep + notificationsPromptSeen stay in
+  // sync with Firestore. A one-shot getDoc left the local state stale after
+  // the notifications-prompt page flipped `notificationsPromptSeen` to true,
+  // which caused the routing effect below to bounce the user between
+  // /onboarding and /onboarding/notifications forever.
   useEffect(() => {
     if (loading || !user) return;
     const username = emailToUsername(user.email ?? "").toLowerCase();
@@ -129,28 +132,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       { merge: true },
     ).catch(() => {/* best-effort */});
 
-    // Only staff need to wait for completedStep — read it in parallel.
-    // Chefs skip onboarding for now, so we short-circuit to "complete".
-    if (!isOwner(user) && !isChef(user)) {
-      getDoc(ref)
-        .then((snap) => {
-          const data = snap.data() ?? {};
-          const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
-          writeStaffStepCache(user.uid, completed);
-          setStaffCompletedStep(completed);
-          setNotificationsPromptSeen(data.notificationsPromptSeen === true);
-        })
-        .catch(() => {
-          const fallback = readStaffStepCache(user.uid) ?? 0;
-          setStaffCompletedStep(fallback);
-          // Fail-open on the notification gate — better to skip the
-          // prompt than to trap the user on it.
-          setNotificationsPromptSeen(true);
-        });
-    } else if (isChef(user)) {
+    // Owners don't have an onboarding gate; chefs are short-circuited.
+    if (isOwner(user)) return;
+    if (isChef(user)) {
       setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
       setNotificationsPromptSeen(true);
+      return;
     }
+
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const data = snap.data() ?? {};
+        const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
+        writeStaffStepCache(user.uid, completed);
+        setStaffCompletedStep(completed);
+        setNotificationsPromptSeen(data.notificationsPromptSeen === true);
+      },
+      () => {
+        const fallback = readStaffStepCache(user.uid) ?? 0;
+        setStaffCompletedStep(fallback);
+        // Fail-open on the notification gate — better to skip the
+        // prompt than to trap the user on it.
+        setNotificationsPromptSeen(true);
+      },
+    );
+    return () => unsub();
   }, [user, loading]);
 
   const userIsOwner = isOwner(user);

@@ -30,26 +30,25 @@ export default function NotificationsPromptPage() {
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
 
-  // Once the prompt has been accepted (or was previously accepted in a
-  // past session), we skip straight to the onboarding checklist. Owner
-  // and chef never see this page — AuthProvider bounces them elsewhere.
+  // Redirect edge cases from a useEffect (never call router.replace mid-
+  // render — React throws in prod). AuthProvider is the primary gate; this
+  // is just belt-and-braces for someone who navigates here manually.
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.replace(ROUTES.login);
-      return;
+    if (authLoading || !user) return;
+    if (staffCompletedStep !== null && staffCompletedStep >= 7) {
+      router.replace(ROUTES.staffHome);
     }
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-      router.replace(ROUTES.staffOnboarding);
-    }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, staffCompletedStep, router]);
 
   async function handleEnable() {
     if (!user || busy) return;
     setBusy(true);
     setDenied(false);
     try {
-      const token = await registerFcmToken(user.uid);
+      const token = await registerFcmToken(user.uid).catch((err) => {
+        console.warn("[notifications-prompt] registerFcmToken failed:", err);
+        return null;
+      });
       // Record what happened either way so we don't nag on every visit.
       await setDoc(
         doc(getDb(), "staff_onboarding", user.uid),
@@ -59,7 +58,7 @@ export default function NotificationsPromptPage() {
           notificationsPromptedAt: serverTimestamp(),
         },
         { merge: true },
-      );
+      ).catch((err) => console.warn("[notifications-prompt] save failed:", err));
       if (token) {
         router.replace(ROUTES.staffOnboarding);
       } else {
@@ -74,11 +73,6 @@ export default function NotificationsPromptPage() {
 
   if (authLoading) return <Splash />;
   if (!user) return <Splash label="Redirecting…" />;
-  // Skip past this page if they've already finished their real onboarding.
-  if (staffCompletedStep !== null && staffCompletedStep >= 7) {
-    router.replace(ROUTES.staffHome);
-    return <Splash />;
-  }
 
   return (
     <div className={styles.page}>
