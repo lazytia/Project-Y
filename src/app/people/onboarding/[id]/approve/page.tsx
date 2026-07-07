@@ -233,8 +233,10 @@ export default function CreateLoginDetailsPage() {
         const firstName = request.fullName.split(" ")[0];
         const projectYLink = "https://project.yurica.com.au";
         const trimmedStaffId = squareStaffId.trim();
+        // Kept to plain ASCII — the emoji and em-dash used previously
+        // dropped to "?" on some AU mobile carriers.
         const smsText = [
-          "Welcome to YURICA! 👋",
+          "Welcome to YURICA!",
           "",
           `Hi ${firstName},`,
           "",
@@ -253,7 +255,7 @@ export default function CreateLoginDetailsPage() {
           "",
           "See you on your first shift!",
           "",
-          "— YURICA",
+          "YURICA",
         ].join("\n");
         try {
           const idToken = await user?.getIdToken();
