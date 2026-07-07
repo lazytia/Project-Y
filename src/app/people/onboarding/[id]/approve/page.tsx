@@ -376,7 +376,10 @@ export default function CreateLoginDetailsPage() {
             className={styles.input}
             type="text"
             value={loginId}
-            onChange={(e) => setLoginId(e.target.value.toLowerCase())}
+            /* Preserve whatever case the owner types — the value is
+               normalised to lower-case when it's persisted to Firebase
+               Auth and when it drives the case-insensitive login. */
+            onChange={(e) => setLoginId(e.target.value)}
             disabled={busy}
             autoComplete="off"
           />
