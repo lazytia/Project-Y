@@ -230,11 +230,31 @@ export default function CreateLoginDetailsPage() {
         // Fire the SMS through our Vonage proxy. Failure is surfaced to
         // the owner but doesn't roll back the account creation — the
         // login is already usable; they can retry the SMS manually.
+        const firstName = request.fullName.split(" ")[0];
+        const projectYLink = "https://project.yurica.com.au";
         const trimmedStaffId = squareStaffId.trim();
-        const squareLine = trimmedStaffId
-          ? ` Square staff ID: ${trimmedStaffId}.`
-          : "";
-        const smsText = `Hi ${request.fullName.split(" ")[0]}, YURICA employee login: ${username} / temporary password: ${password}.${squareLine}`;
+        const smsText = [
+          "Welcome to YURICA! 👋",
+          "",
+          `Hi ${firstName},`,
+          "",
+          "Your staff account is ready.",
+          "",
+          "Clock In / Out ID",
+          trimmedStaffId,
+          "",
+          "Project Y",
+          projectYLink,
+          "",
+          `Login ID: ${username}`,
+          `Password: ${password}`,
+          "",
+          "Please log in to Project Y and enable notifications to receive your roster, payslips and important company updates.",
+          "",
+          "See you on your first shift!",
+          "",
+          "— YURICA",
+        ].join("\n");
         try {
           const idToken = await user?.getIdToken();
           const res = await fetch("/api/vonage/send-sms", {

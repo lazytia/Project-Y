@@ -1,0 +1,147 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+  gap: var(--space-3);
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.header {
+  padding: var(--space-3) 0 var(--space-5);
+}
+.brand {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--color-fg);
+}
+.brandAccent { color: var(--color-warm); }
+
+.bellWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4) 0;
+}
+.bellHalo {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  border-radius: 999px;
+  background: var(--color-warm-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 88px;
+}
+.bell {
+  filter: drop-shadow(0 8px 12px rgba(255, 106, 19, 0.35));
+}
+.bellCheck {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-warm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--color-fg);
+  margin: var(--space-2) 0 0;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+.subtitle {
+  font-size: 15px;
+  color: var(--color-fg-muted);
+  text-align: center;
+  margin: 0 0 var(--space-3);
+  max-width: 320px;
+}
+
+.reasons {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0;
+  width: 100%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.reason {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.reason:last-child { border-bottom: none; }
+.reasonIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  flex-shrink: 0;
+}
+
+.trustLine {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  text-align: center;
+  margin: var(--space-3) 0;
+  max-width: 340px;
+  line-height: 1.5;
+}
+
+.deniedBanner {
+  margin: 0 0 var(--space-3);
+  padding: 12px 14px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 12px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.enableBtn {
+  width: 100%;
+  padding: 16px 18px;
+  background: var(--color-warm);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: opacity 0.15s, background 0.15s;
+}
+.enableBtn:hover:not(:disabled) { background: #e05a08; }
+.enableBtn:disabled { opacity: 0.6; cursor: not-allowed; }

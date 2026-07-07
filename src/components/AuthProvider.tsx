@@ -72,6 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [staffCompletedStep, setStaffCompletedStep] = useState<number | null>(null);
+  // `null` while we haven't looked yet, `true` once the staff member has
+  // seen (and accepted) the enable-notifications prompt, `false` if they
+  // still owe us that step. Owners and chefs skip this entirely.
+  const [notificationsPromptSeen, setNotificationsPromptSeen] = useState<boolean | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -134,13 +138,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
           writeStaffStepCache(user.uid, completed);
           setStaffCompletedStep(completed);
+          setNotificationsPromptSeen(data.notificationsPromptSeen === true);
         })
         .catch(() => {
           const fallback = readStaffStepCache(user.uid) ?? 0;
           setStaffCompletedStep(fallback);
+          // Fail-open on the notification gate — better to skip the
+          // prompt than to trap the user on it.
+          setNotificationsPromptSeen(true);
         });
     } else if (isChef(user)) {
       setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
+      setNotificationsPromptSeen(true);
     }
   }, [user, loading]);
 
@@ -173,7 +182,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Just signed in. Staff who still owe us onboarding go straight to it,
       // everyone else goes to their Home / Dashboard.
       if (staffNeedsOnboarding) {
-        router.replace(ROUTES.staffOnboarding);
+        if (notificationsPromptSeen === false) {
+          router.replace(ROUTES.staffNotificationsPrompt);
+        } else {
+          router.replace(ROUTES.staffOnboarding);
+        }
       } else if (userIsOwnerNow) {
         router.replace(ROUTES.home);
       } else if (isChef(user)) {
@@ -186,7 +199,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Staff who haven't finished onboarding are locked to /onboarding/*.
     if (user && staffNeedsOnboarding && !inOnboarding) {
-      router.replace(ROUTES.staffOnboarding);
+      // New staff who haven't accepted the notifications prompt yet get
+      // sent to that gate first, not straight into the onboarding form.
+      if (notificationsPromptSeen === false) {
+        router.replace(ROUTES.staffNotificationsPrompt);
+      } else {
+        router.replace(ROUTES.staffOnboarding);
+      }
+      return;
+    }
+
+    // Even inside /onboarding/*, if a staff member still owes us the
+    // notifications gate and is trying to visit another onboarding step,
+    // send them back to the prompt.
+    if (
+      user &&
+      staffNeedsOnboarding &&
+      notificationsPromptSeen === false &&
+      inOnboarding &&
+      pathname !== ROUTES.staffNotificationsPrompt
+    ) {
+      router.replace(ROUTES.staffNotificationsPrompt);
       return;
     }
 
@@ -201,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user && !userIsOwnerNow && !userIsChefNow && !isStaffAllowedPath(pathname)) {
       router.replace(ROUTES.staffHome);
     }
-  }, [user, loading, pathname, router, staffCompletedStep, staffNeedsOnboarding]);
+  }, [user, loading, pathname, router, staffCompletedStep, staffNeedsOnboarding, notificationsPromptSeen]);
 
   const signOut = async () => {
     clearStaffStepCache();
