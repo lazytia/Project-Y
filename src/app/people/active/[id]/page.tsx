@@ -59,6 +59,10 @@ type Staff = {
   visaType: string;
   phone: string;
   taxFileNumber: string;
+  /** Data-URL of the signature captured during the TFN declaration step.
+   *  We reuse it across the Contract, Handbook, and TFN modals — it's the
+   *  only signature the onboarding flow records today. */
+  signatureDataUrl: string;
   bank: BankSuper;
   handbookSignedAt: Date | null;
   agreementSignedAt: Date | null;
@@ -193,6 +197,15 @@ export default function EmployeeDetailPage() {
         const policies = (raw.policies ?? {}) as Record<string, unknown>;
         const bank = (raw.bankSuper ?? {}) as BankSuper;
         const documents = (raw.documents ?? {}) as Record<string, unknown>;
+        // TFN declaration nests the actual TFN + signature under `tfn` —
+        // the top-level field only exists on very old rows, so fall back
+        // to it for completeness.
+        const tfnBlock = (raw.tfn ?? {}) as Record<string, unknown>;
+        const tfnValue =
+          (typeof tfnBlock.taxFileNumber === "string" ? tfnBlock.taxFileNumber : "") ||
+          (typeof raw.taxFileNumber === "string" ? raw.taxFileNumber : "");
+        const signatureDataUrl =
+          typeof tfnBlock.signatureDataUrl === "string" ? tfnBlock.signatureDataUrl : "";
 
         const built: Staff = {
           uid: snap.id,
@@ -203,7 +216,8 @@ export default function EmployeeDetailPage() {
           visaExpiry: tsToDate(documents.visaExpiry ?? raw.visaExpiry ?? null),
           visaType: visaTypeOf(raw),
           phone: typeof raw.mobileNumber === "string" ? raw.mobileNumber : "",
-          taxFileNumber: typeof raw.taxFileNumber === "string" ? raw.taxFileNumber : "",
+          taxFileNumber: tfnValue,
+          signatureDataUrl,
           bank,
           handbookSignedAt: tsToDate(policies.handbookSignedAt),
           agreementSignedAt: tsToDate(policies.agreementSignedAt),
@@ -509,15 +523,20 @@ function renderModalBody(
       return {
         title: "Tax File Number",
         body: (
-          <dl className={styles.modalDefs}>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>TFN</dt>
-              <dd className={styles.modalDefValue}>{staff.taxFileNumber || "—"}</dd>
-            </div>
+          <>
+            <dl className={styles.modalDefs}>
+              <div className={styles.modalDefRow}>
+                <dt className={styles.modalDefLabel}>TFN</dt>
+                <dd className={styles.modalDefValue}>{staff.taxFileNumber || "—"}</dd>
+              </div>
+            </dl>
+            {staff.signatureDataUrl && (
+              <SignatureBlock label="Signed by" name={staff.name} src={staff.signatureDataUrl} />
+            )}
             <p className={styles.modalHint}>
               Submitted during onboarding. Visible to owner and manager only.
             </p>
-          </dl>
+          </>
         ),
       };
     case "bank":
@@ -538,39 +557,49 @@ function renderModalBody(
       return {
         title: "Signed Contract",
         body: (
-          <dl className={styles.modalDefs}>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Employment Agreement</dt>
-              <dd className={styles.modalDefValue}>
-                {staff.agreementSignedAt ? `Signed ${fmtDate(staff.agreementSignedAt)}` : "Not signed"}
-              </dd>
-            </div>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Privacy Policy</dt>
-              <dd className={styles.modalDefValue}>
-                {staff.privacySignedAt ? `Signed ${fmtDate(staff.privacySignedAt)}` : "Not signed"}
-              </dd>
-            </div>
-          </dl>
+          <>
+            <dl className={styles.modalDefs}>
+              <div className={styles.modalDefRow}>
+                <dt className={styles.modalDefLabel}>Employment Agreement</dt>
+                <dd className={styles.modalDefValue}>
+                  {staff.agreementSignedAt ? `Signed ${fmtDate(staff.agreementSignedAt)}` : "Not signed"}
+                </dd>
+              </div>
+              <div className={styles.modalDefRow}>
+                <dt className={styles.modalDefLabel}>Privacy Policy</dt>
+                <dd className={styles.modalDefValue}>
+                  {staff.privacySignedAt ? `Signed ${fmtDate(staff.privacySignedAt)}` : "Not signed"}
+                </dd>
+              </div>
+            </dl>
+            {staff.signatureDataUrl && (
+              <SignatureBlock label="Signed by" name={staff.name} src={staff.signatureDataUrl} />
+            )}
+          </>
         ),
       };
     case "handbook":
       return {
         title: "Employee Handbook (Signed)",
         body: (
-          <dl className={styles.modalDefs}>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Acknowledged On</dt>
-              <dd className={styles.modalDefValue}>
-                {staff.handbookSignedAt ? fmtDate(staff.handbookSignedAt) : "Not signed"}
-              </dd>
-            </div>
+          <>
+            <dl className={styles.modalDefs}>
+              <div className={styles.modalDefRow}>
+                <dt className={styles.modalDefLabel}>Acknowledged On</dt>
+                <dd className={styles.modalDefValue}>
+                  {staff.handbookSignedAt ? fmtDate(staff.handbookSignedAt) : "Not signed"}
+                </dd>
+              </div>
+            </dl>
+            {staff.signatureDataUrl && (
+              <SignatureBlock label="Signed by" name={staff.name} src={staff.signatureDataUrl} />
+            )}
             {staff.handbookSignedAt && (
               <p className={styles.modalHint}>
                 {staff.name} confirmed they have read and understood the Yurica staff handbook.
               </p>
             )}
-          </dl>
+          </>
         ),
       };
     case "hrNotes":
@@ -602,6 +631,17 @@ function DefRow({ label, value }: { label: string; value: string | undefined }) 
     <div className={styles.modalDefRow}>
       <dt className={styles.modalDefLabel}>{label}</dt>
       <dd className={styles.modalDefValue}>{value?.trim() ? value : "—"}</dd>
+    </div>
+  );
+}
+
+function SignatureBlock({ label, name, src }: { label: string; name: string; src: string }) {
+  return (
+    <div className={styles.signatureBlock}>
+      <p className={styles.signatureLabel}>{label}</p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={`${name} signature`} className={styles.signatureImg} />
+      <p className={styles.signatureName}>{name}</p>
     </div>
   );
 }
