@@ -23,6 +23,9 @@ import styles from "./page.module.css";
 const POSITIONS = ["Hall Staff", "Kitchen Staff"] as const;
 type Position = (typeof POSITIONS)[number];
 
+const VISA_TYPES = ["Student", "Residence", "Working Holiday"] as const;
+type VisaType = (typeof VISA_TYPES)[number];
+
 const TRAINING_PERIODS = [
   { value: "First 2 Weeks", subtitle: "" },
   { value: "First 3 Weeks", subtitle: "" },
@@ -78,6 +81,7 @@ export default function NewEmployeePage() {
   const [familyName, setFamilyName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [position, setPosition] = useState<Position>("Hall Staff");
+  const [visaType, setVisaType] = useState<VisaType>("Student");
   const [startDate, setStartDate] = useState("");
   const [visaExpiry, setVisaExpiry] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
@@ -118,6 +122,7 @@ export default function NewEmployeePage() {
         fullName: `${g} ${f}`,
         mobileNumber: mobileNumber.trim(),
         position,
+        visaType,
         startDate,
         visaExpiry: visaExpiry || null,
         trainingRate: parseFloat(trainingRate),
@@ -238,6 +243,28 @@ export default function NewEmployeePage() {
             {POSITIONS.map((p) => (
               <option key={p} value={p}>
                 {p}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className={styles.selectChev} />
+        </div>
+      </div>
+
+      {/* Visa Type */}
+      <div className={styles.field}>
+        <label className={styles.fieldLabel} htmlFor="visaType">
+          VISA TYPE
+        </label>
+        <div className={styles.selectWrap}>
+          <select
+            id="visaType"
+            className={styles.select}
+            value={visaType}
+            onChange={(e) => setVisaType(e.target.value as VisaType)}
+          >
+            {VISA_TYPES.map((v) => (
+              <option key={v} value={v}>
+                {v}
               </option>
             ))}
           </select>
