@@ -144,26 +144,29 @@
 .attentionGrid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  align-items: stretch;
 }
 
 .attentionCol {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
   min-width: 0;
 }
 
+/* Icon + title + subtitle stacked vertically so each column reserves the
+   same header height regardless of how the title wraps. */
 .attentionColHeader {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--space-2);
+  min-height: 68px;
 }
 
 .attentionColIcon {
   color: var(--color-warm);
-  flex-shrink: 0;
-  margin-top: 2px;
+  display: inline-flex;
 }
 
 .attentionColTitle {
@@ -176,10 +179,12 @@
 }
 
 .attentionColSub {
-  margin: 2px 0 0;
+  margin: 0;
   font-size: 11px;
   color: var(--color-warm);
   font-weight: 600;
+  min-height: 14px;
+  line-height: 1.2;
 }
 
 .attentionList {
@@ -188,15 +193,14 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .attentionItem {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 6px;
   align-items: baseline;
-  gap: 4px;
-  min-width: 0;
 }
 
 .attentionName {
@@ -207,14 +211,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  flex: 1;
 }
 
 .attentionRight {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-warm);
-  flex-shrink: 0;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .attentionColEmpty {
@@ -223,8 +227,11 @@
   color: var(--color-fg-subtle);
 }
 
+/* Pushed to the bottom of the column so "N staff" lines up across all
+   three columns even when one has fewer rows than the others. */
 .attentionCount {
-  margin: 0;
+  margin: auto 0 0;
+  padding-top: var(--space-2);
   font-size: 11px;
   color: var(--color-fg-muted);
 }

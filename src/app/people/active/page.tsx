@@ -398,10 +398,8 @@ function AttentionColumn({
     <div className={styles.attentionCol}>
       <div className={styles.attentionColHeader}>
         <span className={styles.attentionColIcon}>{icon}</span>
-        <div>
-          <p className={styles.attentionColTitle}>{title}</p>
-          <p className={styles.attentionColSub}>{subtitle}</p>
-        </div>
+        <p className={styles.attentionColTitle}>{title}</p>
+        <p className={styles.attentionColSub}>{subtitle}</p>
       </div>
       {items.length === 0 ? (
         <p className={styles.attentionColEmpty}>—</p>
