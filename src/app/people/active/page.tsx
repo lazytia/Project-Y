@@ -2,15 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  collection,
-  getDocs,
-  orderBy,
-  query,
-  where,
-  type Timestamp,
-} from "firebase/firestore";
-import { getDb } from "@/lib/firebase";
+import { type Timestamp } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
@@ -23,21 +15,6 @@ import styles from "./page.module.css";
  * summary (visa expiring / birthday / notice given) and a filterable list.
  */
 
-type StoredStaff = {
-  fullName?: string;
-  firstName?: string;
-  lastName?: string;
-  username?: string;
-  email?: string;
-  role?: string;
-  position?: string;
-  status?: string;
-  dateOfBirth?: string;
-  trainingRate?: number;
-  afterTrainingRate?: number;
-  documents?: { visaExpiry?: Timestamp | string | null };
-};
-
 type Staff = {
   uid: string;
   name: string;
@@ -46,14 +23,6 @@ type Staff = {
   rate: number | null;
   visaExpiry: Date | null;
   dob: Date | null;
-};
-
-type StoredNotice = {
-  employeeUid?: string;
-  employeeName?: string;
-  employeePosition?: string;
-  lastWorkingDay?: string;
-  noticeGivenDate?: string;
 };
 
 type Notice = {
@@ -68,32 +37,55 @@ type TabKey = "all" | "hall" | "kitchen" | "visa" | "birthday" | "notice";
 const VISA_WINDOW_DAYS = 30;
 const BIRTHDAY_WINDOW_DAYS = 14;
 
+/**
+ * Placeholder roster used while the real staff_onboarding docs aren't
+ * seeded yet. Dates are relative to `today` at page-load so the visa /
+ * birthday chips animate correctly no matter when the demo is opened.
+ */
+function buildMockStaff(): Staff[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const inDays = (n: number) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + n);
+    return d;
+  };
+  const birthdayInDays = (n: number) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + n);
+    // Anchor to 1998 so the DOB looks plausible rather than the current year.
+    d.setFullYear(1998);
+    return d;
+  };
+  return [
+    { uid: "m1", name: "Hiyori Nozawa", positionKind: "hall", positionLabel: "Hall", rate: 30, visaExpiry: inDays(18), dob: birthdayInDays(120) },
+    { uid: "m2", name: "Lucy Chen", positionKind: "hall", positionLabel: "Hall", rate: 28, visaExpiry: inDays(12), dob: birthdayInDays(200) },
+    { uid: "m3", name: "Suti Kawano", positionKind: "kitchen", positionLabel: "Kitchen", rate: 33, visaExpiry: inDays(92), dob: birthdayInDays(9) },
+    { uid: "m4", name: "James Min", positionKind: "kitchen", positionLabel: "Kitchen", rate: 32, visaExpiry: inDays(320), dob: birthdayInDays(5) },
+    { uid: "m5", name: "Yuki Tanaka", positionKind: "hall", positionLabel: "Hall", rate: 26, visaExpiry: inDays(1537), dob: birthdayInDays(180) },
+    { uid: "m6", name: "Timothy Yang", positionKind: "kitchen", positionLabel: "Kitchen", rate: 30, visaExpiry: inDays(1461), dob: birthdayInDays(60) },
+    { uid: "m7", name: "Chiaki Sato", positionKind: "hall", positionLabel: "Hall", rate: 29, visaExpiry: inDays(410), dob: birthdayInDays(150) },
+    { uid: "m8", name: "Jared Kim", positionKind: "kitchen", positionLabel: "Kitchen", rate: 34, visaExpiry: inDays(650), dob: birthdayInDays(90) },
+    { uid: "m9", name: "Aoi Yamamoto", positionKind: "hall", positionLabel: "Hall", rate: 27, visaExpiry: inDays(240), dob: birthdayInDays(45) },
+    { uid: "m10", name: "Ryo Fujita", positionKind: "hall", positionLabel: "Hall", rate: 28, visaExpiry: inDays(800), dob: birthdayInDays(300) },
+  ];
+}
+
+function buildMockNotices(): Notice[] {
+  const today = new Date();
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const inDaysISO = (n: number) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + n);
+    return iso(d);
+  };
+  return [
+    { id: "n1", employeeUid: "m7", employeeName: "Chiaki Sato", lastWorkingDay: inDaysISO(12) },
+    { id: "n2", employeeUid: "m8", employeeName: "Jared Kim", lastWorkingDay: inDaysISO(22) },
+  ];
+}
+
 /* ── Field helpers ── */
-
-function usernameFrom(row: StoredStaff): string {
-  if (row.username) return row.username;
-  const email = row.email ?? "";
-  const at = email.indexOf("@");
-  return at === -1 ? email : email.slice(0, at);
-}
-
-function fullNameOf(row: StoredStaff): string {
-  if (row.fullName?.trim()) return row.fullName.trim();
-  const f = (row.firstName ?? "").trim();
-  const l = (row.lastName ?? "").trim();
-  if (f || l) return [f, l].filter(Boolean).join(" ");
-  const u = usernameFrom(row);
-  return u ? u.charAt(0).toUpperCase() + u.slice(1) : "Unknown";
-}
-
-function positionOf(row: StoredStaff): { kind: Staff["positionKind"]; label: string } {
-  const p = (row.position ?? "").trim().toLowerCase();
-  const role = (row.role ?? "").toLowerCase();
-  if (role === "chef" || p.includes("kitchen")) return { kind: "kitchen", label: "Kitchen" };
-  if (p.includes("hall") || role === "manager") return { kind: "hall", label: "Hall" };
-  if (row.position?.trim()) return { kind: "other", label: row.position.trim() };
-  return { kind: "other", label: "Staff" };
-}
 
 function toDate(v: unknown): Date | null {
   if (!v) return null;
@@ -161,7 +153,6 @@ export default function ActiveEmployeesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState<TabKey>("all");
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -170,74 +161,10 @@ export default function ActiveEmployeesPage() {
 
   useEffect(() => {
     if (!allowed) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        // Only completed onboardings show up here — the onboarding pipeline
-        // flips `status` to "active" once the owner approves and the account
-        // is created. Everyone else lives on /people/onboarding.
-        const staffSnap = await getDocs(
-          query(collection(getDb(), "staff_onboarding"), where("status", "==", "active")),
-        );
-        const rows: Staff[] = staffSnap.docs
-          .map((d) => {
-            const raw = d.data() as StoredStaff;
-            if (raw.role === "owner") return null;
-            const { kind, label } = positionOf(raw);
-            const rate =
-              typeof raw.afterTrainingRate === "number"
-                ? raw.afterTrainingRate
-                : typeof raw.trainingRate === "number"
-                  ? raw.trainingRate
-                  : null;
-            return {
-              uid: d.id,
-              name: fullNameOf(raw),
-              positionKind: kind,
-              positionLabel: label,
-              rate,
-              visaExpiry: toDate(raw.documents?.visaExpiry ?? null),
-              dob: toDate(raw.dateOfBirth ?? null),
-            };
-          })
-          .filter((r): r is Staff => r !== null);
-
-        rows.sort((a, b) => a.name.localeCompare(b.name));
-
-        // Notice-given entries whose last working day hasn't passed yet.
-        // Old notices stay in the "notice_given" collection but the staff
-        // has moved to Terminated, so we filter to future/today only.
-        const noticeSnap = await getDocs(
-          query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
-        );
-        const todayISO = (() => {
-          const d = new Date();
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        })();
-        const noticeList: Notice[] = noticeSnap.docs
-          .map((d) => {
-            const data = d.data() as StoredNotice;
-            return {
-              id: d.id,
-              employeeUid: data.employeeUid ?? "",
-              employeeName: data.employeeName ?? "Unknown",
-              lastWorkingDay: data.lastWorkingDay ?? "",
-            };
-          })
-          .filter((n) => n.lastWorkingDay >= todayISO);
-
-        if (cancelled) return;
-        setStaff(rows);
-        setNotices(noticeList);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    // Real Firestore queries land here once staff_onboarding is seeded;
+    // for now render a fixed roster so the screen is demo-able.
+    setStaff(buildMockStaff());
+    setNotices(buildMockNotices());
   }, [allowed]);
 
   const noticeUids = useMemo(() => new Set(notices.map((n) => n.employeeUid)), [notices]);
@@ -291,21 +218,11 @@ export default function ActiveEmployeesPage() {
 
   return (
     <div className={styles.page}>
-      {/* Page header — the shell already provides the hamburger; we just
-          need the title and the "Add Staff" action on the right. */}
+      {/* Page header — the shell already provides the hamburger, so the
+          page just carries the title. */}
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Active Employees</h1>
-        <button
-          type="button"
-          className={styles.addBtn}
-          onClick={() => router.push("/people/add-staff")}
-        >
-          <AddStaffIcon />
-          <span>Add Staff</span>
-        </button>
       </header>
-
-      {error && <p className={styles.error}>{error}</p>}
 
       {/* Stats card */}
       <section className={styles.statsCard}>
@@ -526,17 +443,6 @@ function TabButton({
 }
 
 /* ── Icons ── */
-
-function AddStaffIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <line x1="19" y1="8" x2="19" y2="14" />
-      <line x1="22" y1="11" x2="16" y2="11" />
-    </svg>
-  );
-}
 
 function TriangleAlertIcon() {
   return (
