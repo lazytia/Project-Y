@@ -7,7 +7,6 @@ import {
   getDocs,
   orderBy,
   query,
-  where,
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -62,7 +61,15 @@ type StoredStaff = {
   afterTrainingRate?: number;
   documents?: { visaExpiry?: Timestamp | string | null };
   visaExpiry?: Timestamp | string | null;
+  approvedAt?: Timestamp | null;
 };
+
+/** Everyone on the roster except the owner accounts. Includes staff who
+ *  are mid-onboarding and staff who haven't started yet, so this screen
+ *  is a single home for the whole team. */
+function isTeamMember(raw: StoredStaff): boolean {
+  return (raw.role ?? "").toLowerCase() !== "owner";
+}
 
 type StoredNotice = {
   employeeUid?: string;
@@ -175,16 +182,14 @@ export default function ActiveEmployeesPage() {
 
     (async () => {
       try {
-        // Only completed onboardings show up here — the onboarding pipeline
-        // flips `status` to "active" once the owner approves and the
-        // account is created. Everyone else lives on /people/onboarding.
-        const staffSnap = await getDocs(
-          query(collection(getDb(), "staff_onboarding"), where("status", "==", "active")),
-        );
+        // Pull every staff_onboarding doc and drop only the owner accounts.
+        // This surface is the single roster view — mid-onboarding staff and
+        // brand-new hires who haven't opened the form yet both show up.
+        const staffSnap = await getDocs(collection(getDb(), "staff_onboarding"));
         const rows: Staff[] = staffSnap.docs
           .map((d) => {
             const raw = d.data() as StoredStaff;
-            if (raw.role === "owner") return null;
+            if (!isTeamMember(raw)) return null;
             const { kind, label } = positionOf(raw);
             const rate =
               typeof raw.afterTrainingRate === "number"
