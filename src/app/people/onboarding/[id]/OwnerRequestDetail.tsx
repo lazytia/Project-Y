@@ -252,7 +252,7 @@ export default function OwnerRequestDetail() {
           <button
             type="button"
             className={styles.backBtn}
-            onClick={() => router.push("/people/onboarding")}
+            onClick={() => router.back()}
             aria-label="Back"
           >
             <ChevronLeft />
@@ -271,7 +271,7 @@ export default function OwnerRequestDetail() {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={() => router.push("/people/onboarding")}
+          onClick={() => router.back()}
           aria-label="Back to requests"
         >
           <ChevronLeft />

@@ -230,7 +230,7 @@ export default function ManagerEditForm() {
           <button
             type="button"
             className={styles.backBtn}
-            onClick={() => router.push("/people/onboarding")}
+            onClick={() => router.back()}
             aria-label="Back to onboarding"
           >
             <ChevronLeft />
@@ -253,7 +253,7 @@ export default function ManagerEditForm() {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={() => router.push("/people/onboarding")}
+          onClick={() => router.back()}
           aria-label="Back to onboarding"
         >
           <ChevronLeft />
