@@ -1,7 +1,6 @@
 import { initializeApp, getApps, getApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
 import { initializeAuth, getAuth as fbGetAuth, browserLocalPersistence, type Auth } from "firebase/auth";
 import { getFirestore as fbGetFirestore, type Firestore } from "firebase/firestore";
-import { getStorage as fbGetStorage, type FirebaseStorage } from "firebase/storage";
 
 const explicitConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,7 +14,6 @@ const explicitConfig: FirebaseOptions = {
 let _app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 let _db: Firestore | null = null;
-let _storage: FirebaseStorage | null = null;
 
 function app(): FirebaseApp {
   if (_app) return _app;
@@ -56,7 +54,8 @@ export function getDb(): Firestore {
   return _db;
 }
 
-export function getStorage(): FirebaseStorage {
-  if (!_storage) _storage = fbGetStorage(app());
-  return _storage;
-}
+// Storage is a large chunk of the Firebase SDK (~40 KB gzipped) and is only
+// used by a handful of routes (document uploads, HR notes, cash payments).
+// Consumers must import from "@/lib/firebase-storage" so those pages pay for
+// it and the main bundle — which every route pulls via AuthProvider — does
+// not. Do not re-add a `getStorage` export here.

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getDb, getStorage } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
+import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";

@@ -11,7 +11,8 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
-import { getDb, getStorage } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
+import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";

@@ -2,12 +2,21 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
-import CalendarPicker from "@/components/CalendarPicker";
-import ManagerDashboard from "@/components/ManagerDashboard";
 import Splash from "@/components/Splash";
+
+// Manager dashboard is only rendered for non-strict-owner managers/chefs, so
+// owners (the majority) don't need it in their initial bundle. Calendar
+// picker is only mounted when the user actually taps the date pill.
+const ManagerDashboard = dynamic(() => import("@/components/ManagerDashboard"), {
+  loading: () => <Splash label="Loading…" />,
+});
+const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
+  ssr: false,
+});
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import {
