@@ -188,10 +188,16 @@ export default function CreateLoginDetailsPage() {
       const [y, m, d] = (request.startDate || new Date().toISOString().slice(0, 10)).split("-").map(Number);
       const startDate = new Date(Date.UTC(y || 2026, (m || 1) - 1, d || 1));
 
-      const { uid } = await createStaffAccount({
+      // allowUsernameSuffix lets us onboard a second person with the same
+      // first name (e.g. two Chaeeuns) — the first keeps "chaeeun" and any
+      // duplicate becomes "chaeeun2", "chaeeun3", …. Firebase Auth still
+      // requires unique emails, so the underlying login IDs stay distinct
+      // even when the passwords happen to differ.
+      const { uid, username: finalUsername } = await createStaffAccount({
         username,
         password,
         startDate,
+        allowUsernameSuffix: true,
       });
 
       const mobileDigits = mobileLocal.replace(/\D/g, "");
@@ -201,8 +207,8 @@ export default function CreateLoginDetailsPage() {
         {
           ...rawRequest,
           uid,
-          username,
-          email: usernameToEmail(username),
+          username: finalUsername,
+          email: usernameToEmail(finalUsername),
           fullName: request.fullName,
           position: request.position,
           mobileNumber: mobileDigits,
@@ -248,7 +254,7 @@ export default function CreateLoginDetailsPage() {
           "Project Y",
           projectYLink,
           "",
-          `Login ID: ${username}`,
+          `Login ID: ${finalUsername}`,
           `Password: ${password}`,
           "",
           "Please log in to Project Y and enable notifications to receive your roster, payslips and important company updates.",
@@ -271,7 +277,10 @@ export default function CreateLoginDetailsPage() {
           if (!res.ok) throw new Error(data?.error ?? `SMS failed (${res.status})`);
           setToast({
             title: "Invitation sent",
-            message: `Login details texted to +61 ${fmtMobileDisplay(mobileLocal)}.`,
+            message:
+              finalUsername === username
+                ? `Login details texted to +61 ${fmtMobileDisplay(mobileLocal)}.`
+                : `Login ID auto-adjusted to "${finalUsername}" — details texted to +61 ${fmtMobileDisplay(mobileLocal)}.`,
           });
         } catch (err) {
           setToast({
@@ -282,7 +291,10 @@ export default function CreateLoginDetailsPage() {
       } else {
         setToast({
           title: "Details saved",
-          message: "Employee login has been created.",
+          message:
+            finalUsername === username
+              ? "Employee login has been created."
+              : `Login ID auto-adjusted to "${finalUsername}" (original was taken).`,
         });
       }
       window.setTimeout(() => router.push("/people/onboarding"), invite ? 1600 : 900);

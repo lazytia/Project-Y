@@ -349,7 +349,15 @@ export default function EmployeeDetailPage() {
         <DocRow icon={<DocIcon />} label="Bank & Super Details" onClick={() => setOpenDoc("bank")} view />
         <DocRow icon={<DocIcon />} label="Signed Contract" onClick={() => setOpenDoc("contract")} view />
         <DocRow icon={<DocIcon />} label="Employee Handbook (Signed)" onClick={() => setOpenDoc("handbook")} view />
-        <DocRow icon={<DocIcon />} label="HR Notes" onClick={() => setOpenDoc("hrNotes")} view last />
+        <DocRow
+          icon={<DocIcon />}
+          label="HR Notes"
+          onClick={() =>
+            router.push(`/people/hr-notes?search=${encodeURIComponent(staff.name)}`)
+          }
+          view
+          last
+        />
       </section>
 
       {/* Change status */}
@@ -358,7 +366,9 @@ export default function EmployeeDetailPage() {
         <button
           type="button"
           className={styles.statusCard}
-          onClick={() => router.push("/people/notice-given/new")}
+          onClick={() =>
+            router.push(`/people/notice-given/new?uid=${encodeURIComponent(staff.uid)}`)
+          }
         >
           <CalendarIcon />
           <span className={styles.statusLabel}>Notice Given</span>

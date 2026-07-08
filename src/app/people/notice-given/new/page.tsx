@@ -1,18 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   addDoc,
   collection,
   getDocs,
-  query,
   serverTimestamp,
-  where,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isOwner, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
+import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
@@ -64,6 +63,8 @@ function initials(name: string): string {
 
 export default function NoticeGivenNewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectUid = searchParams?.get("uid") ?? "";
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
 
@@ -88,40 +89,51 @@ export default function NoticeGivenNewPage() {
     if (!allowed) return;
     (async () => {
       try {
-        const snap = await getDocs(
-          query(collection(getDb(), "staff_onboarding"), where("status", "==", "active")),
-        );
+        // Pull every staff_onboarding row and drop only the real business
+        // owners (Tia, Yurica). Managers, chefs, and staff — regardless of
+        // onboarding progress — all show up as picker options.
+        const snap = await getDocs(collection(getDb(), "staff_onboarding"));
         const list: StaffMember[] = snap.docs
           .map((doc) => {
             const d = doc.data();
-            if (d.role === "owner") return null;
+            const rawUsername =
+              (typeof d.username === "string" && d.username) ||
+              emailToUsername(typeof d.email === "string" ? d.email : "");
+            if (STRICT_OWNER_USERNAMES.has(rawUsername.toLowerCase())) return null;
+            const fullName = typeof d.fullName === "string" ? d.fullName.trim() : "";
             const f = ((d.firstName as string) ?? "").trim();
             const l = ((d.lastName as string) ?? "").trim();
             const name =
-              f || l
+              fullName ||
+              (f || l
                 ? `${f}${f && l ? " " : ""}${l}`
-                : ((d.username as string) ?? doc.id.slice(0, 6));
+                : (rawUsername || doc.id.slice(0, 6)));
             const role = (d.role as string) ?? "";
+            const positionField = typeof d.position === "string" ? d.position.trim() : "";
             const position =
-              role === "manager"
+              positionField ||
+              (role === "manager"
                 ? "Manager"
                 : role === "chef"
                 ? "Kitchen Staff"
                 : role
                 ? role.charAt(0).toUpperCase() + role.slice(1)
-                : "Staff";
+                : "Staff");
             return { uid: doc.id, name, position };
           })
           .filter((x): x is StaffMember => x !== null);
         list.sort((a, b) => a.name.localeCompare(b.name));
         setStaff(list);
+        if (preselectUid && list.some((s) => s.uid === preselectUid)) {
+          setSelectedUid(preselectUid);
+        }
       } catch {
         /* ignore */
       } finally {
         setStaffLoading(false);
       }
     })();
-  }, [allowed]);
+  }, [allowed, preselectUid]);
 
   const selectedStaff = staff.find((s) => s.uid === selectedUid) ?? null;
   const filteredStaff = staffSearch.trim()

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
   getDocs,
@@ -172,8 +172,13 @@ function kindClass(kind: NoteKind): string {
 
 export default function HrNotesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Deep-links from other surfaces (e.g. the Employee Details HR Notes row)
+  // can seed the search box via ?search=<name> so the page opens already
+  // filtered to that person.
+  const initialSearch = searchParams?.get("search") ?? "";
   const [view, setView] = useState<ViewMode>("timeline");
-  const [query_, setQuery] = useState("");
+  const [query_, setQuery] = useState(initialSearch);
   const [sort, setSort] = useState<Sort>("az");
   const [sortOpen, setSortOpen] = useState(false);
 
