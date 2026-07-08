@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   doc,
-  getDoc,
+  onSnapshot,
   setDoc,
   serverTimestamp,
   type Timestamp,
@@ -103,9 +103,14 @@ export default function PoliciesPage() {
 
   useEffect(() => {
     if (!user) return;
-    (async () => {
-      try {
-        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+    // Live listen instead of a one-shot getDoc: the child pages
+    // (staff-handbook / privacy-policy / employee-agreement) write
+    // `policies.{key}SignedAt` and navigate back here — the snapshot
+    // updates the Signed/Pending badges immediately, so a card that was
+    // just signed no longer flashes as Pending on the way back.
+    const unsub = onSnapshot(
+      doc(getDb(), "staff_onboarding", user.uid),
+      (snap) => {
         const data = snap.data() ?? {};
         const p = (data.policies ?? {}) as Record<string, Timestamp | null>;
         setSignedAt({
@@ -113,12 +118,11 @@ export default function PoliciesPage() {
           privacy: p.privacySignedAt ?? null,
           agreement: p.agreementSignedAt ?? null,
         });
-      } catch {
-        /* ignore */
-      } finally {
         setLoading(false);
-      }
-    })();
+      },
+      () => setLoading(false),
+    );
+    return () => unsub();
   }, [user]);
 
   const signedCount = Object.values(signedAt).filter(Boolean).length;

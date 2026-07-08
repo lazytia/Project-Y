@@ -448,6 +448,19 @@
   color: var(--color-fg-muted);
 }
 
+.modalListLink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-warm);
+  text-decoration: none;
+}
+
+.modalNoteMeta {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
 .modalNoteRow {
   display: flex;
   flex-direction: column;

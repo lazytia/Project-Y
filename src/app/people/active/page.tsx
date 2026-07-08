@@ -2,8 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  where,
+  type Timestamp,
+} from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { getMockActiveStaff, getMockActiveNotices } from "@/lib/mock-active-staff";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
@@ -37,15 +45,77 @@ type TabKey = "all" | "hall" | "kitchen" | "visa" | "birthday" | "notice";
 const VISA_WINDOW_DAYS = 30;
 const BIRTHDAY_WINDOW_DAYS = 14;
 
+/* ── Firestore shape ── */
+
+type StoredStaff = {
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  preferredName?: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  position?: string;
+  status?: string;
+  dateOfBirth?: string;
+  trainingRate?: number;
+  afterTrainingRate?: number;
+  documents?: { visaExpiry?: Timestamp | string | null };
+  visaExpiry?: Timestamp | string | null;
+};
+
+type StoredNotice = {
+  employeeUid?: string;
+  employeeName?: string;
+  lastWorkingDay?: string;
+};
+
 /* ── Field helpers ── */
 
-function toDate(v: Date | string | null | undefined): Date | null {
+function toDate(v: Timestamp | Date | string | null | undefined): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
-  const [y, m, d] = v.split("-").map(Number);
-  if (y && m && d) return new Date(y, m - 1, d, 12);
-  const parsed = new Date(v);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (typeof v === "string") {
+    // Anchor date-only ISO strings to midday local time so day-diff math
+    // isn't skewed by timezone offsets.
+    const [y, m, d] = v.split("-").map(Number);
+    if (y && m && d) return new Date(y, m - 1, d, 12);
+    const parsed = new Date(v);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof v === "object" && v !== null && "toDate" in v) {
+    try {
+      return v.toDate();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function usernameFrom(row: StoredStaff): string {
+  if (row.username) return row.username;
+  const email = row.email ?? "";
+  const at = email.indexOf("@");
+  return at === -1 ? email : email.slice(0, at);
+}
+
+function fullNameOf(row: StoredStaff): string {
+  if (row.fullName?.trim()) return row.fullName.trim();
+  const f = (row.firstName ?? "").trim();
+  const l = (row.lastName ?? "").trim();
+  if (f || l) return [f, l].filter(Boolean).join(" ");
+  const u = usernameFrom(row);
+  return u ? u.charAt(0).toUpperCase() + u.slice(1) : "Unknown";
+}
+
+function positionOf(row: StoredStaff): { kind: Staff["positionKind"]; label: string } {
+  const p = (row.position ?? "").trim().toLowerCase();
+  const role = (row.role ?? "").toLowerCase();
+  if (role === "chef" || p.includes("kitchen")) return { kind: "kitchen", label: "Kitchen" };
+  if (p.includes("hall") || role === "manager") return { kind: "hall", label: "Hall" };
+  if (row.position?.trim()) return { kind: "other", label: row.position.trim() };
+  return { kind: "other", label: "Staff" };
 }
 
 /** Whole-day difference from today, ignoring hours. Positive = future. */
@@ -101,20 +171,76 @@ export default function ActiveEmployeesPage() {
 
   useEffect(() => {
     if (!allowed) return;
-    // Real Firestore queries land here once staff_onboarding is seeded;
-    // for now render a fixed roster so the screen is demo-able.
-    setStaff(
-      getMockActiveStaff().map((row) => ({
-        uid: row.uid,
-        name: row.name,
-        positionKind: row.positionKind,
-        positionLabel: row.positionLabel,
-        rate: row.rate,
-        visaExpiry: row.visaExpiry,
-        dob: row.dob,
-      })),
-    );
-    setNotices(getMockActiveNotices());
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // Only completed onboardings show up here — the onboarding pipeline
+        // flips `status` to "active" once the owner approves and the
+        // account is created. Everyone else lives on /people/onboarding.
+        const staffSnap = await getDocs(
+          query(collection(getDb(), "staff_onboarding"), where("status", "==", "active")),
+        );
+        const rows: Staff[] = staffSnap.docs
+          .map((d) => {
+            const raw = d.data() as StoredStaff;
+            if (raw.role === "owner") return null;
+            const { kind, label } = positionOf(raw);
+            const rate =
+              typeof raw.afterTrainingRate === "number"
+                ? raw.afterTrainingRate
+                : typeof raw.trainingRate === "number"
+                  ? raw.trainingRate
+                  : null;
+            return {
+              uid: d.id,
+              name: fullNameOf(raw),
+              positionKind: kind,
+              positionLabel: label,
+              rate,
+              visaExpiry: toDate(raw.documents?.visaExpiry ?? raw.visaExpiry ?? null),
+              dob: toDate(raw.dateOfBirth ?? null),
+            };
+          })
+          .filter((r): r is Staff => r !== null);
+
+        rows.sort((a, b) => a.name.localeCompare(b.name));
+
+        // Only notices whose last working day hasn't passed. Older entries
+        // stay in `notice_given` after the staff move to Terminated.
+        const noticeSnap = await getDocs(
+          query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
+        );
+        const todayISO = (() => {
+          const d = new Date();
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        })();
+        const noticeList: Notice[] = noticeSnap.docs
+          .map((d) => {
+            const data = d.data() as StoredNotice;
+            return {
+              id: d.id,
+              employeeUid: data.employeeUid ?? "",
+              employeeName: data.employeeName ?? "Unknown",
+              lastWorkingDay: data.lastWorkingDay ?? "",
+            };
+          })
+          .filter((n) => n.lastWorkingDay >= todayISO);
+
+        if (cancelled) return;
+        setStaff(rows);
+        setNotices(noticeList);
+      } catch {
+        if (!cancelled) {
+          setStaff([]);
+          setNotices([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [allowed]);
 
   const noticeUids = useMemo(() => new Set(notices.map((n) => n.employeeUid)), [notices]);

@@ -2,16 +2,90 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  type Timestamp,
+} from "firebase/firestore";
+import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
-import { getMockActiveStaff, type MockActiveStaff } from "@/lib/mock-active-staff";
 import styles from "./page.module.css";
 
 type DocKey = "documents" | "tfn" | "bank" | "contract" | "handbook" | "hrNotes";
 
+type BankSuper = {
+  bsb?: string;
+  accountNumber?: string;
+  accountName?: string;
+  superFundName?: string;
+  usi?: string;
+  memberNumber?: string;
+};
+
+type StoredHrNote = {
+  employeeUid?: string;
+  category?: string;
+  kind?: string;
+  date?: string;
+  fields?: Record<string, string>;
+  checkboxes?: { label: string; checked: boolean }[];
+  addedByName?: string;
+  createdAt?: Timestamp;
+};
+
+type HrNote = {
+  id: string;
+  kind: string;
+  category: string;
+  date: string;
+  body: string;
+  addedBy: string;
+};
+
+type Staff = {
+  uid: string;
+  name: string;
+  positionLabel: string;
+  rate: number | null;
+  startDate: Date | null;
+  visaExpiry: Date | null;
+  visaType: string;
+  phone: string;
+  taxFileNumber: string;
+  bank: BankSuper;
+  handbookSignedAt: Date | null;
+  agreementSignedAt: Date | null;
+  privacySignedAt: Date | null;
+  documents: { label: string; url: string }[];
+};
+
 const VISA_WINDOW_DAYS = 30;
+
+function tsToDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "string") {
+    const [y, m, d] = v.split("-").map(Number);
+    if (y && m && d) return new Date(y, m - 1, d, 12);
+    const parsed = new Date(v);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof v === "object" && v !== null && "toDate" in v) {
+    try {
+      return (v as Timestamp).toDate();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 function daysFromToday(d: Date | null): number | null {
   if (!d) return null;
@@ -22,12 +96,7 @@ function daysFromToday(d: Date | null): number | null {
   return Math.round((target.getTime() - now.getTime()) / 86_400_000);
 }
 
-function fmtLongDate(d: Date | null | undefined): string {
-  if (!d) return "—";
-  return d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function fmtRelDate(d: Date | null | undefined): string {
+function fmtDate(d: Date | null | undefined): string {
   if (!d) return "—";
   return d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -38,12 +107,60 @@ function initialsOf(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+function positionLabelOf(raw: Record<string, unknown>): string {
+  const p = String(raw.position ?? "").trim().toLowerCase();
+  const role = String(raw.role ?? "").toLowerCase();
+  if (role === "chef" || p.includes("kitchen")) return "Kitchen Staff";
+  if (p.includes("hall") || role === "manager") return "Hall Staff";
+  const pos = String(raw.position ?? "").trim();
+  return pos || "Staff";
+}
+
+function fullNameOf(raw: Record<string, unknown>): string {
+  const fn = typeof raw.fullName === "string" ? raw.fullName.trim() : "";
+  if (fn) return fn;
+  const f = typeof raw.firstName === "string" ? raw.firstName.trim() : "";
+  const l = typeof raw.lastName === "string" ? raw.lastName.trim() : "";
+  if (f || l) return [f, l].filter(Boolean).join(" ");
+  const email = typeof raw.email === "string" ? raw.email : "";
+  const at = email.indexOf("@");
+  const user = at === -1 ? email : email.slice(0, at);
+  return user ? user.charAt(0).toUpperCase() + user.slice(1) : "Unknown";
+}
+
+/** Best effort — the visa type isn't captured explicitly today, so infer
+ *  it from a `visaType` field if present and otherwise leave blank. */
+function visaTypeOf(raw: Record<string, unknown>): string {
+  if (typeof raw.visaType === "string" && raw.visaType.trim()) return raw.visaType.trim();
+  if (typeof raw.visa === "string" && raw.visa.trim()) return raw.visa.trim();
+  return "—";
+}
+
+/** Read the handful of URL fields we know onboarding writes. */
+function collectDocuments(raw: Record<string, unknown>): { label: string; url: string }[] {
+  const docs = (raw.documents ?? {}) as Record<string, unknown>;
+  const known: { key: string; label: string }[] = [
+    { key: "passportUrl", label: "Passport" },
+    { key: "visaUrl", label: "Visa" },
+    { key: "rsaUrl", label: "RSA Certificate" },
+  ];
+  const out: { label: string; url: string }[] = [];
+  for (const { key, label } of known) {
+    const v = docs[key];
+    if (typeof v === "string" && v) out.push({ label, url: v });
+  }
+  return out;
+}
+
 export default function EmployeeDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user) || isChef(user);
 
+  const [staff, setStaff] = useState<Staff | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [hrNotes, setHrNotes] = useState<HrNote[]>([]);
   const [openDoc, setOpenDoc] = useState<DocKey | null>(null);
 
   useEffect(() => {
@@ -51,13 +168,84 @@ export default function EmployeeDetailPage() {
     if (!allowed) router.replace(ROUTES.home);
   }, [allowed, authLoading, router]);
 
-  const staff: MockActiveStaff | null = useMemo(() => {
+  useEffect(() => {
+    if (!allowed) return;
     const id = params?.id;
-    if (!id) return null;
-    return getMockActiveStaff().find((s) => s.uid === id) ?? null;
-  }, [params?.id]);
+    if (!id) return;
+    let cancelled = false;
 
-  // Lock body scroll while a modal is open.
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", id));
+        if (!snap.exists()) {
+          if (!cancelled) setNotFound(true);
+          return;
+        }
+        const raw = snap.data() as Record<string, unknown>;
+
+        const rate =
+          typeof raw.afterTrainingRate === "number"
+            ? raw.afterTrainingRate
+            : typeof raw.trainingRate === "number"
+              ? raw.trainingRate
+              : null;
+
+        const policies = (raw.policies ?? {}) as Record<string, unknown>;
+        const bank = (raw.bankSuper ?? {}) as BankSuper;
+        const documents = (raw.documents ?? {}) as Record<string, unknown>;
+
+        const built: Staff = {
+          uid: snap.id,
+          name: fullNameOf(raw),
+          positionLabel: positionLabelOf(raw),
+          rate,
+          startDate: tsToDate(raw.startDate),
+          visaExpiry: tsToDate(documents.visaExpiry ?? raw.visaExpiry ?? null),
+          visaType: visaTypeOf(raw),
+          phone: typeof raw.mobileNumber === "string" ? raw.mobileNumber : "",
+          taxFileNumber: typeof raw.taxFileNumber === "string" ? raw.taxFileNumber : "",
+          bank,
+          handbookSignedAt: tsToDate(policies.handbookSignedAt),
+          agreementSignedAt: tsToDate(policies.agreementSignedAt),
+          privacySignedAt: tsToDate(policies.privacySignedAt),
+          documents: collectDocuments(raw),
+        };
+
+        if (!cancelled) setStaff(built);
+
+        // HR notes are stored top-level, keyed by employeeUid.
+        try {
+          const notesSnap = await getDocs(
+            query(collection(getDb(), "hr_notes"), where("employeeUid", "==", id)),
+          );
+          const notes: HrNote[] = notesSnap.docs.map((d) => {
+            const data = d.data() as StoredHrNote;
+            const fields = data.fields ?? {};
+            const body = fields.summary ?? fields.details ?? fields.note ?? Object.values(fields).join(" · ");
+            return {
+              id: d.id,
+              kind: data.kind ?? "Note",
+              category: data.category ?? "",
+              date: data.date ?? "",
+              body: body ?? "",
+              addedBy: data.addedByName ?? "",
+            };
+          });
+          notes.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+          if (!cancelled) setHrNotes(notes);
+        } catch {
+          /* leave notes empty */
+        }
+      } catch {
+        if (!cancelled) setNotFound(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed, params?.id]);
+
   useEffect(() => {
     if (!openDoc) return;
     const prev = document.body.style.overflow;
@@ -76,9 +264,11 @@ export default function EmployeeDetailPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [openDoc]);
 
+  const visaDays = useMemo(() => daysFromToday(staff?.visaExpiry ?? null), [staff]);
+
   if (authLoading || !allowed) return <Splash />;
 
-  if (!staff) {
+  if (notFound) {
     return (
       <div className={styles.page}>
         <TopBar onBack={() => router.back()} />
@@ -87,7 +277,8 @@ export default function EmployeeDetailPage() {
     );
   }
 
-  const visaDays = daysFromToday(staff.visaExpiry);
+  if (!staff) return <Splash label="Loading…" />;
+
   const visaWarn = visaDays !== null && visaDays >= 0 && visaDays <= VISA_WINDOW_DAYS;
 
   return (
@@ -103,19 +294,19 @@ export default function EmployeeDetailPage() {
           </div>
           <div className={styles.profileMain}>
             <h2 className={styles.profileName}>{staff.name}</h2>
-            <p className={styles.profilePos}>{`${staff.positionLabel} Staff`}</p>
+            <p className={styles.profilePos}>{staff.positionLabel}</p>
             <span className={styles.activePill}>Active</span>
           </div>
         </div>
         <div className={styles.profileDivider} aria-hidden="true" />
         <div className={styles.profileStats}>
           <StatCell label="Rate" value={typeof staff.rate === "number" ? `$${staff.rate}/hr` : "—"} accent />
-          <StatCell label="Start Date" value={fmtLongDate(staff.startDate)} />
+          <StatCell label="Start Date" value={fmtDate(staff.startDate)} />
           <StatCell label="Visa Type" value={staff.visaType} />
           <StatCell
             label="Visa Expiry"
-            value={visaWarn ? `${visaDays} days` : fmtLongDate(staff.visaExpiry)}
-            valueSub={visaWarn ? fmtLongDate(staff.visaExpiry) : undefined}
+            value={visaWarn ? `${visaDays} days` : fmtDate(staff.visaExpiry)}
+            valueSub={visaWarn ? fmtDate(staff.visaExpiry) : undefined}
             accent={visaWarn}
             warn={visaWarn}
           />
@@ -123,16 +314,18 @@ export default function EmployeeDetailPage() {
       </section>
 
       {/* Phone row */}
-      <button
-        type="button"
-        className={styles.linkRow}
-        onClick={() => window.open(`tel:${staff.phone.replace(/\s/g, "")}`, "_self")}
-      >
-        <span className={styles.linkRowIcon} aria-hidden="true"><PhoneIcon /></span>
-        <span className={styles.linkRowLabel}>Phone</span>
-        <span className={styles.linkRowValue}>{staff.phone}</span>
-        <span className={styles.chev} aria-hidden="true">›</span>
-      </button>
+      {staff.phone && (
+        <button
+          type="button"
+          className={styles.linkRow}
+          onClick={() => window.open(`tel:${staff.phone.replace(/\s/g, "")}`, "_self")}
+        >
+          <span className={styles.linkRowIcon} aria-hidden="true"><PhoneIcon /></span>
+          <span className={styles.linkRowLabel}>Phone</span>
+          <span className={styles.linkRowValue}>{staff.phone}</span>
+          <span className={styles.chev} aria-hidden="true">›</span>
+        </button>
+      )}
 
       {/* Documents */}
       <p className={styles.sectionLabel}>DOCUMENTS</p>
@@ -170,6 +363,7 @@ export default function EmployeeDetailPage() {
         <DocModal
           docKey={openDoc}
           staff={staff}
+          hrNotes={hrNotes}
           onClose={() => setOpenDoc(null)}
         />
       )}
@@ -247,18 +441,18 @@ function DocRow({
   );
 }
 
-/* ── Modal ── */
-
 function DocModal({
   docKey,
   staff,
+  hrNotes,
   onClose,
 }: {
   docKey: DocKey;
-  staff: MockActiveStaff;
+  staff: Staff;
+  hrNotes: HrNote[];
   onClose: () => void;
 }) {
-  const { title, body } = renderModalBody(docKey, staff);
+  const { title, body } = renderModalBody(docKey, staff, hrNotes);
   return (
     <div
       className={styles.modalBackdrop}
@@ -281,24 +475,35 @@ function DocModal({
   );
 }
 
-function renderModalBody(docKey: DocKey, staff: MockActiveStaff): { title: string; body: React.ReactNode } {
-  const d = staff.documents;
+function renderModalBody(
+  docKey: DocKey,
+  staff: Staff,
+  hrNotes: HrNote[],
+): { title: string; body: React.ReactNode } {
   switch (docKey) {
     case "documents":
       return {
         title: "Documents",
-        body: (
-          <ul className={styles.modalList}>
-            {d.uploaded.map((f) => (
-              <li key={f.label} className={styles.modalListRow}>
-                <span className={styles.modalListName}>{f.label}</span>
-                <span className={styles.modalListMeta}>
-                  {fmtRelDate(f.uploadedOn)} · {f.sizeKb} KB
-                </span>
-              </li>
-            ))}
-          </ul>
-        ),
+        body:
+          staff.documents.length === 0 ? (
+            <p className={styles.modalHint}>No documents uploaded yet.</p>
+          ) : (
+            <ul className={styles.modalList}>
+              {staff.documents.map((d) => (
+                <li key={d.url} className={styles.modalListRow}>
+                  <span className={styles.modalListName}>{d.label}</span>
+                  <a
+                    className={styles.modalListLink}
+                    href={d.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open ↗
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ),
       };
     case "tfn":
       return {
@@ -307,14 +512,10 @@ function renderModalBody(docKey: DocKey, staff: MockActiveStaff): { title: strin
           <dl className={styles.modalDefs}>
             <div className={styles.modalDefRow}>
               <dt className={styles.modalDefLabel}>TFN</dt>
-              <dd className={styles.modalDefValue}>{d.tfn}</dd>
-            </div>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Submitted</dt>
-              <dd className={styles.modalDefValue}>{fmtRelDate(staff.startDate)}</dd>
+              <dd className={styles.modalDefValue}>{staff.taxFileNumber || "—"}</dd>
             </div>
             <p className={styles.modalHint}>
-              Submitted by {staff.name} during onboarding. Visible to owner and manager only.
+              Submitted during onboarding. Visible to owner and manager only.
             </p>
           </dl>
         ),
@@ -324,22 +525,12 @@ function renderModalBody(docKey: DocKey, staff: MockActiveStaff): { title: strin
         title: "Bank & Super Details",
         body: (
           <dl className={styles.modalDefs}>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>BSB</dt>
-              <dd className={styles.modalDefValue}>{d.bank.bsb}</dd>
-            </div>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Account Number</dt>
-              <dd className={styles.modalDefValue}>{d.bank.accountNumber}</dd>
-            </div>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Super Fund</dt>
-              <dd className={styles.modalDefValue}>{d.bank.superFund}</dd>
-            </div>
-            <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Member Number</dt>
-              <dd className={styles.modalDefValue}>{d.bank.memberNumber}</dd>
-            </div>
+            <DefRow label="BSB" value={staff.bank.bsb} />
+            <DefRow label="Account Number" value={staff.bank.accountNumber} />
+            <DefRow label="Account Name" value={staff.bank.accountName} />
+            <DefRow label="Super Fund" value={staff.bank.superFundName} />
+            <DefRow label="USI" value={staff.bank.usi} />
+            <DefRow label="Member Number" value={staff.bank.memberNumber} />
           </dl>
         ),
       };
@@ -349,14 +540,17 @@ function renderModalBody(docKey: DocKey, staff: MockActiveStaff): { title: strin
         body: (
           <dl className={styles.modalDefs}>
             <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Signed On</dt>
-              <dd className={styles.modalDefValue}>{fmtRelDate(d.contract.signedOn)}</dd>
+              <dt className={styles.modalDefLabel}>Employment Agreement</dt>
+              <dd className={styles.modalDefValue}>
+                {staff.agreementSignedAt ? `Signed ${fmtDate(staff.agreementSignedAt)}` : "Not signed"}
+              </dd>
             </div>
             <div className={styles.modalDefRow}>
-              <dt className={styles.modalDefLabel}>Version</dt>
-              <dd className={styles.modalDefValue}>{d.contract.version}</dd>
+              <dt className={styles.modalDefLabel}>Privacy Policy</dt>
+              <dd className={styles.modalDefValue}>
+                {staff.privacySignedAt ? `Signed ${fmtDate(staff.privacySignedAt)}` : "Not signed"}
+              </dd>
             </div>
-            <p className={styles.modalHint}>Digital signature captured during onboarding.</p>
           </dl>
         ),
       };
@@ -367,11 +561,15 @@ function renderModalBody(docKey: DocKey, staff: MockActiveStaff): { title: strin
           <dl className={styles.modalDefs}>
             <div className={styles.modalDefRow}>
               <dt className={styles.modalDefLabel}>Acknowledged On</dt>
-              <dd className={styles.modalDefValue}>{fmtRelDate(d.handbook.acknowledgedOn)}</dd>
+              <dd className={styles.modalDefValue}>
+                {staff.handbookSignedAt ? fmtDate(staff.handbookSignedAt) : "Not signed"}
+              </dd>
             </div>
-            <p className={styles.modalHint}>
-              {staff.name} confirmed they have read and understood the Yurica staff handbook.
-            </p>
+            {staff.handbookSignedAt && (
+              <p className={styles.modalHint}>
+                {staff.name} confirmed they have read and understood the Yurica staff handbook.
+              </p>
+            )}
           </dl>
         ),
       };
@@ -379,23 +577,33 @@ function renderModalBody(docKey: DocKey, staff: MockActiveStaff): { title: strin
       return {
         title: "HR Notes",
         body:
-          d.hrNotes.length === 0 ? (
+          hrNotes.length === 0 ? (
             <p className={styles.modalHint}>No HR notes recorded for this employee.</p>
           ) : (
             <ul className={styles.modalList}>
-              {d.hrNotes.map((n, i) => (
-                <li key={i} className={styles.modalNoteRow}>
+              {hrNotes.map((n) => (
+                <li key={n.id} className={styles.modalNoteRow}>
                   <div className={styles.modalNoteHead}>
-                    <span className={styles.modalNoteAuthor}>{n.author}</span>
-                    <span className={styles.modalNoteDate}>{fmtRelDate(n.date)}</span>
+                    <span className={styles.modalNoteAuthor}>{n.kind}</span>
+                    <span className={styles.modalNoteDate}>{n.date || "—"}</span>
                   </div>
-                  <p className={styles.modalNoteBody}>{n.note}</p>
+                  {n.body && <p className={styles.modalNoteBody}>{n.body}</p>}
+                  {n.addedBy && <p className={styles.modalNoteMeta}>Added by {n.addedBy}</p>}
                 </li>
               ))}
             </ul>
           ),
       };
   }
+}
+
+function DefRow({ label, value }: { label: string; value: string | undefined }) {
+  return (
+    <div className={styles.modalDefRow}>
+      <dt className={styles.modalDefLabel}>{label}</dt>
+      <dd className={styles.modalDefValue}>{value?.trim() ? value : "—"}</dd>
+    </div>
+  );
 }
 
 /* ── Icons ── */
