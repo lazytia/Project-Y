@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { type Timestamp } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
+import { getMockActiveStaff, getMockActiveNotices } from "@/lib/mock-active-staff";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
@@ -37,75 +37,15 @@ type TabKey = "all" | "hall" | "kitchen" | "visa" | "birthday" | "notice";
 const VISA_WINDOW_DAYS = 30;
 const BIRTHDAY_WINDOW_DAYS = 14;
 
-/**
- * Placeholder roster used while the real staff_onboarding docs aren't
- * seeded yet. Dates are relative to `today` at page-load so the visa /
- * birthday chips animate correctly no matter when the demo is opened.
- */
-function buildMockStaff(): Staff[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const inDays = (n: number) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + n);
-    return d;
-  };
-  const birthdayInDays = (n: number) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + n);
-    // Anchor to 1998 so the DOB looks plausible rather than the current year.
-    d.setFullYear(1998);
-    return d;
-  };
-  return [
-    { uid: "m1", name: "Hiyori Nozawa", positionKind: "hall", positionLabel: "Hall", rate: 30, visaExpiry: inDays(18), dob: birthdayInDays(120) },
-    { uid: "m2", name: "Lucy Chen", positionKind: "hall", positionLabel: "Hall", rate: 28, visaExpiry: inDays(12), dob: birthdayInDays(200) },
-    { uid: "m3", name: "Suti Kawano", positionKind: "kitchen", positionLabel: "Kitchen", rate: 33, visaExpiry: inDays(92), dob: birthdayInDays(9) },
-    { uid: "m4", name: "James Min", positionKind: "kitchen", positionLabel: "Kitchen", rate: 32, visaExpiry: inDays(320), dob: birthdayInDays(5) },
-    { uid: "m5", name: "Yuki Tanaka", positionKind: "hall", positionLabel: "Hall", rate: 26, visaExpiry: inDays(1537), dob: birthdayInDays(180) },
-    { uid: "m6", name: "Timothy Yang", positionKind: "kitchen", positionLabel: "Kitchen", rate: 30, visaExpiry: inDays(1461), dob: birthdayInDays(60) },
-    { uid: "m7", name: "Chiaki Sato", positionKind: "hall", positionLabel: "Hall", rate: 29, visaExpiry: inDays(410), dob: birthdayInDays(150) },
-    { uid: "m8", name: "Jared Kim", positionKind: "kitchen", positionLabel: "Kitchen", rate: 34, visaExpiry: inDays(650), dob: birthdayInDays(90) },
-    { uid: "m9", name: "Aoi Yamamoto", positionKind: "hall", positionLabel: "Hall", rate: 27, visaExpiry: inDays(240), dob: birthdayInDays(45) },
-    { uid: "m10", name: "Ryo Fujita", positionKind: "hall", positionLabel: "Hall", rate: 28, visaExpiry: inDays(800), dob: birthdayInDays(300) },
-  ];
-}
-
-function buildMockNotices(): Notice[] {
-  const today = new Date();
-  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const inDaysISO = (n: number) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + n);
-    return iso(d);
-  };
-  return [
-    { id: "n1", employeeUid: "m7", employeeName: "Chiaki Sato", lastWorkingDay: inDaysISO(12) },
-    { id: "n2", employeeUid: "m8", employeeName: "Jared Kim", lastWorkingDay: inDaysISO(22) },
-  ];
-}
-
 /* ── Field helpers ── */
 
-function toDate(v: unknown): Date | null {
+function toDate(v: Date | string | null | undefined): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
-  if (typeof v === "string") {
-    // Anchor date-only ISO strings to midday local time so day-diff math
-    // isn't skewed by timezone offsets.
-    const [y, m, d] = v.split("-").map(Number);
-    if (y && m && d) return new Date(y, m - 1, d, 12);
-    const parsed = new Date(v);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
-    try {
-      return (v as Timestamp).toDate();
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  const [y, m, d] = v.split("-").map(Number);
+  if (y && m && d) return new Date(y, m - 1, d, 12);
+  const parsed = new Date(v);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /** Whole-day difference from today, ignoring hours. Positive = future. */
@@ -163,8 +103,18 @@ export default function ActiveEmployeesPage() {
     if (!allowed) return;
     // Real Firestore queries land here once staff_onboarding is seeded;
     // for now render a fixed roster so the screen is demo-able.
-    setStaff(buildMockStaff());
-    setNotices(buildMockNotices());
+    setStaff(
+      getMockActiveStaff().map((row) => ({
+        uid: row.uid,
+        name: row.name,
+        positionKind: row.positionKind,
+        positionLabel: row.positionLabel,
+        rate: row.rate,
+        visaExpiry: row.visaExpiry,
+        dob: row.dob,
+      })),
+    );
+    setNotices(getMockActiveNotices());
   }, [allowed]);
 
   const noticeUids = useMemo(() => new Set(notices.map((n) => n.employeeUid)), [notices]);
@@ -335,7 +285,7 @@ export default function ActiveEmployeesPage() {
                 <button
                   type="button"
                   className={styles.rowBtn}
-                  onClick={() => router.push(`/people/onboarding/${row.uid}`)}
+                  onClick={() => router.push(`/people/active/${row.uid}`)}
                 >
                   <span className={styles.rowMain}>
                     <span className={styles.rowName}>{row.name}</span>
