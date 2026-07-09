@@ -469,20 +469,23 @@ export default function TimesheetsPage() {
                   className={styles.attentionMain}
                 >
                   <span className={styles.attentionAvatar}>{initialsOf(item.name)}</span>
-                  <div className={styles.attentionBody}>
-                    <p className={styles.attentionName}>{item.name}</p>
+                  <p className={styles.attentionName}>{item.name}</p>
+                </Link>
+                <div className={styles.attentionDetailRow}>
+                  <div className={styles.attentionDetailText}>
                     <p className={styles.attentionMeta}>
                       {trainingEndStatusLabel(item.trainingEndISO, todayISO)}
                     </p>
-                    <p className={styles.attentionRate}>
-                      Current rate: {fmtRateHr(item.currentRate)} → New rate:{" "}
+                    <p className={styles.attentionRateLine}>
+                      Current rate: {fmtRateHr(item.currentRate)} →
+                    </p>
+                    <p className={styles.attentionRateLine}>
+                      New rate:{" "}
                       <strong className={styles.attentionRateNew}>
                         {fmtRateHr(item.newRate)}
                       </strong>
                     </p>
                   </div>
-                </Link>
-                <div className={styles.attentionActions}>
                   <button
                     type="button"
                     className={styles.attentionStopBtn}

@@ -133,10 +133,9 @@
   gap: var(--space-2);
 }
 .attentionRow {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: center;
   padding: var(--space-2) 0 0;
   border-top: 1px solid color-mix(in srgb, var(--color-warm) 18%, var(--color-border));
 }
@@ -146,7 +145,7 @@
 }
 .attentionMain {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-2);
   min-width: 0;
   text-decoration: none;
@@ -166,36 +165,42 @@
   font-weight: 700;
   flex-shrink: 0;
 }
-.attentionBody { min-width: 0; }
 .attentionName {
   font-family: var(--font-display);
   font-size: var(--font-size-sm);
   font-weight: 800;
   color: var(--color-fg);
   margin: 0;
+  min-width: 0;
+}
+.attentionDetailRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 34%);
+  gap: var(--space-3);
+  align-items: end;
+  padding-left: calc(40px + var(--space-2));
+}
+.attentionDetailText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 .attentionMeta {
   font-size: 11px;
   color: var(--color-fg-muted);
-  margin: 2px 0 0;
+  margin: 0;
+  line-height: 1.35;
 }
-.attentionRate {
+.attentionRateLine {
   font-size: 11px;
   color: var(--color-fg-muted);
-  margin: 4px 0 0;
-  line-height: 1.4;
+  margin: 0;
+  line-height: 1.35;
 }
 .attentionRateNew {
   color: var(--color-warm);
   font-weight: 800;
-}
-.attentionActions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  flex-shrink: 0;
-  max-width: 42%;
 }
 .attentionStopBtn {
   background: transparent;
@@ -208,6 +213,8 @@
   font-family: inherit;
   text-align: right;
   line-height: 1.35;
+  align-self: end;
+  max-width: 100%;
 }
 .attentionStopBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
