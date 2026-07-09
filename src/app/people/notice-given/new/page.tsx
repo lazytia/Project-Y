@@ -415,7 +415,7 @@ export default function NoticeGivenNewPage() {
 
             {staffLoading && <p className={styles.pickerMeta}>Loading…</p>}
             {!staffLoading && filteredStaff.length === 0 && (
-              <p className={styles.pickerMeta}>No active employees found.</p>
+              <p className={styles.pickerMeta}>No employees found.</p>
             )}
 
             <ul className={styles.pickerList}>

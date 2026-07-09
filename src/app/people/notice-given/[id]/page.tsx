@@ -8,14 +8,13 @@ import {
   doc,
   getDoc,
   getDocs,
-  query,
   serverTimestamp,
   updateDoc,
-  where,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isOwner, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
+import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
@@ -153,28 +152,40 @@ export default function NoticeGivenEditPage({
     if (!allowed) return;
     (async () => {
       try {
-        const snap = await getDocs(
-          query(collection(getDb(), "staff_onboarding"), where("status", "==", "active")),
-        );
+        // Pull the whole staff_onboarding collection and drop only the
+        // real business owners (Tia, Yurica) — managers, chefs, and
+        // mid-onboarding staff all belong in the picker. Filtering on
+        // role="owner" would hide managers like Yurina since Auth stamps
+        // her with owner-level UI access.
+        const snap = await getDocs(collection(getDb(), "staff_onboarding"));
         const list: StaffMember[] = snap.docs
           .map((d) => {
             const data = d.data();
-            if (data.role === "owner") return null;
+            const rawUsername =
+              (typeof data.username === "string" && data.username) ||
+              emailToUsername(typeof data.email === "string" ? data.email : "");
+            if (STRICT_OWNER_USERNAMES.has(rawUsername.toLowerCase())) return null;
+            const fullName =
+              typeof data.fullName === "string" ? data.fullName.trim() : "";
             const f = ((data.firstName as string) ?? "").trim();
             const l = ((data.lastName as string) ?? "").trim();
             const name =
-              f || l
+              fullName ||
+              (f || l
                 ? `${f}${f && l ? " " : ""}${l}`
-                : ((data.username as string) ?? d.id.slice(0, 6));
+                : (rawUsername || d.id.slice(0, 6)));
             const role = (data.role as string) ?? "";
+            const positionField =
+              typeof data.position === "string" ? data.position.trim() : "";
             const position =
-              role === "manager"
+              positionField ||
+              (role === "manager"
                 ? "Manager"
                 : role === "chef"
                 ? "Kitchen Staff"
                 : role
                 ? role.charAt(0).toUpperCase() + role.slice(1)
-                : "Staff";
+                : "Staff");
             return { uid: d.id, name, position };
           })
           .filter((x): x is StaffMember => x !== null);
@@ -483,7 +494,7 @@ export default function NoticeGivenEditPage({
 
             {staffLoading && <p className={styles.pickerMeta}>Loading…</p>}
             {!staffLoading && filteredStaff.length === 0 && (
-              <p className={styles.pickerMeta}>No active employees found.</p>
+              <p className={styles.pickerMeta}>No employees found.</p>
             )}
 
             <ul className={styles.pickerList}>
