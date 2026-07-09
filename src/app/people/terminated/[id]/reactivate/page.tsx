@@ -21,7 +21,7 @@ import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 const POSITIONS = ["Hall Staff", "Kitchen Staff", "Hall Manager", "Chef"] as const;
-const DEPARTMENTS = ["Hall", "Kitchen"] as const;
+const VISA_TYPES = ["Student", "Residence", "Working Holiday"] as const;
 const EMPLOYMENT_TYPES = ["Casual", "Part-time", "Full-time"] as const;
 const LOCATIONS = ["Hall", "Kitchen"] as const;
 const NOTE_MAX = 200;
@@ -52,7 +52,7 @@ export default function ReactivateEmployeePage() {
 
   const [rehireDate, setRehireDate] = useState(todayIso());
   const [position, setPosition] = useState<string>(POSITIONS[0]);
-  const [department, setDepartment] = useState<string>(DEPARTMENTS[0]);
+  const [visaType, setVisaType] = useState<string>(VISA_TYPES[0]);
   const [employmentType, setEmploymentType] = useState<string>(EMPLOYMENT_TYPES[0]);
   const [rate, setRate] = useState("");
   const [workLocation, setWorkLocation] = useState<string>(LOCATIONS[0]);
@@ -111,7 +111,17 @@ export default function ReactivateEmployeePage() {
               typeof raw.terminatedByName === "string" ? raw.terminatedByName : "",
           });
           setPosition(pos);
-          setDepartment(pos.toLowerCase().includes("kitchen") ? "Kitchen" : "Hall");
+          const existingVisa =
+            typeof raw.visaType === "string" && raw.visaType.trim()
+              ? raw.visaType.trim()
+              : typeof raw.visa === "string" && raw.visa.trim()
+                ? raw.visa.trim()
+                : VISA_TYPES[0];
+          setVisaType(
+            (VISA_TYPES as readonly string[]).includes(existingVisa)
+              ? existingVisa
+              : VISA_TYPES[0],
+          );
           setWorkLocation(pos.toLowerCase().includes("kitchen") ? "Kitchen" : "Hall");
           if (rateVal !== null) setRate(rateVal.toFixed(2));
         }
@@ -130,7 +140,7 @@ export default function ReactivateEmployeePage() {
     return (
       !!rehireDate &&
       !!position &&
-      !!department &&
+      !!visaType &&
       !!employmentType &&
       !!workLocation &&
       !Number.isNaN(parsed) &&
@@ -138,7 +148,7 @@ export default function ReactivateEmployeePage() {
       confirmed &&
       !saving
     );
-  }, [rehireDate, position, department, employmentType, workLocation, rate, confirmed, saving]);
+  }, [rehireDate, position, visaType, employmentType, workLocation, rate, confirmed, saving]);
 
   async function handleReactivate() {
     if (!staff || !canSubmit) return;
@@ -166,7 +176,7 @@ export default function ReactivateEmployeePage() {
         {
           status: "active",
           position,
-          department,
+          visaType,
           employmentType,
           workLocation,
           afterTrainingRate: parsedRate,
@@ -259,11 +269,11 @@ export default function ReactivateEmployeePage() {
 
         <div className={styles.field}>
           <label className={styles.fieldLabel}>
-            Department <span className={styles.required}>*</span>
+            Visa Type <span className={styles.required}>*</span>
           </label>
-          <select className={styles.select} value={department} onChange={(e) => setDepartment(e.target.value)}>
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
+          <select className={styles.select} value={visaType} onChange={(e) => setVisaType(e.target.value)}>
+            {VISA_TYPES.map((v) => (
+              <option key={v} value={v}>{v}</option>
             ))}
           </select>
         </div>

@@ -543,7 +543,7 @@ export default function EmployeeDetailPage() {
           <section className={styles.employmentCard}>
             <EmploymentRow label="Rehire Date" value={fmtDateWithDay(staff.rehireDate)} accent />
             <EmploymentRow label="Position" value={staff.positionLabel} />
-            <EmploymentRow label="Department" value={staff.department} />
+            <EmploymentRow label="Visa Type" value={staff.visaType} />
             <EmploymentRow label="Work Location" value={staff.workLocation} />
             <EmploymentRow label="Employment Type" value={staff.employmentType} />
             <EmploymentRow
