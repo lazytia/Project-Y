@@ -392,24 +392,25 @@ export default function TimesheetsPage() {
 
   async function stopReminder(item: PayrollAttentionItem) {
     setAttentionBusy(item.staffUid);
+    setPayrollStaff((prev) =>
+      prev.map((r) =>
+        r.uid === item.staffUid
+          ? {
+              ...r,
+              payrollRateNotedFor: item.trainingEndISO,
+              payrollRateReminderActive: false,
+            }
+          : r,
+      ),
+    );
     try {
       await updateDoc(doc(getDb(), "staff_onboarding", item.staffUid), {
         payrollRateNotedFor: item.trainingEndISO,
         payrollRateReminderActive: false,
       });
-      setPayrollStaff((prev) =>
-        prev.map((r) =>
-          r.uid === item.staffUid
-            ? {
-                ...r,
-                payrollRateNotedFor: item.trainingEndISO,
-                payrollRateReminderActive: false,
-              }
-            : r,
-        ),
-      );
     } catch (err) {
       console.error("[timesheets] stop reminder failed:", err);
+      void loadStaff();
     } finally {
       setAttentionBusy(null);
     }
@@ -466,10 +467,9 @@ export default function TimesheetsPage() {
               <li key={item.staffUid} className={styles.attentionRow}>
                 <Link
                   href={`/people/active/${item.staffUid}`}
-                  className={styles.attentionMain}
+                  className={styles.attentionNameLink}
                 >
-                  <span className={styles.attentionAvatar}>{initialsOf(item.name)}</span>
-                  <p className={styles.attentionName}>{item.name}</p>
+                  {item.name}
                 </Link>
                 <div className={styles.attentionDetailRow}>
                   <div className={styles.attentionDetailText}>
@@ -477,10 +477,7 @@ export default function TimesheetsPage() {
                       {trainingEndStatusLabel(item.trainingEndISO, todayISO)}
                     </p>
                     <p className={styles.attentionRateLine}>
-                      Current rate: {fmtRateHr(item.currentRate)} →
-                    </p>
-                    <p className={styles.attentionRateLine}>
-                      New rate:{" "}
+                      Current rate: {fmtRateHr(item.currentRate)} → New rate:{" "}
                       <strong className={styles.attentionRateNew}>
                         {fmtRateHr(item.newRate)}
                       </strong>
@@ -490,6 +487,7 @@ export default function TimesheetsPage() {
                     type="button"
                     className={styles.attentionStopBtn}
                     disabled={attentionBusy === item.staffUid}
+                    aria-label={`Stop payroll reminder for ${item.name}`}
                     onClick={() => void stopReminder(item)}
                   >
                     {attentionBusy === item.staffUid
