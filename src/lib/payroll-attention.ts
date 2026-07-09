@@ -8,20 +8,19 @@ export type PayrollStaffRecord = {
   trainingPeriod: string;
   trainingRate: number | null;
   afterTrainingRate: number | null;
-  squareTeamMemberId: string;
   payrollRateNotedFor: string;
+  payrollRateReminderActive: boolean;
+  accountCreated: boolean;
   status: string;
 };
 
 export type PayrollAttentionItem = {
   staffUid: string;
-  teamMemberId: string;
   name: string;
   position: string;
   trainingEndISO: string;
   currentRate: number;
   newRate: number;
-  noted: boolean;
 };
 
 function addDaysISO(iso: string, n: number): string {
@@ -29,6 +28,11 @@ function addDaysISO(iso: string, n: number): string {
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + n);
   return dt.toISOString().slice(0, 10);
+}
+
+function isApprovedStatus(status: string): boolean {
+  const s = status.toLowerCase();
+  return s === "approved" || s === "active";
 }
 
 /** Last day of the training period (inclusive), based on start date + period length. */
@@ -40,65 +44,49 @@ export function trainingEndDateISO(startISO: string, period: string): string | n
   return addDaysISO(startISO, extraDays);
 }
 
-function ratesEqual(a: number, b: number): boolean {
-  return Math.abs(a - b) < 0.005;
+export function isPayrollReminderEligible(row: PayrollStaffRecord): boolean {
+  if (!row.accountCreated || !isApprovedStatus(row.status)) return false;
+  if (row.payrollRateReminderActive === false) return false;
+  if (row.trainingRate == null || row.afterTrainingRate == null) return false;
+  if (row.afterTrainingRate <= row.trainingRate) return false;
+  if (row.trainingPeriod === "Until Fully Trained") return false;
+  return true;
 }
 
 /**
- * Returns true when this employee should appear in Payroll Attention for the
- * selected timesheet range.
+ * Returns true when this approved employee should appear in Payroll Attention
+ * for the selected timesheet range.
  */
 export function shouldShowPayrollAttention(
   trainingEndISO: string | null,
-  trainingRate: number | null,
-  afterRate: number | null,
   rangeStart: string,
   rangeEnd: string,
-  squareRateDollars: number | null,
+  dismissedFor: string,
 ): boolean {
-  if (!trainingEndISO || trainingRate == null || afterRate == null) return false;
-  if (afterRate <= trainingRate) return false;
-
-  const endsInRange = trainingEndISO >= rangeStart && trainingEndISO <= rangeEnd;
-  const endedAndStillOnTrainingRate =
-    trainingEndISO <= rangeEnd &&
-    squareRateDollars !== null &&
-    ratesEqual(squareRateDollars, trainingRate) &&
-    !ratesEqual(squareRateDollars, afterRate);
-
-  if (!endsInRange && !endedAndStillOnTrainingRate) return false;
-
-  if (squareRateDollars !== null && ratesEqual(squareRateDollars, afterRate)) {
-    return false;
-  }
-
-  return true;
+  if (!trainingEndISO) return false;
+  if (dismissedFor === trainingEndISO) return false;
+  return trainingEndISO >= rangeStart && trainingEndISO <= rangeEnd;
 }
 
 export function buildPayrollAttentionItems(
   staff: PayrollStaffRecord[],
   rangeStart: string,
   rangeEnd: string,
-  squareRateByMember: Record<string, number | null>,
 ): PayrollAttentionItem[] {
   const items: PayrollAttentionItem[] = [];
 
   for (const row of staff) {
-    if (!row.squareTeamMemberId) continue;
     const status = (row.status ?? "").toLowerCase();
     if (status === "terminated") continue;
+    if (!isPayrollReminderEligible(row)) continue;
 
     const trainingEndISO = trainingEndDateISO(row.startDate, row.trainingPeriod);
-    const squareRate = squareRateByMember[row.squareTeamMemberId] ?? null;
-
     if (
       !shouldShowPayrollAttention(
         trainingEndISO,
-        row.trainingRate,
-        row.afterTrainingRate,
         rangeStart,
         rangeEnd,
-        squareRate,
+        row.payrollRateNotedFor,
       )
     ) {
       continue;
@@ -106,13 +94,11 @@ export function buildPayrollAttentionItems(
 
     items.push({
       staffUid: row.uid,
-      teamMemberId: row.squareTeamMemberId,
       name: row.name,
       position: row.position,
       trainingEndISO: trainingEndISO!,
       currentRate: row.trainingRate!,
       newRate: row.afterTrainingRate!,
-      noted: row.payrollRateNotedFor === trainingEndISO,
     });
   }
 
@@ -126,4 +112,21 @@ export function fmtTrainingEndLabel(iso: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+export function shouldActivatePayrollReminder(raw: {
+  trainingRate?: unknown;
+  afterTrainingRate?: unknown;
+  trainingPeriod?: unknown;
+}): boolean {
+  const trainingRate =
+    typeof raw.trainingRate === "number" ? raw.trainingRate : null;
+  const afterTrainingRate =
+    typeof raw.afterTrainingRate === "number" ? raw.afterTrainingRate : null;
+  const trainingPeriod =
+    typeof raw.trainingPeriod === "string" ? raw.trainingPeriod : "";
+  if (trainingRate == null || afterTrainingRate == null) return false;
+  if (afterTrainingRate <= trainingRate) return false;
+  if (trainingPeriod === "Until Fully Trained") return false;
+  return true;
 }

@@ -16,6 +16,7 @@ import { isOwner } from "@/lib/permissions";
 import {
   buildPayrollAttentionItems,
   fmtTrainingEndLabel,
+  shouldActivatePayrollReminder,
   type PayrollAttentionItem,
   type PayrollStaffRecord,
 } from "@/lib/payroll-attention";
@@ -286,10 +287,10 @@ export default function TimesheetsPage() {
           trainingRate: typeof raw.trainingRate === "number" ? raw.trainingRate : null,
           afterTrainingRate:
             typeof raw.afterTrainingRate === "number" ? raw.afterTrainingRate : null,
-          squareTeamMemberId:
-            typeof raw.squareTeamMemberId === "string" ? raw.squareTeamMemberId : "",
           payrollRateNotedFor:
             typeof raw.payrollRateNotedFor === "string" ? raw.payrollRateNotedFor : "",
+          payrollRateReminderActive: raw.payrollRateReminderActive !== false,
+          accountCreated: !!raw.accountCreated,
           status: typeof raw.status === "string" ? raw.status : "",
         };
       });
@@ -374,83 +375,31 @@ export default function TimesheetsPage() {
     };
   }, [shifts, teamMembers, startISO, endISO]);
 
-  const squareRateByMember = useMemo(() => {
-    const latest: Record<string, { startAt: string; rate: number }> = {};
-    for (const s of shifts) {
-      if (typeof s.hourlyRateCents !== "number") continue;
-      const prev = latest[s.teamMemberId];
-      if (!prev || s.startAt > prev.startAt) {
-        latest[s.teamMemberId] = { startAt: s.startAt, rate: s.hourlyRateCents / 100 };
-      }
-    }
-    const out: Record<string, number | null> = {};
-    for (const [id, v] of Object.entries(latest)) out[id] = v.rate;
-    return out;
-  }, [shifts]);
-
   const attentionItems = useMemo(() => {
     if (!startISO || !endISO) return [] as PayrollAttentionItem[];
-    return buildPayrollAttentionItems(payrollStaff, startISO, endISO, squareRateByMember);
-  }, [payrollStaff, startISO, endISO, squareRateByMember]);
+    return buildPayrollAttentionItems(payrollStaff, startISO, endISO);
+  }, [payrollStaff, startISO, endISO]);
 
-  async function markNoted(item: PayrollAttentionItem) {
-    setAttentionBusy(`${item.staffUid}:noted`);
+  async function stopReminder(item: PayrollAttentionItem) {
+    setAttentionBusy(item.staffUid);
     try {
       await updateDoc(doc(getDb(), "staff_onboarding", item.staffUid), {
         payrollRateNotedFor: item.trainingEndISO,
-      });
-      setPayrollStaff((prev) =>
-        prev.map((r) =>
-          r.uid === item.staffUid ? { ...r, payrollRateNotedFor: item.trainingEndISO } : r,
-        ),
-      );
-    } catch (err) {
-      console.error("[timesheets] mark noted failed:", err);
-    } finally {
-      setAttentionBusy(null);
-    }
-  }
-
-  async function updateSquareRate(item: PayrollAttentionItem) {
-    if (!user) return;
-    setAttentionBusy(`${item.staffUid}:update`);
-    try {
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/square/update-wage", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          teamMemberId: item.teamMemberId,
-          hourlyRateCents: Math.round(item.newRate * 100),
-          jobTitle: item.position,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? `Update failed (${res.status})`);
-
-      await updateDoc(doc(getDb(), "staff_onboarding", item.staffUid), {
-        trainingRate: item.newRate,
-        payrollRateNotedFor: item.trainingEndISO,
-        payrollRateUpdatedAt: serverTimestamp(),
+        payrollRateReminderActive: false,
       });
       setPayrollStaff((prev) =>
         prev.map((r) =>
           r.uid === item.staffUid
             ? {
                 ...r,
-                trainingRate: item.newRate,
                 payrollRateNotedFor: item.trainingEndISO,
+                payrollRateReminderActive: false,
               }
             : r,
         ),
       );
-      void load();
     } catch (err) {
-      console.error("[timesheets] update wage failed:", err);
-      setFetchError(err instanceof Error ? err.message : "Wage update failed.");
+      console.error("[timesheets] stop reminder failed:", err);
     } finally {
       setAttentionBusy(null);
     }
@@ -494,8 +443,8 @@ export default function TimesheetsPage() {
                 <p className={styles.attentionEyebrow}>PAYROLL ATTENTION</p>
                 <p className={styles.attentionTitle}>
                   {attentionItems.length === 1
-                    ? "1 employee requires wage increase"
-                    : `${attentionItems.length} employees require wage increase`}
+                    ? "1 employee may require wage increase"
+                    : `${attentionItems.length} employees may require wage increase`}
                 </p>
               </div>
             </div>
@@ -524,25 +473,15 @@ export default function TimesheetsPage() {
                   </div>
                 </Link>
                 <div className={styles.attentionActions}>
-                  {item.noted ? (
-                    <span className={styles.attentionNotedLabel}>Noted</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.attentionNotedBtn}
-                      disabled={attentionBusy === `${item.staffUid}:noted`}
-                      onClick={() => void markNoted(item)}
-                    >
-                      {attentionBusy === `${item.staffUid}:noted` ? "…" : "Noted"}
-                    </button>
-                  )}
                   <button
                     type="button"
-                    className={styles.attentionUpdateBtn}
-                    disabled={attentionBusy === `${item.staffUid}:update`}
-                    onClick={() => void updateSquareRate(item)}
+                    className={styles.attentionStopBtn}
+                    disabled={attentionBusy === item.staffUid}
+                    onClick={() => void stopReminder(item)}
                   >
-                    {attentionBusy === `${item.staffUid}:update` ? "Updating…" : "Update Rate"}
+                    {attentionBusy === item.staffUid
+                      ? "…"
+                      : "New rate applied. Stop the reminder."}
                   </button>
                 </div>
               </li>

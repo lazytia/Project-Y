@@ -193,38 +193,23 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-1);
+  justify-content: center;
   flex-shrink: 0;
+  max-width: 42%;
 }
-.attentionNotedLabel {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-fg-muted);
-}
-.attentionNotedBtn {
+.attentionStopBtn {
   background: transparent;
   border: none;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-fg-muted);
-  cursor: pointer;
-  font-family: inherit;
   padding: 0;
-}
-.attentionNotedBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-.attentionUpdateBtn {
-  padding: 6px 12px;
-  background: transparent;
-  border: 1px solid var(--color-warm);
-  border-radius: 999px;
-  color: var(--color-warm);
   font-size: 11px;
   font-weight: 700;
+  color: var(--color-warm);
   cursor: pointer;
   font-family: inherit;
-  white-space: nowrap;
+  text-align: right;
+  line-height: 1.35;
 }
-.attentionUpdateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.attentionStopBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── filter card ── */
 .filterCard {

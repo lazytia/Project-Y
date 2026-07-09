@@ -13,7 +13,7 @@ import {
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isStrictOwner } from "@/lib/permissions";
-import { ROUTES } from "@/lib/routes";
+import { shouldActivatePayrollReminder } from "@/lib/payroll-attention";
 import { createStaffAccount } from "@/lib/staff-admin";
 import { emailToUsername, usernameToEmail, validateUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -220,6 +220,7 @@ export default function CreateLoginDetailsPage() {
           approvedByUid: user?.uid ?? null,
           approvedByName: requesterName(user?.email),
           accountCreated: true,
+          payrollRateReminderActive: shouldActivatePayrollReminder(rawRequest),
           addedToScheduling: false,
           invitationStatus: invite ? "sent" : "saved",
           invitationSentAt: invite ? serverTimestamp() : null,
