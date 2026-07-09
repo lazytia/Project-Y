@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { isOnboardingListEmployee } from "@/lib/staff-active";
 import { registerFcmToken } from "@/lib/fcm";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -187,8 +188,13 @@ export default function ManagerOnboardingPage() {
           };
         });
         if (cancelled) return;
-        const staffOnly = data.filter(
-          (r) => r.role !== "owner" && r.status !== "active",
+        const staffOnly = data.filter((r) =>
+          isOnboardingListEmployee({
+            status: r.status,
+            role: r.role,
+            accountCreated: r.accountCreated,
+            addedToScheduling: r.addedToScheduling,
+          }),
         );
         staffOnly.sort((a, b) => {
           const at = a.startDate?.getTime() ?? Infinity;

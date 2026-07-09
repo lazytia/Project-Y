@@ -14,14 +14,14 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
-import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
+import { isActiveEmployee } from "@/lib/staff-active";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 /**
- * Owner-only Active Employees screen. Lists everyone whose onboarding is
- * complete (`status === "active"`), with a stats card, a Needs-Attention
- * summary (visa expiring / birthday / notice given) and a filterable list.
+ * Owner-only Active Employees screen. Lists everyone who has completed
+ * onboarding (added to scheduling and approved by the owner), with a stats
+ * card, a Needs-Attention summary and a filterable list.
  */
 
 type Staff = {
@@ -61,6 +61,8 @@ type StoredStaff = {
   dateOfBirth?: string;
   trainingRate?: number;
   afterTrainingRate?: number;
+  accountCreated?: boolean;
+  addedToScheduling?: boolean;
   documents?: { visaExpiry?: Timestamp | string | null };
   visaExpiry?: Timestamp | string | null;
   approvedAt?: Timestamp | null;
@@ -207,6 +209,7 @@ export default function ActiveEmployeesPage() {
           .map((d) => {
             const raw = d.data() as StoredStaff;
             if (!isTeamMember(raw)) return null;
+            if (!isActiveEmployee(raw)) return null;
             const { kind, label } = positionOf(raw);
             const rate =
               typeof raw.afterTrainingRate === "number"

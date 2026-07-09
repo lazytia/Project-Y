@@ -14,6 +14,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isStrictOwner } from "@/lib/permissions";
 import { shouldActivatePayrollReminder } from "@/lib/payroll-attention";
+import { onboardingProgressPatch } from "@/lib/staff-active";
 import { createStaffAccount } from "@/lib/staff-admin";
 import { emailToUsername, usernameToEmail, validateUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -201,6 +202,7 @@ export default function CreateLoginDetailsPage() {
       });
 
       const mobileDigits = mobileLocal.replace(/\D/g, "");
+      const progress = onboardingProgressPatch(rawRequest, { accountCreated: true });
 
       await setDoc(
         doc(getDb(), "staff_onboarding", uid),
@@ -215,13 +217,13 @@ export default function CreateLoginDetailsPage() {
           squareStaffId: squareStaffId.trim() || null,
           squareTeamMemberId: squareTeamMemberId,
           useSquareStaffIdForClockIn: useSquareClockIn,
-          status: "approved",
+          status: progress.status,
           approvedAt: serverTimestamp(),
           approvedByUid: user?.uid ?? null,
           approvedByName: requesterName(user?.email),
-          accountCreated: true,
+          accountCreated: progress.accountCreated,
           payrollRateReminderActive: shouldActivatePayrollReminder(rawRequest),
-          addedToScheduling: false,
+          addedToScheduling: progress.addedToScheduling,
           invitationStatus: invite ? "sent" : "saved",
           invitationSentAt: invite ? serverTimestamp() : null,
           updatedAt: serverTimestamp(),

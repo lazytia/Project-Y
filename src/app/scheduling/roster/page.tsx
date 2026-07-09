@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { collection, doc, getDocs, setDoc, type Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import {
@@ -11,6 +11,7 @@ import {
   type Decision,
   type PublishShift,
 } from "@/lib/manager-actions";
+import { onboardingProgressPatch, type StaffOnboardingFlags } from "@/lib/staff-active";
 import { isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -706,6 +707,20 @@ export default function ManagerRosterPage() {
     const cur = assignedFor(modalCell.iso, modalCell.meal, modalCell.weekKey);
     if (cur[uid] === startTime) return;
     await saveAssignments(modalCell.weekKey, modalCell.iso, modalCell.meal, { ...cur, [uid]: startTime });
+    if (!uid.startsWith("tr_")) {
+      try {
+        const ref = doc(getDb(), "staff_onboarding", uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const raw = snap.data() as StaffOnboardingFlags;
+          const progress = onboardingProgressPatch(raw, { addedToScheduling: true });
+          await updateDoc(ref, { ...progress, updatedAt: serverTimestamp() });
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("[roster] addedToScheduling update failed", err);
+      }
+    }
   }
 
   async function removeStaff(uid: string) {
