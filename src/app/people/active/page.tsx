@@ -14,14 +14,15 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
+import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import { isActiveEmployee } from "@/lib/staff-active";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 /**
- * Owner-only Active Employees screen. Lists everyone who has completed
- * onboarding (added to scheduling and approved by the owner), with a stats
- * card, a Needs-Attention summary and a filterable list.
+ * Owner-only Active Employees screen. Lists everyone the owner has approved
+ * (account created), with a stats card, a Needs-Attention summary and a
+ * filterable list.
  */
 
 type Staff = {
@@ -200,12 +201,10 @@ export default function ActiveEmployeesPage() {
     let cancelled = false;
 
     (async () => {
+      let rows: Staff[] = [];
       try {
-        // Pull every staff_onboarding doc and drop only the owner accounts.
-        // This surface is the single roster view — mid-onboarding staff and
-        // brand-new hires who haven't opened the form yet both show up.
         const staffSnap = await getDocs(collection(getDb(), "staff_onboarding"));
-        const rows: Staff[] = staffSnap.docs
+        rows = staffSnap.docs
           .map((d) => {
             const raw = d.data() as StoredStaff;
             if (!isTeamMember(raw)) return null;
@@ -230,19 +229,18 @@ export default function ActiveEmployeesPage() {
           .filter((r): r is Staff => r !== null);
 
         rows.sort((a, b) => a.name.localeCompare(b.name));
+      } catch (err) {
+        console.error("[active] staff load failed:", err);
+        rows = [];
+      }
 
-        // Load every outstanding notice — the terminate flow deletes the
-        // row when the owner confirms, so anything still here is either
-        // Notice Given (last-day upcoming or unset) or Ready to Terminate
-        // (last-day already passed but not yet confirmed).
+      let noticeList: Notice[] = [];
+      try {
         const noticeSnap = await getDocs(
           query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
         );
-        const noticeList: Notice[] = noticeSnap.docs.map((d) => {
+        noticeList = noticeSnap.docs.map((d) => {
           const data = d.data() as StoredNotice;
-          // The form writes the chosen date to finalShiftDate — the
-          // lastWorkingDay column stays empty on new rows for legacy
-          // schema compat, so we prefer whichever is populated.
           const lastDay = noticeLastWorkingDay(data);
           return {
             id: d.id,
@@ -251,16 +249,14 @@ export default function ActiveEmployeesPage() {
             lastWorkingDay: lastDay,
           };
         });
-
-        if (cancelled) return;
-        setStaff(rows);
-        setNotices(noticeList);
-      } catch {
-        if (!cancelled) {
-          setStaff([]);
-          setNotices([]);
-        }
+      } catch (err) {
+        console.error("[active] notice_given load failed:", err);
+        noticeList = [];
       }
+
+      if (cancelled) return;
+      setStaff(rows);
+      setNotices(noticeList);
     })();
 
     return () => {

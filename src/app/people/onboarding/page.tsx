@@ -194,6 +194,9 @@ export default function ManagerOnboardingPage() {
             role: r.role,
             accountCreated: r.accountCreated,
             addedToScheduling: r.addedToScheduling,
+            approvedAt: r.approvedAt,
+            username: r.username,
+            email: r.email,
           }),
         );
         staffOnly.sort((a, b) => {

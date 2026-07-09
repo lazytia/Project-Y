@@ -5,13 +5,27 @@ export type StaffOnboardingFlags = {
   role?: string;
   accountCreated?: boolean;
   addedToScheduling?: boolean;
+  approvedAt?: unknown;
+  username?: string;
+  email?: string;
 };
+
+/** Matches the owner-approval rule used on /people/onboarding. */
+export function isOwnerApproved(raw: StaffOnboardingFlags): boolean {
+  const status = (raw.status ?? "").toLowerCase();
+  return status === "approved" || status === "active" || !!raw.approvedAt || !!raw.accountCreated;
+}
 
 export function isActiveEmployee(raw: StaffOnboardingFlags): boolean {
   const status = (raw.status ?? "").toLowerCase();
   if (status === "terminated") return false;
-  if (status === "active") return true;
-  return !!(raw.accountCreated && raw.addedToScheduling);
+  if (isOwnerApproved(raw)) return true;
+
+  // Legacy hires stored before approval flags — keep anyone with a login
+  // who is not still a pending manager request.
+  const pending = status === "waiting for documents";
+  const hasLogin = !!(raw.username?.trim() || raw.email?.trim());
+  return hasLogin && !pending;
 }
 
 export function isOnboardingListEmployee(raw: StaffOnboardingFlags): boolean {
@@ -20,11 +34,8 @@ export function isOnboardingListEmployee(raw: StaffOnboardingFlags): boolean {
   return !isActiveEmployee(raw);
 }
 
-export function staffStatusAfterOnboardingSteps(
-  accountCreated: boolean,
-  addedToScheduling: boolean,
-): "active" | "approved" {
-  return accountCreated && addedToScheduling ? "active" : "approved";
+export function staffStatusAfterOnboardingSteps(accountCreated: boolean): "active" | "approved" {
+  return accountCreated ? "active" : "approved";
 }
 
 /** Merge scheduling / approval progress and derive the next status. */
@@ -37,6 +48,6 @@ export function onboardingProgressPatch(
   return {
     accountCreated,
     addedToScheduling,
-    status: staffStatusAfterOnboardingSteps(accountCreated, addedToScheduling),
+    status: staffStatusAfterOnboardingSteps(accountCreated),
   };
 }
