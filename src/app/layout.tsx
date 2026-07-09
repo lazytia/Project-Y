@@ -42,6 +42,24 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <head>
+        {/* Boot splash must paint before layout.css downloads — otherwise users
+            see a long blank white screen on cold start / slow networks. */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              .bootSplash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fff}
+              .bootSplashHidden{display:none!important}
+              .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
+              .bootSplashMark{color:#fff;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:40px;line-height:1}
+              .bootSplashWordmark{font-family:Arial,sans-serif;font-size:16px;font-weight:600;color:#111;letter-spacing:.04em}
+              .bootSplashDots{display:flex;gap:6px;margin-top:8px}
+              .bootSplashDots span{width:6px;height:6px;border-radius:50%;background:#6E6E73;animation:bootDotBounce 1.2s ease-in-out infinite}
+              .bootSplashDots span:nth-child(2){animation-delay:.15s}
+              .bootSplashDots span:nth-child(3){animation-delay:.3s}
+              @keyframes bootDotBounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
+            `,
+          }}
+        />
         <link rel="preconnect" href="https://firebase.googleapis.com" />
         <link rel="preconnect" href="https://firestore.googleapis.com" />
         <link rel="dns-prefetch" href="https://www.googleapis.com" />
