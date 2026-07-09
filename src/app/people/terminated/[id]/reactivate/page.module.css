@@ -8,6 +8,26 @@
   gap: var(--space-4);
 }
 
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 6px var(--space-2) 6px 4px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.backBtn:hover {
+  color: var(--color-fg);
+}
+
 .intro {
   display: flex;
   flex-direction: column;

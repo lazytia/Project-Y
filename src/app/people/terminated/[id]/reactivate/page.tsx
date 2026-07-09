@@ -212,6 +212,7 @@ export default function ReactivateEmployeePage() {
   if (notFound) {
     return (
       <div className={styles.page}>
+        <BackButton onClick={() => router.back()} />
         <p className={styles.notFound}>Employee not found.</p>
       </div>
     );
@@ -222,6 +223,10 @@ export default function ReactivateEmployeePage() {
 
   return (
     <div className={styles.page}>
+      <BackButton
+        onClick={() => router.push(`/people/terminated/${staff.uid}`)}
+      />
+
       <header className={styles.intro}>
         <h1 className={styles.pageTitle}>Reactivate Employee</h1>
         <p className={styles.pageDesc}>Provide the details below to reactivate this employee.</p>
@@ -400,6 +405,17 @@ export default function ReactivateEmployeePage() {
         </div>
       )}
     </div>
+  );
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className={styles.backBtn} onClick={onClick} aria-label="Back">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="15 18 9 12 15 6" />
+      </svg>
+      Back
+    </button>
   );
 }
 
