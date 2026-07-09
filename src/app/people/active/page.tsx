@@ -354,21 +354,18 @@ export default function ActiveEmployeesPage() {
             icon={<TriangleAlertIcon />}
             count={attention.visa.length}
             title="Visa Expiring"
-            subtitle={`< ${VISA_WINDOW_DAYS} days`}
             onReview={() => setTab("visa")}
           />
           <AttentionRow
             icon={<CakeIcon />}
             count={attention.birthday.length}
             title="Birthday Coming Up"
-            subtitle={`< ${BIRTHDAY_WINDOW_DAYS} days`}
             onReview={() => setTab("birthday")}
           />
           <AttentionRow
             icon={<NoteIcon />}
             count={attention.notice.length}
             title="Notice Given"
-            subtitle={`${attention.notice.length} employee${attention.notice.length === 1 ? "" : "s"} have given notice`}
             onReview={() => setTab("notice")}
             last
           />
@@ -518,14 +515,12 @@ function AttentionRow({
   icon,
   count,
   title,
-  subtitle,
   onReview,
   last = false,
 }: {
   icon: React.ReactNode;
   count: number;
   title: string;
-  subtitle: string;
   onReview: () => void;
   last?: boolean;
 }) {
@@ -533,10 +528,7 @@ function AttentionRow({
     <li className={last ? styles.attnRowLast : styles.attnRow}>
       <span className={styles.attnRowIcon} aria-hidden="true">{icon}</span>
       <span className={styles.attnRowCount}>{count}</span>
-      <span className={styles.attnRowText}>
-        <span className={styles.attnRowTitle}>{title}</span>
-        <span className={styles.attnRowSubtitle}>{subtitle}</span>
-      </span>
+      <span className={styles.attnRowTitle}>{title}</span>
       <button
         type="button"
         className={count > 0 ? styles.attnReviewBtnHot : styles.attnReviewBtn}
