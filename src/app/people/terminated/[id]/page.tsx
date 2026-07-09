@@ -317,7 +317,7 @@ export default function TerminatedEmployeeDetailPage() {
         <button
           type="button"
           className={styles.statusCard}
-          onClick={() => router.push("/people/hr-notes/add")}
+          onClick={() => router.push(`/people/hr-notes/add?employee=${staff.uid}`)}
         >
           <EditIcon />
           <span className={styles.statusLabel}>Add HR Note</span>

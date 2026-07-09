@@ -745,7 +745,7 @@ export default function EmployeeDetailPage() {
           <button
             type="button"
             className={`${styles.statusCard} ${styles.statusCardWarm}`}
-            onClick={() => router.push("/people/hr-notes/add")}
+            onClick={() => router.push(`/people/hr-notes/add?employee=${staff.uid}`)}
           >
             <EditIcon />
             <span className={styles.statusLabel}>Add HR Note</span>

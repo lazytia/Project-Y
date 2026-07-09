@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import Splash from "@/components/Splash";
@@ -91,6 +91,8 @@ function categoryIcon(key: CategoryKey, size = 22) {
 
 export default function AddHrNotePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetEmployeeId = searchParams?.get("employee") ?? "";
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [employeeId, setEmployeeId] = useState<string>("");
@@ -116,14 +118,18 @@ export default function AddHrNotePage() {
           })
           .sort((a, b) => a.firstName.localeCompare(b.firstName));
         setMembers(list);
-        if (list.length > 0) setEmployeeId(list[0].id);
+        const preset =
+          presetEmployeeId && list.some((m) => m.id === presetEmployeeId)
+            ? presetEmployeeId
+            : list[0]?.id ?? "";
+        setEmployeeId(preset);
       } catch {
         /* leave empty */
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [presetEmployeeId]);
 
   const selected = useMemo(
     () => members.find((m) => m.id === employeeId) ?? members[0],
