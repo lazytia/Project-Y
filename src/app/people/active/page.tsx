@@ -80,6 +80,7 @@ type StoredNotice = {
   employeeUid?: string;
   employeeName?: string;
   lastWorkingDay?: string;
+  finalShiftDate?: string;
 };
 
 /* ── Field helpers ── */
@@ -231,11 +232,15 @@ export default function ActiveEmployeesPage() {
         const noticeList: Notice[] = noticeSnap.docs
           .map((d) => {
             const data = d.data() as StoredNotice;
+            // The form writes the chosen date to finalShiftDate — the
+            // lastWorkingDay column stays empty on new rows for legacy
+            // schema compat, so we prefer whichever is populated.
+            const lastDay = data.finalShiftDate || data.lastWorkingDay || "";
             return {
               id: d.id,
               employeeUid: data.employeeUid ?? "",
               employeeName: data.employeeName ?? "Unknown",
-              lastWorkingDay: data.lastWorkingDay ?? "",
+              lastWorkingDay: lastDay,
             };
           })
           .filter((n) => !n.lastWorkingDay || n.lastWorkingDay >= todayISO);
@@ -257,6 +262,11 @@ export default function ActiveEmployeesPage() {
   }, [allowed]);
 
   const noticeUids = useMemo(() => new Set(notices.map((n) => n.employeeUid)), [notices]);
+  const noticeByUid = useMemo(() => {
+    const map = new Map<string, Notice>();
+    for (const n of notices) if (n.employeeUid) map.set(n.employeeUid, n);
+    return map;
+  }, [notices]);
 
   const counts = useMemo(() => {
     const s = staff ?? [];
@@ -418,7 +428,9 @@ export default function ActiveEmployeesPage() {
             const bdayDays = daysUntilBirthday(row.dob);
             const visaSoon = visaDays !== null && visaDays >= 0 && visaDays <= VISA_WINDOW_DAYS;
             const bdaySoon = bdayDays !== null && bdayDays >= 0 && bdayDays <= BIRTHDAY_WINDOW_DAYS;
-            const showBadge = visaSoon || bdaySoon;
+            const rowNotice = noticeByUid.get(row.uid) ?? null;
+            const noticeDays = rowNotice ? daysFromToday(toDate(rowNotice.lastWorkingDay)) : null;
+            const showBadge = visaSoon || bdaySoon || !!rowNotice;
             return (
               <li key={row.uid}>
                 <button
@@ -429,10 +441,31 @@ export default function ActiveEmployeesPage() {
                   <span className={styles.rowMain}>
                     <span className={styles.rowName}>{row.name}</span>
                     <span className={styles.rowPos}>{row.positionLabel}</span>
+                    {rowNotice ? (
+                      <span className={styles.statusPillNotice}>
+                        <span className={styles.statusPillDot} aria-hidden="true" />
+                        Notice Given
+                      </span>
+                    ) : (
+                      <span className={styles.statusPillActive}>Active</span>
+                    )}
                   </span>
-                  <span className={styles.rowRate}>{fmtRate(row.rate)}</span>
+                  <span className={styles.rowRate}>
+                    {rowNotice ? "" : fmtRate(row.rate)}
+                  </span>
                   <span className={styles.rowSide}>
-                    {visaSoon ? (
+                    {rowNotice ? (
+                      <>
+                        {rowNotice.lastWorkingDay && (
+                          <span className={styles.sideLabel}>
+                            Last day {fmtDateShort(rowNotice.lastWorkingDay)}
+                          </span>
+                        )}
+                        {noticeDays !== null && noticeDays >= 0 && (
+                          <span className={styles.sideWarm}>{noticeDays} days remaining</span>
+                        )}
+                      </>
+                    ) : visaSoon ? (
                       <>
                         <span className={styles.sideLabel}>Visa</span>
                         <span className={styles.sideWarm}>{visaDays} days</span>
