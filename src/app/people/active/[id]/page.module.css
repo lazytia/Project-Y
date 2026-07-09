@@ -148,34 +148,50 @@
 
 .noticeCountdown {
   display: inline-flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   color: var(--color-warm);
-  align-self: flex-start;
+  align-self: center;
   margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .noticeCountdownIcon {
-  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-warm);
 }
 
 .noticeCountdownText {
   display: flex;
   flex-direction: column;
-  line-height: 1.1;
+  align-items: flex-start;
+  line-height: 1.15;
 }
 
 .noticeCountdownDays {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
   color: var(--color-warm);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 .noticeCountdownSub {
   margin: 0;
   font-size: 12px;
+  font-weight: 500;
   color: var(--color-fg-muted);
+  white-space: nowrap;
+}
+
+/* Keep the profile name column from hogging the row when the name
+   itself wraps — the countdown needs its own breathing room. */
+.profileCardNotice .profileMain {
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .noticeDateGrid {
