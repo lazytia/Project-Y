@@ -390,6 +390,27 @@
   letter-spacing: 0.02em;
 }
 
+.statusPillReady {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-negative);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.sideDanger {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-negative);
+}
+
 .statusPillDot {
   width: 6px;
   height: 6px;

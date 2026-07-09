@@ -219,33 +219,26 @@ export default function ActiveEmployeesPage() {
 
         rows.sort((a, b) => a.name.localeCompare(b.name));
 
-        // Show notices for anyone still in their notice period: the last
-        // working day is either not set yet (empty string — the form saves
-        // an empty value when the owner leaves the final-shift picker
-        // blank) or is on/after today. Anything with a past last-working
-        // day has already flipped to Terminated.
+        // Load every outstanding notice — the terminate flow deletes the
+        // row when the owner confirms, so anything still here is either
+        // Notice Given (last-day upcoming or unset) or Ready to Terminate
+        // (last-day already passed but not yet confirmed).
         const noticeSnap = await getDocs(
           query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
         );
-        const todayISO = (() => {
-          const d = new Date();
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        })();
-        const noticeList: Notice[] = noticeSnap.docs
-          .map((d) => {
-            const data = d.data() as StoredNotice;
-            // The form writes the chosen date to finalShiftDate — the
-            // lastWorkingDay column stays empty on new rows for legacy
-            // schema compat, so we prefer whichever is populated.
-            const lastDay = data.finalShiftDate || data.lastWorkingDay || "";
-            return {
-              id: d.id,
-              employeeUid: data.employeeUid ?? "",
-              employeeName: data.employeeName ?? "Unknown",
-              lastWorkingDay: lastDay,
-            };
-          })
-          .filter((n) => !n.lastWorkingDay || n.lastWorkingDay >= todayISO);
+        const noticeList: Notice[] = noticeSnap.docs.map((d) => {
+          const data = d.data() as StoredNotice;
+          // The form writes the chosen date to finalShiftDate — the
+          // lastWorkingDay column stays empty on new rows for legacy
+          // schema compat, so we prefer whichever is populated.
+          const lastDay = data.finalShiftDate || data.lastWorkingDay || "";
+          return {
+            id: d.id,
+            employeeUid: data.employeeUid ?? "",
+            employeeName: data.employeeName ?? "Unknown",
+            lastWorkingDay: lastDay,
+          };
+        });
 
         if (cancelled) return;
         setStaff(rows);
@@ -432,7 +425,17 @@ export default function ActiveEmployeesPage() {
             const bdaySoon = bdayDays !== null && bdayDays >= 0 && bdayDays <= BIRTHDAY_WINDOW_DAYS;
             const rowNotice = noticeByUid.get(row.uid) ?? null;
             const noticeDays = rowNotice ? daysFromToday(toDate(rowNotice.lastWorkingDay)) : null;
-            const showBadge = visaSoon || bdaySoon || !!rowNotice;
+            // 3-state flow:
+            //   noNotice           → Active   (green pill, visa/birthday chip on the right)
+            //   notice, days >= 0  → Notice Given (orange pill, N days remaining)
+            //   notice, days < 0   → Ready to Terminate (red pill, Last day passed)
+            const readyToTerminate =
+              !!rowNotice &&
+              rowNotice.lastWorkingDay !== "" &&
+              noticeDays !== null &&
+              noticeDays < 0;
+            const noticeMode = !!rowNotice;
+            const showBadge = visaSoon || bdaySoon || noticeMode;
             return (
               <li key={row.uid}>
                 <button
@@ -443,7 +446,12 @@ export default function ActiveEmployeesPage() {
                   <span className={styles.rowMain}>
                     <span className={styles.rowName}>{row.name}</span>
                     <span className={styles.rowPos}>{row.positionLabel}</span>
-                    {rowNotice ? (
+                    {readyToTerminate ? (
+                      <span className={styles.statusPillReady}>
+                        <span className={styles.statusPillDot} aria-hidden="true" />
+                        Ready to Terminate
+                      </span>
+                    ) : noticeMode ? (
                       <span className={styles.statusPillNotice}>
                         <span className={styles.statusPillDot} aria-hidden="true" />
                         Notice Given
@@ -453,10 +461,19 @@ export default function ActiveEmployeesPage() {
                     )}
                   </span>
                   <span className={styles.rowRate}>
-                    {rowNotice ? "" : fmtRate(row.rate)}
+                    {noticeMode ? "" : fmtRate(row.rate)}
                   </span>
                   <span className={styles.rowSide}>
-                    {rowNotice ? (
+                    {readyToTerminate && rowNotice ? (
+                      <>
+                        {rowNotice.lastWorkingDay && (
+                          <span className={styles.sideLabel}>
+                            Last day {fmtDateShort(rowNotice.lastWorkingDay)}
+                          </span>
+                        )}
+                        <span className={styles.sideDanger}>Last day passed</span>
+                      </>
+                    ) : rowNotice ? (
                       <>
                         {rowNotice.lastWorkingDay && (
                           <span className={styles.sideLabel}>
