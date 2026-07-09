@@ -363,12 +363,22 @@ export default function EmployeeDetailPage() {
     try {
       // 1) Flip the staff doc into a terminated state so it drops off
       //    the active roster and lands on /people/terminated.
+      const reasonBase = notice?.reasonForLeaving ?? "";
+      const reasonOther = notice?.reasonForLeavingOther ?? "";
+      const reasonDisplay =
+        reasonBase === "Other" && reasonOther.trim()
+          ? `Other — ${reasonOther.trim()}`
+          : reasonBase;
+
       await setDoc(
         doc(getDb(), "staff_onboarding", staff.uid),
         {
           status: "terminated",
           terminatedAt: serverTimestamp(),
           lastWorkingDate: lastDayISO,
+          reasonForLeaving: reasonBase,
+          reasonForLeavingOther: reasonBase === "Other" ? reasonOther.trim() : "",
+          terminationReason: reasonDisplay,
           updatedAt: serverTimestamp(),
         },
         { merge: true },
