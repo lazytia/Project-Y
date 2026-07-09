@@ -1,9 +1,14 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const projectRoot = path.join(__dirname);
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  outputFileTracingRoot: path.join(__dirname),
+  outputFileTracingRoot: projectRoot,
+  turbopack: {
+    root: projectRoot,
+  },
 };
 
 export default nextConfig;
