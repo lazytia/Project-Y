@@ -216,8 +216,11 @@ export default function ActiveEmployeesPage() {
 
         rows.sort((a, b) => a.name.localeCompare(b.name));
 
-        // Only notices whose last working day hasn't passed. Older entries
-        // stay in `notice_given` after the staff move to Terminated.
+        // Show notices for anyone still in their notice period: the last
+        // working day is either not set yet (empty string — the form saves
+        // an empty value when the owner leaves the final-shift picker
+        // blank) or is on/after today. Anything with a past last-working
+        // day has already flipped to Terminated.
         const noticeSnap = await getDocs(
           query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
         );
@@ -235,7 +238,7 @@ export default function ActiveEmployeesPage() {
               lastWorkingDay: data.lastWorkingDay ?? "",
             };
           })
-          .filter((n) => n.lastWorkingDay >= todayISO);
+          .filter((n) => !n.lastWorkingDay || n.lastWorkingDay >= todayISO);
 
         if (cancelled) return;
         setStaff(rows);
