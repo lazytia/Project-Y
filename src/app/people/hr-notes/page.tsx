@@ -233,25 +233,43 @@ export default function HrNotesPage() {
     })();
   }, []);
 
+  // Split the query into individual whitespace tokens so a deep-link
+  // that carries a full name like "Yurico Oo" still matches notes for
+  // "Yurico" alone (any token contained in the target counts as a hit).
+  const queryTokens = useMemo(
+    () =>
+      query_
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((t) => t.length > 0),
+    [query_],
+  );
+
+  function anyTokenMatches(haystack: string): boolean {
+    if (queryTokens.length === 0) return true;
+    const lower = haystack.toLowerCase();
+    return queryTokens.some((t) => lower.includes(t));
+  }
+
   // ── Timeline: filter by query, sort by date desc ──
   const timeline = useMemo(() => {
-    const q = query_.trim().toLowerCase();
-    return notes.filter((n) => {
-      if (!q) return true;
-      return (
-        n.employeeName.toLowerCase().includes(q) ||
-        n.kind.toLowerCase().includes(q) ||
-        n.body.toLowerCase().includes(q)
-      );
-    });
-  }, [notes, query_]);
+    if (queryTokens.length === 0) return notes;
+    return notes.filter(
+      (n) =>
+        anyTokenMatches(n.employeeName) ||
+        anyTokenMatches(n.kind) ||
+        anyTokenMatches(n.body),
+    );
+    // anyTokenMatches is stable per queryTokens value; safe to omit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes, queryTokens]);
 
   // ── By Employee: each member + their last note ──
   const byEmployee = useMemo(() => {
-    const q = query_.trim().toLowerCase();
     const rows = members.filter((m) => {
-      if (!q) return true;
-      return `${m.firstName} ${m.lastName}`.toLowerCase().includes(q);
+      if (queryTokens.length === 0) return true;
+      return anyTokenMatches(`${m.firstName} ${m.lastName}`);
     }).map((m) => {
       const notesForMember = notes
         .filter((n) => n.employeeId === m.id)
@@ -276,7 +294,9 @@ export default function HrNotesPage() {
       }
     });
     return rows;
-  }, [members, notes, query_, sort]);
+    // anyTokenMatches is stable per queryTokens value; safe to omit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, notes, queryTokens, sort]);
 
   function handleAddNote() {
     router.push("/people/hr-notes/add");

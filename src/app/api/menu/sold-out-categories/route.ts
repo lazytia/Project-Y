@@ -21,7 +21,10 @@ type CategoryConfig = {
 };
 
 const CONFIG: CategoryConfig[] = [
-  { id: "squid", displayName: "Squid", subName: "Ika", match: /\b(squid|ika)\b/i },
+  // Menu-wise the category is now called Cuttlefish, but the underlying
+  // Square catalog still names the items Squid / Ika — keep the match
+  // regex tied to the old keywords so item detection still works.
+  { id: "squid", displayName: "Cuttlefish", subName: "Ika", match: /\b(squid|ika)\b/i },
   { id: "snapper", displayName: "Snapper", match: /\bsnapper\b/i },
   { id: "trevally", displayName: "Trevally", match: /\btrevally\b/i },
   { id: "tuna", displayName: "Tuna", match: /\btuna\b/i },
