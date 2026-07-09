@@ -15,7 +15,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import {
   buildPayrollAttentionItems,
-  fmtTrainingEndLabel,
+  trainingEndStatusLabel,
   shouldActivatePayrollReminder,
   type PayrollAttentionItem,
   type PayrollStaffRecord,
@@ -307,6 +307,18 @@ export default function TimesheetsPage() {
     void loadStaff();
   }, [authLoading, allowed, load, loadStaff]);
 
+  /* Re-fetch staff when returning from onboarding approval so the alert
+     appears without a manual refresh. */
+  useEffect(() => {
+    if (authLoading || !allowed) return;
+    const onFocus = () => void loadStaff();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") void loadStaff();
+    });
+    return () => window.removeEventListener("focus", onFocus);
+  }, [authLoading, allowed, loadStaff]);
+
   /* Filter shifts down to the requested range (the API pads by a day on
      each side to catch overnight shifts) and fold into per-day + per-
      staff aggregates. */
@@ -375,10 +387,8 @@ export default function TimesheetsPage() {
     };
   }, [shifts, teamMembers, startISO, endISO]);
 
-  const attentionItems = useMemo(() => {
-    if (!startISO || !endISO) return [] as PayrollAttentionItem[];
-    return buildPayrollAttentionItems(payrollStaff, startISO, endISO);
-  }, [payrollStaff, startISO, endISO]);
+  const attentionItems = useMemo(() => buildPayrollAttentionItems(payrollStaff), [payrollStaff]);
+  const todayISO = useMemo(() => sydneyTodayISO(), []);
 
   async function stopReminder(item: PayrollAttentionItem) {
     setAttentionBusy(item.staffUid);
@@ -462,7 +472,7 @@ export default function TimesheetsPage() {
                   <div className={styles.attentionBody}>
                     <p className={styles.attentionName}>{item.name}</p>
                     <p className={styles.attentionMeta}>
-                      Training period ended: {fmtTrainingEndLabel(item.trainingEndISO)}
+                      {trainingEndStatusLabel(item.trainingEndISO, todayISO)}
                     </p>
                     <p className={styles.attentionRate}>
                       Current rate: {fmtRateHr(item.currentRate)} → New rate:{" "}

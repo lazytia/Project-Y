@@ -54,24 +54,21 @@ export function isPayrollReminderEligible(row: PayrollStaffRecord): boolean {
 }
 
 /**
- * Returns true when this approved employee should appear in Payroll Attention
- * for the selected timesheet range.
+ * Returns true when this approved employee should appear in Payroll Attention.
+ * Shown from owner approval until the owner dismisses the reminder — not gated
+ * on the timesheet date range (training end is often weeks after hire).
  */
 export function shouldShowPayrollAttention(
   trainingEndISO: string | null,
-  rangeStart: string,
-  rangeEnd: string,
   dismissedFor: string,
 ): boolean {
   if (!trainingEndISO) return false;
   if (dismissedFor === trainingEndISO) return false;
-  return trainingEndISO >= rangeStart && trainingEndISO <= rangeEnd;
+  return true;
 }
 
 export function buildPayrollAttentionItems(
   staff: PayrollStaffRecord[],
-  rangeStart: string,
-  rangeEnd: string,
 ): PayrollAttentionItem[] {
   const items: PayrollAttentionItem[] = [];
 
@@ -81,14 +78,7 @@ export function buildPayrollAttentionItems(
     if (!isPayrollReminderEligible(row)) continue;
 
     const trainingEndISO = trainingEndDateISO(row.startDate, row.trainingPeriod);
-    if (
-      !shouldShowPayrollAttention(
-        trainingEndISO,
-        rangeStart,
-        rangeEnd,
-        row.payrollRateNotedFor,
-      )
-    ) {
+    if (!shouldShowPayrollAttention(trainingEndISO, row.payrollRateNotedFor)) {
       continue;
     }
 
@@ -103,6 +93,11 @@ export function buildPayrollAttentionItems(
   }
 
   return items.sort((a, b) => a.trainingEndISO.localeCompare(b.trainingEndISO));
+}
+
+export function trainingEndStatusLabel(iso: string, todayISO: string): string {
+  const prefix = iso >= todayISO ? "Training period ends" : "Training period ended";
+  return `${prefix}: ${fmtTrainingEndLabel(iso)}`;
 }
 
 export function fmtTrainingEndLabel(iso: string): string {
