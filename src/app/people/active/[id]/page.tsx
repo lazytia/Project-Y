@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   collection,
@@ -9,7 +9,10 @@ import {
   getDoc,
   getDocs,
   query,
+  serverTimestamp,
+  setDoc,
   where,
+  writeBatch,
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -202,6 +205,8 @@ export default function EmployeeDetailPage() {
   const [notice, setNotice] = useState<ActiveNotice | null>(null);
   const [cancellingNotice, setCancellingNotice] = useState(false);
   const [openDoc, setOpenDoc] = useState<DocKey | null>(null);
+  const [terminateOpen, setTerminateOpen] = useState(false);
+  const [terminating, setTerminating] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -351,6 +356,42 @@ export default function EmployeeDetailPage() {
     () => (notice ? daysBetween(notice.lastWorkingDay) : null),
     [notice],
   );
+
+  async function handleConfirmTermination(lastDayISO: string) {
+    if (!staff || terminating) return;
+    setTerminating(true);
+    try {
+      // 1) Flip the staff doc into a terminated state so it drops off
+      //    the active roster and lands on /people/terminated.
+      await setDoc(
+        doc(getDb(), "staff_onboarding", staff.uid),
+        {
+          status: "terminated",
+          terminatedAt: serverTimestamp(),
+          lastWorkingDate: lastDayISO,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      // 2) Any open notice_given rows belong to the pre-termination
+      //    flow — sweep them so the terminated list isn't cluttered
+      //    with countdowns that no longer apply.
+      const noticeSnap = await getDocs(
+        query(collection(getDb(), "notice_given"), where("employeeUid", "==", staff.uid)),
+      );
+      if (!noticeSnap.empty) {
+        const batch = writeBatch(getDb());
+        noticeSnap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+      setTerminateOpen(false);
+      router.push("/people/active");
+    } catch (err) {
+      console.error("[terminate] failed:", err);
+      alert("Failed to terminate. Please try again.");
+      setTerminating(false);
+    }
+  }
 
   async function handleCancelNotice() {
     if (!notice || cancellingNotice) return;
@@ -525,7 +566,7 @@ export default function EmployeeDetailPage() {
             <button
               type="button"
               className={styles.statusCard}
-              onClick={() => router.push("/people/terminated")}
+              onClick={() => setTerminateOpen(true)}
             >
               <StopIcon />
               <span className={styles.statusLabel}>Terminate Employee</span>
@@ -546,7 +587,7 @@ export default function EmployeeDetailPage() {
             <button
               type="button"
               className={styles.statusCard}
-              onClick={() => router.push("/people/terminated")}
+              onClick={() => setTerminateOpen(true)}
             >
               <StopIcon />
               <span className={styles.statusLabel}>Terminated</span>
@@ -561,6 +602,16 @@ export default function EmployeeDetailPage() {
           staff={staff}
           hrNotes={hrNotes}
           onClose={() => setOpenDoc(null)}
+        />
+      )}
+
+      {terminateOpen && (
+        <TerminateModal
+          staff={staff}
+          defaultDate={notice?.lastWorkingDay || ""}
+          submitting={terminating}
+          onClose={() => (terminating ? undefined : setTerminateOpen(false))}
+          onConfirm={handleConfirmTermination}
         />
       )}
     </div>
@@ -827,6 +878,133 @@ function InfoRow({
   );
 }
 
+function TerminateModal({
+  staff,
+  defaultDate,
+  submitting,
+  onClose,
+  onConfirm,
+}: {
+  staff: Staff;
+  defaultDate: string;
+  submitting: boolean;
+  onClose: () => void;
+  onConfirm: (lastDayISO: string) => void;
+}) {
+  const [lastDayISO, setLastDayISO] = useState<string>(() => {
+    if (defaultDate) return defaultDate;
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+
+  function openDatePicker() {
+    const el = dateInputRef.current;
+    if (!el) return;
+    // showPicker() opens the native OS date wheel — Safari added support
+    // in 16.4, Chrome/Edge earlier. If it's missing (older iOS), fall back
+    // to focusing the input which prompts the picker on tap-to-open.
+    const anyEl = el as HTMLInputElement & { showPicker?: () => void };
+    if (typeof anyEl.showPicker === "function") anyEl.showPicker();
+    else el.focus();
+  }
+
+  return (
+    <div
+      className={styles.sheetBackdrop}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Terminate employee"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className={styles.sheet}>
+        <div className={styles.sheetGrabber} aria-hidden="true" />
+        <div className={styles.sheetHeader}>
+          <div className={styles.sheetIcon} aria-hidden="true">
+            <AlertOctagonIcon />
+          </div>
+          <div className={styles.sheetHeaderText}>
+            <h3 className={styles.sheetTitle}>Terminate Employee?</h3>
+            <p className={styles.sheetDesc}>
+              Please confirm the last working date.
+              <br />
+              This employee will be moved from Active Employees to Terminated Employees.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            onClick={onClose}
+            aria-label="Close"
+            disabled={submitting}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <section className={styles.sheetCard}>
+          <p className={styles.sheetFieldLabel}>EMPLOYEE</p>
+          <p className={styles.sheetEmployeeName}>{staff.name}</p>
+          <p className={styles.sheetEmployeePos}>{staff.positionLabel}</p>
+
+          <div className={styles.sheetDivider} aria-hidden="true" />
+
+          <p className={styles.sheetFieldLabel}>LAST WORKING DATE</p>
+          <div className={styles.sheetDateRow}>
+            <span className={styles.sheetDateIcon} aria-hidden="true"><CalendarMiniIcon /></span>
+            <span className={styles.sheetDateValue}>
+              {fmtDateWithDay(lastDayISO)}
+            </span>
+            <button type="button" className={styles.sheetEditBtn} onClick={openDatePicker} disabled={submitting}>
+              Edit
+            </button>
+            <input
+              ref={dateInputRef}
+              type="date"
+              className={styles.sheetHiddenDate}
+              value={lastDayISO}
+              onChange={(e) => setLastDayISO(e.target.value)}
+              disabled={submitting}
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+          </div>
+          <p className={styles.sheetHint}>This should be the employee&apos;s final day of work.</p>
+        </section>
+
+        <div className={styles.sheetInfoBox}>
+          <span className={styles.sheetInfoIcon} aria-hidden="true"><InfoCircleIcon /></span>
+          <p className={styles.sheetInfoText}>
+            After termination, the employee will be removed from active schedules and payroll.
+            All records and documents will be archived for reference.
+          </p>
+        </div>
+
+        <div className={styles.sheetActions}>
+          <button
+            type="button"
+            className={styles.sheetCancelBtn}
+            onClick={onClose}
+            disabled={submitting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={styles.sheetConfirmBtn}
+            onClick={() => onConfirm(lastDayISO)}
+            disabled={submitting || !lastDayISO}
+          >
+            {submitting ? "Terminating…" : "Confirm Termination"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DefRow({ label, value }: { label: string; value: string | undefined }) {
   return (
     <div className={styles.modalDefRow}>
@@ -902,6 +1080,26 @@ function StopIcon() {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
       <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+    </svg>
+  );
+}
+
+function AlertOctagonIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+function InfoCircleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
     </svg>
   );
 }

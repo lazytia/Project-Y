@@ -65,13 +65,15 @@ type StoredStaff = {
   approvedAt?: Timestamp | null;
 };
 
-/** Everyone on the roster except the real business owners (Tia, Yurica).
- *  Managers (yurina), chefs, staff mid-onboarding, and staff who haven't
- *  started yet all show up so this screen is a single home for the whole
- *  team. AuthProvider stamps every account with role="owner" whenever it
- *  has owner-level UI access, so filtering on role alone would also hide
- *  managers — we key on the username instead. */
+/** Everyone on the roster except the real business owners (Tia, Yurica)
+ *  and anyone who has been terminated. Managers (yurina), chefs, staff
+ *  mid-onboarding, and staff who haven't started yet all show up so this
+ *  screen is a single home for the whole team. AuthProvider stamps every
+ *  account with role="owner" whenever it has owner-level UI access, so
+ *  filtering on role alone would also hide managers — we key on the
+ *  username instead. */
 function isTeamMember(raw: StoredStaff): boolean {
+  if ((raw.status ?? "").toLowerCase() === "terminated") return false;
   const username = (raw.username ?? emailToUsername(raw.email ?? "")).toLowerCase();
   return !STRICT_OWNER_USERNAMES.has(username);
 }

@@ -656,6 +656,232 @@
   font-weight: 500;
 }
 
+/* ── Terminate bottom sheet ── */
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(17, 17, 17, 0.42);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--color-bg);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: var(--space-3) var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.18);
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.sheetGrabber {
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border);
+  margin-bottom: var(--space-2);
+}
+
+.sheetHeader {
+  display: grid;
+  grid-template-columns: 48px 1fr 32px;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.sheetIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheetHeaderText {
+  min-width: 0;
+}
+
+.sheetTitle {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.sheetDesc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+  line-height: 1.5;
+}
+
+.sheetCard {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sheetFieldLabel {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+}
+
+.sheetEmployeeName {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.sheetEmployeePos {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.sheetDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-3) 0;
+}
+
+.sheetDateRow {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  position: relative;
+}
+
+.sheetDateIcon {
+  color: var(--color-fg);
+  display: inline-flex;
+}
+
+.sheetDateValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.sheetEditBtn {
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-warm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheetEditBtn:hover {
+  background: var(--color-warm-bg);
+}
+
+.sheetHiddenDate {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  right: 20px;
+  bottom: 6px;
+}
+
+.sheetHint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.sheetInfoBox {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+.sheetInfoIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-warm);
+}
+
+.sheetInfoText {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-fg);
+  line-height: 1.5;
+}
+
+.sheetActions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-3);
+}
+
+.sheetCancelBtn,
+.sheetConfirmBtn {
+  padding: 14px 12px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheetCancelBtn {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-fg);
+}
+
+.sheetCancelBtn:hover {
+  background: var(--color-surface);
+}
+
+.sheetConfirmBtn {
+  background: var(--color-warm);
+  border: none;
+  color: #fff;
+}
+
+.sheetConfirmBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .modalNoteRow {
   display: flex;
   flex-direction: column;
