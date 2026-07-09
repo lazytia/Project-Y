@@ -1019,7 +1019,10 @@ export default function EmployeeDetailPage() {
       {calRehireOpen && (
         <CalendarPicker
           value={editRehireDate}
+          maxDate="2030-12-31"
+          singleOnly
           onChange={setEditRehireDate}
+          onRangeChange={() => {}}
           onClose={() => setCalRehireOpen(false)}
         />
       )}
