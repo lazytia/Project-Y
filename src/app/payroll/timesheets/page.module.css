@@ -73,6 +73,159 @@
 .summaryUnit { font-size: 12px; color: var(--color-fg-muted); font-weight: 600; margin-left: 2px; }
 .summarySub { font-size: 11px; color: var(--color-fg-muted); margin: 4px 0 0; }
 
+/* ── payroll attention ── */
+.attentionCard {
+  background: var(--color-warm-bg);
+  border: 1px solid color-mix(in srgb, var(--color-warm) 28%, var(--color-border));
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.attentionHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.attentionHeadLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.attentionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-warm);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.attentionEyebrow {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--color-warm);
+  margin: 0 0 2px;
+}
+.attentionTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  color: var(--color-fg);
+  margin: 0;
+  line-height: 1.35;
+}
+.attentionChev {
+  color: var(--color-fg-muted);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.attentionList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.attentionRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-warm) 18%, var(--color-border));
+}
+.attentionRow:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.attentionMain {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.attentionAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--color-warm);
+  color: var(--color-accent-fg);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.attentionBody { min-width: 0; }
+.attentionName {
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  color: var(--color-fg);
+  margin: 0;
+}
+.attentionMeta {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  margin: 2px 0 0;
+}
+.attentionRate {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+.attentionRateNew {
+  color: var(--color-warm);
+  font-weight: 800;
+}
+.attentionActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+.attentionNotedLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+.attentionNotedBtn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+.attentionNotedBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.attentionUpdateBtn {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--color-warm);
+  border-radius: 999px;
+  color: var(--color-warm);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.attentionUpdateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* ── filter card ── */
 .filterCard {
   background: var(--color-bg);

@@ -2,10 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
+import {
+  buildPayrollAttentionItems,
+  fmtTrainingEndLabel,
+  type PayrollAttentionItem,
+  type PayrollStaffRecord,
+} from "@/lib/payroll-attention";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
@@ -154,6 +167,29 @@ function initialsOf(name: string): string {
   return (a + b) || "??";
 }
 
+function fmtRateHr(n: number): string {
+  return `$${n.toFixed(2)}/hr`;
+}
+
+function staffStartISO(v: unknown): string {
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  if (typeof v === "object" && v !== null && "toDate" in v) {
+    try {
+      return (v as { toDate: () => Date }).toDate().toISOString().slice(0, 10);
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
+function staffNameOf(raw: Record<string, unknown>): string {
+  if (typeof raw.fullName === "string" && raw.fullName.trim()) return raw.fullName.trim();
+  const first = String(raw.firstName ?? "").trim();
+  const last = String(raw.lastName ?? "").trim();
+  return `${first}${last ? ` ${last}` : ""}`.trim() || "Unknown";
+}
+
 // Stable colour per team member id — matches the palette used on the
 // roster page + day-details Staff view, so the same person always shows
 // up in the same tint across the app.
@@ -196,6 +232,8 @@ export default function TimesheetsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const [payrollStaff, setPayrollStaff] = useState<PayrollStaffRecord[]>([]);
+  const [attentionBusy, setAttentionBusy] = useState<string | null>(null);
 
   useEffect(() => {
     const today = sydneyTodayISO();
@@ -233,10 +271,40 @@ export default function TimesheetsPage() {
     }
   }, [startISO, endISO]);
 
+  const loadStaff = useCallback(async () => {
+    try {
+      const snap = await getDocs(collection(getDb(), "staff_onboarding"));
+      const rows: PayrollStaffRecord[] = snap.docs.map((d) => {
+        const raw = d.data() as Record<string, unknown>;
+        return {
+          uid: d.id,
+          name: staffNameOf(raw),
+          position: typeof raw.position === "string" ? raw.position : "Staff",
+          startDate: staffStartISO(raw.startDate),
+          trainingPeriod:
+            typeof raw.trainingPeriod === "string" ? raw.trainingPeriod : "First 2 Weeks",
+          trainingRate: typeof raw.trainingRate === "number" ? raw.trainingRate : null,
+          afterTrainingRate:
+            typeof raw.afterTrainingRate === "number" ? raw.afterTrainingRate : null,
+          squareTeamMemberId:
+            typeof raw.squareTeamMemberId === "string" ? raw.squareTeamMemberId : "",
+          payrollRateNotedFor:
+            typeof raw.payrollRateNotedFor === "string" ? raw.payrollRateNotedFor : "",
+          status: typeof raw.status === "string" ? raw.status : "",
+        };
+      });
+      setPayrollStaff(rows);
+    } catch (err) {
+      console.error("[timesheets] staff_onboarding load failed:", err);
+      setPayrollStaff([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (authLoading || !allowed) return;
     void load();
-  }, [authLoading, allowed, load]);
+    void loadStaff();
+  }, [authLoading, allowed, load, loadStaff]);
 
   /* Filter shifts down to the requested range (the API pads by a day on
      each side to catch overnight shifts) and fold into per-day + per-
@@ -306,6 +374,88 @@ export default function TimesheetsPage() {
     };
   }, [shifts, teamMembers, startISO, endISO]);
 
+  const squareRateByMember = useMemo(() => {
+    const latest: Record<string, { startAt: string; rate: number }> = {};
+    for (const s of shifts) {
+      if (typeof s.hourlyRateCents !== "number") continue;
+      const prev = latest[s.teamMemberId];
+      if (!prev || s.startAt > prev.startAt) {
+        latest[s.teamMemberId] = { startAt: s.startAt, rate: s.hourlyRateCents / 100 };
+      }
+    }
+    const out: Record<string, number | null> = {};
+    for (const [id, v] of Object.entries(latest)) out[id] = v.rate;
+    return out;
+  }, [shifts]);
+
+  const attentionItems = useMemo(() => {
+    if (!startISO || !endISO) return [] as PayrollAttentionItem[];
+    return buildPayrollAttentionItems(payrollStaff, startISO, endISO, squareRateByMember);
+  }, [payrollStaff, startISO, endISO, squareRateByMember]);
+
+  async function markNoted(item: PayrollAttentionItem) {
+    setAttentionBusy(`${item.staffUid}:noted`);
+    try {
+      await updateDoc(doc(getDb(), "staff_onboarding", item.staffUid), {
+        payrollRateNotedFor: item.trainingEndISO,
+      });
+      setPayrollStaff((prev) =>
+        prev.map((r) =>
+          r.uid === item.staffUid ? { ...r, payrollRateNotedFor: item.trainingEndISO } : r,
+        ),
+      );
+    } catch (err) {
+      console.error("[timesheets] mark noted failed:", err);
+    } finally {
+      setAttentionBusy(null);
+    }
+  }
+
+  async function updateSquareRate(item: PayrollAttentionItem) {
+    if (!user) return;
+    setAttentionBusy(`${item.staffUid}:update`);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/square/update-wage", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          teamMemberId: item.teamMemberId,
+          hourlyRateCents: Math.round(item.newRate * 100),
+          jobTitle: item.position,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Update failed (${res.status})`);
+
+      await updateDoc(doc(getDb(), "staff_onboarding", item.staffUid), {
+        trainingRate: item.newRate,
+        payrollRateNotedFor: item.trainingEndISO,
+        payrollRateUpdatedAt: serverTimestamp(),
+      });
+      setPayrollStaff((prev) =>
+        prev.map((r) =>
+          r.uid === item.staffUid
+            ? {
+                ...r,
+                trainingRate: item.newRate,
+                payrollRateNotedFor: item.trainingEndISO,
+              }
+            : r,
+        ),
+      );
+      void load();
+    } catch (err) {
+      console.error("[timesheets] update wage failed:", err);
+      setFetchError(err instanceof Error ? err.message : "Wage update failed.");
+    } finally {
+      setAttentionBusy(null);
+    }
+  }
+
   if (authLoading || loading) return <Splash />;
   if (!allowed) return <div className={styles.page}><p>Owner access only.</p></div>;
 
@@ -332,6 +482,74 @@ export default function TimesheetsPage() {
           </div>
         </div>
       </section>
+
+      {attentionItems.length > 0 && (
+        <section className={styles.attentionCard} aria-label="Payroll attention">
+          <div className={styles.attentionHead}>
+            <div className={styles.attentionHeadLeft}>
+              <span className={styles.attentionIcon} aria-hidden="true">
+                <WarnIcon />
+              </span>
+              <div>
+                <p className={styles.attentionEyebrow}>PAYROLL ATTENTION</p>
+                <p className={styles.attentionTitle}>
+                  {attentionItems.length === 1
+                    ? "1 employee requires wage increase"
+                    : `${attentionItems.length} employees require wage increase`}
+                </p>
+              </div>
+            </div>
+            <span className={styles.attentionChev} aria-hidden="true">›</span>
+          </div>
+
+          <ul className={styles.attentionList}>
+            {attentionItems.map((item) => (
+              <li key={item.staffUid} className={styles.attentionRow}>
+                <Link
+                  href={`/people/active/${item.staffUid}`}
+                  className={styles.attentionMain}
+                >
+                  <span className={styles.attentionAvatar}>{initialsOf(item.name)}</span>
+                  <div className={styles.attentionBody}>
+                    <p className={styles.attentionName}>{item.name}</p>
+                    <p className={styles.attentionMeta}>
+                      Training period ended: {fmtTrainingEndLabel(item.trainingEndISO)}
+                    </p>
+                    <p className={styles.attentionRate}>
+                      Current rate: {fmtRateHr(item.currentRate)} → New rate:{" "}
+                      <strong className={styles.attentionRateNew}>
+                        {fmtRateHr(item.newRate)}
+                      </strong>
+                    </p>
+                  </div>
+                </Link>
+                <div className={styles.attentionActions}>
+                  {item.noted ? (
+                    <span className={styles.attentionNotedLabel}>Noted</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.attentionNotedBtn}
+                      disabled={attentionBusy === `${item.staffUid}:noted`}
+                      onClick={() => void markNoted(item)}
+                    >
+                      {attentionBusy === `${item.staffUid}:noted` ? "…" : "Noted"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.attentionUpdateBtn}
+                    disabled={attentionBusy === `${item.staffUid}:update`}
+                    onClick={() => void updateSquareRate(item)}
+                  >
+                    {attentionBusy === `${item.staffUid}:update` ? "Updating…" : "Update Rate"}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className={styles.filterCard}>
         <div className={styles.rangeGrid}>
@@ -745,6 +963,15 @@ function RefreshIcon() {
       <polyline points="23 4 23 10 17 10" />
       <polyline points="1 20 1 14 7 14" />
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  );
+}
+function WarnIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }
