@@ -83,7 +83,6 @@ type Staff = {
   isReactivated: boolean;
   rehireDate: string;
   reactivatedAt: Date | null;
-  department: string;
   employmentType: string;
   workLocation: string;
   reportsTo: string;
@@ -161,12 +160,40 @@ function initialsOf(name: string): string {
 }
 
 function positionLabelOf(raw: Record<string, unknown>): string {
-  const p = String(raw.position ?? "").trim().toLowerCase();
+  const custom = String(raw.position ?? "").trim();
+  if (custom) return custom;
+  const p = custom.toLowerCase();
   const role = String(raw.role ?? "").toLowerCase();
   if (role === "chef" || p.includes("kitchen")) return "Kitchen Staff";
   if (p.includes("hall") || role === "manager") return "Hall Staff";
-  const pos = String(raw.position ?? "").trim();
-  return pos || "Staff";
+  return "Staff";
+}
+
+function strField(raw: Record<string, unknown>, key: string): string {
+  const v = raw[key];
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function workLocationOf(raw: Record<string, unknown>): string {
+  const loc = strField(raw, "workLocation");
+  if (loc) return loc;
+  const pos = strField(raw, "position").toLowerCase();
+  if (pos.includes("kitchen")) return "Kitchen";
+  if (pos.includes("hall")) return "Hall";
+  return "";
+}
+
+function reportsToOf(raw: Record<string, unknown>): string {
+  return (
+    strField(raw, "reportsTo") ||
+    strField(raw, "approvedByName") ||
+    strField(raw, "reactivatedByName") ||
+    ""
+  );
+}
+
+function displayOrDash(value: string): string {
+  return value.trim() || "—";
 }
 
 function fullNameOf(raw: Record<string, unknown>): string {
@@ -298,10 +325,9 @@ export default function EmployeeDetailPage() {
           isReactivated,
           rehireDate,
           reactivatedAt,
-          department: typeof raw.department === "string" ? raw.department : "Hall",
-          employmentType: typeof raw.employmentType === "string" ? raw.employmentType : "Casual",
-          workLocation: typeof raw.workLocation === "string" ? raw.workLocation : "Hall",
-          reportsTo: typeof raw.reportsTo === "string" ? raw.reportsTo : "Yukina Sato",
+          employmentType: strField(raw, "employmentType"),
+          workLocation: workLocationOf(raw),
+          reportsTo: reportsToOf(raw),
           previousTermination,
         };
 
@@ -542,15 +568,19 @@ export default function EmployeeDetailPage() {
           <p className={styles.sectionLabel}>EMPLOYMENT INFORMATION</p>
           <section className={styles.employmentCard}>
             <EmploymentRow label="Rehire Date" value={fmtDateWithDay(staff.rehireDate)} accent />
-            <EmploymentRow label="Position" value={staff.positionLabel} />
-            <EmploymentRow label="Visa Type" value={staff.visaType} />
-            <EmploymentRow label="Work Location" value={staff.workLocation} />
-            <EmploymentRow label="Employment Type" value={staff.employmentType} />
+            <EmploymentRow label="Position" value={displayOrDash(staff.positionLabel)} />
+            <EmploymentRow label="Visa Type" value={displayOrDash(staff.visaType)} />
+            <EmploymentRow label="Work Location" value={displayOrDash(staff.workLocation)} />
+            <EmploymentRow label="Employment Type" value={displayOrDash(staff.employmentType)} />
             <EmploymentRow
               label="Rate"
               value={typeof staff.rate === "number" ? `$${staff.rate.toFixed(2)} /hr` : "—"}
             />
-            <EmploymentRow label="Reports To" value={`${staff.reportsTo} ›`} last />
+            <EmploymentRow
+              label="Reports To"
+              value={staff.reportsTo ? `${staff.reportsTo} ›` : "—"}
+              last
+            />
             <button type="button" className={styles.editEmploymentBtn}>
               <EditIcon />
               Edit Employment Details
