@@ -20,6 +20,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
+import { todayIso } from "@/lib/staff-display";
+import CalendarPicker from "@/components/CalendarPicker";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -96,6 +98,11 @@ type Staff = {
 };
 
 const VISA_WINDOW_DAYS = 30;
+
+const EMPLOYMENT_POSITIONS = ["Hall Staff", "Kitchen Staff", "Hall Manager", "Chef"] as const;
+const EMPLOYMENT_VISA_TYPES = ["Student", "Residence", "Working Holiday"] as const;
+const EMPLOYMENT_TYPES = ["Casual", "Part-time", "Full-time"] as const;
+const WORK_LOCATIONS = ["Hall", "Kitchen"] as const;
 
 function tsToDate(v: unknown): Date | null {
   if (!v) return null;
@@ -247,6 +254,16 @@ export default function EmployeeDetailPage() {
   const [terminateOpen, setTerminateOpen] = useState(false);
   const [terminating, setTerminating] = useState(false);
   const [termDetailsOpen, setTermDetailsOpen] = useState(false);
+  const [employmentEditing, setEmploymentEditing] = useState(false);
+  const [savingEmployment, setSavingEmployment] = useState(false);
+  const [editRehireDate, setEditRehireDate] = useState("");
+  const [editPosition, setEditPosition] = useState("");
+  const [editVisaType, setEditVisaType] = useState("");
+  const [editWorkLocation, setEditWorkLocation] = useState("");
+  const [editEmploymentType, setEditEmploymentType] = useState("");
+  const [editRate, setEditRate] = useState("");
+  const [editReportsTo, setEditReportsTo] = useState("");
+  const [calRehireOpen, setCalRehireOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -480,6 +497,77 @@ export default function EmployeeDetailPage() {
     }
   }
 
+  function startEmploymentEdit() {
+    if (!staff) return;
+    setEditRehireDate(staff.rehireDate || todayIso());
+    setEditPosition(
+      EMPLOYMENT_POSITIONS.includes(staff.positionLabel as (typeof EMPLOYMENT_POSITIONS)[number])
+        ? staff.positionLabel
+        : EMPLOYMENT_POSITIONS[0],
+    );
+    setEditVisaType(
+      EMPLOYMENT_VISA_TYPES.includes(staff.visaType as (typeof EMPLOYMENT_VISA_TYPES)[number])
+        ? staff.visaType
+        : EMPLOYMENT_VISA_TYPES[0],
+    );
+    setEditWorkLocation(
+      WORK_LOCATIONS.includes(staff.workLocation as (typeof WORK_LOCATIONS)[number])
+        ? staff.workLocation
+        : WORK_LOCATIONS[0],
+    );
+    setEditEmploymentType(
+      EMPLOYMENT_TYPES.includes(staff.employmentType as (typeof EMPLOYMENT_TYPES)[number])
+        ? staff.employmentType
+        : EMPLOYMENT_TYPES[0],
+    );
+    setEditRate(staff.rate != null ? String(staff.rate) : "");
+    setEditReportsTo(staff.reportsTo || "");
+    setEmploymentEditing(true);
+  }
+
+  async function handleSaveEmployment() {
+    if (!staff || savingEmployment) return;
+    const parsedRate = parseFloat(editRate);
+    if (Number.isNaN(parsedRate) || parsedRate <= 0) {
+      alert("Please enter a valid rate.");
+      return;
+    }
+    setSavingEmployment(true);
+    try {
+      await setDoc(
+        doc(getDb(), "staff_onboarding", staff.uid),
+        {
+          rehireDate: editRehireDate,
+          position: editPosition,
+          visaType: editVisaType,
+          workLocation: editWorkLocation,
+          employmentType: editEmploymentType,
+          afterTrainingRate: parsedRate,
+          trainingRate: parsedRate,
+          reportsTo: editReportsTo.trim(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      setStaff({
+        ...staff,
+        rehireDate: editRehireDate,
+        positionLabel: editPosition,
+        visaType: editVisaType,
+        workLocation: editWorkLocation,
+        employmentType: editEmploymentType,
+        rate: parsedRate,
+        reportsTo: editReportsTo.trim(),
+      });
+      setEmploymentEditing(false);
+    } catch (err) {
+      console.error("[employment] save failed:", err);
+      alert("Failed to save employment details.");
+    } finally {
+      setSavingEmployment(false);
+    }
+  }
+
   async function handleCancelNotice() {
     if (!notice || cancellingNotice) return;
     const ok = window.confirm(
@@ -567,24 +655,125 @@ export default function EmployeeDetailPage() {
 
           <p className={styles.sectionLabel}>EMPLOYMENT INFORMATION</p>
           <section className={styles.employmentCard}>
-            <EmploymentRow label="Rehire Date" value={fmtDateWithDay(staff.rehireDate)} accent />
-            <EmploymentRow label="Position" value={displayOrDash(staff.positionLabel)} />
-            <EmploymentRow label="Visa Type" value={displayOrDash(staff.visaType)} />
-            <EmploymentRow label="Work Location" value={displayOrDash(staff.workLocation)} />
-            <EmploymentRow label="Employment Type" value={displayOrDash(staff.employmentType)} />
-            <EmploymentRow
-              label="Rate"
-              value={typeof staff.rate === "number" ? `$${staff.rate.toFixed(2)} /hr` : "—"}
-            />
-            <EmploymentRow
-              label="Reports To"
-              value={staff.reportsTo ? `${staff.reportsTo} ›` : "—"}
-              last
-            />
-            <button type="button" className={styles.editEmploymentBtn}>
-              <EditIcon />
-              Edit Employment Details
-            </button>
+            {employmentEditing ? (
+              <>
+                <EmploymentEditRow label="Rehire Date">
+                  <button
+                    type="button"
+                    className={styles.employmentDateBtn}
+                    onClick={() => setCalRehireOpen(true)}
+                  >
+                    <CalendarMiniIcon />
+                    {fmtDateWithDay(editRehireDate)}
+                  </button>
+                </EmploymentEditRow>
+                <EmploymentEditRow label="Position">
+                  <select
+                    className={styles.employmentSelect}
+                    value={editPosition}
+                    onChange={(e) => setEditPosition(e.target.value)}
+                  >
+                    {EMPLOYMENT_POSITIONS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </EmploymentEditRow>
+                <EmploymentEditRow label="Visa Type">
+                  <select
+                    className={styles.employmentSelect}
+                    value={editVisaType}
+                    onChange={(e) => setEditVisaType(e.target.value)}
+                  >
+                    {EMPLOYMENT_VISA_TYPES.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </EmploymentEditRow>
+                <EmploymentEditRow label="Work Location">
+                  <select
+                    className={styles.employmentSelect}
+                    value={editWorkLocation}
+                    onChange={(e) => setEditWorkLocation(e.target.value)}
+                  >
+                    {WORK_LOCATIONS.map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </EmploymentEditRow>
+                <EmploymentEditRow label="Employment Type">
+                  <select
+                    className={styles.employmentSelect}
+                    value={editEmploymentType}
+                    onChange={(e) => setEditEmploymentType(e.target.value)}
+                  >
+                    {EMPLOYMENT_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </EmploymentEditRow>
+                <EmploymentEditRow label="Rate">
+                  <div className={styles.employmentRateRow}>
+                    <input
+                      type="number"
+                      className={styles.employmentInput}
+                      value={editRate}
+                      onChange={(e) => setEditRate(e.target.value)}
+                      min="0"
+                      step="0.01"
+                    />
+                    <span className={styles.employmentRateSuffix}>per hour</span>
+                  </div>
+                </EmploymentEditRow>
+                <EmploymentEditRow label="Reports To" last>
+                  <input
+                    type="text"
+                    className={styles.employmentInput}
+                    value={editReportsTo}
+                    onChange={(e) => setEditReportsTo(e.target.value)}
+                    placeholder="Manager name"
+                  />
+                </EmploymentEditRow>
+                <div className={styles.employmentEditActions}>
+                  <button
+                    type="button"
+                    className={styles.employmentCancelBtn}
+                    onClick={() => setEmploymentEditing(false)}
+                    disabled={savingEmployment}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.employmentSaveBtn}
+                    onClick={handleSaveEmployment}
+                    disabled={savingEmployment}
+                  >
+                    {savingEmployment ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <EmploymentRow label="Rehire Date" value={fmtDateWithDay(staff.rehireDate)} accent />
+                <EmploymentRow label="Position" value={displayOrDash(staff.positionLabel)} />
+                <EmploymentRow label="Visa Type" value={displayOrDash(staff.visaType)} />
+                <EmploymentRow label="Work Location" value={displayOrDash(staff.workLocation)} />
+                <EmploymentRow label="Employment Type" value={displayOrDash(staff.employmentType)} />
+                <EmploymentRow
+                  label="Rate"
+                  value={typeof staff.rate === "number" ? `$${staff.rate.toFixed(2)} /hr` : "—"}
+                />
+                <EmploymentRow
+                  label="Reports To"
+                  value={staff.reportsTo ? `${staff.reportsTo} ›` : "—"}
+                  last
+                />
+                <button type="button" className={styles.editEmploymentBtn} onClick={startEmploymentEdit}>
+                  <EditIcon />
+                  Edit Employment Details
+                </button>
+              </>
+            )}
           </section>
 
           <section className={styles.reactivationAlert}>
@@ -599,12 +788,6 @@ export default function EmployeeDetailPage() {
             </div>
             <span className={styles.activePill}>Active</span>
           </section>
-
-          <button type="button" className={styles.historyRow}>
-            <DocIcon />
-            <span className={styles.historyRowLabel}>Employment History</span>
-            <span className={styles.chev} aria-hidden="true">›</span>
-          </button>
 
           {prevTerm && (
             <>
@@ -767,18 +950,14 @@ export default function EmployeeDetailPage() {
       {/* Change status */}
       <p className={styles.sectionLabel}>CHANGE STATUS</p>
       {staff.isReactivated ? (
-        <div className={styles.statusGrid}>
-          <button type="button" className={styles.statusCard}>
-            <RefreshIcon />
-            <span className={styles.statusLabel}>Reactivate History</span>
-          </button>
+        <div className={styles.statusGridSingle}>
           <button
             type="button"
-            className={`${styles.statusCard} ${styles.statusCardWarm}`}
-            onClick={() => router.push(`/people/hr-notes/add?employee=${staff.uid}`)}
+            className={styles.statusCard}
+            onClick={() => setTerminateOpen(true)}
           >
-            <EditIcon />
-            <span className={styles.statusLabel}>Add HR Note</span>
+            <StopIcon />
+            <span className={styles.statusLabel}>Terminated</span>
           </button>
         </div>
       ) : (
@@ -834,6 +1013,14 @@ export default function EmployeeDetailPage() {
           submitting={terminating}
           onClose={() => (terminating ? undefined : setTerminateOpen(false))}
           onConfirm={handleConfirmTermination}
+        />
+      )}
+
+      {calRehireOpen && (
+        <CalendarPicker
+          value={editRehireDate}
+          onChange={setEditRehireDate}
+          onClose={() => setCalRehireOpen(false)}
         />
       )}
     </div>
@@ -1098,6 +1285,23 @@ function EmploymentRow({
       <span className={`${styles.employmentValue} ${accent ? styles.employmentValueAccent : ""}`}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function EmploymentEditRow({
+  label,
+  children,
+  last = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  last?: boolean;
+}) {
+  return (
+    <div className={`${styles.employmentEditRow} ${last ? styles.employmentRowLast : ""}`}>
+      <span className={styles.employmentLabel}>{label}</span>
+      <div className={styles.employmentEditControl}>{children}</div>
     </div>
   );
 }
