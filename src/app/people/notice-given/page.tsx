@@ -13,7 +13,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef, isStrictOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
-import { noticeLastWorkingDay } from "@/lib/notice-last-day";
+import { noticeLastWorkingDay, isReadyToTerminate } from "@/lib/notice-last-day";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -115,6 +115,12 @@ function daysDiff(iso: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
+function fmtLastDayShort(iso: string): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+}
+
 function tsDate(v: unknown): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
@@ -180,10 +186,19 @@ export default function NoticeGivenPage() {
     }
     (async () => {
       try {
-        const snap = await getDocs(
-          query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
+        const [noticeSnap, staffSnap] = await Promise.all([
+          getDocs(query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc"))),
+          getDocs(collection(getDb(), "staff_onboarding")),
+        ]);
+        const terminatedUids = new Set(
+          staffSnap.docs
+            .filter((d) => (d.data().status ?? "").toLowerCase() === "terminated")
+            .map((d) => d.id),
         );
-        setNotices(snap.docs.map((doc) => mapNoticeDoc(doc.id, doc.data() as StoredNotice)));
+        const list = noticeSnap.docs
+          .map((doc) => mapNoticeDoc(doc.id, doc.data() as StoredNotice))
+          .filter((n) => n.employeeUid && !terminatedUids.has(n.employeeUid));
+        setNotices(list);
       } catch {
         setNotices([]);
       } finally {
@@ -268,7 +283,9 @@ function OwnerNoticeGivenList({ notices }: { notices: Notice[] }) {
         <p className={styles.ownerEmpty}>No notices found.</p>
       ) : (
         <ul className={styles.ownerList}>
-          {paged.map((n) => (
+          {paged.map((n) => {
+            const readyToTerminate = isReadyToTerminate(n.lastWorkingDay);
+            return (
             <li key={n.id}>
               <button
                 type="button"
@@ -282,22 +299,40 @@ function OwnerNoticeGivenList({ notices }: { notices: Notice[] }) {
                   <div className={styles.ownerCardMain}>
                     <div className={styles.ownerCardIdentity}>
                       <p className={styles.ownerCardName}>{n.employeeName}</p>
-                      <p className={styles.ownerCardPos}>{n.employeePosition || "—"}</p>
                       {n.department !== "Other" && (
                         <span className={styles.ownerDeptBadge}>{n.department}</span>
                       )}
+                      {readyToTerminate && (
+                        <span className={styles.ownerReadyPill}>
+                          <span className={styles.ownerReadyDot} aria-hidden="true" />
+                          Ready to Terminate
+                        </span>
+                      )}
                     </div>
                     <div className={styles.ownerCardDates}>
-                      <div className={styles.ownerDateBlock}>
-                        <span className={styles.ownerDateLabel}>Notice Given</span>
-                        <span className={styles.ownerDateValue}>{fmtWithDay(n.noticeGivenDate)}</span>
-                      </div>
-                      <div className={styles.ownerDateBlock}>
-                        <span className={styles.ownerDateLabel}>Last Working Day</span>
-                        <span className={`${styles.ownerDateValue} ${styles.ownerDateWarm}`}>
-                          {fmtWithDay(n.lastWorkingDay)}
-                        </span>
-                      </div>
+                      {readyToTerminate ? (
+                        <>
+                          <div className={styles.ownerDateBlock}>
+                            <span className={styles.ownerDateLabel}>
+                              Last day {fmtLastDayShort(n.lastWorkingDay)}
+                            </span>
+                          </div>
+                          <span className={styles.ownerDatePassed}>Last day passed</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className={styles.ownerDateBlock}>
+                            <span className={styles.ownerDateLabel}>Notice Given</span>
+                            <span className={styles.ownerDateValue}>{fmtWithDay(n.noticeGivenDate)}</span>
+                          </div>
+                          <div className={styles.ownerDateBlock}>
+                            <span className={styles.ownerDateLabel}>Last Working Day</span>
+                            <span className={`${styles.ownerDateValue} ${styles.ownerDateWarm}`}>
+                              {fmtWithDay(n.lastWorkingDay)}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                   <ChevronIcon />
@@ -317,7 +352,8 @@ function OwnerNoticeGivenList({ notices }: { notices: Notice[] }) {
                 </div>
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
