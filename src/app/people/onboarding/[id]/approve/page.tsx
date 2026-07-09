@@ -15,6 +15,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { isStrictOwner } from "@/lib/permissions";
 import { shouldActivatePayrollReminder } from "@/lib/payroll-attention";
 import { onboardingProgressPatch } from "@/lib/staff-active";
+import { ROUTES } from "@/lib/routes";
 import { createStaffAccount } from "@/lib/staff-admin";
 import { emailToUsername, usernameToEmail, validateUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
