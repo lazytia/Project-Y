@@ -86,12 +86,6 @@
 .attentionHead {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-.attentionHeadLeft {
-  display: flex;
-  align-items: flex-start;
   gap: var(--space-2);
   min-width: 0;
 }
@@ -118,11 +112,6 @@
   color: var(--color-fg);
   margin: 0;
   line-height: 1.35;
-}
-.attentionChev {
-  color: var(--color-fg-muted);
-  font-size: 18px;
-  flex-shrink: 0;
 }
 .attentionList {
   list-style: none;

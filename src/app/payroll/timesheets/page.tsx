@@ -446,20 +446,17 @@ export default function TimesheetsPage() {
       {attentionItems.length > 0 && (
         <section className={styles.attentionCard} aria-label="Payroll attention">
           <div className={styles.attentionHead}>
-            <div className={styles.attentionHeadLeft}>
-              <span className={styles.attentionIcon} aria-hidden="true">
-                <WarnIcon />
-              </span>
-              <div>
-                <p className={styles.attentionEyebrow}>PAYROLL ATTENTION</p>
-                <p className={styles.attentionTitle}>
-                  {attentionItems.length === 1
-                    ? "1 employee may require wage increase"
-                    : `${attentionItems.length} employees may require wage increase`}
-                </p>
-              </div>
+            <span className={styles.attentionIcon} aria-hidden="true">
+              <WarnIcon />
+            </span>
+            <div>
+              <p className={styles.attentionEyebrow}>PAYROLL ATTENTION</p>
+              <p className={styles.attentionTitle}>
+                {attentionItems.length === 1
+                  ? "1 employee may require wage increase"
+                  : `${attentionItems.length} employees may require wage increase`}
+              </p>
             </div>
-            <span className={styles.attentionChev} aria-hidden="true">›</span>
           </div>
 
           <ul className={styles.attentionList}>
