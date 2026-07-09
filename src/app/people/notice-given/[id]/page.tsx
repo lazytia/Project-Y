@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
   deleteDoc,
@@ -13,11 +13,13 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
+import { isOwner, isStrictOwner, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
+import { noticeLastWorkingDay } from "@/lib/notice-last-day";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
+import NoticeDetailView, { type NoticeDetailData } from "./NoticeDetailView";
 import styles from "./page.module.css";
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -65,37 +67,123 @@ function initials(name: string): string {
     .join("");
 }
 
-export default function NoticeGivenEditPage({
+function departmentOf(position: string): NoticeDetailData["department"] {
+  const p = position.trim().toLowerCase();
+  if (p.includes("kitchen") || p.includes("chef")) return "Kitchen";
+  if (p.includes("hall") || p.includes("manager")) return "Hall";
+  return "Other";
+}
+
+export default function NoticeGivenIdPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
+  const ownerView = isStrictOwner(user);
+  const editMode = searchParams.get("edit") === "1";
 
-  const [docId, setDocId] = useState<string>("");
+  const [docId, setDocId] = useState("");
+  const [detail, setDetail] = useState<NoticeDetailData | null>(null);
   const [docLoading, setDocLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!allowed) router.replace(ROUTES.home);
+  }, [authLoading, allowed, router]);
+
+  useEffect(() => {
+    if (!allowed) return;
+    (async () => {
+      try {
+        const resolved = await params;
+        setDocId(resolved.id);
+        const snap = await getDoc(doc(getDb(), "notice_given", resolved.id));
+        if (!snap.exists()) {
+          setNotFound(true);
+          return;
+        }
+        const d = snap.data();
+        const position = (d.employeePosition as string) ?? "";
+        setDetail({
+          id: resolved.id,
+          employeeUid: (d.employeeUid as string) ?? "",
+          employeeName: (d.employeeName as string) ?? "Unknown",
+          employeePosition: position,
+          department: departmentOf(position),
+          noticeGivenDate: (d.noticeGivenDate as string) ?? "",
+          lastWorkingDay: noticeLastWorkingDay({
+            finalShiftDate: d.finalShiftDate as string | undefined,
+            lastWorkingDay: d.lastWorkingDay as string | undefined,
+          }),
+          reasonForLeaving: (d.reasonForLeaving as string) ?? "",
+          reasonForLeavingOther: (d.reasonForLeavingOther as string) ?? "",
+          rehireEligible: (d.rehireEligible as string) ?? "",
+          managerNotes: (d.managerNotes as string) ?? "",
+          submittedByName: (d.createdByName as string) ?? "",
+        });
+      } catch {
+        setNotFound(true);
+      } finally {
+        setDocLoading(false);
+      }
+    })();
+  }, [allowed, params]);
+
+  if (authLoading || docLoading) return <Splash />;
+  if (!allowed) return null;
+  if (notFound || !detail) {
+    return (
+      <div className={styles.page}>
+        <p className={styles.saveHint}>Notice not found.</p>
+      </div>
+    );
+  }
+
+  if (ownerView && !editMode) {
+    return <NoticeDetailView notice={detail} />;
+  }
+
+  return <NoticeEditForm docId={docId} initialDetail={detail} />;
+}
+
+function NoticeEditForm({
+  docId,
+  initialDetail,
+}: {
+  docId: string;
+  initialDetail: NoticeDetailData;
+}) {
+  const router = useRouter();
+  const { user } = useAuth();
 
   /* ── Staff picker ── */
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
-  const [selectedUid, setSelectedUid] = useState("");
+  const [selectedUid, setSelectedUid] = useState(initialDetail.employeeUid);
 
   /* ── Notice Details ── */
-  const [noticeGivenDate, setNoticeGivenDate] = useState("");
-  const [lastWorkingDay, setLastWorkingDay] = useState("");
-  const [reasonForLeaving, setReasonForLeaving] = useState("");
-  const [reasonForLeavingOther, setReasonForLeavingOther] = useState("");
-  const [rehireEligible, setRehireEligible] = useState<"Yes" | "No" | "Unsure" | "">("");
+  const [noticeGivenDate, setNoticeGivenDate] = useState(initialDetail.noticeGivenDate);
+  const [lastWorkingDay, setLastWorkingDay] = useState(initialDetail.lastWorkingDay);
+  const [reasonForLeaving, setReasonForLeaving] = useState(initialDetail.reasonForLeaving);
+  const [reasonForLeavingOther, setReasonForLeavingOther] = useState(initialDetail.reasonForLeavingOther);
+  const [rehireEligible, setRehireEligible] = useState<"Yes" | "No" | "Unsure" | "">(
+    (["Yes", "No", "Unsure"].includes(initialDetail.rehireEligible)
+      ? initialDetail.rehireEligible
+      : "") as "Yes" | "No" | "Unsure" | "",
+  );
 
   /* ── Final Shift ── */
-  const [finalShiftDate, setFinalShiftDate] = useState("");
+  const [finalShiftDate, setFinalShiftDate] = useState(initialDetail.lastWorkingDay);
 
   /* ── Manager Notes ── */
-  const [managerNotes, setManagerNotes] = useState("");
+  const [managerNotes, setManagerNotes] = useState(initialDetail.managerNotes);
 
   /* ── Calendar pickers ── */
   const [calNoticeOpen, setCalNoticeOpen] = useState(false);
@@ -107,49 +195,11 @@ export default function NoticeGivenEditPage({
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!allowed) router.replace(ROUTES.home);
-  }, [authLoading, allowed, router]);
-
-  // Defer date initialization to avoid hydration mismatch
-  useEffect(() => {
-    setNoticeGivenDate(todayIso());
-  }, []);
-
-  /* ── Resolve params and load document ── */
-  useEffect(() => {
-    if (!allowed) return;
-    (async () => {
-      try {
-        const resolved = await params;
-        setDocId(resolved.id);
-        const snap = await getDoc(doc(getDb(), "notice_given", resolved.id));
-        if (snap.exists()) {
-          const d = snap.data();
-          setSelectedUid((d.employeeUid as string) ?? "");
-          setNoticeGivenDate((d.noticeGivenDate as string) ?? todayIso());
-          setLastWorkingDay((d.lastWorkingDay as string) ?? "");
-          setReasonForLeaving((d.reasonForLeaving as string) ?? "");
-          setReasonForLeavingOther((d.reasonForLeavingOther as string) ?? "");
-          setRehireEligible(
-            (["Yes", "No", "Unsure"].includes(d.rehireEligible as string)
-              ? d.rehireEligible
-              : "") as "Yes" | "No" | "Unsure" | "",
-          );
-          setFinalShiftDate((d.finalShiftDate as string) ?? "");
-          setManagerNotes((d.managerNotes as string) ?? "");
-        }
-      } catch {
-        /* ignore */
-      } finally {
-        setDocLoading(false);
-      }
-    })();
-  }, [allowed, params]);
+    if (!noticeGivenDate) setNoticeGivenDate(todayIso());
+  }, [noticeGivenDate]);
 
   /* ── Load staff list ── */
   useEffect(() => {
-    if (!allowed) return;
     (async () => {
       try {
         // Pull the whole staff_onboarding collection and drop only the
@@ -197,7 +247,7 @@ export default function NoticeGivenEditPage({
         setStaffLoading(false);
       }
     })();
-  }, [allowed]);
+  }, [user]);
 
   const selectedStaff = staff.find((s) => s.uid === selectedUid) ?? null;
   const filteredStaff = staffSearch.trim()
@@ -224,11 +274,11 @@ export default function NoticeGivenEditPage({
         reasonForLeaving,
         reasonForLeavingOther: reasonForLeaving === "Other" ? reasonForLeavingOther.trim() : "",
         rehireEligible,
-        finalShiftDate,
+        finalShiftDate: lastWorkingDay,
         managerNotes: managerNotes.trim(),
         updatedAt: serverTimestamp(),
       });
-      router.push("/people/notice-given");
+      router.push(isStrictOwner(user) ? `/people/notice-given/${docId}` : "/people/notice-given");
     } catch {
       alert("Failed to save.");
     } finally {
@@ -250,9 +300,6 @@ export default function NoticeGivenEditPage({
     }
   }
 
-  if (authLoading || docLoading) return <Splash />;
-  if (!allowed) return null;
-
   return (
     <div className={styles.page}>
       {/* Header */}
@@ -260,7 +307,11 @@ export default function NoticeGivenEditPage({
         <button
           type="button"
           className={styles.backBtn}
-          onClick={() => router.push("/people/notice-given")}
+          onClick={() =>
+            router.push(
+              isStrictOwner(user) ? `/people/notice-given/${docId}` : "/people/notice-given",
+            )
+          }
           aria-label="Back"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

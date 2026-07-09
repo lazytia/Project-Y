@@ -60,8 +60,6 @@ const MANAGER_TAB_LABELS: Record<ManagerTab, string> = {
   overdue: "Overdue",
 };
 
-const PER_PAGE_OPTIONS = [10, 20, 50] as const;
-
 function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -222,8 +220,6 @@ export default function NoticeGivenPage() {
 function OwnerNoticeGivenList({ notices }: { notices: Notice[] }) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState<(typeof PER_PAGE_OPTIONS)[number]>(10);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -235,17 +231,6 @@ function OwnerNoticeGivenList({ notices }: { notices: Notice[] }) {
         n.department.toLowerCase().includes(q),
     );
   }, [notices, searchQuery]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, perPage]);
-
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / perPage));
-  const safePage = Math.min(page, totalPages);
-  const startIdx = total === 0 ? 0 : (safePage - 1) * perPage + 1;
-  const endIdx = Math.min(safePage * perPage, total);
-  const paged = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   return (
     <div className={styles.ownerPage}>
@@ -279,20 +264,18 @@ function OwnerNoticeGivenList({ notices }: { notices: Notice[] }) {
         </span>
       </div>
 
-      {paged.length === 0 ? (
+      {filtered.length === 0 ? (
         <p className={styles.ownerEmpty}>No notices found.</p>
       ) : (
         <ul className={styles.ownerList}>
-          {paged.map((n) => {
+          {filtered.map((n) => {
             const readyToTerminate = isReadyToTerminate(n.lastWorkingDay);
             return (
             <li key={n.id}>
               <button
                 type="button"
                 className={styles.ownerCard}
-                onClick={() => {
-                  if (n.employeeUid) router.push(`/people/active/${n.employeeUid}`);
-                }}
+                onClick={() => router.push(`/people/notice-given/${n.id}`)}
               >
                 <div className={styles.ownerCardTop}>
                   <div className={styles.ownerAvatar}>{initials(n.employeeName)}</div>
@@ -355,35 +338,6 @@ function OwnerNoticeGivenList({ notices }: { notices: Notice[] }) {
             );
           })}
         </ul>
-      )}
-
-      {total > 0 && (
-        <div className={styles.ownerPagination}>
-          <p className={styles.ownerPaginationText}>
-            Showing {startIdx} to {endIdx} of {total} notices
-          </p>
-          <div className={styles.ownerPaginationControls}>
-            <button
-              type="button"
-              className={styles.ownerPageBtn}
-              aria-current="page"
-            >
-              {safePage}
-            </button>
-            <select
-              className={styles.ownerPerPage}
-              value={perPage}
-              onChange={(e) => setPerPage(Number(e.target.value) as (typeof PER_PAGE_OPTIONS)[number])}
-              aria-label="Notices per page"
-            >
-              {PER_PAGE_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  {n} per page
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
       )}
 
       <aside className={styles.ownerInfoBox}>

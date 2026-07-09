@@ -183,6 +183,12 @@ export default function NoticeGivenNewPage() {
         rehireEligible,
         finalShiftDate,
         managerNotes: managerNotes.trim(),
+        createdByName:
+          user?.displayName?.trim() ||
+          (() => {
+            const u = emailToUsername(user?.email ?? "");
+            return u ? u.charAt(0).toUpperCase() + u.slice(1) : "Manager";
+          })(),
         createdAt: serverTimestamp(),
       });
       router.push("/people/notice-given");
