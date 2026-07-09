@@ -17,6 +17,11 @@ const ManagerDashboard = dynamic(() => import("@/components/ManagerDashboard"), 
 const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
   ssr: false,
 });
+// Attention card sits above the TODAY tile — code-split so it doesn't
+// bloat the manager/chef dashboards (which don't render it).
+const DashboardAttention = dynamic(() => import("@/components/DashboardAttention"), {
+  ssr: false,
+});
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import {
@@ -590,6 +595,11 @@ function OwnerDashboard() {
           onClose={() => setCalendarOpen(false)}
         />
       )}
+
+      {/* ATTENTION — today's new items across catering, sold-out, new
+          hires, notice given, HR notes, and cash payments. Rows the owner
+          hits Noted on disappear until tomorrow. */}
+      <DashboardAttention />
 
       {/* TODAY */}
       <section className={styles.todayCard}>
