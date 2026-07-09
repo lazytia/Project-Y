@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -47,6 +48,16 @@ type HrNote = {
   date: string;
   body: string;
   addedBy: string;
+};
+
+type ActiveNotice = {
+  id: string;
+  noticeGivenDate: string;
+  lastWorkingDay: string;
+  reasonForLeaving: string;
+  reasonForLeavingOther: string;
+  rehireEligible: string;
+  managerNotes: string;
 };
 
 type Staff = {
@@ -103,6 +114,29 @@ function daysFromToday(d: Date | null): number | null {
 function fmtDate(d: Date | null | undefined): string {
   if (!d) return "—";
   return d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** "25 Jul 2026 (Fri)" — used inside the notice information rows so the
+ *  owner can double-check the day of the week without a mental map. */
+function fmtDateWithDay(iso: string): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const date = new Date(y, m - 1, d);
+  const main = date.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  const dow = date.toLocaleDateString("en-AU", { weekday: "short" });
+  return `${main} (${dow})`;
+}
+
+function daysBetween(fromISO: string): number | null {
+  if (!fromISO) return null;
+  const [y, m, d] = fromISO.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const target = new Date(y, m - 1, d);
+  target.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - now.getTime()) / 86_400_000);
 }
 
 function initialsOf(name: string): string {
@@ -165,6 +199,8 @@ export default function EmployeeDetailPage() {
   const [staff, setStaff] = useState<Staff | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [hrNotes, setHrNotes] = useState<HrNote[]>([]);
+  const [notice, setNotice] = useState<ActiveNotice | null>(null);
+  const [cancellingNotice, setCancellingNotice] = useState(false);
   const [openDoc, setOpenDoc] = useState<DocKey | null>(null);
 
   useEffect(() => {
@@ -227,6 +263,32 @@ export default function EmployeeDetailPage() {
 
         if (!cancelled) setStaff(built);
 
+        // Notice given — one active row per employee (they only appear on
+        // Active while the notice is open, so we take the most recent).
+        try {
+          const noticeSnap = await getDocs(
+            query(collection(getDb(), "notice_given"), where("employeeUid", "==", id)),
+          );
+          const notices = noticeSnap.docs
+            .map((d) => {
+              const data = d.data() as Record<string, unknown>;
+              return {
+                id: d.id,
+                noticeGivenDate: typeof data.noticeGivenDate === "string" ? data.noticeGivenDate : "",
+                lastWorkingDay: typeof data.lastWorkingDay === "string" ? data.lastWorkingDay : "",
+                reasonForLeaving: typeof data.reasonForLeaving === "string" ? data.reasonForLeaving : "",
+                reasonForLeavingOther: typeof data.reasonForLeavingOther === "string" ? data.reasonForLeavingOther : "",
+                rehireEligible: typeof data.rehireEligible === "string" ? data.rehireEligible : "",
+                managerNotes: typeof data.managerNotes === "string" ? data.managerNotes : "",
+              } satisfies ActiveNotice;
+            })
+            // Newest first — the most recent notice is authoritative.
+            .sort((a, b) => (b.noticeGivenDate || "").localeCompare(a.noticeGivenDate || ""));
+          if (!cancelled) setNotice(notices[0] ?? null);
+        } catch {
+          /* leave notice null */
+        }
+
         // HR notes are stored top-level, keyed by employeeUid.
         try {
           const notesSnap = await getDocs(
@@ -279,6 +341,28 @@ export default function EmployeeDetailPage() {
   }, [openDoc]);
 
   const visaDays = useMemo(() => daysFromToday(staff?.visaExpiry ?? null), [staff]);
+  const noticeDaysRemaining = useMemo(
+    () => (notice ? daysBetween(notice.lastWorkingDay) : null),
+    [notice],
+  );
+
+  async function handleCancelNotice() {
+    if (!notice || cancellingNotice) return;
+    const ok = window.confirm(
+      "Cancel this notice? The employee will move back to Active status.",
+    );
+    if (!ok) return;
+    setCancellingNotice(true);
+    try {
+      await deleteDoc(doc(getDb(), "notice_given", notice.id));
+      setNotice(null);
+    } catch (err) {
+      console.error("[notice-given] cancel failed:", err);
+      alert("Failed to cancel notice. Please try again.");
+    } finally {
+      setCancellingNotice(false);
+    }
+  }
 
   if (authLoading || !allowed) return <Splash />;
 
@@ -294,24 +378,66 @@ export default function EmployeeDetailPage() {
   if (!staff) return <Splash label="Loading…" />;
 
   const visaWarn = visaDays !== null && visaDays >= 0 && visaDays <= VISA_WINDOW_DAYS;
+  const hasNotice = notice !== null;
+  const reasonDisplay =
+    notice?.reasonForLeaving === "Other" && notice.reasonForLeavingOther
+      ? `Other — ${notice.reasonForLeavingOther}`
+      : notice?.reasonForLeaving || "—";
 
   return (
     <div className={styles.page}>
       <TopBar onBack={() => router.back()} />
 
-      {/* Profile card */}
-      <section className={styles.profileCard}>
+      {/* Profile card — orange notice-mode variant when the employee has
+          an active notice_given row. */}
+      <section className={`${styles.profileCard} ${hasNotice ? styles.profileCardNotice : ""}`}>
         <div className={styles.profileTop}>
           <div className={styles.avatarWrap} aria-hidden="true">
             <div className={styles.avatar}>{initialsOf(staff.name)}</div>
-            <span className={styles.avatarDot} />
+            <span className={`${styles.avatarDot} ${hasNotice ? styles.avatarDotNotice : ""}`} />
           </div>
           <div className={styles.profileMain}>
             <h2 className={styles.profileName}>{staff.name}</h2>
             <p className={styles.profilePos}>{staff.positionLabel}</p>
-            <span className={styles.activePill}>Active</span>
+            {hasNotice ? (
+              <span className={styles.noticePill}>Notice Given</span>
+            ) : (
+              <span className={styles.activePill}>Active</span>
+            )}
           </div>
+          {hasNotice && noticeDaysRemaining !== null && noticeDaysRemaining >= 0 && (
+            <div className={styles.noticeCountdown} aria-label="Days remaining">
+              <span className={styles.noticeCountdownIcon} aria-hidden="true"><ClockIcon /></span>
+              <div className={styles.noticeCountdownText}>
+                <p className={styles.noticeCountdownDays}>{noticeDaysRemaining} days</p>
+                <p className={styles.noticeCountdownSub}>remaining</p>
+              </div>
+            </div>
+          )}
         </div>
+
+        {hasNotice && notice && (
+          <>
+            <div className={styles.profileDivider} aria-hidden="true" />
+            <div className={styles.noticeDateGrid}>
+              <div className={styles.noticeDateCol}>
+                <span className={styles.noticeDateIcon} aria-hidden="true"><CalendarMiniIcon /></span>
+                <div>
+                  <p className={styles.noticeDateLabel}>LAST WORKING DAY</p>
+                  <p className={styles.noticeDateValue}>{fmtDateWithDay(notice.lastWorkingDay)}</p>
+                </div>
+              </div>
+              <div className={styles.noticeDateDivider} aria-hidden="true" />
+              <div className={styles.noticeDateCol}>
+                <div>
+                  <p className={styles.noticeDateLabel}>NOTICE GIVEN DATE</p>
+                  <p className={styles.noticeDateValueMuted}>{fmtDateWithDay(notice.noticeGivenDate)}</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         <div className={styles.profileDivider} aria-hidden="true" />
         <div className={styles.profileStats}>
           <StatCell label="Rate" value={typeof staff.rate === "number" ? `$${staff.rate}/hr` : "—"} accent />
@@ -341,6 +467,20 @@ export default function EmployeeDetailPage() {
         </button>
       )}
 
+      {/* Notice information — only when the employee is under notice. */}
+      {hasNotice && notice && (
+        <>
+          <p className={styles.sectionLabel}>NOTICE INFORMATION</p>
+          <section className={styles.noticeInfoCard}>
+            <InfoRow label="Notice Given Date" value={fmtDateWithDay(notice.noticeGivenDate)} />
+            <InfoRow label="Last Working Day" value={fmtDateWithDay(notice.lastWorkingDay)} accent />
+            <InfoRow label="Reason for Leaving" value={reasonDisplay} />
+            <InfoRow label="Rehire Eligible" value={notice.rehireEligible || "—"} />
+            <InfoRow label="Manager Notes" value={notice.managerNotes || "—"} last />
+          </section>
+        </>
+      )}
+
       {/* Documents */}
       <p className={styles.sectionLabel}>DOCUMENTS</p>
       <section className={styles.docsCard}>
@@ -363,24 +503,50 @@ export default function EmployeeDetailPage() {
       {/* Change status */}
       <p className={styles.sectionLabel}>CHANGE STATUS</p>
       <div className={styles.statusGrid}>
-        <button
-          type="button"
-          className={styles.statusCard}
-          onClick={() =>
-            router.push(`/people/notice-given/new?uid=${encodeURIComponent(staff.uid)}`)
-          }
-        >
-          <CalendarIcon />
-          <span className={styles.statusLabel}>Notice Given</span>
-        </button>
-        <button
-          type="button"
-          className={styles.statusCard}
-          onClick={() => router.push("/people/terminated")}
-        >
-          <StopIcon />
-          <span className={styles.statusLabel}>Terminated</span>
-        </button>
+        {hasNotice ? (
+          <>
+            <button
+              type="button"
+              className={styles.statusCard}
+              onClick={handleCancelNotice}
+              disabled={cancellingNotice}
+            >
+              <EditIcon />
+              <span className={styles.statusLabel}>
+                {cancellingNotice ? "Cancelling…" : "Cancel Notice"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.statusCard}
+              onClick={() => router.push("/people/terminated")}
+            >
+              <StopIcon />
+              <span className={styles.statusLabel}>Terminate Employee</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={styles.statusCard}
+              onClick={() =>
+                router.push(`/people/notice-given/new?uid=${encodeURIComponent(staff.uid)}`)
+              }
+            >
+              <CalendarIcon />
+              <span className={styles.statusLabel}>Notice Given</span>
+            </button>
+            <button
+              type="button"
+              className={styles.statusCard}
+              onClick={() => router.push("/people/terminated")}
+            >
+              <StopIcon />
+              <span className={styles.statusLabel}>Terminated</span>
+            </button>
+          </>
+        )}
       </div>
 
       {openDoc && (
@@ -636,6 +802,25 @@ function renderModalBody(
   }
 }
 
+function InfoRow({
+  label,
+  value,
+  accent = false,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <div className={`${styles.infoRow} ${last ? styles.infoRowLast : ""}`}>
+      <span className={styles.infoLabel}>{label}</span>
+      <span className={`${styles.infoValue} ${accent ? styles.infoValueAccent : ""}`}>{value}</span>
+    </div>
+  );
+}
+
 function DefRow({ label, value }: { label: string; value: string | undefined }) {
   return (
     <div className={styles.modalDefRow}>
@@ -711,6 +896,35 @@ function StopIcon() {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
       <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function CalendarMiniIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
   );
 }

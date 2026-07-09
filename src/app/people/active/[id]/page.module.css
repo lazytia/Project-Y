@@ -53,6 +53,12 @@
   gap: var(--space-4);
 }
 
+/* Warm-tinted variant used when the employee has an active notice. */
+.profileCardNotice {
+  background: var(--color-warm-bg);
+  border-color: transparent;
+}
+
 .profileTop {
   display: flex;
   align-items: center;
@@ -89,6 +95,10 @@
   border: 2px solid var(--color-bg);
 }
 
+.avatarDotNotice {
+  background: var(--color-warm);
+}
+
 .profileMain {
   display: flex;
   flex-direction: column;
@@ -119,6 +129,137 @@
   color: var(--color-positive);
   font-size: 12px;
   font-weight: 600;
+}
+
+.noticePill {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--color-warm);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profileTop {
+  position: relative;
+}
+
+.noticeCountdown {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--color-warm);
+  align-self: flex-start;
+  margin-left: auto;
+}
+
+.noticeCountdownIcon {
+  margin-top: 2px;
+}
+
+.noticeCountdownText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.noticeCountdownDays {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-warm);
+}
+
+.noticeCountdownSub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.noticeDateGrid {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.noticeDateCol {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.noticeDateIcon {
+  color: var(--color-warm);
+  margin-top: 2px;
+}
+
+.noticeDateLabel {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.noticeDateValue {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-warm);
+}
+
+.noticeDateValueMuted {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.noticeDateDivider {
+  width: 1px;
+  background: rgba(255, 106, 19, 0.25);
+}
+
+/* ── Notice information card ── */
+.noticeInfoCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.infoRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.infoRowLast {
+  border-bottom: none;
+}
+
+.infoLabel {
+  font-size: 13px;
+  color: var(--color-fg);
+  font-weight: 500;
+}
+
+.infoValue {
+  font-size: 13px;
+  color: var(--color-fg);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.infoValueAccent {
+  color: var(--color-warm);
 }
 
 .profileDivider {
