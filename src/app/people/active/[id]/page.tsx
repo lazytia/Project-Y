@@ -19,6 +19,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -283,10 +284,11 @@ export default function EmployeeDetailPage() {
               // `lastWorkingDay` string, so fall back to it if needed.
               const finalShift = typeof data.finalShiftDate === "string" ? data.finalShiftDate : "";
               const legacyLast = typeof data.lastWorkingDay === "string" ? data.lastWorkingDay : "";
+              const lastDay = noticeLastWorkingDay({ finalShiftDate: finalShift, lastWorkingDay: legacyLast });
               return {
                 id: d.id,
                 noticeGivenDate: typeof data.noticeGivenDate === "string" ? data.noticeGivenDate : "",
-                lastWorkingDay: finalShift || legacyLast,
+                lastWorkingDay: lastDay,
                 reasonForLeaving: typeof data.reasonForLeaving === "string" ? data.reasonForLeaving : "",
                 reasonForLeavingOther: typeof data.reasonForLeavingOther === "string" ? data.reasonForLeavingOther : "",
                 rehireEligible: typeof data.rehireEligible === "string" ? data.rehireEligible : "",
@@ -353,7 +355,11 @@ export default function EmployeeDetailPage() {
 
   const visaDays = useMemo(() => daysFromToday(staff?.visaExpiry ?? null), [staff]);
   const noticeDaysRemaining = useMemo(
-    () => (notice ? daysBetween(notice.lastWorkingDay) : null),
+    () => (notice ? noticeDaysFromToday(notice.lastWorkingDay) : null),
+    [notice],
+  );
+  const readyToTerminate = useMemo(
+    () => (notice ? isReadyToTerminate(notice.lastWorkingDay) : false),
     [notice],
   );
 
@@ -457,7 +463,11 @@ export default function EmployeeDetailPage() {
             <h2 className={styles.profileName}>{staff.name}</h2>
             <p className={styles.profilePos}>{staff.positionLabel}</p>
             {hasNotice ? (
-              <span className={styles.noticePill}>Notice Given</span>
+              readyToTerminate ? (
+                <span className={styles.readyPill}>Ready to Terminate</span>
+              ) : (
+                <span className={styles.noticePill}>Notice Given</span>
+              )
             ) : (
               <span className={styles.activePill}>Active</span>
             )}

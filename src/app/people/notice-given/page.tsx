@@ -14,6 +14,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
+import { noticeLastWorkingDay } from "@/lib/notice-last-day";
 import styles from "./page.module.css";
 
 type StoredNotice = {
@@ -135,7 +136,7 @@ export default function NoticeGivenPage() {
             employeeName: data.employeeName ?? "Unknown",
             employeePosition: data.employeePosition ?? "",
             noticeGivenDate: data.noticeGivenDate ?? "",
-            lastWorkingDay: data.lastWorkingDay ?? "",
+            lastWorkingDay: noticeLastWorkingDay(data),
             reasonForLeaving: data.reasonForLeaving ?? "",
             reasonForLeavingOther: data.reasonForLeavingOther ?? "",
             rehireEligible: data.rehireEligible ?? "",

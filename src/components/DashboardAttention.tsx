@@ -12,6 +12,7 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { isNoticeGivenActive, isReadyToTerminate, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import styles from "./DashboardAttention.module.css";
 
 /**
@@ -31,6 +32,7 @@ type AttentionKind =
   | "soldOut"
   | "newEmployee"
   | "noticeGiven"
+  | "readyToTerminate"
   | "hrNotes"
   | "cashPayment";
 
@@ -125,16 +127,23 @@ async function loadNewEmployeeCount(): Promise<number> {
   }, 0);
 }
 
-async function loadNoticeGivenCount(todayKey: string): Promise<number> {
-  // Notices still in play — either no final day set yet, or the final
-  // day is today/future. Past notices belong to Terminated.
+async function loadNoticeGivenCount(): Promise<number> {
   const snap = await getDocs(
     query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
   );
   return snap.docs.reduce((acc, d) => {
-    const last = String(d.data().lastWorkingDay ?? "");
-    if (!last || last >= todayKey) return acc + 1;
-    return acc;
+    const last = noticeLastWorkingDay(d.data() as { finalShiftDate?: string; lastWorkingDay?: string });
+    return isNoticeGivenActive(last) ? acc + 1 : acc;
+  }, 0);
+}
+
+async function loadReadyToTerminateCount(): Promise<number> {
+  const snap = await getDocs(
+    query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
+  );
+  return snap.docs.reduce((acc, d) => {
+    const last = noticeLastWorkingDay(d.data() as { finalShiftDate?: string; lastWorkingDay?: string });
+    return isReadyToTerminate(last) ? acc + 1 : acc;
   }, 0);
 }
 
@@ -224,6 +233,15 @@ function DollarIcon() {
   );
 }
 
+function StopCircleIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="8" y1="8" x2="16" y2="16" />
+    </svg>
+  );
+}
+
 function CheckCircleIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -251,11 +269,12 @@ export default function DashboardAttention() {
     let cancelled = false;
     (async () => {
       const sinceUtc = startOfSydneyToday();
-      const [catering, soldOut, newEmp, notice, hr, cash] = await Promise.all([
+      const [catering, soldOut, newEmp, notice, ready, hr, cash] = await Promise.all([
         loadCateringCount(sinceUtc).catch(() => 0),
         loadSoldOutCount(todayKey).catch(() => 0),
         loadNewEmployeeCount().catch(() => 0),
-        loadNoticeGivenCount(todayKey).catch(() => 0),
+        loadNoticeGivenCount().catch(() => 0),
+        loadReadyToTerminateCount().catch(() => 0),
         loadHrNotesCount(sinceUtc).catch(() => 0),
         loadCashPaymentCount(sinceUtc).catch(() => 0),
       ]);
@@ -265,6 +284,7 @@ export default function DashboardAttention() {
         soldOut,
         newEmployee: newEmp,
         noticeGiven: notice,
+        readyToTerminate: ready,
         hrNotes: hr,
         cashPayment: cash,
       });
@@ -308,6 +328,14 @@ export default function DashboardAttention() {
         subtitle: `${counts.noticeGiven ?? 0} employee${counts.noticeGiven === 1 ? "" : "s"} have given notice`,
         href: "/people/notice-given",
         icon: <UserClockIcon />,
+      },
+      {
+        kind: "readyToTerminate",
+        count: counts.readyToTerminate ?? 0,
+        title: "Ready to Terminate",
+        subtitle: `${counts.readyToTerminate ?? 0} employee${counts.readyToTerminate === 1 ? "" : "s"} awaiting owner confirmation`,
+        href: "/people/active?tab=ready",
+        icon: <StopCircleIcon />,
       },
       {
         kind: "hrNotes",

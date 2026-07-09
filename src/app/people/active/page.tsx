@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
   getDocs,
@@ -14,6 +14,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
+import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -40,7 +41,7 @@ type Notice = {
   lastWorkingDay: string;
 };
 
-type TabKey = "all" | "hall" | "kitchen" | "visa" | "birthday" | "notice";
+type TabKey = "all" | "hall" | "kitchen" | "visa" | "birthday" | "notice" | "ready";
 
 const VISA_WINDOW_DAYS = 30;
 const BIRTHDAY_WINDOW_DAYS = 14;
@@ -171,6 +172,7 @@ function fmtRate(n: number | null): string {
 
 export default function ActiveEmployeesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user) || isChef(user);
 
@@ -183,6 +185,13 @@ export default function ActiveEmployeesPage() {
     if (authLoading) return;
     if (!allowed) router.replace(ROUTES.home);
   }, [allowed, authLoading, router]);
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "ready" || t === "notice" || t === "visa" || t === "birthday" || t === "hall" || t === "kitchen") {
+      setTab(t);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!allowed) return;
@@ -231,7 +240,7 @@ export default function ActiveEmployeesPage() {
           // The form writes the chosen date to finalShiftDate — the
           // lastWorkingDay column stays empty on new rows for legacy
           // schema compat, so we prefer whichever is populated.
-          const lastDay = data.finalShiftDate || data.lastWorkingDay || "";
+          const lastDay = noticeLastWorkingDay(data);
           return {
             id: d.id,
             employeeUid: data.employeeUid ?? "",
@@ -256,7 +265,6 @@ export default function ActiveEmployeesPage() {
     };
   }, [allowed]);
 
-  const noticeUids = useMemo(() => new Set(notices.map((n) => n.employeeUid)), [notices]);
   const noticeByUid = useMemo(() => {
     const map = new Map<string, Notice>();
     for (const n of notices) if (n.employeeUid) map.set(n.employeeUid, n);
@@ -284,8 +292,20 @@ export default function ActiveEmployeesPage() {
       .filter((x): x is { row: Staff; days: number } => x.days !== null && x.days >= 0 && x.days <= BIRTHDAY_WINDOW_DAYS)
       .sort((a, b) => a.days - b.days);
 
-    return { visa: visaSoon, birthday: bdaySoon, notice: notices };
+    const noticeGiven = notices.filter((n) => isReadyToTerminate(n.lastWorkingDay) === false);
+    const readyToTerminate = notices.filter((n) => isReadyToTerminate(n.lastWorkingDay));
+
+    return { visa: visaSoon, birthday: bdaySoon, noticeGiven, readyToTerminate };
   }, [staff, notices]);
+
+  const noticeGivenUids = useMemo(
+    () => new Set(attention.noticeGiven.map((n) => n.employeeUid)),
+    [attention.noticeGiven],
+  );
+  const readyUids = useMemo(
+    () => new Set(attention.readyToTerminate.map((n) => n.employeeUid)),
+    [attention.readyToTerminate],
+  );
 
   const filtered = useMemo(() => {
     if (!staff) return [];
@@ -299,12 +319,14 @@ export default function ActiveEmployeesPage() {
       const uids = new Set(attention.birthday.map((v) => v.row.uid));
       list = list.filter((r) => uids.has(r.uid));
     } else if (tab === "notice") {
-      list = list.filter((r) => noticeUids.has(r.uid));
+      list = list.filter((r) => noticeGivenUids.has(r.uid));
+    } else if (tab === "ready") {
+      list = list.filter((r) => readyUids.has(r.uid));
     }
     const q = searchQuery.trim().toLowerCase();
     if (q) list = list.filter((r) => r.name.toLowerCase().includes(q));
     return list;
-  }, [staff, tab, searchQuery, attention.visa, attention.birthday, noticeUids]);
+  }, [staff, tab, searchQuery, attention.visa, attention.birthday, noticeGivenUids, readyUids]);
 
   if (authLoading || !allowed) return <Splash />;
 
@@ -364,9 +386,15 @@ export default function ActiveEmployeesPage() {
           />
           <AttentionRow
             icon={<NoteIcon />}
-            count={attention.notice.length}
+            count={attention.noticeGiven.length}
             title="Notice Given"
             onReview={() => setTab("notice")}
+          />
+          <AttentionRow
+            icon={<StopSmallIcon />}
+            count={attention.readyToTerminate.length}
+            title="Ready to Terminate"
+            onReview={() => setTab("ready")}
             last
           />
         </ul>
@@ -398,6 +426,7 @@ export default function ActiveEmployeesPage() {
         <TabButton active={tab === "visa"} onClick={() => setTab("visa")}>Visa</TabButton>
         <TabButton active={tab === "birthday"} onClick={() => setTab("birthday")}>Birthday</TabButton>
         <TabButton active={tab === "notice"} onClick={() => setTab("notice")}>Notice Given</TabButton>
+        <TabButton active={tab === "ready"} onClick={() => setTab("ready")}>Ready</TabButton>
       </div>
 
       {/* Employee list */}
@@ -413,16 +442,9 @@ export default function ActiveEmployeesPage() {
             const visaSoon = visaDays !== null && visaDays >= 0 && visaDays <= VISA_WINDOW_DAYS;
             const bdaySoon = bdayDays !== null && bdayDays >= 0 && bdayDays <= BIRTHDAY_WINDOW_DAYS;
             const rowNotice = noticeByUid.get(row.uid) ?? null;
-            const noticeDays = rowNotice ? daysFromToday(toDate(rowNotice.lastWorkingDay)) : null;
-            // 3-state flow:
-            //   noNotice           → Active   (green pill, visa/birthday chip on the right)
-            //   notice, days >= 0  → Notice Given (orange pill, N days remaining)
-            //   notice, days < 0   → Ready to Terminate (red pill, Last day passed)
+            const noticeDays = rowNotice ? noticeDaysFromToday(rowNotice.lastWorkingDay) : null;
             const readyToTerminate =
-              !!rowNotice &&
-              rowNotice.lastWorkingDay !== "" &&
-              noticeDays !== null &&
-              noticeDays < 0;
+              !!rowNotice && isReadyToTerminate(rowNotice.lastWorkingDay);
             const noticeMode = !!rowNotice;
             const showBadge = visaSoon || bdaySoon || noticeMode;
             return (
@@ -596,6 +618,15 @@ function CakeSmallIcon() {
       <path d="M4 16s1.5 2 4 2 4-2 4-2 1.5 2 4 2 4-2 4-2" />
       <path d="M2 21h20" />
       <path d="M12 8v3" />
+    </svg>
+  );
+}
+
+function StopSmallIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="8" y1="8" x2="16" y2="16" />
     </svg>
   );
 }

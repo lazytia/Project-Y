@@ -177,7 +177,7 @@ export default function NoticeGivenNewPage() {
         employeeName: selectedStaff.name,
         employeePosition: selectedStaff.position,
         noticeGivenDate,
-        lastWorkingDay: "",
+        lastWorkingDay: finalShiftDate,
         reasonForLeaving,
         reasonForLeavingOther: reasonForLeaving === "Other" ? reasonForLeavingOther.trim() : "",
         rehireEligible,
