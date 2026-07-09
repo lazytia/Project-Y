@@ -141,99 +141,97 @@
   gap: 4px;
 }
 
-.attentionGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--space-3);
-  align-items: stretch;
-}
-
-.attentionCol {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* Icon + title + subtitle stacked vertically so each column reserves the
-   same header height regardless of how the title wraps. */
-.attentionColHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: var(--space-2);
-  min-height: 68px;
-}
-
-.attentionColIcon {
-  color: var(--color-warm);
-  display: inline-flex;
-}
-
-.attentionColTitle {
-  margin: 0;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--color-fg);
-  line-height: 1.2;
-}
-
-.attentionColSub {
-  margin: 0;
-  font-size: 11px;
-  color: var(--color-warm);
-  font-weight: 600;
-  min-height: 14px;
-  line-height: 1.2;
-}
-
+/* ── Attention list — vertical row cards ── */
 .attentionList {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
-.attentionItem {
+.attnRow,
+.attnRowLast {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 6px;
-  align-items: baseline;
+  grid-template-columns: 44px 28px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.attentionName {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-fg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.attnRowLast {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.attnRowIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.attnRowCount {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-warm);
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+.attnRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
-.attentionRight {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-warm);
-  white-space: nowrap;
-  text-align: right;
+.attnRowTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-fg);
+  line-height: 1.2;
 }
 
-.attentionColEmpty {
-  margin: 0;
+.attnRowSubtitle {
   font-size: 12px;
-  color: var(--color-fg-subtle);
-}
-
-/* Pushed to the bottom of the column so "N staff" lines up across all
-   three columns even when one has fewer rows than the others. */
-.attentionCount {
-  margin: auto 0 0;
-  padding-top: var(--space-2);
-  font-size: 11px;
   color: var(--color-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attnReviewBtn,
+.attnReviewBtnHot {
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.attnReviewBtnHot {
+  border-color: var(--color-warm);
+  color: var(--color-warm);
+}
+
+.attnReviewBtnHot:hover {
+  background: var(--color-warm-bg);
+}
+
+.attnReviewBtn:disabled {
+  color: var(--color-fg-subtle);
+  cursor: not-allowed;
 }
 
 /* ── Search + filter ── */

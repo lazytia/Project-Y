@@ -349,38 +349,30 @@ export default function ActiveEmployeesPage() {
             View all <span aria-hidden="true">›</span>
           </button>
         </div>
-        <div className={styles.attentionGrid}>
-          <AttentionColumn
+        <ul className={styles.attentionList}>
+          <AttentionRow
             icon={<TriangleAlertIcon />}
-            title="VISA EXPIRING"
+            count={attention.visa.length}
+            title="Visa Expiring"
             subtitle={`< ${VISA_WINDOW_DAYS} days`}
-            items={attention.visa.slice(0, 2).map((x) => ({
-              name: x.row.name,
-              right: `${x.days} days`,
-            }))}
-            totalCount={attention.visa.length}
+            onReview={() => setTab("visa")}
           />
-          <AttentionColumn
+          <AttentionRow
             icon={<CakeIcon />}
-            title="BIRTHDAY COMING UP"
+            count={attention.birthday.length}
+            title="Birthday Coming Up"
             subtitle={`< ${BIRTHDAY_WINDOW_DAYS} days`}
-            items={attention.birthday.slice(0, 2).map((x) => ({
-              name: x.row.name,
-              right: `${x.days} days`,
-            }))}
-            totalCount={attention.birthday.length}
+            onReview={() => setTab("birthday")}
           />
-          <AttentionColumn
+          <AttentionRow
             icon={<NoteIcon />}
-            title="NOTICE GIVEN"
-            subtitle={" "}
-            items={attention.notice.slice(0, 2).map((n) => ({
-              name: n.employeeName,
-              right: fmtDateShort(n.lastWorkingDay),
-            }))}
-            totalCount={attention.notice.length}
+            count={attention.notice.length}
+            title="Notice Given"
+            subtitle={`${attention.notice.length} employee${attention.notice.length === 1 ? "" : "s"} have given notice`}
+            onReview={() => setTab("notice")}
+            last
           />
-        </div>
+        </ul>
       </section>
 
       {/* Search + filter */}
@@ -522,42 +514,38 @@ export default function ActiveEmployeesPage() {
 
 /* ── Sub-components ── */
 
-function AttentionColumn({
+function AttentionRow({
   icon,
+  count,
   title,
   subtitle,
-  items,
-  totalCount,
+  onReview,
+  last = false,
 }: {
   icon: React.ReactNode;
+  count: number;
   title: string;
   subtitle: string;
-  items: { name: string; right: string }[];
-  totalCount: number;
+  onReview: () => void;
+  last?: boolean;
 }) {
   return (
-    <div className={styles.attentionCol}>
-      <div className={styles.attentionColHeader}>
-        <span className={styles.attentionColIcon}>{icon}</span>
-        <p className={styles.attentionColTitle}>{title}</p>
-        <p className={styles.attentionColSub}>{subtitle}</p>
-      </div>
-      {items.length === 0 ? (
-        <p className={styles.attentionColEmpty}>—</p>
-      ) : (
-        <ul className={styles.attentionList}>
-          {items.map((it) => (
-            <li key={it.name} className={styles.attentionItem}>
-              <span className={styles.attentionName}>{it.name}</span>
-              <span className={styles.attentionRight}>{it.right}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className={styles.attentionCount}>
-        {totalCount} staff
-      </p>
-    </div>
+    <li className={last ? styles.attnRowLast : styles.attnRow}>
+      <span className={styles.attnRowIcon} aria-hidden="true">{icon}</span>
+      <span className={styles.attnRowCount}>{count}</span>
+      <span className={styles.attnRowText}>
+        <span className={styles.attnRowTitle}>{title}</span>
+        <span className={styles.attnRowSubtitle}>{subtitle}</span>
+      </span>
+      <button
+        type="button"
+        className={count > 0 ? styles.attnReviewBtnHot : styles.attnReviewBtn}
+        onClick={onReview}
+        disabled={count === 0}
+      >
+        Review
+      </button>
+    </li>
   );
 }
 
