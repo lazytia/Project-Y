@@ -391,7 +391,7 @@ export default function TerminatedEmployeesPage() {
               <button
                 type="button"
                 className={styles.card}
-                onClick={() => router.push(`/people/active/${e.uid}`)}
+                onClick={() => router.push(`/people/terminated/${e.uid}`)}
               >
                 <div className={styles.avatar}>{initials(e.name)}</div>
                 <div className={styles.cardMain}>
@@ -426,7 +426,6 @@ export default function TerminatedEmployeesPage() {
           All employee data, documents, and HR notes are permanently archived. You can
           view but cannot edit terminated employee records.
         </p>
-        <ChevronIcon />
       </aside>
     </div>
   );

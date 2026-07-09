@@ -74,15 +74,26 @@ type Staff = {
   visaType: string;
   phone: string;
   taxFileNumber: string;
-  /** Data-URL of the signature captured during the TFN declaration step.
-   *  We reuse it across the Contract, Handbook, and TFN modals — it's the
-   *  only signature the onboarding flow records today. */
   signatureDataUrl: string;
   bank: BankSuper;
   handbookSignedAt: Date | null;
   agreementSignedAt: Date | null;
   privacySignedAt: Date | null;
   documents: { label: string; url: string }[];
+  isReactivated: boolean;
+  rehireDate: string;
+  reactivatedAt: Date | null;
+  department: string;
+  employmentType: string;
+  workLocation: string;
+  reportsTo: string;
+  previousTermination: {
+    lastWorkingDate: string;
+    noticeGivenDate: string;
+    terminationReason: string;
+    terminatedByName: string;
+    terminatedAt: string;
+  } | null;
 };
 
 const VISA_WINDOW_DAYS = 30;
@@ -208,6 +219,7 @@ export default function EmployeeDetailPage() {
   const [openDoc, setOpenDoc] = useState<DocKey | null>(null);
   const [terminateOpen, setTerminateOpen] = useState(false);
   const [terminating, setTerminating] = useState(false);
+  const [termDetailsOpen, setTermDetailsOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -228,6 +240,24 @@ export default function EmployeeDetailPage() {
           return;
         }
         const raw = snap.data() as Record<string, unknown>;
+        if (String(raw.status ?? "").toLowerCase() === "terminated") {
+          router.replace(`/people/terminated/${id}`);
+          return;
+        }
+
+        const prevRaw = (raw.previousTermination ?? null) as Record<string, unknown> | null;
+        const previousTermination = prevRaw
+          ? {
+              lastWorkingDate: String(prevRaw.lastWorkingDate ?? ""),
+              noticeGivenDate: String(prevRaw.noticeGivenDate ?? ""),
+              terminationReason: String(prevRaw.terminationReason ?? ""),
+              terminatedByName: String(prevRaw.terminatedByName ?? ""),
+              terminatedAt: String(prevRaw.terminatedAt ?? ""),
+            }
+          : null;
+        const rehireDate = typeof raw.rehireDate === "string" ? raw.rehireDate : "";
+        const reactivatedAt = tsToDate(raw.reactivatedAt);
+        const isReactivated = !!rehireDate || !!reactivatedAt;
 
         const rate =
           typeof raw.afterTrainingRate === "number"
@@ -265,6 +295,14 @@ export default function EmployeeDetailPage() {
           agreementSignedAt: tsToDate(policies.agreementSignedAt),
           privacySignedAt: tsToDate(policies.privacySignedAt),
           documents: collectDocuments(raw),
+          isReactivated,
+          rehireDate,
+          reactivatedAt,
+          department: typeof raw.department === "string" ? raw.department : "Hall",
+          employmentType: typeof raw.employmentType === "string" ? raw.employmentType : "Casual",
+          workLocation: typeof raw.workLocation === "string" ? raw.workLocation : "Hall",
+          reportsTo: typeof raw.reportsTo === "string" ? raw.reportsTo : "Yukina Sato",
+          previousTermination,
         };
 
         if (!cancelled) setStaff(built);
@@ -375,6 +413,9 @@ export default function EmployeeDetailPage() {
         reasonBase === "Other" && reasonOther.trim()
           ? `Other — ${reasonOther.trim()}`
           : reasonBase;
+      const terminatedByName =
+        user?.displayName?.trim() ||
+        (user?.email ? user.email.split("@")[0] : "Owner");
 
       await setDoc(
         doc(getDb(), "staff_onboarding", staff.uid),
@@ -385,6 +426,10 @@ export default function EmployeeDetailPage() {
           reasonForLeaving: reasonBase,
           reasonForLeavingOther: reasonBase === "Other" ? reasonOther.trim() : "",
           terminationReason: reasonDisplay,
+          noticeGivenDate: notice?.noticeGivenDate ?? "",
+          rehireEligible: notice?.rehireEligible ?? "",
+          terminationManagerNotes: notice?.managerNotes ?? "",
+          terminatedByName,
           updatedAt: serverTimestamp(),
         },
         { merge: true },
@@ -447,10 +492,130 @@ export default function EmployeeDetailPage() {
       ? `Other — ${notice.reasonForLeavingOther}`
       : notice?.reasonForLeaving || "—";
 
+  const reactivatedOnDisplay = staff.reactivatedAt
+    ? fmtDateWithDay(
+        `${staff.reactivatedAt.getFullYear()}-${String(staff.reactivatedAt.getMonth() + 1).padStart(2, "0")}-${String(staff.reactivatedAt.getDate()).padStart(2, "0")}`,
+      )
+    : fmtDateWithDay(staff.rehireDate);
+  const prevTerm = staff.previousTermination;
+  const prevTerminatedDisplay = prevTerm?.terminatedAt
+    ? fmtDateWithDay(prevTerm.terminatedAt)
+    : "—";
+
   return (
     <div className={styles.page}>
       <TopBar onBack={() => router.back()} />
 
+      {staff.isReactivated ? (
+        <>
+          <section className={styles.profileCard}>
+            <div className={`${styles.profileTop} ${styles.profileTopReactivated}`}>
+              <div className={styles.avatarWrap} aria-hidden="true">
+                <div className={styles.avatar}>{initialsOf(staff.name)}</div>
+                <span className={`${styles.avatarDot} ${styles.avatarDotNotice}`} />
+              </div>
+              <div className={styles.profileMain}>
+                <h2 className={styles.profileName}>{staff.name}</h2>
+                <p className={styles.profilePos}>{staff.positionLabel}</p>
+                <span className={styles.activePill}>Active</span>
+              </div>
+              <div className={styles.reactivatedOn}>
+                <p className={styles.reactivatedOnLabel}>Reactivated on</p>
+                <p className={styles.reactivatedOnDate}>{reactivatedOnDisplay}</p>
+              </div>
+            </div>
+          </section>
+
+          {staff.phone && (
+            <button
+              type="button"
+              className={styles.linkRow}
+              onClick={() => window.open(`tel:${staff.phone.replace(/\s/g, "")}`, "_self")}
+            >
+              <span className={styles.linkRowIcon} aria-hidden="true"><PhoneIcon /></span>
+              <span className={styles.linkRowLabel}>Phone</span>
+              <span className={styles.linkRowValue}>{staff.phone}</span>
+              <span className={styles.chev} aria-hidden="true">›</span>
+            </button>
+          )}
+
+          <p className={styles.sectionLabel}>EMPLOYMENT INFORMATION</p>
+          <section className={styles.employmentCard}>
+            <EmploymentRow label="Rehire Date" value={fmtDateWithDay(staff.rehireDate)} accent />
+            <EmploymentRow label="Position" value={staff.positionLabel} />
+            <EmploymentRow label="Department" value={staff.department} />
+            <EmploymentRow label="Work Location" value={staff.workLocation} />
+            <EmploymentRow label="Employment Type" value={staff.employmentType} />
+            <EmploymentRow
+              label="Rate"
+              value={typeof staff.rate === "number" ? `$${staff.rate.toFixed(2)} /hr` : "—"}
+            />
+            <EmploymentRow label="Reports To" value={`${staff.reportsTo} ›`} last />
+            <button type="button" className={styles.editEmploymentBtn}>
+              <EditIcon />
+              Edit Employment Details
+            </button>
+          </section>
+
+          <section className={styles.reactivationAlert}>
+            <span className={styles.reactivationAlertIcon} aria-hidden="true"><RefreshIcon /></span>
+            <div>
+              <p className={styles.reactivationAlertTitle}>
+                This employee was reactivated. Previously terminated on {prevTerminatedDisplay}.
+              </p>
+              <p className={styles.reactivationAlertSub}>
+                Rehire Date <span className={styles.reactivationAlertDate}>{fmtDateWithDay(staff.rehireDate)}</span>
+              </p>
+            </div>
+            <span className={styles.activePill}>Active</span>
+          </section>
+
+          <button type="button" className={styles.historyRow}>
+            <DocIcon />
+            <span className={styles.historyRowLabel}>Employment History</span>
+            <span className={styles.chev} aria-hidden="true">›</span>
+          </button>
+
+          {prevTerm && (
+            <>
+              <p className={styles.sectionLabel}>TERMINATION SUMMARY (PREVIOUS)</p>
+              <section className={styles.terminationPrevCard}>
+                <EmploymentRow label="Last Working Day" value={fmtDateWithDay(prevTerm.lastWorkingDate)} />
+                <EmploymentRow label="Reason for Leaving" value={prevTerm.terminationReason || "—"} />
+                <EmploymentRow label="Terminated By" value={prevTerm.terminatedByName || "—"} />
+                <button
+                  type="button"
+                  className={styles.terminationPrevToggle}
+                  onClick={() => setTermDetailsOpen((v) => !v)}
+                >
+                  View Termination Details
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`${styles.toggleArrow} ${termDetailsOpen ? styles.toggleArrowOpen : ""}`}
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {termDetailsOpen && (
+                  <>
+                    <EmploymentRow label="Notice Given Date" value={fmtDateWithDay(prevTerm.noticeGivenDate)} />
+                    <EmploymentRow label="Termination Date" value={prevTerminatedDisplay} accent last />
+                  </>
+                )}
+              </section>
+            </>
+          )}
+        </>
+      ) : (
+        <>
       {/* Profile card — orange notice-mode variant when the employee has
           an active notice_given row. */}
       <section className={`${styles.profileCard} ${hasNotice ? styles.profileCardNotice : ""}`}>
@@ -547,6 +712,8 @@ export default function EmployeeDetailPage() {
           </section>
         </>
       )}
+        </>
+      )}
 
       {/* Documents */}
       <p className={styles.sectionLabel}>DOCUMENTS</p>
@@ -569,6 +736,22 @@ export default function EmployeeDetailPage() {
 
       {/* Change status */}
       <p className={styles.sectionLabel}>CHANGE STATUS</p>
+      {staff.isReactivated ? (
+        <div className={styles.statusGrid}>
+          <button type="button" className={styles.statusCard}>
+            <RefreshIcon />
+            <span className={styles.statusLabel}>Reactivate History</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.statusCard} ${styles.statusCardWarm}`}
+            onClick={() => router.push("/people/hr-notes/add")}
+          >
+            <EditIcon />
+            <span className={styles.statusLabel}>Add HR Note</span>
+          </button>
+        </div>
+      ) : (
       <div className={hasNotice ? styles.statusGrid : styles.statusGridSingle}>
         {hasNotice ? (
           <>
@@ -603,6 +786,7 @@ export default function EmployeeDetailPage() {
           </button>
         )}
       </div>
+      )}
 
       {openDoc && (
         <DocModal
@@ -865,6 +1049,36 @@ function renderModalBody(
           ),
       };
   }
+}
+
+function EmploymentRow({
+  label,
+  value,
+  accent = false,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <div className={`${styles.employmentRow} ${last ? styles.employmentRowLast : ""}`}>
+      <span className={styles.employmentLabel}>{label}</span>
+      <span className={`${styles.employmentValue} ${accent ? styles.employmentValueAccent : ""}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="23 4 23 10 17 10" />
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  );
 }
 
 function InfoRow({
