@@ -272,10 +272,16 @@ export default function EmployeeDetailPage() {
           const notices = noticeSnap.docs
             .map((d) => {
               const data = d.data() as Record<string, unknown>;
+              // The form calls the field "Final Shift Date" and persists it
+              // as `finalShiftDate` — that's the real "last working day"
+              // for the countdown. Older rows may only carry the legacy
+              // `lastWorkingDay` string, so fall back to it if needed.
+              const finalShift = typeof data.finalShiftDate === "string" ? data.finalShiftDate : "";
+              const legacyLast = typeof data.lastWorkingDay === "string" ? data.lastWorkingDay : "";
               return {
                 id: d.id,
                 noticeGivenDate: typeof data.noticeGivenDate === "string" ? data.noticeGivenDate : "",
-                lastWorkingDay: typeof data.lastWorkingDay === "string" ? data.lastWorkingDay : "",
+                lastWorkingDay: finalShift || legacyLast,
                 reasonForLeaving: typeof data.reasonForLeaving === "string" ? data.reasonForLeaving : "",
                 reasonForLeavingOther: typeof data.reasonForLeavingOther === "string" ? data.reasonForLeavingOther : "",
                 rehireEligible: typeof data.rehireEligible === "string" ? data.rehireEligible : "",
