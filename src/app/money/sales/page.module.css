@@ -1,0 +1,478 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 640px;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Page header ── */
+.pageHeader {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.backBtn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-fg);
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.backBtn:hover {
+  background: var(--color-surface);
+}
+
+.headerTitles {
+  min-width: 0;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+}
+
+.pageSubtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.datePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.datePillLabel {
+  white-space: nowrap;
+}
+
+.datePillChevron {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Cards ── */
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg);
+}
+
+.dotsBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.dotsBtn:hover {
+  background: var(--color-surface);
+}
+
+.viewAll {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-warm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── Number row ── */
+.numberRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-4);
+  align-items: end;
+}
+
+.numberLabel {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+}
+
+.numberValue {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+}
+
+.numberValuePrimary {
+  color: #2b6ef6;
+}
+
+.numberValueMuted {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-fg-muted);
+  letter-spacing: -0.02em;
+}
+
+.deltaWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.deltaValue {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.deltaUp {
+  color: var(--color-positive);
+}
+
+.deltaDown {
+  color: var(--color-warm);
+}
+
+.deltaSub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Bar chart ── */
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.chartBars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: end;
+  min-height: 180px;
+  padding-top: var(--space-2);
+}
+
+.chartGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 180px;
+}
+
+.chartGroupBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 100%;
+  width: 100%;
+  justify-content: center;
+}
+
+.chartBarPrimary,
+.chartBarMuted {
+  width: 8px;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.2s ease;
+}
+
+.chartBarPrimary {
+  background: #2b6ef6;
+}
+
+.chartBarMuted {
+  background: #cbd0d6;
+}
+
+.chartXLabel {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chartLegend {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: center;
+  padding-top: var(--space-1);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.legendSwatchPrimary,
+.legendSwatchMuted {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.legendSwatchPrimary {
+  background: #2b6ef6;
+}
+
+.legendSwatchMuted {
+  background: #cbd0d6;
+}
+
+.chartLoading {
+  margin: 0;
+  text-align: center;
+  color: var(--color-fg-muted);
+  font-size: 12px;
+}
+
+/* ── Category donut ── */
+.categoryBody {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.donutWrap {
+  position: relative;
+  width: 160px;
+  height: 160px;
+}
+
+.donutSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.donutCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.donutCenterLabel {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.donutCenterValue {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.categoryList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.categoryRow {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.categoryDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.categoryName {
+  font-size: 13px;
+  color: var(--color-fg);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.categoryValue {
+  font-size: 13px;
+  color: var(--color-fg);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.categoryDeltaUp,
+.categoryDeltaDown {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.categoryDeltaUp {
+  color: var(--color-positive);
+}
+
+.categoryDeltaDown {
+  color: var(--color-warm);
+}
+
+.emptyRow {
+  padding: var(--space-3) 0;
+  color: var(--color-fg-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.categoryFoot {
+  margin: 0;
+  padding-top: var(--space-1);
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  text-align: right;
+}
+
+/* ── Best selling categories ── */
+.bestList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.bestItem {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bestRank,
+.bestRankHot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--color-fg);
+}
+
+.bestRankHot {
+  background: var(--color-warm);
+}
+
+.bestName {
+  font-size: 14px;
+  color: var(--color-fg);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.bestSales {
+  font-size: 13px;
+  color: var(--color-fg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bestDeltaUp,
+.bestDeltaDown {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bestDeltaUp {
+  color: var(--color-positive);
+}
+
+.bestDeltaDown {
+  color: var(--color-warm);
+}
+
+.footnote {
+  margin: 0;
+  padding: 0 var(--space-1);
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  line-height: 1.5;
+  text-align: center;
+}
