@@ -91,6 +91,9 @@ export default function SalesPage() {
   const [daily, setDaily] = useState<DailyMap | null>(null);
   const [categories, setCategories] = useState<CategoryRow[] | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  // 2025 monthly totals from Square (Firestore's sales_daily hasn't been
+  // backfilled that far; we hit Square directly for the comparison year).
+  const [lastYearMonthly, setLastYearMonthly] = useState<number[] | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -133,6 +136,28 @@ export default function SalesPage() {
       } catch (err) {
         console.error("[sales] daily fetch failed:", err);
         if (!cancelled) setDaily(new Map());
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed, todayKey]);
+
+  // ── Last-year monthly totals (Square direct — sales_daily may not have
+  //    that far of a backfill). Runs once per todayKey change.
+  useEffect(() => {
+    if (!allowed || !todayKey) return;
+    let cancelled = false;
+    const lastYear = Number(todayKey.slice(0, 4)) - 1;
+    (async () => {
+      try {
+        const res = await fetch(`/api/square/yearly-sales?year=${lastYear}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as { monthly: number[] };
+        if (!cancelled) setLastYearMonthly(data.monthly ?? new Array(12).fill(0));
+      } catch (err) {
+        console.error("[sales] last-year fetch failed:", err);
+        if (!cancelled) setLastYearMonthly(new Array(12).fill(0));
       }
     })();
     return () => {
@@ -184,22 +209,29 @@ export default function SalesPage() {
     return { thisWeek, lastWeek, thisTotal, lastTotal, deltaPct };
   }, [daily, weekMondayISO]);
 
-  /* ── Derived: yearly monthly bars ── */
+  /* ── Derived: yearly monthly bars ──
+   *   This year: bucketed from Firestore sales_daily (fresh nightly cache).
+   *   Last year: whatever the /yearly-sales API returned — falls back to
+   *   sales_daily for old backfills, and to zeros while loading. */
   const yearly = useMemo(() => {
     if (!daily || !todayKey) return null;
     const [ty] = todayKey.split("-").map(Number);
     const thisYear = new Array(12).fill(0);
-    const lastYear = new Array(12).fill(0);
+    const lastYearFromDaily = new Array(12).fill(0);
     for (const [iso, val] of daily) {
       const [yy, mm] = iso.split("-").map(Number);
       if (yy === ty) thisYear[mm - 1] += val;
-      else if (yy === ty - 1) lastYear[mm - 1] += val;
+      else if (yy === ty - 1) lastYearFromDaily[mm - 1] += val;
     }
+    // Prefer the /yearly-sales API data (has the whole year even without
+    // sales_daily backfill); fall back to Firestore per-month if API
+    // hasn't returned yet.
+    const lastYear = lastYearMonthly ?? lastYearFromDaily;
     const thisYtd = thisYear.reduce((s, v) => s + v, 0);
     const lastYtd = lastYear.reduce((s, v) => s + v, 0);
     const deltaPct = lastYtd > 0 ? ((thisYtd - lastYtd) / lastYtd) * 100 : null;
     return { thisYear, lastYear, thisYtd, lastYtd, deltaPct };
-  }, [daily, todayKey]);
+  }, [daily, todayKey, lastYearMonthly]);
 
   const totalCategorySales = useMemo(
     () => (categories ?? []).reduce((s, c) => s + c.sales, 0),
@@ -371,44 +403,48 @@ export default function SalesPage() {
         <p className={styles.categoryFoot}>vs previous week</p>
       </section>
 
-      {/* ── Best Selling Categories ── */}
+      {/* ── Best Selling Categories — horizontal card row ── */}
       <section className={styles.card}>
         <div className={styles.cardHead}>
           <p className={styles.cardTitle}>BEST SELLING CATEGORIES</p>
         </div>
-        <ul className={styles.bestList}>
-          {(categories ?? []).slice(0, 5).map((c, idx) => (
-            <li key={c.name} className={styles.bestItem}>
-              <span
-                className={idx === 0 ? styles.bestRankHot : styles.bestRank}
-                aria-hidden="true"
-              >
-                {idx + 1}
-              </span>
-              <span className={styles.bestName}>{c.name}</span>
-              <span className={styles.bestSales}>{fmtCurrency(c.sales)}</span>
-              <span
-                className={
-                  c.deltaPct === null || c.deltaPct >= 0
-                    ? styles.bestDeltaUp
-                    : styles.bestDeltaDown
-                }
-              >
-                {c.deltaPct === null
-                  ? "—"
-                  : `${c.deltaPct >= 0 ? "↑" : "↓"} ${Math.abs(c.deltaPct).toFixed(1)}%`}
-              </span>
-            </li>
-          ))}
-          {categories && categories.length === 0 && (
-            <li className={styles.emptyRow}>No sales this week yet.</li>
-          )}
-        </ul>
+        {categories && categories.length === 0 ? (
+          <p className={styles.emptyRow}>No sales this week yet.</p>
+        ) : (
+          <div className={styles.bestScroller}>
+            <ul className={styles.bestGrid}>
+              {(categories ?? []).slice(0, 5).map((c, idx) => (
+                <li key={c.name} className={styles.bestCard}>
+                  <span
+                    className={idx === 0 ? styles.bestRankHot : styles.bestRank}
+                    aria-hidden="true"
+                  >
+                    {idx + 1}
+                  </span>
+                  <span
+                    className={styles.bestCardDot}
+                    style={{ background: donutColorAt(idx) }}
+                    aria-hidden="true"
+                  />
+                  <p className={styles.bestCardName}>{c.name}</p>
+                  <p className={styles.bestCardSales}>{fmtCurrency(c.sales)}</p>
+                  <p
+                    className={
+                      c.deltaPct === null || c.deltaPct >= 0
+                        ? styles.bestCardDeltaUp
+                        : styles.bestCardDeltaDown
+                    }
+                  >
+                    {c.deltaPct === null
+                      ? "—"
+                      : `${c.deltaPct >= 0 ? "↑" : "↓"} ${Math.abs(c.deltaPct).toFixed(1)}%`}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
-
-      <p className={styles.footnote}>
-        Figures use Square Web dashboard&apos;s Gross Sales (9am–10pm business day, net of refunds).
-      </p>
     </div>
   );
 }
