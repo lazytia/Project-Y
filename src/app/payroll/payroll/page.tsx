@@ -357,7 +357,7 @@ export default function PayrollOverviewPage() {
             {totals ? fmtCurrency(totals.totalIncSuper) : "—"}
           </span>
           {chips?.totalIncSuper !== null && chips?.totalIncSuper !== undefined && (
-            <>
+            <span className={styles.totalDeltaWrap}>
               <span
                 className={
                   chips.totalIncSuper >= 0 ? styles.totalDeltaUp : styles.totalDeltaDown
@@ -367,7 +367,7 @@ export default function PayrollOverviewPage() {
                 {Math.abs(chips.totalIncSuper).toFixed(1)}%
               </span>
               <span className={styles.totalDeltaSub}>vs prev 2 weeks avg</span>
-            </>
+            </span>
           )}
         </div>
       </section>

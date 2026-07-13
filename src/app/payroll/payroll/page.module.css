@@ -303,15 +303,20 @@
 /* ── Total row ── */
 .totalRow {
   display: grid;
-  grid-template-columns: 32px 1fr auto auto auto;
+  grid-template-columns: 32px 1fr auto;
+  grid-template-areas:
+    "icon label value"
+    "icon delta delta";
   align-items: center;
-  gap: var(--space-2);
+  column-gap: var(--space-2);
+  row-gap: 2px;
   padding: 12px var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-warm-bg);
 }
 
 .totalIcon {
+  grid-area: icon;
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -323,17 +328,33 @@
 }
 
 .totalLabel {
+  grid-area: label;
   font-size: 13px;
   font-weight: 700;
   color: var(--color-fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .totalValue {
+  grid-area: value;
+  text-align: right;
   font-size: 16px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
   white-space: nowrap;
+}
+
+.totalDeltaWrap {
+  grid-area: delta;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .totalDeltaUp,
@@ -426,12 +447,20 @@
   font-size: 12px;
   color: var(--color-fg);
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .comparisonNameBold {
   font-size: 12px;
   color: var(--color-fg);
   font-weight: 800;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .comparisonValue,
@@ -442,6 +471,7 @@
   font-weight: 700;
   color: var(--color-fg);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .comparisonValueHot {
@@ -465,6 +495,14 @@
   border-top: 1px dashed transparent;
   border-bottom: 1px dashed var(--color-border);
   margin: 2px 0;
+}
+
+/* On narrow phones two side-by-side week columns can't fit currency
+   values, so stack them to give each row the full card width. */
+@media (max-width: 520px) {
+  .comparisonGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Table ── */
