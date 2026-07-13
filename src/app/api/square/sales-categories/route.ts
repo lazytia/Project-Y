@@ -21,6 +21,18 @@ export const dynamic = "force-dynamic";
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ORDER_STATES = ["COMPLETED"];
 
+// Module-level cache — Cloud Run instances stay warm for a while, so the
+// catalog (which changes only when the owner edits the menu) doesn't need
+// to be re-fetched on every category request within the same instance.
+const CATALOG_TTL_MS = 10 * 60 * 1000; // 10 min
+let cachedCatalog: { at: number; data: CatalogObject[] } | null = null;
+
+const CACHE_HEADERS = {
+  // 5 min fresh, 30 min stale-while-revalidate — safe for the week-scope
+  // category breakdown which only shifts as new orders roll in.
+  "Cache-Control": "public, s-maxage=300, stale-while-revalidate=1800",
+} as const;
+
 type CatalogObject = {
   id?: string;
   type?: string;
@@ -34,10 +46,14 @@ type CatalogObject = {
   itemVariationData?: { itemId?: string };
 };
 
-async function loadCatalog() {
+async function loadCatalog(): Promise<CatalogObject[]> {
+  if (cachedCatalog && Date.now() - cachedCatalog.at < CATALOG_TTL_MS) {
+    return cachedCatalog.data;
+  }
   const all: CatalogObject[] = [];
   const page = await squareClient.catalog.list({ types: "ITEM,CATEGORY,ITEM_VARIATION" });
   for await (const obj of page) all.push(obj as CatalogObject);
+  cachedCatalog = { at: Date.now(), data: all };
   return all;
 }
 
@@ -200,14 +216,17 @@ export async function GET(req: NextRequest) {
     merged.sort((a, b) => b.sales - a.sales);
     const totalSales = merged.reduce((s, m) => s + m.sales, 0);
 
-    return NextResponse.json({
-      startDate,
-      endDate,
-      previousStartDate: prevStartDate,
-      previousEndDate: prevEndDate,
-      totalSales: Math.round(totalSales * 100) / 100,
-      categories: merged,
-    });
+    return NextResponse.json(
+      {
+        startDate,
+        endDate,
+        previousStartDate: prevStartDate,
+        previousEndDate: prevEndDate,
+        totalSales: Math.round(totalSales * 100) / 100,
+        categories: merged,
+      },
+      { headers: CACHE_HEADERS },
+    );
   } catch (err) {
     console.error("[Square] sales-categories error:", err);
     return NextResponse.json({ error: "Failed to fetch Square data" }, { status: 502 });

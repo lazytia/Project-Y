@@ -78,6 +78,32 @@ type CategoryRow = {
   deltaPct: number | null;
 };
 
+/* ── Session cache helpers — save the network hop when the owner
+ *  bounces off Sales and back within the same tab. TTL is short (5 min)
+ *  so the numbers stay fresh but tab-switches feel instant. */
+const SESSION_TTL_MS = 5 * 60 * 1000;
+
+function readSession<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at: number; data: T };
+    if (Date.now() - parsed.at > SESSION_TTL_MS) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession<T>(key: string, data: T) {
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data }));
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
 /* ── Page ── */
 
 export default function SalesPage() {
@@ -147,30 +173,53 @@ export default function SalesPage() {
 
   // ── Yearly monthly totals (this + last year, both from Square).
   //    sales_daily doesn't have a full backfill so we always hit the API
-  //    for the yearly chart. Both years fire in parallel.
+  //    for the yearly chart. Both years fire in parallel — with a
+  //    sessionStorage cache so tab-back-and-forth is instant.
   useEffect(() => {
     if (!allowed || !todayKey) return;
     let cancelled = false;
     const thisYear = Number(todayKey.slice(0, 4));
     const lastYear = thisYear - 1;
+    const thisKey = `y.sales.yearly.${thisYear}`;
+    const lastKey = `y.sales.yearly.${lastYear}`;
+
+    // Hydrate from session first so the chart paints before the network
+    // round-trip returns.
+    const cachedThis = readSession<number[]>(thisKey);
+    const cachedLast = readSession<number[]>(lastKey);
+    if (cachedThis) setThisYearMonthly(cachedThis);
+    if (cachedLast) setLastYearMonthly(cachedLast);
+
     (async () => {
       try {
         const [thisRes, lastRes] = await Promise.all([
-          fetch(`/api/square/yearly-sales?year=${thisYear}`),
-          fetch(`/api/square/yearly-sales?year=${lastYear}`),
+          cachedThis
+            ? Promise.resolve<Response | null>(null)
+            : fetch(`/api/square/yearly-sales?year=${thisYear}`),
+          cachedLast
+            ? Promise.resolve<Response | null>(null)
+            : fetch(`/api/square/yearly-sales?year=${lastYear}`),
         ]);
-        const [thisData, lastData] = await Promise.all([
-          thisRes.ok ? thisRes.json() : Promise.resolve({ monthly: [] }),
-          lastRes.ok ? lastRes.json() : Promise.resolve({ monthly: [] }),
-        ]);
+        const thisData = thisRes && thisRes.ok ? await thisRes.json() : null;
+        const lastData = lastRes && lastRes.ok ? await lastRes.json() : null;
         if (cancelled) return;
-        setThisYearMonthly((thisData.monthly as number[] | undefined) ?? new Array(12).fill(0));
-        setLastYearMonthly((lastData.monthly as number[] | undefined) ?? new Array(12).fill(0));
+        if (thisData?.monthly) {
+          setThisYearMonthly(thisData.monthly as number[]);
+          writeSession(thisKey, thisData.monthly);
+        } else if (!cachedThis) {
+          setThisYearMonthly(new Array(12).fill(0));
+        }
+        if (lastData?.monthly) {
+          setLastYearMonthly(lastData.monthly as number[]);
+          writeSession(lastKey, lastData.monthly);
+        } else if (!cachedLast) {
+          setLastYearMonthly(new Array(12).fill(0));
+        }
       } catch (err) {
         console.error("[sales] yearly fetch failed:", err);
         if (!cancelled) {
-          setThisYearMonthly(new Array(12).fill(0));
-          setLastYearMonthly(new Array(12).fill(0));
+          if (!cachedThis) setThisYearMonthly(new Array(12).fill(0));
+          if (!cachedLast) setLastYearMonthly(new Array(12).fill(0));
         }
       }
     })();
@@ -416,47 +465,6 @@ export default function SalesPage() {
         </div>
         <p className={styles.categoryFoot}>vs previous week</p>
       </section>
-
-      {/* ── Best Selling Categories — horizontal card row ── */}
-      <section className={styles.card}>
-        <div className={styles.cardHead}>
-          <p className={styles.cardTitle}>BEST SELLING CATEGORIES</p>
-        </div>
-        {categories && categories.length === 0 ? (
-          <p className={styles.emptyRow}>No sales this week yet.</p>
-        ) : (
-          <div className={styles.bestScroller}>
-            <ul className={styles.bestGrid}>
-              {(categories ?? []).slice(0, 5).map((c, idx) => (
-                <li key={c.name} className={styles.bestCard}>
-                  <span
-                    className={idx === 0 ? styles.bestRankHot : styles.bestRank}
-                    aria-hidden="true"
-                  >
-                    {idx + 1}
-                  </span>
-                  <span className={styles.bestCardIcon} aria-hidden="true">
-                    {iconForCategory(c.name)}
-                  </span>
-                  <p className={styles.bestCardName}>{c.name}</p>
-                  <p className={styles.bestCardSales}>{fmtCurrency(c.sales)}</p>
-                  <p
-                    className={
-                      c.deltaPct === null || c.deltaPct >= 0
-                        ? styles.bestCardDeltaUp
-                        : styles.bestCardDeltaDown
-                    }
-                  >
-                    {c.deltaPct === null
-                      ? "—"
-                      : `${c.deltaPct >= 0 ? "↑" : "↓"} ${Math.abs(c.deltaPct).toFixed(1)}%`}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
     </div>
   );
 }
@@ -582,177 +590,6 @@ function donutColorAt(i: number): string {
   return DONUT_COLORS[i % DONUT_COLORS.length];
 }
 
-/** Map a Square category name to a monochrome line-art SVG. Cheaper
- *  visual weight than colour emoji and consistent across every OS/font
- *  (colour emoji drift wildly between Apple / Windows / Android). Falls
- *  back to a neutral plate glyph when nothing matches. */
-function iconForCategory(name: string): React.ReactNode {
-  const n = name.toLowerCase();
-  if (/donburi|rice bowl|bowl|katsudon|gyudon|oyakodon/.test(n)) return <IconBowl />;
-  if (/sushi|nigiri|roll|sashimi|maki/.test(n)) return <IconSushi />;
-  if (/ramen|noodle/.test(n)) return <IconRamen />;
-  if (/udon|soba|soup/.test(n)) return <IconRamen />;
-  if (/bento/.test(n)) return <IconBento />;
-  if (/tempura|katsu|kushi|fried|shrimp|prawn/.test(n)) return <IconShrimp />;
-  if (/appetizer|side|small|starter|edamame|dumpling/.test(n)) return <IconDumpling />;
-  if (/dessert|cake|ice cream|mochi|matcha/.test(n)) return <IconCake />;
-  if (/beer|sake|wine|alcohol|spirit|whisky|cocktail/.test(n)) return <IconBeer />;
-  if (/drink|beverage|soft|juice|tea|coffee|water/.test(n)) return <IconCup />;
-  if (/salad|vegetable|veg/.test(n)) return <IconSalad />;
-  if (/chicken|karaage/.test(n)) return <IconDrumstick />;
-  if (/beef|steak/.test(n)) return <IconMeat />;
-  return <IconPlate />;
-}
-
-/* ── Monochrome category glyphs ── */
-const ICON_ATTRS = {
-  width: 22,
-  height: 22,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.6,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-function IconBowl() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M3 12h18a9 9 0 0 1-18 0Z" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <path d="M8 8c1-1.5 3-1.5 4 0" />
-      <path d="M13 7c1-1.5 3-1.5 4 0" />
-    </svg>
-  );
-}
-
-function IconSushi() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <ellipse cx="12" cy="16" rx="8" ry="3" />
-      <path d="M4 16v-3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" />
-      <line x1="8" y1="11" x2="8" y2="16" />
-      <line x1="16" y1="11" x2="16" y2="16" />
-    </svg>
-  );
-}
-
-function IconRamen() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M3 13h18a9 9 0 0 1-18 0Z" />
-      <line x1="2" y1="13" x2="22" y2="13" />
-      <path d="M8 6c-1 1-1 2 0 3" />
-      <path d="M12 5c-1 1-1 2 0 3" />
-      <path d="M16 6c-1 1-1 2 0 3" />
-    </svg>
-  );
-}
-
-function IconBento() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="3" y1="12" x2="21" y2="12" />
-    </svg>
-  );
-}
-
-function IconShrimp() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M5 14c0-4 3-7 8-7s6 2 6 4-2 3-4 3H9c-1 0-2 1-2 2s1 3 4 3" />
-      <line x1="6" y1="4" x2="8" y2="7" />
-    </svg>
-  );
-}
-
-function IconDumpling() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M4 13c0-4 3-6 8-6s8 2 8 6" />
-      <path d="M4 13a8 8 0 0 0 16 0" />
-      <path d="M8 12v-1" />
-      <path d="M12 11v-1" />
-      <path d="M16 12v-1" />
-    </svg>
-  );
-}
-
-function IconCake() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M4 20V13a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7" />
-      <path d="M4 15c1.5 1 3 1 4.5 0S11 14 12 15s2 1 3.5 0S18 14 20 15" />
-      <line x1="3" y1="20" x2="21" y2="20" />
-      <line x1="12" y1="7" x2="12" y2="11" />
-      <path d="M11 6c.5-.5.5-1.5 0-2" />
-    </svg>
-  );
-}
-
-function IconBeer() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M6 6h10v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1Z" />
-      <path d="M16 9h2a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-      <line x1="9" y1="10" x2="9" y2="18" />
-      <line x1="13" y1="10" x2="13" y2="18" />
-    </svg>
-  );
-}
-
-function IconCup() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M7 8h10l-1 12a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1Z" />
-      <line x1="6" y1="8" x2="18" y2="8" />
-      <path d="M10 4c1 1 3 1 4 0" />
-    </svg>
-  );
-}
-
-function IconSalad() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M3 12h18a9 9 0 0 1-18 0Z" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <circle cx="9" cy="9" r="2" />
-      <circle cx="14" cy="8" r="1.8" />
-      <path d="M11 6c1-1 2-1 3 0" />
-    </svg>
-  );
-}
-
-function IconDrumstick() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M15 4a4 4 0 0 1 4 4c0 3-3 4-4 6l-1 1-4-4 1-1c2-1 3-4 4-6Z" />
-      <path d="M10 12l-4 4a2 2 0 0 0 0 3 2 2 0 0 0 3 0l4-4" />
-    </svg>
-  );
-}
-
-function IconMeat() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <path d="M4 12c0-4 3-7 8-7s8 3 8 7-3 7-8 7-8-3-8-7Z" />
-      <circle cx="10" cy="11" r="1.6" />
-    </svg>
-  );
-}
-
-function IconPlate() {
-  return (
-    <svg {...ICON_ATTRS}>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="5" />
-    </svg>
-  );
-}
 
 function DonutChart({
   slices,
