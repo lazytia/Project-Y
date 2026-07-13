@@ -130,27 +130,37 @@
   cursor: pointer;
 }
 
-/* ── Number row ── */
+/* ── Number row ──
+   3-col grid: [this-year] [last-year] [delta]. Numbers can be long
+   ($1,170,302.31 kind of long) so we keep the delta text nowrap and
+   dial back the font a notch so it fits on narrow phones without
+   splitting "↓ 46.7%" onto two lines. */
 .numberRow {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: var(--space-4);
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: baseline;
 }
 
 .numberLabel {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-fg-muted);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .numberValue {
   margin: 4px 0 0;
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .numberValuePrimary {
@@ -159,22 +169,29 @@
 
 .numberValueMuted {
   margin: 4px 0 0;
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 800;
   color: var(--color-fg-muted);
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .deltaWrap {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .deltaValue {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .deltaUp {
@@ -187,8 +204,9 @@
 
 .deltaSub {
   margin: 2px 0 0;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--color-fg-muted);
+  white-space: nowrap;
 }
 
 /* ── Bar chart ── */
