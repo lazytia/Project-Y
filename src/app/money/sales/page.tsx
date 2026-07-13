@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
@@ -9,6 +10,12 @@ import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
+
+// Full-screen calendar overlay — code-split so the initial Sales bundle
+// doesn't include it until the owner taps the date pill.
+const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
+  ssr: false,
+});
 
 /**
  * Owner Sales overview — pulls from two data sources:
@@ -114,6 +121,7 @@ export default function SalesPage() {
   const [todayKey, setTodayKey] = useState<string>("");
   // Monday of the currently-viewed week.
   const [weekMondayISO, setWeekMondayISO] = useState<string>("");
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [daily, setDaily] = useState<DailyMap | null>(null);
   const [categories, setCategories] = useState<CategoryRow[] | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
@@ -135,7 +143,9 @@ export default function SalesPage() {
     setWeekMondayISO(isoMondayOf(key));
   }, []);
 
-  // ── Firestore daily fetch — 2 years back covers weekly + monthly views.
+  // ── Firestore daily fetch — 3 years back covers the weekly bars for
+  //    anything the calendar picker will let the owner pick, and the
+  //    yearly bars for last year's monthly buckets.
   useEffect(() => {
     if (!allowed || !todayKey) return;
     let cancelled = false;
@@ -144,7 +154,7 @@ export default function SalesPage() {
         // sales_daily documents are keyed by "YYYY-MM-DD" but the schema
         // also has a dateISO field, so filter on that for a clean range.
         const [ty] = todayKey.split("-").map(Number);
-        const startISO = `${ty - 1}-01-01`;
+        const startISO = `${ty - 2}-01-01`;
         const endISO = `${ty}-12-31`;
         const snap = await getDocs(
           query(
@@ -320,7 +330,12 @@ export default function SalesPage() {
           <h1 className={styles.pageTitle}>Sales</h1>
           <p className={styles.pageSubtitle}>Overview of your sales performance.</p>
         </div>
-        <button type="button" className={styles.datePill}>
+        <button
+          type="button"
+          className={styles.datePill}
+          onClick={() => setCalendarOpen(true)}
+          aria-label="Choose week"
+        >
           <CalendarIcon />
           <span className={styles.datePillLabel}>
             {weekMondayISO ? fmtRangeLabel(weekMondayISO) : "—"}
@@ -328,6 +343,23 @@ export default function SalesPage() {
           <span className={styles.datePillChevron} aria-hidden="true">▾</span>
         </button>
       </header>
+
+      {calendarOpen && weekMondayISO && (
+        <CalendarPicker
+          value={weekMondayISO}
+          maxDate={todayKey}
+          singleOnly
+          onChange={(d) => {
+            // Snap whatever day the owner picks to the Monday of that
+            // week — Sales is always presented in Mon-Sun buckets.
+            setWeekMondayISO(isoMondayOf(d));
+          }}
+          onRangeChange={() => {
+            /* range mode disabled */
+          }}
+          onClose={() => setCalendarOpen(false)}
+        />
+      )}
 
       {/* ── This Week vs Last Week ── */}
       <section className={styles.card}>
