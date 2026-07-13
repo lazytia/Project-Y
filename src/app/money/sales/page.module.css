@@ -375,6 +375,17 @@
   letter-spacing: -0.01em;
 }
 
+.donutSliceLabel {
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 700;
+  fill: #fff;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.25);
+  stroke-width: 0.4;
+}
+
 .categoryList {
   list-style: none;
   padding: 0;
@@ -447,17 +458,11 @@
   text-align: right;
 }
 
-/* ── Best selling categories — horizontal card row ── */
+/* ── Best selling categories — horizontal row ── */
 .bestScroller {
-  overflow-x: auto;
-  margin: 0 calc(-1 * var(--space-4));
-  padding: 0 var(--space-4);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.bestScroller::-webkit-scrollbar {
-  display: none;
+  /* Give the row breathing room but keep the whole set visible on mobile
+     without scroll — 5 cards fit inside a 320px-wide plot area at these
+     paddings. */
 }
 
 .bestGrid {
@@ -465,9 +470,8 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(112px, 1fr);
-  gap: var(--space-3);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
   align-items: stretch;
 }
 
@@ -475,8 +479,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: var(--space-3) var(--space-2);
+  gap: 4px;
+  padding: var(--space-2) 4px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);
@@ -502,26 +506,26 @@
   background: var(--color-warm);
 }
 
-.bestCardDot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+.bestCardIcon {
+  font-size: 24px;
+  line-height: 1;
   margin-top: 4px;
+  filter: grayscale(0.05);
 }
 
 .bestCardName {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 2px 0 0;
+  font-size: 11px;
   font-weight: 700;
   color: var(--color-fg);
-  line-height: 1.25;
+  line-height: 1.2;
   overflow-wrap: anywhere;
   min-width: 0;
 }
 
 .bestCardSales {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-fg);
   font-weight: 700;
   white-space: nowrap;
@@ -530,7 +534,7 @@
 .bestCardDeltaUp,
 .bestCardDeltaDown {
   margin: 2px 0 0;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
 }

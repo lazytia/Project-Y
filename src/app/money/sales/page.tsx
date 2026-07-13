@@ -91,8 +91,10 @@ export default function SalesPage() {
   const [daily, setDaily] = useState<DailyMap | null>(null);
   const [categories, setCategories] = useState<CategoryRow[] | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
-  // 2025 monthly totals from Square (Firestore's sales_daily hasn't been
-  // backfilled that far; we hit Square directly for the comparison year).
+  // sales_daily is only backfilled for recent months so the older months
+  // of the current year read as zero. Hit Square directly for both
+  // year buckets so the comparison is apples-to-apples.
+  const [thisYearMonthly, setThisYearMonthly] = useState<number[] | null>(null);
   const [lastYearMonthly, setLastYearMonthly] = useState<number[] | null>(null);
 
   useEffect(() => {
@@ -143,21 +145,33 @@ export default function SalesPage() {
     };
   }, [allowed, todayKey]);
 
-  // ── Last-year monthly totals (Square direct — sales_daily may not have
-  //    that far of a backfill). Runs once per todayKey change.
+  // ── Yearly monthly totals (this + last year, both from Square).
+  //    sales_daily doesn't have a full backfill so we always hit the API
+  //    for the yearly chart. Both years fire in parallel.
   useEffect(() => {
     if (!allowed || !todayKey) return;
     let cancelled = false;
-    const lastYear = Number(todayKey.slice(0, 4)) - 1;
+    const thisYear = Number(todayKey.slice(0, 4));
+    const lastYear = thisYear - 1;
     (async () => {
       try {
-        const res = await fetch(`/api/square/yearly-sales?year=${lastYear}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as { monthly: number[] };
-        if (!cancelled) setLastYearMonthly(data.monthly ?? new Array(12).fill(0));
+        const [thisRes, lastRes] = await Promise.all([
+          fetch(`/api/square/yearly-sales?year=${thisYear}`),
+          fetch(`/api/square/yearly-sales?year=${lastYear}`),
+        ]);
+        const [thisData, lastData] = await Promise.all([
+          thisRes.ok ? thisRes.json() : Promise.resolve({ monthly: [] }),
+          lastRes.ok ? lastRes.json() : Promise.resolve({ monthly: [] }),
+        ]);
+        if (cancelled) return;
+        setThisYearMonthly((thisData.monthly as number[] | undefined) ?? new Array(12).fill(0));
+        setLastYearMonthly((lastData.monthly as number[] | undefined) ?? new Array(12).fill(0));
       } catch (err) {
-        console.error("[sales] last-year fetch failed:", err);
-        if (!cancelled) setLastYearMonthly(new Array(12).fill(0));
+        console.error("[sales] yearly fetch failed:", err);
+        if (!cancelled) {
+          setThisYearMonthly(new Array(12).fill(0));
+          setLastYearMonthly(new Array(12).fill(0));
+        }
       }
     })();
     return () => {
@@ -210,28 +224,28 @@ export default function SalesPage() {
   }, [daily, weekMondayISO]);
 
   /* ── Derived: yearly monthly bars ──
-   *   This year: bucketed from Firestore sales_daily (fresh nightly cache).
-   *   Last year: whatever the /yearly-sales API returned — falls back to
-   *   sales_daily for old backfills, and to zeros while loading. */
+   *   Both years read from the /yearly-sales API. sales_daily is used
+   *   as a cheap fallback while the API round-trip is still in flight
+   *   so the chart animates in progressively instead of flashing empty. */
   const yearly = useMemo(() => {
-    if (!daily || !todayKey) return null;
+    if (!todayKey) return null;
     const [ty] = todayKey.split("-").map(Number);
-    const thisYear = new Array(12).fill(0);
-    const lastYearFromDaily = new Array(12).fill(0);
-    for (const [iso, val] of daily) {
-      const [yy, mm] = iso.split("-").map(Number);
-      if (yy === ty) thisYear[mm - 1] += val;
-      else if (yy === ty - 1) lastYearFromDaily[mm - 1] += val;
+    const thisFromDaily = new Array(12).fill(0);
+    const lastFromDaily = new Array(12).fill(0);
+    if (daily) {
+      for (const [iso, val] of daily) {
+        const [yy, mm] = iso.split("-").map(Number);
+        if (yy === ty) thisFromDaily[mm - 1] += val;
+        else if (yy === ty - 1) lastFromDaily[mm - 1] += val;
+      }
     }
-    // Prefer the /yearly-sales API data (has the whole year even without
-    // sales_daily backfill); fall back to Firestore per-month if API
-    // hasn't returned yet.
-    const lastYear = lastYearMonthly ?? lastYearFromDaily;
+    const thisYear = thisYearMonthly ?? thisFromDaily;
+    const lastYear = lastYearMonthly ?? lastFromDaily;
     const thisYtd = thisYear.reduce((s, v) => s + v, 0);
     const lastYtd = lastYear.reduce((s, v) => s + v, 0);
     const deltaPct = lastYtd > 0 ? ((thisYtd - lastYtd) / lastYtd) * 100 : null;
     return { thisYear, lastYear, thisYtd, lastYtd, deltaPct };
-  }, [daily, todayKey, lastYearMonthly]);
+  }, [daily, todayKey, thisYearMonthly, lastYearMonthly]);
 
   const totalCategorySales = useMemo(
     () => (categories ?? []).reduce((s, c) => s + c.sales, 0),
@@ -372,7 +386,7 @@ export default function SalesPage() {
             loading={categories === null}
           />
           <ul className={styles.categoryList}>
-            {(categories ?? []).slice(0, 6).map((c, idx) => (
+            {(categories ?? []).slice(0, 5).map((c, idx) => (
               <li key={c.name} className={styles.categoryRow}>
                 <span
                   className={styles.categoryDot}
@@ -421,11 +435,9 @@ export default function SalesPage() {
                   >
                     {idx + 1}
                   </span>
-                  <span
-                    className={styles.bestCardDot}
-                    style={{ background: donutColorAt(idx) }}
-                    aria-hidden="true"
-                  />
+                  <span className={styles.bestCardIcon} aria-hidden="true">
+                    {iconForCategory(c.name)}
+                  </span>
                   <p className={styles.bestCardName}>{c.name}</p>
                   <p className={styles.bestCardSales}>{fmtCurrency(c.sales)}</p>
                   <p
@@ -570,6 +582,27 @@ function donutColorAt(i: number): string {
   return DONUT_COLORS[i % DONUT_COLORS.length];
 }
 
+/** Map a Square category name to a compact emoji glyph. Falls back to a
+ *  neutral plate icon when nothing matches so every rank card still has
+ *  something to sit under its number. */
+function iconForCategory(name: string): string {
+  const n = name.toLowerCase();
+  if (/donburi|rice bowl|bowl|katsudon|gyudon|oyakodon/.test(n)) return "🍚";
+  if (/sushi|nigiri|roll|sashimi|maki/.test(n)) return "🍣";
+  if (/ramen|noodle/.test(n)) return "🍜";
+  if (/udon|soba/.test(n)) return "🍲";
+  if (/bento/.test(n)) return "🍱";
+  if (/tempura|katsu|kushi|fried/.test(n)) return "🍤";
+  if (/appetizer|side|small|starter|edamame/.test(n)) return "🥟";
+  if (/dessert|cake|ice cream|mochi|matcha/.test(n)) return "🍰";
+  if (/beer|sake|wine|alcohol|spirit|whisky|cocktail/.test(n)) return "🍺";
+  if (/drink|beverage|soft|juice|tea|coffee|water/.test(n)) return "🥤";
+  if (/salad|vegetable|veg/.test(n)) return "🥗";
+  if (/chicken|karaage/.test(n)) return "🍗";
+  if (/beef|steak/.test(n)) return "🥩";
+  return "🍽️";
+}
+
 function DonutChart({
   slices,
   centerLabel,
@@ -587,13 +620,24 @@ function DonutChart({
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
 
+  // Precompute the arc-center angle for each slice so we can drop a "% "
+  // label right on top of the ring. Only slices with a wide-enough sweep
+  // (≥ 5%) get a label — narrower ones would just overlap their neighbours.
   const segments = slices.map((v, i) => {
     const fraction = total > 0 ? v / total : 0;
     const length = fraction * circumference;
+    // Angle at the middle of this slice, measured from 12 o'clock (‑Y axis)
+    // going clockwise; matches the `rotate(-90 80 80)` we apply below.
+    const midAngleRad = ((offset + length / 2) / circumference) * 2 * Math.PI - Math.PI / 2;
+    const labelX = 80 + Math.cos(midAngleRad) * radius;
+    const labelY = 80 + Math.sin(midAngleRad) * radius;
     const seg = {
       color: donutColorAt(i),
       dashArray: `${length} ${circumference - length}`,
       dashOffset: -offset,
+      fraction,
+      labelX,
+      labelY,
     };
     offset += length;
     return seg;
@@ -623,6 +667,22 @@ function DonutChart({
               transform="rotate(-90 80 80)"
             />
           ))}
+        {total > 0 &&
+          segments.map(
+            (seg, i) =>
+              seg.fraction >= 0.05 && (
+                <text
+                  key={`lbl-${i}`}
+                  x={seg.labelX}
+                  y={seg.labelY}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className={styles.donutSliceLabel}
+                >
+                  {Math.round(seg.fraction * 100)}%
+                </text>
+              ),
+          )}
       </svg>
       <div className={styles.donutCenter}>
         <p className={styles.donutCenterLabel}>{centerLabel}</p>
