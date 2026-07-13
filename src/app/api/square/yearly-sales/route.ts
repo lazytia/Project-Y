@@ -40,6 +40,78 @@ type CachedYear = {
   computedAt?: Timestamp;
 };
 
+/** Guard against firing multiple background refreshes for the same year. */
+const inFlightRefresh = new Map<string, Promise<void>>();
+
+/** Compute Square-side totals for `year` and write the result to Firestore.
+ *  Runs asynchronously so we can serve cached data first and update the
+ *  cache in the background. */
+async function refreshInBackground(year: string): Promise<void> {
+  if (inFlightRefresh.has(year)) return inFlightRefresh.get(year)!;
+  const p = (async () => {
+    try {
+      await computeAndCache(year);
+    } finally {
+      inFlightRefresh.delete(year);
+    }
+  })();
+  inFlightRefresh.set(year, p);
+  return p;
+}
+
+async function computeAndCache(year: string): Promise<CachedYear> {
+  const { locationId, timezone } = squareEnv;
+  if (!locationId) throw new Error("locationId missing");
+  const jan1 = getSalesDayRange(timezone, `${year}-01-01`);
+  const dec31 = getSalesDayRange(timezone, `${year}-12-31`);
+  const orders = await fetchOrders(locationId, jan1.startAt, dec31.endAt, ORDER_STATES);
+
+  const monthly = new Array(12).fill(0);
+  for (const order of orders) {
+    if (order.state !== "COMPLETED") continue;
+    const created = order.createdAt ? new Date(order.createdAt) : null;
+    if (!created || Number.isNaN(created.getTime())) continue;
+    const localMonthKey = created.toLocaleDateString("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "numeric",
+    });
+    const [monthStr, yearStr] = localMonthKey.split("/");
+    if (yearStr !== year) continue;
+    const m = Number(monthStr) - 1;
+    if (m < 0 || m > 11) continue;
+    monthly[m] += squareGrossSalesCents(order);
+  }
+
+  const refundResults = await Promise.all(
+    Array.from({ length: 12 }, async (_, i) => {
+      const monthNum = i + 1;
+      const firstKey = `${year}-${String(monthNum).padStart(2, "0")}-01`;
+      const nextMonth = i === 11 ? [Number(year) + 1, 1] : [Number(year), monthNum + 1];
+      const nextKey = `${nextMonth[0]}-${String(nextMonth[1]).padStart(2, "0")}-01`;
+      const startWin = getSalesDayRange(timezone, firstKey);
+      const endOfMonthWin = getSalesDayRange(timezone, nextKey);
+      return sumRefundCents(locationId, startWin.startAt, endOfMonthWin.startAt);
+    }),
+  );
+
+  const monthlyDollars = monthly.map((grossCents, i) => {
+    const net = (grossCents - refundResults[i]) / 100;
+    return Math.round(net * 100) / 100;
+  });
+  const total = Math.round(monthlyDollars.reduce((s, v) => s + v, 0) * 100) / 100;
+
+  await adminDb()
+    .collection("sales_yearly")
+    .doc(year)
+    .set(
+      { year, monthly: monthlyDollars, total, computedAt: Timestamp.now() },
+      { merge: true },
+    );
+
+  return { year, monthly: monthlyDollars, total };
+}
+
 export async function GET(req: NextRequest) {
   const { locationId, timezone, accessToken } = squareEnv;
   if (!locationId || !accessToken) {
@@ -51,21 +123,39 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "year=YYYY required" }, { status: 400 });
   }
 
-  // Firestore write-through cache — instant on repeat hits, self-refreshes
-  // for the current year at CURRENT_YEAR_TTL_MS cadence.
+  // Firestore write-through cache — instant on repeat hits. To keep the
+  // chart snappy on mobile we return the cached copy immediately even if
+  // it's slightly stale, then kick off a background refresh so the next
+  // request sees a newer number.
   const currentYear = new Date().getFullYear();
   const isPastYear = Number(year) < currentYear;
+  let cachedData: CachedYear | undefined;
+  let staleForBackgroundRefresh = false;
   try {
     const snap = await adminDb().collection("sales_yearly").doc(year).get();
     if (snap.exists) {
-      const data = snap.data() as CachedYear | undefined;
-      const computedAt = data?.computedAt?.toDate?.() ?? null;
+      cachedData = snap.data() as CachedYear | undefined;
+      const computedAt = cachedData?.computedAt?.toDate?.() ?? null;
       const fresh =
         isPastYear ||
         (computedAt && Date.now() - computedAt.getTime() < CURRENT_YEAR_TTL_MS);
-      if (fresh && data?.monthly && Array.isArray(data.monthly)) {
+      if (cachedData?.monthly && Array.isArray(cachedData.monthly)) {
+        if (!fresh) staleForBackgroundRefresh = true;
+        // Serve the cached copy now. If it's stale, we'll queue a
+        // background compute after the response is on its way.
+        if (staleForBackgroundRefresh) {
+          void refreshInBackground(year).catch((err) =>
+            console.warn("[yearly-sales] background refresh failed:", err),
+          );
+        }
         return NextResponse.json(
-          { year, monthly: data.monthly, total: data.total ?? 0, cached: true },
+          {
+            year,
+            monthly: cachedData.monthly,
+            total: cachedData.total ?? 0,
+            cached: true,
+            stale: staleForBackgroundRefresh,
+          },
           { headers: CACHE_HEADERS },
         );
       }
@@ -76,79 +166,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Business-day window across the whole year: Jan 1 9am → Dec 31 10pm.
-    const jan1 = getSalesDayRange(timezone, `${year}-01-01`);
-    const dec31 = getSalesDayRange(timezone, `${year}-12-31`);
-
-    // Fetch every order for the year in one paginated walk, then bucket
-    // by the local month of its `createdAt`. This keeps the network cost
-    // to a single walk instead of 12 monthly windows.
-    const orders = await fetchOrders(locationId, jan1.startAt, dec31.endAt, ORDER_STATES);
-
-    const monthly = new Array(12).fill(0); // gross sales cents per month
-    for (const order of orders) {
-      // Skip open orders (not yet finalised sales); Square Web ignores
-      // them in the Sales Summary too.
-      if (order.state !== "COMPLETED") continue;
-      const created = order.createdAt ? new Date(order.createdAt) : null;
-      if (!created || Number.isNaN(created.getTime())) continue;
-      // Translate UTC createdAt to the store's local month so orders that
-      // straddle midnight UTC stay in the right calendar month.
-      const localMonthKey = created.toLocaleDateString("en-US", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "numeric",
-      });
-      const [monthStr, yearStr] = localMonthKey.split("/");
-      if (yearStr !== year) continue; // window sometimes leaks a few hours
-      const m = Number(monthStr) - 1;
-      if (m < 0 || m > 11) continue;
-      monthly[m] += squareGrossSalesCents(order);
-    }
-
-    // Refunds are trickier: their timestamp can lag the original order.
-    // Query month-by-month so each month's Gross Sales is netted against
-    // the refunds that actually posted in that month's business window.
-    const refundResults = await Promise.all(
-      Array.from({ length: 12 }, async (_, i) => {
-        const monthNum = i + 1;
-        const firstKey = `${year}-${String(monthNum).padStart(2, "0")}-01`;
-        const nextMonth = i === 11 ? [Number(year) + 1, 1] : [Number(year), monthNum + 1];
-        const nextKey = `${nextMonth[0]}-${String(nextMonth[1]).padStart(2, "0")}-01`;
-        const startWin = getSalesDayRange(timezone, firstKey);
-        // End of month = start of next month's business day window,
-        // shifted back one microsecond so the ranges don't overlap.
-        const endOfMonthWin = getSalesDayRange(timezone, nextKey);
-        return sumRefundCents(locationId, startWin.startAt, endOfMonthWin.startAt);
-      }),
-    );
-
-    const monthlyDollars = monthly.map((grossCents, i) => {
-      const net = (grossCents - refundResults[i]) / 100;
-      return Math.round(net * 100) / 100;
-    });
-    const total = Math.round(monthlyDollars.reduce((s, v) => s + v, 0) * 100) / 100;
-
-    // Fire-and-forget write-through cache. Read path will pick this up
-    // instantly on the next request for the same year.
-    adminDb()
-      .collection("sales_yearly")
-      .doc(year)
-      .set(
-        {
-          year,
-          monthly: monthlyDollars,
-          total,
-          computedAt: Timestamp.now(),
-        },
-        { merge: true },
-      )
-      .catch((err) => console.warn("[yearly-sales] cache write failed:", err));
-
-    return NextResponse.json(
-      { year, monthly: monthlyDollars, total },
-      { headers: CACHE_HEADERS },
-    );
+    const result = await computeAndCache(year);
+    return NextResponse.json(result, { headers: CACHE_HEADERS });
   } catch (err) {
     console.error("[Square] yearly-sales error:", err);
     return NextResponse.json({ error: "Failed to fetch Square data" }, { status: 502 });

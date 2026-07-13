@@ -281,12 +281,33 @@ export async function fetchWeekPayrollDetail(
       }
       return -1;
     }
-    const employeeCol = findCol(/employee|name/i);
-    const netPayCol = findCol(/net\s*pay/i);
-    const taxCol = findCol(/^tax$|tax\s*with|payg/i);
-    const superCol = findCol(/^super$|superannuation|super\s*ann/i);
-    const cashPayCol = findCol(/cash\s*pay|cash\s*wage|paid\s*in\s*cash/i);
+    // Column resolution — Australian pay sheets label the same idea a
+    // few different ways. Try the exact keyword first and fall back to
+    // looser variants.
+    const employeeCol = findCol(/^\s*employee\s*$/i, /^\s*name\s*$/i, /employee|name/i);
+    const netPayCol = findCol(/^\s*net\s*pay\s*$/i, /net\s*(pay|wage|amount)/i, /take[\s-]?home/i);
+    const taxCol = findCol(/^\s*tax\s*$/i, /payg/i, /withhold/i);
+    const superCol = findCol(/superannuation/i, /super\s*ann/i, /^\s*super\s*$/i, /^\s*sga\s*$/i);
+    const cashPayCol = findCol(
+      /^\s*cash\s*pay\s*$/i,
+      /^\s*cash\s*$/i,
+      /cash\s*(pay|wage|amount)/i,
+      /paid\s*in\s*cash/i,
+    );
     const totalIncCol = findCol(/total\s*inc\s*super/i);
+    // Log which columns matched so we can debug if a week comes back
+    // with all-zero breakdown lines. (Cloud Run captures these.)
+    if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+      console.log("[payroll-sheet] cols for", weekStartISO, {
+        employeeCol,
+        netPayCol,
+        taxCol,
+        superCol,
+        cashPayCol,
+        totalIncCol,
+        headerRow: cols,
+      });
+    }
 
     const employees: EmployeePayRow[] = [];
     let totalNet = 0;
