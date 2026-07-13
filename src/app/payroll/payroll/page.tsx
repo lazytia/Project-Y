@@ -2,11 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
+
+// Week picker is only mounted after the owner taps the date pill — keep
+// it out of the initial bundle.
+const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
+  ssr: false,
+});
 
 /**
  * Owner Payroll overview — reads from /api/payroll/summary which pulls
@@ -149,9 +156,11 @@ export default function PayrollOverviewPage() {
   const allowed = isOwner(user);
 
   const [weekMondayISO, setWeekMondayISO] = useState<string>("");
+  const [todayKey, setTodayKey] = useState<string>("");
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -160,6 +169,7 @@ export default function PayrollOverviewPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    setTodayKey(sydneyTodayKey());
     setWeekMondayISO(isoLastCompletedPayWeek());
   }, []);
 
@@ -240,7 +250,12 @@ export default function PayrollOverviewPage() {
           <h1 className={styles.pageTitle}>Payroll</h1>
           <p className={styles.pageSubtitle}>Weekly payroll overview and summary.</p>
         </div>
-        <button type="button" className={styles.datePill}>
+        <button
+          type="button"
+          className={styles.datePill}
+          onClick={() => setCalendarOpen(true)}
+          aria-label="Pick a pay week"
+        >
           <CalendarIcon />
           <span className={styles.datePillLabel}>
             {weekMondayISO ? fmtWeekRange(weekMondayISO) : "—"}
@@ -248,6 +263,24 @@ export default function PayrollOverviewPage() {
           <span className={styles.datePillChevron} aria-hidden="true">▾</span>
         </button>
       </header>
+
+      {calendarOpen && (
+        <CalendarPicker
+          value={weekMondayISO}
+          maxDate={todayKey}
+          singleOnly
+          onChange={(pickedISO) => {
+            // Snap whichever day the owner picked to that week's Monday
+            // so the summary always fetches a full Mon–Sun window.
+            setWeekMondayISO(isoMondayOf(pickedISO));
+            setCalendarOpen(false);
+          }}
+          onRangeChange={() => {
+            /* range mode disabled via singleOnly */
+          }}
+          onClose={() => setCalendarOpen(false)}
+        />
+      )}
 
       {/* ── Payroll % of sales ── */}
       <section className={styles.pctCard}>
