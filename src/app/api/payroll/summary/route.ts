@@ -36,6 +36,28 @@ function todayKey(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: TIMEZONE });
 }
 
+/** The sheet leaves Total Inc Super blank on employee rows, so derive
+ *  it from the components. Applied to whatever the parser/cache returned
+ *  so stale cached entries with 0 totals still surface a correct number. */
+function normaliseDetail(d: WeekPayrollDetail): WeekPayrollDetail {
+  const employees = d.employees.map((e) => {
+    const derived = e.netPay + e.tax + e.superAnn;
+    const totalIncSuper = e.totalIncSuper > 0 ? e.totalIncSuper : derived;
+    return { ...e, totalIncSuper: Math.round(totalIncSuper * 100) / 100 };
+  });
+  const t = d.totals;
+  const derivedTotal = t.netPay + t.tax + t.superAnn;
+  const totalIncSuper =
+    t.totalIncSuper > 0
+      ? t.totalIncSuper
+      : Math.round(derivedTotal * 100) / 100;
+  return {
+    ...d,
+    employees,
+    totals: { ...t, totalIncSuper },
+  };
+}
+
 async function loadDetailCached(weekStart: string): Promise<WeekPayrollDetail | null> {
   const today = todayKey();
   const weekEnd = shiftDateKey(weekStart, 6, TIMEZONE);
@@ -48,7 +70,7 @@ async function loadDetailCached(weekStart: string): Promise<WeekPayrollDetail | 
       const computedAt = data?.computedAt?.toDate?.() ?? null;
       const ttl = isPast ? PAST_TTL_MS : CURRENT_TTL_MS;
       if (data?.detail && computedAt && Date.now() - computedAt.getTime() < ttl) {
-        return data.detail;
+        return normaliseDetail(data.detail);
       }
     }
   } catch (err) {
@@ -60,16 +82,18 @@ async function loadDetailCached(weekStart: string): Promise<WeekPayrollDetail | 
     return null;
   });
   if (fresh) {
+    const normalised = normaliseDetail(fresh);
     adminDb()
       .collection("payroll_summary_cache")
       .doc(weekStart)
       .set(
-        { detail: fresh, computedAt: Timestamp.now() },
+        { detail: normalised, computedAt: Timestamp.now() },
         { merge: true },
       )
       .catch((err) => console.warn("[payroll/summary] cache write failed:", err));
+    return normalised;
   }
-  return fresh;
+  return null;
 }
 
 async function loadWeekSales(weekStart: string): Promise<number> {
