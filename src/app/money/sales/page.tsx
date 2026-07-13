@@ -130,6 +130,11 @@ export default function SalesPage() {
   // year buckets so the comparison is apples-to-apples.
   const [thisYearMonthly, setThisYearMonthly] = useState<number[] | null>(null);
   const [lastYearMonthly, setLastYearMonthly] = useState<number[] | null>(null);
+  // Fresh-from-Square weekly bars for the selected week, keyed by the
+  // week's Monday ISO. Populated by /api/square/weekly-daily; falls back
+  // to the Firestore sales_daily buckets while the API is in flight.
+  const [thisWeekDaily, setThisWeekDaily] = useState<number[] | null>(null);
+  const [lastWeekDaily, setLastWeekDaily] = useState<number[] | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -180,6 +185,48 @@ export default function SalesPage() {
       cancelled = true;
     };
   }, [allowed, todayKey]);
+
+  // ── Weekly daily bars (this + last week) — always Square-direct so
+  //    the "This Week vs Last Week" chart reflects the live dashboard
+  //    figure rather than whatever nightly cache last touched
+  //    sales_daily. Cached per week in sessionStorage.
+  useEffect(() => {
+    if (!allowed || !weekMondayISO) return;
+    let cancelled = false;
+    const cacheKey = `y.sales.weekDaily.${weekMondayISO}`;
+    type WeeklyCache = { thisWeek: number[]; lastWeek: number[] };
+    const cached = readSession<WeeklyCache>(cacheKey);
+    if (cached) {
+      setThisWeekDaily(cached.thisWeek);
+      setLastWeekDaily(cached.lastWeek);
+    } else {
+      setThisWeekDaily(null);
+      setLastWeekDaily(null);
+    }
+    (async () => {
+      try {
+        if (cached) return; // sessionStorage was still fresh
+        const res = await fetch(`/api/square/weekly-daily?weekStart=${weekMondayISO}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as {
+          thisWeek: { daily: number[] };
+          lastWeek: { daily: number[] };
+        };
+        if (cancelled) return;
+        setThisWeekDaily(data.thisWeek.daily);
+        setLastWeekDaily(data.lastWeek.daily);
+        writeSession<WeeklyCache>(cacheKey, {
+          thisWeek: data.thisWeek.daily,
+          lastWeek: data.lastWeek.daily,
+        });
+      } catch (err) {
+        console.error("[sales] weekly-daily fetch failed:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed, weekMondayISO]);
 
   // ── Yearly monthly totals (this + last year, both from Square).
   //    sales_daily doesn't have a full backfill so we always hit the API
@@ -266,21 +313,34 @@ export default function SalesPage() {
     };
   }, [allowed, weekMondayISO]);
 
-  /* ── Derived: weekly bars ── */
+  /* ── Derived: weekly bars ──
+   *   Prefer the Square-direct API response (thisWeekDaily / lastWeekDaily)
+   *   when available. Falls back to the Firestore sales_daily bucket while
+   *   the API round-trip is still in flight so the chart doesn't flash
+   *   empty on cold loads. */
   const weekly = useMemo(() => {
-    if (!daily || !weekMondayISO) return null;
+    if (!weekMondayISO) return null;
     const prevMonday = addDaysISO(weekMondayISO, -7);
-    const thisWeek: number[] = [];
-    const lastWeek: number[] = [];
-    for (let i = 0; i < 7; i++) {
-      thisWeek.push(daily.get(addDaysISO(weekMondayISO, i)) ?? 0);
-      lastWeek.push(daily.get(addDaysISO(prevMonday, i)) ?? 0);
+    let thisWeek: number[];
+    let lastWeek: number[];
+    if (thisWeekDaily && lastWeekDaily) {
+      thisWeek = thisWeekDaily;
+      lastWeek = lastWeekDaily;
+    } else if (daily) {
+      thisWeek = [];
+      lastWeek = [];
+      for (let i = 0; i < 7; i++) {
+        thisWeek.push(daily.get(addDaysISO(weekMondayISO, i)) ?? 0);
+        lastWeek.push(daily.get(addDaysISO(prevMonday, i)) ?? 0);
+      }
+    } else {
+      return null;
     }
     const thisTotal = thisWeek.reduce((s, v) => s + v, 0);
     const lastTotal = lastWeek.reduce((s, v) => s + v, 0);
     const deltaPct = lastTotal > 0 ? ((thisTotal - lastTotal) / lastTotal) * 100 : null;
     return { thisWeek, lastWeek, thisTotal, lastTotal, deltaPct };
-  }, [daily, weekMondayISO]);
+  }, [daily, weekMondayISO, thisWeekDaily, lastWeekDaily]);
 
   /* ── Derived: yearly monthly bars ──
    *   Both years read from the /yearly-sales API. sales_daily is used
