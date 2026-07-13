@@ -337,14 +337,27 @@ export async function fetchWeekPayrollDetail(
       const tax = taxCol >= 0 ? parseMoney(r[taxCol]) ?? 0 : 0;
       const superAnn = superCol >= 0 ? parseMoney(r[superCol]) ?? 0 : 0;
       const cashPay = cashPayCol >= 0 ? parseMoney(r[cashPayCol]) ?? 0 : 0;
-      const totalIncSuper = totalIncCol >= 0 ? parseMoney(r[totalIncCol]) ?? 0 : 0;
+      const rawTotalInc = totalIncCol >= 0 ? parseMoney(r[totalIncCol]) ?? 0 : 0;
+      // The sheet often leaves the Total Inc Super column blank per
+      // employee (it's only populated on the Total row). Derive it from
+      // the components in that case so per-employee cards + the header
+      // total both add up to the sheet's grand total.
+      const totalIncSuper =
+        rawTotalInc > 0 ? rawTotalInc : netPay + tax + superAnn;
 
       // Skip pure zero rows — usually blank continuation lines.
       if (netPay === 0 && tax === 0 && superAnn === 0 && cashPay === 0 && totalIncSuper === 0) {
         continue;
       }
 
-      employees.push({ name, netPay, tax, superAnn, cashPay, totalIncSuper });
+      employees.push({
+        name,
+        netPay,
+        tax,
+        superAnn,
+        cashPay,
+        totalIncSuper: Math.round(totalIncSuper * 100) / 100,
+      });
       totalNet += netPay;
       totalTax += tax;
       totalSuper += superAnn;

@@ -69,14 +69,16 @@ function isoMondayOf(dateKey: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
-function isoLastMonday(): string {
-  // "Last week" for a payroll surface is usually the most recently
-  // completed pay week — i.e. last Monday, not this Monday. Shift back a
-  // week from the current Monday so the page opens on the finalised run.
+function isoLastCompletedPayWeek(): string {
+  // Yurica's Pay History sheet finalises a week after Sunday closes. So
+  // the most recently *paid* week has its Sunday last Sunday or earlier
+  // — i.e. two Mondays ago from today. Landing there means the page
+  // opens on real numbers instead of the current in-progress week that
+  // hasn't been paid yet.
   const thisMonday = isoMondayOf(sydneyTodayKey());
   const [y, m, d] = thisMonday.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() - 7);
+  dt.setUTCDate(dt.getUTCDate() - 14);
   return dt.toISOString().slice(0, 10);
 }
 
@@ -158,7 +160,7 @@ export default function PayrollOverviewPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setWeekMondayISO(isoLastMonday());
+    setWeekMondayISO(isoLastCompletedPayWeek());
   }, []);
 
   useEffect(() => {
