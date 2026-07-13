@@ -176,7 +176,9 @@ export default function PayrollOverviewPage() {
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    const cacheKey = `y.payroll.summary.${weekMondayISO}`;
+    // Bump the version whenever the API's response shape or values
+    // change so stale sessionStorage entries don't shadow the fix.
+    const cacheKey = `y.payroll.summary.v2.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
     if (cached) {
       setSummary(cached);
