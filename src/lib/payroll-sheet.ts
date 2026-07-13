@@ -27,6 +27,28 @@ export type WeeklyPayrollRow = {
   totalIncSuper: number;  // dollars
 };
 
+export type EmployeePayRow = {
+  name: string;
+  netPay: number;
+  tax: number;
+  superAnn: number;
+  cashPay: number;
+  totalIncSuper: number;
+};
+
+export type WeekPayrollDetail = {
+  weekStartISO: string;
+  weekEndISO: string;
+  employees: EmployeePayRow[];
+  totals: {
+    netPay: number;
+    tax: number;
+    superAnn: number;
+    cashPay: number;
+    totalIncSuper: number;
+  };
+};
+
 const HEADER_RE = /Pay\s+History\s*\((\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*[-–—]\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/i;
 
 function ddmmToIso(d: string, m: string, y: string): string {
@@ -186,4 +208,141 @@ export async function fetchWeeklyPayrollTotals(): Promise<Record<string, WeeklyP
   }
 
   return out;
+}
+
+/**
+ * Extract the full per-employee breakdown for a specific pay week from the
+ * same Google Sheet. Best-effort column matching — falls back to 0 for any
+ * money column that isn't present in the header row.
+ */
+export async function fetchWeekPayrollDetail(
+  weekStartISO: string,
+): Promise<WeekPayrollDetail | null> {
+  const sheetId = process.env.PAYROLL_SHEET_ID ?? DEFAULT_SHEET_ID;
+  const range = process.env.PAYROLL_SHEET_RANGE ?? DEFAULT_SHEET_RANGE;
+
+  const auth = authClient();
+  const sheets = google.sheets({ version: "v4", auth });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range,
+    valueRenderOption: "UNFORMATTED_VALUE",
+  });
+  const rows = (res.data.values ?? []) as unknown[][];
+
+  // Find the block whose header matches weekStartISO.
+  const wantYear = weekStartISO.slice(0, 4);
+  const wantMonth = weekStartISO.slice(5, 7);
+  const wantDay = weekStartISO.slice(8, 10);
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i] ?? [];
+    let header: RegExpExecArray | null = null;
+    for (const cell of row) {
+      if (typeof cell !== "string") continue;
+      const m = HEADER_RE.exec(cell);
+      if (m) {
+        header = m;
+        break;
+      }
+    }
+    if (!header) continue;
+    const wsISO = ddmmToIso(header[1], header[2], header[3]);
+    if (wsISO !== weekStartISO && !(
+      header[1].padStart(2, "0") === wantDay &&
+      header[2].padStart(2, "0") === wantMonth &&
+      (header[3].length === 4 ? header[3] : `20${header[3]}`) === wantYear
+    )) continue;
+
+    const weekEndISO = ddmmToIso(header[4], header[5], header[6]);
+
+    // Find the column header row within a few lines below.
+    let colHeaderIdx = -1;
+    let cols: unknown[] = [];
+    for (let j = i + 1; j < Math.min(i + 5, rows.length); j += 1) {
+      const r = rows[j] ?? [];
+      const hasIncSuper = r.some(
+        (c) => typeof c === "string" && /total\s*inc\s*super/i.test(c),
+      );
+      if (hasIncSuper) {
+        colHeaderIdx = j;
+        cols = r;
+        break;
+      }
+    }
+    if (colHeaderIdx === -1) return null;
+
+    // Map column names → index. Match on partial lower-cased comparison.
+    function findCol(...patterns: RegExp[]): number {
+      for (let k = 0; k < cols.length; k += 1) {
+        const c = cols[k];
+        if (typeof c !== "string") continue;
+        for (const p of patterns) if (p.test(c)) return k;
+      }
+      return -1;
+    }
+    const employeeCol = findCol(/employee|name/i);
+    const netPayCol = findCol(/net\s*pay/i);
+    const taxCol = findCol(/^tax$|tax\s*with|payg/i);
+    const superCol = findCol(/^super$|superannuation|super\s*ann/i);
+    const cashPayCol = findCol(/cash\s*pay|cash\s*wage|paid\s*in\s*cash/i);
+    const totalIncCol = findCol(/total\s*inc\s*super/i);
+
+    const employees: EmployeePayRow[] = [];
+    let totalNet = 0;
+    let totalTax = 0;
+    let totalSuper = 0;
+    let totalCash = 0;
+    let totalInc = 0;
+
+    for (let j = colHeaderIdx + 1; j < rows.length; j += 1) {
+      const r = rows[j] ?? [];
+      // Stop at next Pay History block.
+      const hitNext = r.some((c) => typeof c === "string" && HEADER_RE.test(c));
+      if (hitNext) break;
+
+      // Skip summary rows (Total / Grand Total).
+      const firstCells = r.slice(0, 3).filter((c) => typeof c === "string") as string[];
+      const isSummary = firstCells.some((c) => /^\s*(grand\s+)?total\s*:?\s*$/i.test(c));
+      if (isSummary) continue;
+
+      const rawName = employeeCol >= 0 ? r[employeeCol] : "";
+      const name = typeof rawName === "string" ? rawName.trim() : "";
+      // Skip fully-empty rows and rows where the "name" is a number/blank.
+      if (!name) continue;
+      if (/^\s*(pay\s*rate|hours|hrs)\s*$/i.test(name)) continue;
+
+      const netPay = netPayCol >= 0 ? parseMoney(r[netPayCol]) ?? 0 : 0;
+      const tax = taxCol >= 0 ? parseMoney(r[taxCol]) ?? 0 : 0;
+      const superAnn = superCol >= 0 ? parseMoney(r[superCol]) ?? 0 : 0;
+      const cashPay = cashPayCol >= 0 ? parseMoney(r[cashPayCol]) ?? 0 : 0;
+      const totalIncSuper = totalIncCol >= 0 ? parseMoney(r[totalIncCol]) ?? 0 : 0;
+
+      // Skip pure zero rows — usually blank continuation lines.
+      if (netPay === 0 && tax === 0 && superAnn === 0 && cashPay === 0 && totalIncSuper === 0) {
+        continue;
+      }
+
+      employees.push({ name, netPay, tax, superAnn, cashPay, totalIncSuper });
+      totalNet += netPay;
+      totalTax += tax;
+      totalSuper += superAnn;
+      totalCash += cashPay;
+      totalInc += totalIncSuper;
+    }
+
+    return {
+      weekStartISO,
+      weekEndISO,
+      employees,
+      totals: {
+        netPay: Math.round(totalNet * 100) / 100,
+        tax: Math.round(totalTax * 100) / 100,
+        superAnn: Math.round(totalSuper * 100) / 100,
+        cashPay: Math.round(totalCash * 100) / 100,
+        totalIncSuper: Math.round(totalInc * 100) / 100,
+      },
+    };
+  }
+  return null;
 }
