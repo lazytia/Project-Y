@@ -238,9 +238,6 @@ export default function SalesPage() {
       <section className={styles.card}>
         <div className={styles.cardHead}>
           <p className={styles.cardTitle}>THIS WEEK vs LAST WEEK</p>
-          <button type="button" className={styles.dotsBtn} aria-label="Options">
-            <DotsIcon />
-          </button>
         </div>
         <div className={styles.numberRow}>
           <div>
@@ -285,9 +282,6 @@ export default function SalesPage() {
       <section className={styles.card}>
         <div className={styles.cardHead}>
           <p className={styles.cardTitle}>THIS YEAR vs LAST YEAR</p>
-          <button type="button" className={styles.dotsBtn} aria-label="Options">
-            <DotsIcon />
-          </button>
         </div>
         <div className={styles.numberRow}>
           <div>
@@ -337,9 +331,6 @@ export default function SalesPage() {
       <section className={styles.card}>
         <div className={styles.cardHead}>
           <p className={styles.cardTitle}>SALES BY CATEGORY</p>
-          <button type="button" className={styles.dotsBtn} aria-label="Options">
-            <DotsIcon />
-          </button>
         </div>
         <div className={styles.categoryBody}>
           <DonutChart
@@ -384,13 +375,6 @@ export default function SalesPage() {
       <section className={styles.card}>
         <div className={styles.cardHead}>
           <p className={styles.cardTitle}>BEST SELLING CATEGORIES</p>
-          <button
-            type="button"
-            className={styles.viewAll}
-            onClick={() => setCategoriesError(null)}
-          >
-            View all
-          </button>
         </div>
         <ul className={styles.bestList}>
           {(categories ?? []).slice(0, 5).map((c, idx) => (
@@ -444,39 +428,78 @@ function BarChart({
   seriesColors: ("primary" | "muted")[];
   loading: boolean;
 }) {
-  const max = useMemo(() => {
-    if (!groups) return 0;
-    let m = 0;
-    for (const g of groups) for (const v of g) if (v > m) m = v;
-    return m;
+  // niceScale rounds the max up to a friendly tick value so the y-axis
+  // reads $0 / $1K / $2K / … or $0 / $20K / $40K / … instead of odd
+  // numbers like $4,732.
+  const { niceMax, ticks } = useMemo(() => {
+    let raw = 0;
+    if (groups) for (const g of groups) for (const v of g) if (v > raw) raw = v;
+    if (raw <= 0) return { niceMax: 0, ticks: [0] };
+    const targetTicks = 5;
+    const rough = raw / targetTicks;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+    const residual = rough / magnitude;
+    let step: number;
+    if (residual <= 1) step = magnitude;
+    else if (residual <= 2) step = 2 * magnitude;
+    else if (residual <= 2.5) step = 2.5 * magnitude;
+    else if (residual <= 5) step = 5 * magnitude;
+    else step = 10 * magnitude;
+    const niceMaxCalc = Math.ceil(raw / step) * step;
+    const arr: number[] = [];
+    for (let v = 0; v <= niceMaxCalc + 1e-9; v += step) arr.push(v);
+    return { niceMax: niceMaxCalc, ticks: arr };
   }, [groups]);
+
+  function fmtTick(v: number): string {
+    if (v >= 1000) {
+      const k = v / 1000;
+      return "$" + (k >= 10 ? Math.round(k) : k.toFixed(k % 1 === 0 ? 0 : 1)) + "K";
+    }
+    return "$" + Math.round(v).toLocaleString("en-US");
+  }
 
   return (
     <div className={styles.chart}>
-      <div className={styles.chartBars}>
-        {labels.map((lbl, i) => (
-          <div key={lbl} className={styles.chartGroup}>
-            <div className={styles.chartGroupBars}>
-              {(groups ?? [[], []]).map((g, gi) => {
-                const value = g[i] ?? 0;
-                const height = max > 0 ? Math.max((value / max) * 100, value > 0 ? 2 : 0) : 0;
-                return (
-                  <div
-                    key={gi}
-                    className={
-                      seriesColors[gi] === "primary"
-                        ? styles.chartBarPrimary
-                        : styles.chartBarMuted
-                    }
-                    style={{ height: `${height}%` }}
-                    title={`${seriesLabels[gi]} ${lbl}: ${value ? fmtCurrency(value) : "—"}`}
-                  />
-                );
-              })}
-            </div>
-            <span className={styles.chartXLabel}>{lbl}</span>
+      <div className={styles.chartPlot}>
+        {/* Y-axis tick labels — rendered top-down so $max is at the top. */}
+        <div className={styles.chartYAxis}>
+          {[...ticks].reverse().map((t) => (
+            <span key={t} className={styles.chartYTick}>{fmtTick(t)}</span>
+          ))}
+        </div>
+        {/* Bars + horizontal gridlines. */}
+        <div className={styles.chartBars}>
+          <div className={styles.chartGrid} aria-hidden="true">
+            {[...ticks].reverse().map((_, i) => (
+              <span key={i} className={styles.chartGridLine} />
+            ))}
           </div>
-        ))}
+          {labels.map((lbl, i) => (
+            <div key={lbl} className={styles.chartGroup}>
+              <div className={styles.chartGroupBars}>
+                {(groups ?? [[], []]).map((g, gi) => {
+                  const value = g[i] ?? 0;
+                  const height =
+                    niceMax > 0 ? Math.max((value / niceMax) * 100, value > 0 ? 2 : 0) : 0;
+                  return (
+                    <div
+                      key={gi}
+                      className={
+                        seriesColors[gi] === "primary"
+                          ? styles.chartBarPrimary
+                          : styles.chartBarMuted
+                      }
+                      style={{ height: `${height}%` }}
+                      title={`${seriesLabels[gi]} ${lbl}: ${value ? fmtCurrency(value) : "—"}`}
+                    />
+                  );
+                })}
+              </div>
+              <span className={styles.chartXLabel}>{lbl}</span>
+            </div>
+          ))}
+        </div>
       </div>
       <div className={styles.chartLegend}>
         {seriesLabels.map((lbl, i) => (
@@ -594,12 +617,3 @@ function CalendarIcon() {
   );
 }
 
-function DotsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <circle cx="5" cy="12" r="2" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="19" cy="12" r="2" />
-    </svg>
-  );
-}
