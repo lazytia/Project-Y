@@ -92,9 +92,28 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // No exact match — dump every block header we found so we can see
+    // what weeks the sheet actually has.
+    const allBlockHeaders: { rowIdx: number; iso: string; raw: string }[] = [];
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i] ?? [];
+      for (const cell of row) {
+        if (typeof cell !== "string") continue;
+        const m = HEADER_RE.exec(cell);
+        if (m) {
+          allBlockHeaders.push({
+            rowIdx: i,
+            iso: ddmmToIso(m[1], m[2], m[3]),
+            raw: cell,
+          });
+          break;
+        }
+      }
+    }
     return NextResponse.json({
       error: `No block found for weekStart=${weekStart}`,
       totalRows: rows.length,
+      allBlockHeaders,
       firstFiveRows: rows.slice(0, 5),
     }, { status: 404 });
   } catch (err) {
