@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
-import { fetchSupplierMonth, type MonthlySuppliers } from "@/lib/suppliers-sheet";
+import { fetchSupplierMonths, type MonthlySuppliers } from "@/lib/suppliers-sheet";
 
 /**
  * GET /api/money/suppliers/summary?month=YYYY-MM
@@ -51,17 +51,36 @@ function currentMonthKey(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: TIMEZONE }).slice(0, 7);
 }
 
-async function loadMonth(monthISO: string): Promise<MonthlySuppliers | null> {
+function isEmptyMonth(m: MonthlySuppliers | null | undefined): boolean {
+  if (!m) return true;
+  return (m.total ?? 0) <= 0 && m.suppliers.length === 0;
+}
+
+async function loadMonth(
+  monthISO: string,
+  batch: Map<string, MonthlySuppliers | null> | null,
+): Promise<MonthlySuppliers | null> {
   const isPast = monthISO < currentMonthKey();
-  // Firestore write-through cache — skip the Google Sheets round-trip
-  // when the parsed detail is still fresh.
+
+  if (batch?.has(monthISO)) {
+    const fromSheet = batch.get(monthISO) ?? null;
+    if (!isEmptyMonth(fromSheet)) {
+      adminDb()
+        .collection("suppliers_month_cache")
+        .doc(monthISO)
+        .set({ detail: fromSheet!, computedAt: Timestamp.now() }, { merge: true })
+        .catch((err) => console.warn("[suppliers/summary] cache write failed", err));
+      return fromSheet;
+    }
+  }
+
   try {
     const snap = await adminDb().collection("suppliers_month_cache").doc(monthISO).get();
     if (snap.exists) {
       const data = snap.data() as CachedMonth | undefined;
       const computedAt = data?.computedAt?.toDate?.() ?? null;
       const ttl = isPast ? PAST_TTL_MS : CURRENT_TTL_MS;
-      if (data?.detail && computedAt && Date.now() - computedAt.getTime() < ttl) {
+      if (data?.detail && !isEmptyMonth(data.detail) && computedAt && Date.now() - computedAt.getTime() < ttl) {
         return data.detail;
       }
     }
@@ -69,18 +88,11 @@ async function loadMonth(monthISO: string): Promise<MonthlySuppliers | null> {
     console.warn("[suppliers/summary] cache read failed", monthISO, err);
   }
 
-  const fresh = await fetchSupplierMonth(monthISO).catch((err) => {
-    console.warn("[suppliers/summary] sheet fetch failed", monthISO, err);
-    return null;
-  });
-  if (fresh) {
-    adminDb()
-      .collection("suppliers_month_cache")
-      .doc(monthISO)
-      .set({ detail: fresh, computedAt: Timestamp.now() }, { merge: true })
-      .catch((err) => console.warn("[suppliers/summary] cache write failed", err));
+  if (batch?.has(monthISO)) {
+    return batch.get(monthISO) ?? null;
   }
-  return fresh;
+
+  return null;
 }
 
 async function loadMonthSales(monthISO: string): Promise<number> {
@@ -124,8 +136,13 @@ export async function GET(req: NextRequest) {
     const monthKeys: string[] = [];
     for (let i = 5; i >= 0; i--) monthKeys.push(shiftMonth(month, -i));
 
+    const batch = await fetchSupplierMonths(monthKeys).catch((err) => {
+      console.warn("[suppliers/summary] workbook fetch failed:", err);
+      return null;
+    });
+
     const [monthData, salesData] = await Promise.all([
-      Promise.all(monthKeys.map(loadMonth)),
+      Promise.all(monthKeys.map((mk) => loadMonth(mk, batch))),
       Promise.all(monthKeys.map(loadMonthSales)),
     ]);
 

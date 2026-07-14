@@ -117,7 +117,7 @@ export default function SuppliersPage() {
   useEffect(() => {
     if (!allowed || !monthISO) return;
     let cancelled = false;
-    const cacheKey = `y.suppliers.summary.v1.${monthISO}`;
+    const cacheKey = `y.suppliers.summary.v2.${monthISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
     if (cached) setSummary(cached);
     else setSummary(null);

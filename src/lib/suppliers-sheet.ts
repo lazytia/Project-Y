@@ -1,40 +1,38 @@
 /**
- * Reads owner-maintained supplier payment totals from a Google Sheet.
+ * Reads owner-maintained supplier payment totals from a Google Sheet or
+ * Excel workbook stored on Google Drive.
  *
- * Source workbook (per request, 1rY4Qi5_JSDOSTO9Re2xDNmGVXo2jIFGU) stores
- * one tab per calendar month. Each tab looks like:
- *
- *   | Day  | Date       | JFC  | Alpha Fresh | Pyrmont | ... | Total |
- *   | Mon  | 01/06/26   |  ... |    ...      |   ...   | ... |  ...  |
- *   | Tue  | 02/06/26   |  ... |    ...      |   ...   | ... |  ...  |
- *   | ...
- *   | Sun  | 07/06/26   |  ← weekly subtotal row (skipped)
- *   | ...
- *   | Total|            |  X   |     Y       |   Z     | ... |   T   |
- *
- * We resolve the header row's supplier column indices and read the
- * "Total" row per column, which matches what the owner sees on-sheet.
- *
- * The service account (either PAYROLL_SHEET_SA_JSON or the default
- * FIREBASE_SERVICE_ACCOUNT_JSON) needs Viewer access on the workbook —
- * share it with the SA's client_email address.
- *
- * Env vars:
- *   SUPPLIERS_SHEET_ID — spreadsheet ID (default: the project workbook).
+ * Source workbook (1rY4Qi5_JSDOSTO9Re2xDNmGVXo2jIFGU) has one tab per month.
+ * Native Google Sheets use the Sheets API; Excel uploads use Drive download
+ * + xlsx parsing (the owner's workbook is an Office file).
  */
 import { existsSync } from "node:fs";
 import { google } from "googleapis";
+import * as XLSX from "xlsx";
 
 const DEFAULT_SHEET_ID = "1rY4Qi5_JSDOSTO9Re2xDNmGVXo2jIFGU";
+
+const API_SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets.readonly",
+  "https://www.googleapis.com/auth/drive.readonly",
+];
 
 export type SupplierRow = { name: string; cost: number };
 
 export type MonthlySuppliers = {
-  monthISO: string;   // "2026-06"
-  tabTitle: string;   // Google Sheets tab name that matched
+  monthISO: string;
+  tabTitle: string;
   suppliers: SupplierRow[];
-  total: number;      // from the "Total" row's total column when present
+  total: number;
 };
+
+type TabReader = {
+  titles: string[];
+  rowsForTab: (tabTitle: string) => Promise<unknown[][]>;
+};
+
+let workbookCache: { at: number; reader: TabReader } | null = null;
+const WORKBOOK_TTL_MS = 5 * 60 * 1000;
 
 function authClient() {
   const inline = (process.env.PAYROLL_SHEET_SA_JSON ?? process.env.FIREBASE_SERVICE_ACCOUNT_JSON)?.trim();
@@ -43,7 +41,7 @@ function authClient() {
     return new google.auth.JWT({
       email: creds.client_email,
       key: creds.private_key,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+      scopes: API_SCOPES,
     });
   }
   const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -51,12 +49,17 @@ function authClient() {
     delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
   }
   return new google.auth.GoogleAuth({
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    scopes: API_SCOPES,
     projectId:
       process.env.GCLOUD_PROJECT ??
       process.env.GOOGLE_CLOUD_PROJECT ??
       "project-y-d04dc",
   });
+}
+
+function isOfficeFileError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /office file|not be an office/i.test(msg);
 }
 
 function parseMoney(v: unknown): number | null {
@@ -77,9 +80,7 @@ const MONTH_SHORT = [
   "jul", "aug", "sep", "oct", "nov", "dec",
 ];
 
-/** Does `title` refer to `monthISO`? Handles common tab-name shapes:
- *  "June 2026", "Jun 2026", "2026-06", "06/2026", "June". */
-function tabMatchesMonth(title: string, monthISO: string): boolean {
+export function tabMatchesMonth(title: string, monthISO: string): boolean {
   const t = title.trim().toLowerCase();
   const [yStr, mStr] = monthISO.split("-");
   const y = yStr;
@@ -90,54 +91,94 @@ function tabMatchesMonth(title: string, monthISO: string): boolean {
   const monthShort = MONTH_SHORT[mIdx];
   const yy = y.slice(2);
   const patterns: RegExp[] = [
-    new RegExp(`^${monthName}(\\s+${y}|\\s+${yy})?$`),
-    new RegExp(`^${monthShort}(\\s+${y}|\\s+${yy})?$`),
+    new RegExp(`^${monthName}(\\s+${y}|\\s+${yy})?$`, "i"),
+    new RegExp(`^${monthShort}(\\s+${y}|\\s+${yy})?$`, "i"),
     new RegExp(`^${y}[-/]${String(m).padStart(2, "0")}$`),
     new RegExp(`^${String(m).padStart(2, "0")}[-/]${y}$`),
     new RegExp(`^${String(m).padStart(2, "0")}[-/]${yy}$`),
+    new RegExp(`^${m}$`),
+    new RegExp(`^${String(m).padStart(2, "0")}$`),
   ];
   return patterns.some((r) => r.test(t));
 }
 
-/** Fetch every tab title from the workbook. */
-async function listTabTitles(): Promise<string[]> {
-  const sheetId = process.env.SUPPLIERS_SHEET_ID ?? DEFAULT_SHEET_ID;
+async function openSheetsReader(sheetId: string): Promise<TabReader> {
   const auth = authClient();
   const sheets = google.sheets({ version: "v4", auth });
-  const res = await sheets.spreadsheets.get({
+  const meta = await sheets.spreadsheets.get({
     spreadsheetId: sheetId,
     fields: "sheets.properties.title",
   });
   const titles: string[] = [];
-  for (const s of res.data.sheets ?? []) {
+  for (const s of meta.data.sheets ?? []) {
     const t = s.properties?.title;
     if (typeof t === "string") titles.push(t);
   }
-  return titles;
+  return {
+    titles,
+    rowsForTab: async (tabTitle: string) => {
+      const safe = tabTitle.replace(/'/g, "''");
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `'${safe}'!A1:Z200`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
+      return (res.data.values ?? []) as unknown[][];
+    },
+  };
 }
 
-/** Fetch and parse a specific tab. */
-async function readTab(tabTitle: string, monthISO: string): Promise<MonthlySuppliers | null> {
-  const sheetId = process.env.SUPPLIERS_SHEET_ID ?? DEFAULT_SHEET_ID;
+async function openExcelReader(sheetId: string): Promise<TabReader> {
   const auth = authClient();
-  const sheets = google.sheets({ version: "v4", auth });
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: `${tabTitle}!A1:Z200`,
-    valueRenderOption: "UNFORMATTED_VALUE",
-  });
-  const rows = (res.data.values ?? []) as unknown[][];
+  const drive = google.drive({ version: "v3", auth });
+  const res = await drive.files.get(
+    { fileId: sheetId, alt: "media" },
+    { responseType: "arraybuffer" },
+  );
+  const buf = Buffer.from(res.data as ArrayBuffer);
+  const workbook = XLSX.read(buf, { type: "buffer" });
+  return {
+    titles: workbook.SheetNames,
+    rowsForTab: async (tabTitle: string) => {
+      const sheet = workbook.Sheets[tabTitle];
+      if (!sheet) return [];
+      return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as unknown[][];
+    },
+  };
+}
+
+async function openTabReader(): Promise<TabReader> {
+  if (workbookCache && Date.now() - workbookCache.at < WORKBOOK_TTL_MS) {
+    return workbookCache.reader;
+  }
+
+  const sheetId = process.env.SUPPLIERS_SHEET_ID ?? DEFAULT_SHEET_ID;
+  let reader: TabReader;
+  try {
+    reader = await openSheetsReader(sheetId);
+  } catch (err) {
+    if (!isOfficeFileError(err)) throw err;
+    reader = await openExcelReader(sheetId);
+  }
+
+  workbookCache = { at: Date.now(), reader };
+  return reader;
+}
+
+function parseTabRows(
+  rows: unknown[][],
+  monthISO: string,
+  tabTitle: string,
+): MonthlySuppliers | null {
   if (rows.length === 0) return null;
 
-  // Find the header row — the first row that contains at least one
-  // non-empty label besides "day" / "date" / "total".
   let headerIdx = -1;
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
     const row = rows[i] ?? [];
     let realLabels = 0;
     for (const cell of row) {
-      if (typeof cell !== "string") continue;
-      const c = cell.trim().toLowerCase();
+      if (typeof cell !== "string" && typeof cell !== "number") continue;
+      const c = String(cell).trim().toLowerCase();
       if (!c) continue;
       if (c === "day" || c === "date" || c === "total") continue;
       realLabels += 1;
@@ -150,13 +191,12 @@ async function readTab(tabTitle: string, monthISO: string): Promise<MonthlySuppl
   if (headerIdx === -1) return null;
 
   const header = rows[headerIdx];
-  // Column indices for suppliers = everything that isn't a system column.
   const supplierCols: { name: string; col: number }[] = [];
   let totalCol = -1;
   for (let c = 0; c < header.length; c++) {
     const cell = header[c];
-    if (typeof cell !== "string") continue;
-    const label = cell.trim();
+    if (cell === undefined || cell === null || cell === "") continue;
+    const label = String(cell).trim();
     if (!label) continue;
     const lower = label.toLowerCase();
     if (lower === "day" || lower === "date") continue;
@@ -167,14 +207,17 @@ async function readTab(tabTitle: string, monthISO: string): Promise<MonthlySuppl
     supplierCols.push({ name: label, col: c });
   }
 
-  // Find the "Total" row — first non-header row whose leftmost non-empty
-  // cell is exactly "Total".
   let totalRowIdx = -1;
   for (let r = headerIdx + 1; r < rows.length; r++) {
     const row = rows[r] ?? [];
     for (let c = 0; c < Math.min(row.length, 3); c++) {
       const cell = row[c];
       if (typeof cell === "string" && /^\s*total\s*$/i.test(cell)) {
+        totalRowIdx = r;
+        break;
+      }
+      if (typeof cell === "number" && c === 0) continue;
+      if (cell != null && String(cell).trim().toLowerCase() === "total") {
         totalRowIdx = r;
         break;
       }
@@ -190,15 +233,14 @@ async function readTab(tabTitle: string, monthISO: string): Promise<MonthlySuppl
       if (v && v > 0) suppliers.push({ name, cost: Math.round(v * 100) / 100 });
     }
   } else {
-    // No total row — fall back to summing every non-Sunday-subtotal row.
     for (const { name, col } of supplierCols) {
       let sum = 0;
       for (let r = headerIdx + 1; r < rows.length; r++) {
         const row = rows[r] ?? [];
-        // Skip rows that look like weekly subtotals — first cell empty
-        // but the Total column populated, or the "Day" column reads
-        // "Sun" while the row has a total-column value already.
-        const dayCell = typeof row[0] === "string" ? row[0].trim().toLowerCase() : "";
+        const dayCell =
+          typeof row[0] === "string"
+            ? row[0].trim().toLowerCase()
+            : String(row[0] ?? "").trim().toLowerCase();
         if (dayCell === "sun") continue;
         const v = parseMoney(row[col]);
         if (v && v > 0) sum += v;
@@ -223,14 +265,33 @@ async function readTab(tabTitle: string, monthISO: string): Promise<MonthlySuppl
   };
 }
 
-export async function fetchSupplierMonth(monthISO: string): Promise<MonthlySuppliers | null> {
-  const titles = await listTabTitles();
-  const match = titles.find((t) => tabMatchesMonth(t, monthISO));
-  if (!match) return null;
-  return readTab(match, monthISO);
+export async function fetchSupplierTabTitles(): Promise<string[]> {
+  const reader = await openTabReader();
+  return reader.titles;
 }
 
-/** Expose the raw tab list for the diagnostic endpoint. */
-export async function fetchSupplierTabTitles(): Promise<string[]> {
-  return listTabTitles();
+export async function fetchSupplierMonth(monthISO: string): Promise<MonthlySuppliers | null> {
+  const reader = await openTabReader();
+  const match = reader.titles.find((t) => tabMatchesMonth(t, monthISO));
+  if (!match) return null;
+  const rows = await reader.rowsForTab(match);
+  return parseTabRows(rows, monthISO, match);
+}
+
+/** Load several months from one workbook download. */
+export async function fetchSupplierMonths(
+  monthISOs: string[],
+): Promise<Map<string, MonthlySuppliers | null>> {
+  const reader = await openTabReader();
+  const out = new Map<string, MonthlySuppliers | null>();
+  for (const monthISO of monthISOs) {
+    const match = reader.titles.find((t) => tabMatchesMonth(t, monthISO));
+    if (!match) {
+      out.set(monthISO, null);
+      continue;
+    }
+    const rows = await reader.rowsForTab(match);
+    out.set(monthISO, parseTabRows(rows, monthISO, match));
+  }
+  return out;
 }
