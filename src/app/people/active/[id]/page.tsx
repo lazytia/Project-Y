@@ -100,7 +100,7 @@ type Staff = {
 const VISA_WINDOW_DAYS = 30;
 
 const EMPLOYMENT_POSITIONS = ["Hall Staff", "Kitchen Staff", "Hall Manager", "Chef"] as const;
-const EMPLOYMENT_VISA_TYPES = ["Student", "Residence", "Working Holiday"] as const;
+const EMPLOYMENT_VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
 const EMPLOYMENT_TYPES = ["Casual", "Part-time", "Full-time"] as const;
 const WORK_LOCATIONS = ["Hall", "Kitchen"] as const;
 

@@ -23,7 +23,7 @@ import styles from "./page.module.css";
 const POSITIONS = ["Hall Staff", "Kitchen Staff"] as const;
 type Position = (typeof POSITIONS)[number];
 
-const VISA_TYPES = ["Student", "Residence", "Working Holiday"] as const;
+const VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
 type VisaType = (typeof VISA_TYPES)[number];
 
 const TRAINING_PERIODS = [

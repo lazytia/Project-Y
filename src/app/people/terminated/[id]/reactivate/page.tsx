@@ -21,7 +21,7 @@ import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 const POSITIONS = ["Hall Staff", "Kitchen Staff", "Hall Manager", "Chef"] as const;
-const VISA_TYPES = ["Student", "Residence", "Working Holiday"] as const;
+const VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
 const EMPLOYMENT_TYPES = ["Casual", "Part-time", "Full-time"] as const;
 const LOCATIONS = ["Hall", "Kitchen"] as const;
 const NOTE_MAX = 200;
