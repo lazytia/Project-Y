@@ -38,6 +38,19 @@ function getTodayDisplay(): string {
   });
 }
 
+function formatDeclarationDisplay(dateKey: string): string {
+  if (!dateKey) return "";
+  const [y, m, d] = dateKey.split("-").map((v) => parseInt(v, 10));
+  if (!y || !m || !d) return "";
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toLocaleDateString("en-AU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function TfnDeclarationPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -65,6 +78,7 @@ export default function TfnDeclarationPage() {
   const [showSignaturePad, setShowSignaturePad] = useState(false);
 
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showDeclarationCalendar, setShowDeclarationCalendar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState("Required Fields Missing");
@@ -73,9 +87,12 @@ export default function TfnDeclarationPage() {
 
   const [todayKey, setTodayKey] = useState("");
   const [declarationDate, setDeclarationDate] = useState("");
+  const [declarationDateKey, setDeclarationDateKey] = useState("");
 
   useEffect(() => {
-    setTodayKey(new Date().toLocaleDateString("en-CA"));
+    const today = new Date().toLocaleDateString("en-CA");
+    setTodayKey(today);
+    setDeclarationDateKey(today);
     setDeclarationDate(getTodayDisplay());
   }, []);
 
@@ -639,7 +656,7 @@ export default function TfnDeclarationPage() {
               )}
             </div>
 
-            {/* Date (read-only) */}
+            {/* Date */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
                 Date <span className={styles.required}>*</span>
@@ -650,10 +667,34 @@ export default function TfnDeclarationPage() {
                   readOnly
                   className={`${styles.input} ${styles.inputNoIcon} ${styles.inputWithRightIcon}`}
                   value={declarationDate}
+                  onClick={() => setShowDeclarationCalendar(true)}
                 />
-                <span className={styles.inputIconRight}>{calendarSvg}</span>
+                <button
+                  type="button"
+                  className={styles.inputIconRightBtn}
+                  onClick={() => setShowDeclarationCalendar(true)}
+                  aria-label="Open date picker"
+                >
+                  {calendarSvg}
+                </button>
               </div>
             </div>
+
+            {showDeclarationCalendar && (
+              <CalendarPicker
+                singleOnly
+                value={declarationDateKey || todayKey}
+                maxDate={todayKey}
+                minDate="1900-01-01"
+                onChange={(dateKey) => {
+                  setDeclarationDateKey(dateKey);
+                  setDeclarationDate(formatDeclarationDisplay(dateKey));
+                  setShowDeclarationCalendar(false);
+                }}
+                onRangeChange={() => {}}
+                onClose={() => setShowDeclarationCalendar(false)}
+              />
+            )}
 
             <div className={styles.infoBox}>
               <div className={styles.infoBoxRow}>
