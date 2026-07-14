@@ -2,15 +2,15 @@
  * Reads owner-maintained supplier payment totals from a Google Sheet or
  * Excel workbook stored on Google Drive.
  *
- * Source workbook (1rY4Qi5_JSDOSTO9Re2xDNmGVXo2jIFGU) has one tab per month.
+ * Source workbook (1mnFXBjGw8KC1f2r_mTa4xA3pA5GTfO7wND4HVUohHVg) has one tab per month.
  * Native Google Sheets use the Sheets API; Excel uploads use Drive download
- * + xlsx parsing (the owner's workbook is an Office file).
+ * + xlsx parsing as a fallback.
  */
 import { existsSync } from "node:fs";
 import { google } from "googleapis";
 import * as XLSX from "xlsx";
 
-const DEFAULT_SHEET_ID = "1rY4Qi5_JSDOSTO9Re2xDNmGVXo2jIFGU";
+const DEFAULT_SHEET_ID = "1mnFXBjGw8KC1f2r_mTa4xA3pA5GTfO7wND4HVUohHVg";
 
 const API_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets.readonly",
