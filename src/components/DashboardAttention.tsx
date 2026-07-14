@@ -97,11 +97,21 @@ function writeNoted(next: NotedMap) {
 
 /* ── data loaders ── */
 
-async function loadCateringCount(sinceUtc: Date): Promise<number> {
+async function loadCateringCount(sinceUtc: Date, todayKey: string): Promise<number> {
   const snap = await getDocs(collection(getDb(), "catering_orders"));
   return snap.docs.reduce((acc, d) => {
-    const created = tsDate(d.data().createdAt);
-    return created && created >= sinceUtc ? acc + 1 : acc;
+    const data = d.data();
+    const created = tsDate(data.createdAt);
+    if (!created || created < sinceUtc) return acc;
+    // Filter out bulk-backfilled historical orders. Yurica's Square
+    // sync stamps createdAt = serverTimestamp() at import time, so a
+    // one-off catalogue rebuild puts every past order under today's
+    // timestamp and floods the attention card. Requiring the delivery
+    // date to be today or in the future rules those out — a genuinely
+    // new catering booking always has a delivery date >= today.
+    const delivery = typeof data.deliveryDateISO === "string" ? data.deliveryDateISO : "";
+    if (delivery && delivery < todayKey) return acc;
+    return acc + 1;
   }, 0);
 }
 
@@ -270,7 +280,7 @@ export default function DashboardAttention() {
     (async () => {
       const sinceUtc = startOfSydneyToday();
       const [catering, soldOut, newEmp, notice, ready, hr, cash] = await Promise.all([
-        loadCateringCount(sinceUtc).catch(() => 0),
+        loadCateringCount(sinceUtc, todayKey).catch(() => 0),
         loadSoldOutCount(todayKey).catch(() => 0),
         loadNewEmployeeCount().catch(() => 0),
         loadNoticeGivenCount().catch(() => 0),
