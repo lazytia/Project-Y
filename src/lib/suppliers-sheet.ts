@@ -207,6 +207,22 @@ function parseTabRows(
     supplierCols.push({ name: label, col: c });
   }
 
+  const dayCol = header.findIndex((cell) => {
+    if (cell == null) return false;
+    return String(cell).trim().toLowerCase() === "day";
+  });
+  const dayColumn = dayCol >= 0 ? dayCol : header.length > 1 ? 1 : 0;
+
+  function isSundayRow(row: unknown[]): boolean {
+    return String(row[dayColumn] ?? "").trim().toLowerCase() === "sun";
+  }
+
+  const sunRows: unknown[][] = [];
+  for (let r = headerIdx + 1; r < rows.length; r++) {
+    const row = rows[r] ?? [];
+    if (isSundayRow(row)) sunRows.push(row);
+  }
+
   let totalRowIdx = -1;
   for (let r = headerIdx + 1; r < rows.length; r++) {
     const row = rows[r] ?? [];
@@ -226,7 +242,18 @@ function parseTabRows(
   }
 
   const suppliers: SupplierRow[] = [];
-  if (totalRowIdx !== -1) {
+
+  // Each Sunday row holds that week's supplier totals — sum them for the month.
+  if (sunRows.length > 0) {
+    for (const { name, col } of supplierCols) {
+      let sum = 0;
+      for (const row of sunRows) {
+        const v = parseMoney(row[col]);
+        if (v && v > 0) sum += v;
+      }
+      if (sum > 0) suppliers.push({ name, cost: Math.round(sum * 100) / 100 });
+    }
+  } else if (totalRowIdx !== -1) {
     const totalRow = rows[totalRowIdx];
     for (const { name, col } of supplierCols) {
       const v = parseMoney(totalRow[col]);
@@ -237,11 +264,7 @@ function parseTabRows(
       let sum = 0;
       for (let r = headerIdx + 1; r < rows.length; r++) {
         const row = rows[r] ?? [];
-        const dayCell =
-          typeof row[0] === "string"
-            ? row[0].trim().toLowerCase()
-            : String(row[0] ?? "").trim().toLowerCase();
-        if (dayCell === "sun") continue;
+        if (isSundayRow(row)) continue;
         const v = parseMoney(row[col]);
         if (v && v > 0) sum += v;
       }
@@ -250,7 +273,23 @@ function parseTabRows(
   }
 
   let total = 0;
-  if (totalRowIdx !== -1 && totalCol !== -1) {
+  if (sunRows.length > 0) {
+    if (totalCol !== -1) {
+      for (const row of sunRows) {
+        const v = parseMoney(row[totalCol]);
+        if (v && v > 0) total += v;
+      }
+    }
+    if (total <= 0) {
+      const headerWidth = header.length;
+      for (const row of sunRows) {
+        if (row.length > headerWidth) {
+          const v = parseMoney(row[row.length - 1]);
+          if (v && v > 0) total += v;
+        }
+      }
+    }
+  } else if (totalRowIdx !== -1 && totalCol !== -1) {
     total = parseMoney(rows[totalRowIdx][totalCol]) ?? 0;
   }
   if (total <= 0) {

@@ -26,7 +26,11 @@ const CACHE_HEADERS = {
 type CachedMonth = {
   detail: MonthlySuppliers;
   computedAt?: Timestamp;
+  parseVersion?: number;
 };
+
+/** Bump when sheet parsing logic changes so stale Firestore cache is ignored. */
+const PARSE_VERSION = 2;
 
 /** Past months are historical; today's month goes stale as new purchases
  *  are entered on-sheet, so refresh at most every 15 minutes. */
@@ -68,7 +72,7 @@ async function loadMonth(
       adminDb()
         .collection("suppliers_month_cache")
         .doc(monthISO)
-        .set({ detail: fromSheet!, computedAt: Timestamp.now() }, { merge: true })
+        .set({ detail: fromSheet!, computedAt: Timestamp.now(), parseVersion: PARSE_VERSION }, { merge: true })
         .catch((err) => console.warn("[suppliers/summary] cache write failed", err));
       return fromSheet;
     }
@@ -80,7 +84,13 @@ async function loadMonth(
       const data = snap.data() as CachedMonth | undefined;
       const computedAt = data?.computedAt?.toDate?.() ?? null;
       const ttl = isPast ? PAST_TTL_MS : CURRENT_TTL_MS;
-      if (data?.detail && !isEmptyMonth(data.detail) && computedAt && Date.now() - computedAt.getTime() < ttl) {
+      if (
+        data?.detail &&
+        data.parseVersion === PARSE_VERSION &&
+        !isEmptyMonth(data.detail) &&
+        computedAt &&
+        Date.now() - computedAt.getTime() < ttl
+      ) {
         return data.detail;
       }
     }
@@ -110,6 +120,7 @@ async function monthsCacheWarm(monthKeys: string[]): Promise<boolean> {
       const ttl = mk < current ? PAST_TTL_MS : CURRENT_TTL_MS;
       return (
         !!data?.detail &&
+        data.parseVersion === PARSE_VERSION &&
         !isEmptyMonth(data.detail) &&
         !!computedAt &&
         now - computedAt.getTime() < ttl
