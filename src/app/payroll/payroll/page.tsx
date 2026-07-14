@@ -234,8 +234,10 @@ export default function PayrollOverviewPage() {
   if (authLoading || !allowed) return <Splash />;
 
   const totals = summary?.current.totals;
-  const prevTotals = summary?.previous.totals;
-  const previousLabel = summary ? fmtWeekRange(summary.previous.weekStartISO) : "—";
+  // The right-hand comparison card is labelled "2 Weeks Ago" so it must
+  // read from the twoWeeksAgo bucket, not the immediately-prior week.
+  const prevTotals = summary?.twoWeeksAgo.totals;
+  const previousLabel = summary ? fmtWeekRange(summary.twoWeeksAgo.weekStartISO) : "—";
 
   return (
     <div className={styles.page}>
@@ -357,7 +359,7 @@ export default function PayrollOverviewPage() {
             {totals ? fmtCurrency(totals.totalIncSuper) : "—"}
           </span>
           {chips?.totalIncSuper !== null && chips?.totalIncSuper !== undefined && (
-            <span className={styles.totalDeltaWrap}>
+            <span className={styles.totalDeltaGroup}>
               <span
                 className={
                   chips.totalIncSuper >= 0 ? styles.totalDeltaUp : styles.totalDeltaDown

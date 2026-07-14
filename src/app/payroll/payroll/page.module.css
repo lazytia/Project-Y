@@ -257,13 +257,14 @@
 
 .tileValue {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--color-fg);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .tileDeltaUp,
@@ -300,23 +301,39 @@
   }
 }
 
-/* ── Total row ── */
+/* Tighter typography on very narrow phones so nothing overflows. */
+@media (max-width: 380px) {
+  .tileValue { font-size: 13px; }
+  .pctBig { font-size: 42px; }
+  .pctBigUnit { font-size: 22px; }
+  .totalLabel { font-size: 12px; }
+  .totalValue { font-size: 15px; }
+  .comparisonName,
+  .comparisonNameBold { font-size: 11px; }
+  .comparisonValue,
+  .comparisonValueHot,
+  .comparisonValueBold,
+  .comparisonValueBoldHot { font-size: 11px; }
+  .datePillLabel { font-size: 12px; }
+}
+
+/* ── Total row ──
+   Flex row that lets the [delta + subtext] chip wrap to a second line
+   when the label + value + chip don't all fit on one line. Prevents
+   the "Total Payroll Cost" label from breaking mid-word or the value
+   from spilling off the right edge on narrow phones. */
 .totalRow {
-  display: grid;
-  grid-template-columns: 32px 1fr auto;
-  grid-template-areas:
-    "icon label value"
-    "icon delta delta";
+  display: flex;
   align-items: center;
-  column-gap: var(--space-2);
-  row-gap: 2px;
+  gap: var(--space-2);
   padding: 12px var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-warm-bg);
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 
 .totalIcon {
-  grid-area: icon;
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -325,36 +342,34 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .totalLabel {
-  grid-area: label;
   font-size: 13px;
   font-weight: 700;
   color: var(--color-fg);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .totalValue {
-  grid-area: value;
-  text-align: right;
   font-size: 16px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
   white-space: nowrap;
+  margin-left: auto;
 }
 
-.totalDeltaWrap {
-  grid-area: delta;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
+/* Delta arrow + "vs prev 2 weeks avg" stay together as one wrap unit
+   so they either sit next to the value or drop to a new row cleanly. */
+.totalDeltaGroup {
+  display: inline-flex;
+  align-items: baseline;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .totalDeltaUp,
@@ -441,26 +456,27 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-}
-
-.comparisonName {
-  font-size: 12px;
-  color: var(--color-fg);
-  font-weight: 500;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
+.comparisonName,
 .comparisonNameBold {
   font-size: 12px;
   color: var(--color-fg);
-  font-weight: 800;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Wrap at word boundaries so "Total Payroll Cost" stacks across two
+     lines cleanly instead of splitting mid-word on 320-ish-px phones. */
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-height: 1.25;
+}
+
+.comparisonName {
+  font-weight: 500;
+}
+
+.comparisonNameBold {
+  font-weight: 800;
 }
 
 .comparisonValue,
@@ -495,14 +511,6 @@
   border-top: 1px dashed transparent;
   border-bottom: 1px dashed var(--color-border);
   margin: 2px 0;
-}
-
-/* On narrow phones two side-by-side week columns can't fit currency
-   values, so stack them to give each row the full card width. */
-@media (max-width: 520px) {
-  .comparisonGrid {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* ── Table ── */
