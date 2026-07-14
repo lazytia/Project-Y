@@ -96,7 +96,27 @@ async function loadDetailCached(weekStart: string): Promise<WeekPayrollDetail | 
   return null;
 }
 
+/** Sales lookup precedence:
+ *   1. sales_weekly_daily/{weekStart} — the Square-direct cache the
+ *      /money/sales page fills. Covers older months that sales_daily
+ *      doesn't have.
+ *   2. sales_daily range query — nightly Firestore cache, recent
+ *      months only. */
 async function loadWeekSales(weekStart: string): Promise<number> {
+  try {
+    const cacheSnap = await adminDb()
+      .collection("sales_weekly_daily")
+      .doc(weekStart)
+      .get();
+    if (cacheSnap.exists) {
+      const data = cacheSnap.data() as { thisWeek?: { total?: number } };
+      const t = data.thisWeek?.total;
+      if (typeof t === "number" && t > 0) return Math.round(t * 100) / 100;
+    }
+  } catch (err) {
+    console.warn("[payroll/summary] weekly-cache lookup failed:", err);
+  }
+
   const startISO = weekStart;
   const endISO = shiftDateKey(weekStart, 6, TIMEZONE);
   try {
@@ -110,11 +130,32 @@ async function loadWeekSales(weekStart: string): Promise<number> {
       const v = d.data().grossSales;
       if (typeof v === "number") total += v;
     });
-    return Math.round(total * 100) / 100;
+    if (total > 0) return Math.round(total * 100) / 100;
   } catch (err) {
-    console.warn("[payroll/summary] sales lookup failed:", err);
-    return 0;
+    console.warn("[payroll/summary] sales_daily lookup failed:", err);
   }
+  return 0;
+}
+
+/** loadWeekSales, but if no cache is populated for the week, kick off a
+ *  background compute against /api/square/weekly-daily so the very next
+ *  visit resolves against a real number. The current request still
+ *  returns whatever loadWeekSales found (usually 0), so the page renders
+ *  "—%" once and then the correct value on refresh. */
+async function loadWeekSalesWithWarm(reqUrl: string, weekStart: string): Promise<number> {
+  const cached = await loadWeekSales(weekStart);
+  if (cached > 0) return cached;
+  // Fire and forget — no await, so the current response stays fast.
+  void (async () => {
+    try {
+      const origin = new URL(reqUrl).origin;
+      const target = `${origin}/api/square/weekly-daily?weekStart=${weekStart}`;
+      await fetch(target, { cache: "no-store" });
+    } catch (err) {
+      console.warn("[payroll/summary] warm weekly-daily failed:", err);
+    }
+  })();
+  return 0;
 }
 
 export async function GET(req: NextRequest) {
@@ -132,9 +173,9 @@ export async function GET(req: NextRequest) {
         loadDetailCached(weekStart),
         loadDetailCached(prev1),
         loadDetailCached(prev2),
-        loadWeekSales(weekStart),
-        loadWeekSales(prev1),
-        loadWeekSales(prev2),
+        loadWeekSalesWithWarm(req.url, weekStart),
+        loadWeekSalesWithWarm(req.url, prev1),
+        loadWeekSalesWithWarm(req.url, prev2),
       ]);
 
     const empty = {
