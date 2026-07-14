@@ -7,7 +7,6 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import CalendarPicker from "@/components/CalendarPicker";
 import Toast from "@/components/Toast";
-import SignaturePad from "@/components/SignaturePad";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -74,8 +73,6 @@ export default function TfnDeclarationPage() {
 
   // Section 4: Declaration
   const [declarationAgreed, setDeclarationAgreed] = useState(false);
-  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
-  const [showSignaturePad, setShowSignaturePad] = useState(false);
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [showDeclarationCalendar, setShowDeclarationCalendar] = useState(false);
@@ -143,8 +140,6 @@ export default function TfnDeclarationPage() {
           (typeof t.declarationAgreed === "boolean" ? (t.declarationAgreed as boolean) : undefined) ??
           (typeof d.declarationAgreed === "boolean" ? (d.declarationAgreed as boolean) : undefined);
         if (da !== undefined) setDeclarationAgreed(da);
-        const sig = pick("signatureDataUrl");
-        if (sig !== undefined) setSignatureDataUrl(sig);
       } catch {
         // Silent — fall back to defaults so the form stays usable.
       }
@@ -176,7 +171,6 @@ export default function TfnDeclarationPage() {
           helpDebt,
           otherGovDebt,
           declarationAgreed,
-          ...(signatureDataUrl && { signatureDataUrl }),
         },
         step: CURRENT_STEP,
         status: markComplete ? "step_complete" : "in_progress",
@@ -619,41 +613,19 @@ export default function TfnDeclarationPage() {
           <div className={styles.formSection}>
             <h3 className={styles.sectionTitle}>Declaration</h3>
 
-            {/* Declaration checkbox → opens signature pad */}
+            {/* Declaration checkbox */}
             <div className={styles.fieldGroup}>
               <label className={styles.checkboxItem} style={undefined}>
                 <input
                   type="checkbox"
                   className={styles.checkboxInput}
                   checked={declarationAgreed}
-                  readOnly
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (declarationAgreed) {
-                      setDeclarationAgreed(false);
-                      setSignatureDataUrl(null);
-                    } else {
-                      setShowSignaturePad(true);
-                    }
-                  }}
+                  onChange={(e) => setDeclarationAgreed(e.target.checked)}
                 />
                 <span className={styles.radioLabel}>
                   Employee Declaration <span className={styles.required}>*</span> — I declare that the information I have given is true and correct.
                 </span>
               </label>
-              {signatureDataUrl && (
-                <div className={styles.signaturePreview}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={signatureDataUrl} alt="Your signature" className={styles.signatureImg} />
-                  <button
-                    type="button"
-                    className={styles.resignBtn}
-                    onClick={() => setShowSignaturePad(true)}
-                  >
-                    Re-sign
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Date */}
@@ -730,18 +702,6 @@ export default function TfnDeclarationPage() {
           </div>
         </form>
       </div>
-
-      {/* Signature Pad Modal */}
-      {showSignaturePad && (
-        <SignaturePad
-          onConfirm={(dataUrl) => {
-            setSignatureDataUrl(dataUrl);
-            setDeclarationAgreed(true);
-            setShowSignaturePad(false);
-          }}
-          onClose={() => setShowSignaturePad(false)}
-        />
-      )}
 
       {/* Toast */}
       {showToast && (
