@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
-import {
-  fetchOrders,
-  getSalesDayRange,
-  shiftDateKey,
-  squareClient,
-  squareEnv,
-  squareGrossSalesCents,
-} from "@/lib/square";
+import { computeWeekPair } from "@/lib/square-weekly-daily";
+import { shiftDateKey, squareEnv } from "@/lib/square";
 
 /**
  * GET /api/square/weekly-daily?weekStart=YYYY-MM-DD
@@ -22,7 +16,6 @@ import {
 export const dynamic = "force-dynamic";
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
-const ORDER_STATES = ["OPEN", "COMPLETED"];
 
 /** Past weeks never change — cache them forever. The week that contains
  *  today refreshes every 10 minutes so the running total stays live. */
@@ -40,91 +33,6 @@ type CachedWeekPair = {
   lastWeek: { daily: number[]; total: number };
   computedAt?: Timestamp;
 };
-
-type Refund = {
-  createdAt?: string;
-  amountMoney?: { amount?: bigint };
-};
-
-/** All refunds inside [startAt, endAt) — one paginated walk instead of
- *  one per day. Uses Square's async-iterator surface so pagination is
- *  handled for us. */
-async function fetchRefunds(
-  locationId: string,
-  startAt: string,
-  endAt: string,
-): Promise<Refund[]> {
-  const refunds: Refund[] = [];
-  const iter = await squareClient.refunds.list({
-    locationId,
-    beginTime: startAt,
-    endTime: endAt,
-    limit: 100,
-    sortField: "CREATED_AT",
-  });
-  for await (const r of iter) refunds.push(r as Refund);
-  return refunds;
-}
-
-/** Split a UTC ISO instant into the Sydney-local yyyy-mm-dd string so we
- *  bucket orders by the store's calendar day rather than UTC. */
-function localDateKey(iso: string, timezone: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-CA", { timeZone: timezone });
-}
-
-async function computeWeekPair(
-  locationId: string,
-  timezone: string,
-  weekStart: string,
-): Promise<{
-  thisWeek: { daily: number[]; total: number };
-  lastWeek: { daily: number[]; total: number };
-}> {
-  const prevWeekStart = shiftDateKey(weekStart, -7, timezone);
-  // 14-day window — first day of last week to the last day of this week.
-  const startWin = getSalesDayRange(timezone, prevWeekStart);
-  const endWin = getSalesDayRange(timezone, shiftDateKey(weekStart, 6, timezone));
-
-  // Two paginated walks total (orders + refunds), regardless of week
-  // count. Compare with the old code, which did 14 daily order-fetch
-  // walks and 14 daily refund walks per request.
-  const [orders, refunds] = await Promise.all([
-    fetchOrders(locationId, startWin.startAt, endWin.endAt, ORDER_STATES),
-    fetchRefunds(locationId, startWin.startAt, endWin.endAt),
-  ]);
-
-  const dayCents = new Map<string, number>();
-  for (const o of orders) {
-    if (o.state !== "COMPLETED") continue;
-    if (!o.createdAt) continue;
-    const dk = localDateKey(o.createdAt, timezone);
-    dayCents.set(dk, (dayCents.get(dk) ?? 0) + squareGrossSalesCents(o));
-  }
-  for (const r of refunds) {
-    if (!r.createdAt) continue;
-    const dk = localDateKey(r.createdAt, timezone);
-    const amt = Number(r.amountMoney?.amount ?? 0n);
-    if (!Number.isFinite(amt) || amt <= 0) continue;
-    dayCents.set(dk, (dayCents.get(dk) ?? 0) - amt);
-  }
-
-  function seven(mondayKey: string) {
-    const daily: number[] = [];
-    for (let i = 0; i < 7; i++) {
-      const dk = shiftDateKey(mondayKey, i, timezone);
-      const cents = dayCents.get(dk) ?? 0;
-      daily.push(Math.round(cents) / 100);
-    }
-    const total = Math.round(daily.reduce((s, v) => s + v, 0) * 100) / 100;
-    return { daily, total };
-  }
-
-  return {
-    thisWeek: seven(weekStart),
-    lastWeek: seven(prevWeekStart),
-  };
-}
 
 function todaySydneyKey(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });

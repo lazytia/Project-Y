@@ -9,6 +9,7 @@ import {
   type WeeklyPayrollRow,
   type WeekPayrollDetail,
 } from "@/lib/payroll-sheet";
+import { warmWeekSalesCache } from "@/lib/square-weekly-daily";
 import { shiftDateKey } from "@/lib/square";
 
 /**
@@ -48,12 +49,12 @@ function todayKey(): string {
  *  so stale cached entries with 0 totals still surface a correct number. */
 function normaliseDetail(d: WeekPayrollDetail): WeekPayrollDetail {
   const employees = d.employees.map((e) => {
-    const derived = e.netPay + e.tax + e.superAnn;
+    const derived = e.netPay + e.tax + e.superAnn + e.cashPay;
     const totalIncSuper = e.totalIncSuper > 0 ? e.totalIncSuper : derived;
     return { ...e, totalIncSuper: Math.round(totalIncSuper * 100) / 100 };
   });
   const t = d.totals;
-  const derivedTotal = t.netPay + t.tax + t.superAnn;
+  const derivedTotal = t.netPay + t.tax + t.superAnn + t.cashPay;
   const totalIncSuper =
     t.totalIncSuper > 0
       ? t.totalIncSuper
@@ -156,28 +157,35 @@ async function loadDetailCached(
   sheetRows: unknown[][] | null,
   weeklyTotals: Record<string, WeeklyPayrollRow>,
 ): Promise<WeekPayrollDetail | null> {
-  const freshCache = await readSummaryCache(weekStart, { respectTtl: true });
-  if (freshCache) return freshCache;
+  try {
+    if (sheetRows) {
+      let fresh: WeekPayrollDetail | null = null;
+      try {
+        fresh = parseWeekPayrollDetailFromRows(sheetRows, weekStart);
+      } catch (err) {
+        console.warn("[payroll/summary] sheet parse failed for", weekStart, err);
+      }
+      if (isEmptyPayrollDetail(fresh) && weeklyTotals[weekStart]) {
+        fresh = detailFromWeeklyTotal(weekStart, weeklyTotals[weekStart], fresh);
+      }
+      if (!isEmptyPayrollDetail(fresh)) {
+        const normalised = normaliseDetail(fresh!);
+        await persistDetailCache(weekStart, normalised);
+        return normalised;
+      }
+    }
 
-  let fresh: WeekPayrollDetail | null = null;
-  if (sheetRows) {
-    fresh = parseWeekPayrollDetailFromRows(sheetRows, weekStart);
+    const freshCache = await readSummaryCache(weekStart, { respectTtl: true });
+    if (freshCache) return freshCache;
+
+    const weeklyFallback = await readPayrollWeeklyFallback(weekStart);
+    if (weeklyFallback) return normaliseDetail(weeklyFallback);
+
+    const staleCache = await readSummaryCache(weekStart, { respectTtl: false });
+    if (staleCache) return staleCache;
+  } catch (err) {
+    console.warn("[payroll/summary] loadDetailCached failed for", weekStart, err);
   }
-  if (isEmptyPayrollDetail(fresh) && weeklyTotals[weekStart]) {
-    fresh = detailFromWeeklyTotal(weekStart, weeklyTotals[weekStart], fresh);
-  }
-  if (!isEmptyPayrollDetail(fresh)) {
-    const normalised = normaliseDetail(fresh!);
-    await persistDetailCache(weekStart, normalised);
-    return normalised;
-  }
-
-  const weeklyFallback = await readPayrollWeeklyFallback(weekStart);
-  if (weeklyFallback) return normaliseDetail(weeklyFallback);
-
-  const staleCache = await readSummaryCache(weekStart, { respectTtl: false });
-  if (staleCache) return staleCache;
-
   return null;
 }
 
@@ -222,21 +230,24 @@ async function loadWeekSales(weekStart: string): Promise<number> {
   return 0;
 }
 
-/** loadWeekSales, but if no cache is populated for the week, warm
- *  /api/square/weekly-daily and retry so the first visit gets real sales. */
-async function loadWeekSalesWithWarm(reqUrl: string, weekStart: string): Promise<number> {
-  const cached = await loadWeekSales(weekStart);
-  if (cached > 0) return cached;
-  try {
-    const origin = new URL(reqUrl).origin;
-    const target = `${origin}/api/square/weekly-daily?weekStart=${weekStart}`;
-    await fetch(target, { cache: "no-store" });
-    const warmed = await loadWeekSales(weekStart);
-    if (warmed > 0) return warmed;
-  } catch (err) {
-    console.warn("[payroll/summary] warm weekly-daily failed:", err);
+/** Read cache first; warm from Square one week at a time on miss. */
+async function loadWeekSalesResolved(weekStarts: string[]): Promise<number[]> {
+  const out = await Promise.all(weekStarts.map((ws) => loadWeekSales(ws)));
+  for (let i = 0; i < weekStarts.length; i += 1) {
+    if (out[i] > 0) continue;
+    try {
+      const warmed = await warmWeekSalesCache(weekStarts[i]);
+      if (warmed > 0) {
+        out[i] = warmed;
+        continue;
+      }
+      const retry = await loadWeekSales(weekStarts[i]);
+      if (retry > 0) out[i] = retry;
+    } catch (err) {
+      console.warn("[payroll/summary] warm weekly sales failed for", weekStarts[i], err);
+    }
   }
-  return 0;
+  return out;
 }
 
 export async function GET(req: NextRequest) {
@@ -245,73 +256,70 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "weekStart=YYYY-MM-DD required" }, { status: 400 });
   }
 
+  const prev1 = shiftDateKey(weekStart, -7, TIMEZONE);
+  const prev2 = shiftDateKey(weekStart, -14, TIMEZONE);
+
+  let sheetRows: unknown[][] | null = null;
+  let weeklyTotals: Record<string, WeeklyPayrollRow> = {};
   try {
-    const prev1 = shiftDateKey(weekStart, -7, TIMEZONE);
-    const prev2 = shiftDateKey(weekStart, -14, TIMEZONE);
-
-    const sheetRows = await fetchPayrollSheetRows().catch((err) => {
-      console.warn("[payroll/summary] sheet read failed:", err);
-      return null;
-    });
-    const weeklyTotals = sheetRows ? parseWeeklyPayrollTotalsFromRows(sheetRows) : {};
-
-    const [currentDetail, prev1Detail, prev2Detail, salesCurrent, salesPrev1, salesPrev2] =
-      await Promise.all([
-        loadDetailCached(weekStart, sheetRows, weeklyTotals),
-        loadDetailCached(prev1, sheetRows, weeklyTotals),
-        loadDetailCached(prev2, sheetRows, weeklyTotals),
-        loadWeekSalesWithWarm(req.url, weekStart),
-        loadWeekSalesWithWarm(req.url, prev1),
-        loadWeekSalesWithWarm(req.url, prev2),
-      ]);
-
-    const empty = {
-      weekStartISO: "",
-      weekEndISO: "",
-      employees: [],
-      totals: { netPay: 0, tax: 0, superAnn: 0, cashPay: 0, totalIncSuper: 0 },
-    } as WeekPayrollDetail;
-
-    const cur = currentDetail ?? { ...empty, weekStartISO: weekStart };
-    const p1 = prev1Detail ?? { ...empty, weekStartISO: prev1 };
-    const p2 = prev2Detail ?? { ...empty, weekStartISO: prev2 };
-
-    // Average of prev 2 weeks for the "vs prev 2 weeks avg" chips.
-    const avg2 = {
-      netPay: (p1.totals.netPay + p2.totals.netPay) / 2,
-      tax: (p1.totals.tax + p2.totals.tax) / 2,
-      superAnn: (p1.totals.superAnn + p2.totals.superAnn) / 2,
-      cashPay: (p1.totals.cashPay + p2.totals.cashPay) / 2,
-      totalIncSuper: (p1.totals.totalIncSuper + p2.totals.totalIncSuper) / 2,
-    };
-
-    const payrollPctSales =
-      salesCurrent > 0 ? (cur.totals.totalIncSuper / salesCurrent) * 100 : null;
-    const prev2WeeksSales = salesPrev1 + salesPrev2;
-    const prev2WeeksPayroll = p1.totals.totalIncSuper + p2.totals.totalIncSuper;
-    const payrollPctPrev =
-      prev2WeeksSales > 0 ? (prev2WeeksPayroll / prev2WeeksSales) * 100 : null;
-
-    return NextResponse.json(
-      {
-        weekStart,
-        weekEnd: shiftDateKey(weekStart, 6, TIMEZONE),
-        current: cur,
-        previous: p1,
-        twoWeeksAgo: p2,
-        prev2WeekAvg: avg2,
-        sales: {
-          current: salesCurrent,
-          prev1: salesPrev1,
-          prev2: salesPrev2,
-        },
-        payrollPctSales,
-        payrollPctPrev,
-      },
-      { headers: CACHE_HEADERS },
-    );
+    sheetRows = await fetchPayrollSheetRows();
+    weeklyTotals = parseWeeklyPayrollTotalsFromRows(sheetRows);
   } catch (err) {
-    console.error("[payroll/summary] error:", err);
-    return NextResponse.json({ error: "Failed to build payroll summary" }, { status: 502 });
+    console.warn("[payroll/summary] sheet read failed:", err);
   }
+
+  const [currentDetail, prev1Detail, prev2Detail, sales] = await Promise.all([
+    loadDetailCached(weekStart, sheetRows, weeklyTotals),
+    loadDetailCached(prev1, sheetRows, weeklyTotals),
+    loadDetailCached(prev2, sheetRows, weeklyTotals),
+    loadWeekSalesResolved([weekStart, prev1, prev2]),
+  ]);
+
+  const [salesCurrent, salesPrev1, salesPrev2] = sales;
+
+  const empty = {
+    weekStartISO: "",
+    weekEndISO: "",
+    employees: [],
+    totals: { netPay: 0, tax: 0, superAnn: 0, cashPay: 0, totalIncSuper: 0 },
+  } as WeekPayrollDetail;
+
+  const cur = currentDetail ?? { ...empty, weekStartISO: weekStart };
+  const p1 = prev1Detail ?? { ...empty, weekStartISO: prev1 };
+  const p2 = prev2Detail ?? { ...empty, weekStartISO: prev2 };
+
+  // Average of prev 2 weeks for the "vs prev 2 weeks avg" chips.
+  const avg2 = {
+    netPay: (p1.totals.netPay + p2.totals.netPay) / 2,
+    tax: (p1.totals.tax + p2.totals.tax) / 2,
+    superAnn: (p1.totals.superAnn + p2.totals.superAnn) / 2,
+    cashPay: (p1.totals.cashPay + p2.totals.cashPay) / 2,
+    totalIncSuper: (p1.totals.totalIncSuper + p2.totals.totalIncSuper) / 2,
+  };
+
+  const payrollPctSales =
+    salesCurrent > 0 ? (cur.totals.totalIncSuper / salesCurrent) * 100 : null;
+  const prev2WeeksSales = salesPrev1 + salesPrev2;
+  const prev2WeeksPayroll = p1.totals.totalIncSuper + p2.totals.totalIncSuper;
+  const payrollPctPrev =
+    prev2WeeksSales > 0 ? (prev2WeeksPayroll / prev2WeeksSales) * 100 : null;
+
+  return NextResponse.json(
+    {
+      weekStart,
+      weekEnd: shiftDateKey(weekStart, 6, TIMEZONE),
+      current: cur,
+      previous: p1,
+      twoWeeksAgo: p2,
+      prev2WeekAvg: avg2,
+      sales: {
+        current: salesCurrent,
+        prev1: salesPrev1,
+        prev2: salesPrev2,
+      },
+      payrollPctSales,
+      payrollPctPrev,
+    },
+    { headers: CACHE_HEADERS },
+  );
 }

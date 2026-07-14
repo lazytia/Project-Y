@@ -178,16 +178,15 @@ export default function PayrollOverviewPage() {
     let cancelled = false;
     // Bump the version whenever the API's response shape or values
     // change so stale sessionStorage entries don't shadow the fix.
-    const cacheKey = `y.payroll.summary.v4.${weekMondayISO}`;
+    const cacheKey = `y.payroll.summary.v7.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
-    // Ignore an all-zero cache — it's almost always a stale entry from
-    // before the parser fix rather than a real "no data" week, and it
-    // just flashes empty numbers before the fresh fetch arrives.
+    // Ignore stale entries that have payroll totals but no sales — they
+    // render "—%" on the gauge and a misleading ↓100% chip.
     const cachedHasData =
       cached &&
-      (cached.current?.totals?.totalIncSuper ?? 0) +
-        (cached.current?.totals?.netPay ?? 0) >
-        0;
+      (cached.current?.totals?.totalIncSuper ?? 0) > 0 &&
+      (cached.sales?.current ?? 0) > 0 &&
+      cached.payrollPctSales != null;
     if (cachedHasData) {
       setSummary(cached);
     } else {
@@ -229,7 +228,8 @@ export default function PayrollOverviewPage() {
 
   const payrollPctChip = useMemo(() => {
     if (!summary) return null;
-    return safePct(summary.payrollPctSales ?? 0, summary.payrollPctPrev ?? 0);
+    if (summary.payrollPctSales == null || summary.payrollPctPrev == null) return null;
+    return safePct(summary.payrollPctSales, summary.payrollPctPrev);
   }, [summary]);
 
   const topPaid = useMemo(() => {

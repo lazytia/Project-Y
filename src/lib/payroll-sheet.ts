@@ -156,6 +156,15 @@ function resolveMoneyCols(cols: unknown[]): MoneyCols {
     }
     return -1;
   }
+  let cashPayCol = findCol(
+    /^\s*cash\s*pay\s*$/i,
+    /^\s*cash\s*$/i,
+    /cash\s*(pay|wage|amount)/i,
+    /paid\s*in\s*cash/i,
+  );
+  // Pay History blocks keep Cash Pay in column L (0-based index 11).
+  if (cashPayCol < 0 && cols.length > 11) cashPayCol = 11;
+
   return {
     employeeCol: findCol(/^\s*employee\s*$/i, /^\s*staff\s*$/i, /^\s*name\s*$/i, /employee|staff|name/i),
     netPayCol: findCol(
@@ -165,12 +174,7 @@ function resolveMoneyCols(cols: unknown[]): MoneyCols {
     ),
     taxCol: findCol(/^\s*tax\s*$/i, /payg/i, /withhold/i),
     superCol: findCol(/superannuation/i, /super\s*ann/i, /super\s*guarantee/i, /^\s*super\s*$/i, /^\s*sga\s*$/i),
-    cashPayCol: findCol(
-      /^\s*cash\s*pay\s*$/i,
-      /^\s*cash\s*$/i,
-      /cash\s*(pay|wage|amount)/i,
-      /paid\s*in\s*cash/i,
-    ),
+    cashPayCol,
     totalIncCol: findCol(/total\s*inc\s*super/i, /total\s*payroll/i),
   };
 }
@@ -378,7 +382,7 @@ export function parseWeekPayrollDetailFromRows(
       const cashPay = cashPayCol >= 0 ? parseMoney(r[cashPayCol]) ?? 0 : 0;
       const rawTotalInc = totalIncCol >= 0 ? parseMoney(r[totalIncCol]) ?? 0 : 0;
       const totalIncSuper =
-        rawTotalInc > 0 ? rawTotalInc : netPay + tax + superAnn;
+        rawTotalInc > 0 ? rawTotalInc : netPay + tax + superAnn + cashPay;
 
       if (netPay === 0 && tax === 0 && superAnn === 0 && cashPay === 0 && totalIncSuper === 0) {
         continue;
@@ -399,7 +403,9 @@ export function parseWeekPayrollDetailFromRows(
       totalInc += totalIncSuper;
     }
 
-    if (totalInc === 0 && summaryRows.length > 0) {
+    // The sheet's Total row is authoritative — employee-row sums miss cash
+    // pay and blank Total Inc Super cells (e.g. 06/07/26 block).
+    if (summaryRows.length > 0) {
       const pick =
         summaryRows.find((s) => s.isGrand)?.row ??
         summaryRows[summaryRows.length - 1].row;
