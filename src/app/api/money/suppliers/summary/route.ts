@@ -95,28 +95,58 @@ async function loadMonth(
   return null;
 }
 
-async function loadMonthSales(monthISO: string): Promise<number> {
-  // Sum sales_daily.grossSales for every date within the given month.
-  const [y, m] = monthISO.split("-").map(Number);
-  const startISO = `${monthISO}-01`;
-  const nextMonthDate = new Date(Date.UTC(y, m, 1));
-  const nextMonthISO = nextMonthDate.toISOString().slice(0, 10);
+async function monthsCacheWarm(monthKeys: string[]): Promise<boolean> {
+  const now = Date.now();
+  const current = currentMonthKey();
+  try {
+    const snaps = await Promise.all(
+      monthKeys.map((mk) => adminDb().collection("suppliers_month_cache").doc(mk).get()),
+    );
+    return snaps.every((snap, i) => {
+      const mk = monthKeys[i];
+      if (!snap.exists) return false;
+      const data = snap.data() as CachedMonth | undefined;
+      const computedAt = data?.computedAt?.toDate?.() ?? null;
+      const ttl = mk < current ? PAST_TTL_MS : CURRENT_TTL_MS;
+      return (
+        !!data?.detail &&
+        !isEmptyMonth(data.detail) &&
+        !!computedAt &&
+        now - computedAt.getTime() < ttl
+      );
+    });
+  } catch (err) {
+    console.warn("[suppliers/summary] cache warm check failed", err);
+    return false;
+  }
+}
+
+/** One Firestore read for the whole trend window instead of six. */
+async function loadSalesByMonths(monthKeys: string[]): Promise<number[]> {
+  if (monthKeys.length === 0) return [];
+  const first = monthKeys[0];
+  const [ly, lm] = monthKeys[monthKeys.length - 1].split("-").map(Number);
+  const startISO = `${first}-01`;
+  const endISO = new Date(Date.UTC(ly, lm, 1)).toISOString().slice(0, 10);
+  const totals = new Map(monthKeys.map((mk) => [mk, 0]));
   try {
     const snap = await adminDb()
       .collection("sales_daily")
       .where("dateISO", ">=", startISO)
-      .where("dateISO", "<", nextMonthISO)
+      .where("dateISO", "<", endISO)
       .get();
-    let total = 0;
     snap.docs.forEach((d) => {
+      const dateISO = d.data().dateISO;
+      if (typeof dateISO !== "string") return;
+      const mk = dateISO.slice(0, 7);
+      if (!totals.has(mk)) return;
       const v = d.data().grossSales;
-      if (typeof v === "number") total += v;
+      if (typeof v === "number") totals.set(mk, (totals.get(mk) ?? 0) + v);
     });
-    return Math.round(total * 100) / 100;
   } catch (err) {
-    console.warn("[suppliers/summary] sales read failed", monthISO, err);
-    return 0;
+    console.warn("[suppliers/summary] sales range read failed", err);
   }
+  return monthKeys.map((mk) => Math.round((totals.get(mk) ?? 0) * 100) / 100);
 }
 
 function totalOf(m: MonthlySuppliers | null): number {
@@ -136,14 +166,17 @@ export async function GET(req: NextRequest) {
     const monthKeys: string[] = [];
     for (let i = 5; i >= 0; i--) monthKeys.push(shiftMonth(month, -i));
 
-    const batch = await fetchSupplierMonths(monthKeys).catch((err) => {
-      console.warn("[suppliers/summary] workbook fetch failed:", err);
-      return null;
-    });
+    const cacheWarm = await monthsCacheWarm(monthKeys);
+    const batch = cacheWarm
+      ? null
+      : await fetchSupplierMonths(monthKeys).catch((err) => {
+          console.warn("[suppliers/summary] workbook fetch failed:", err);
+          return null;
+        });
 
     const [monthData, salesData] = await Promise.all([
       Promise.all(monthKeys.map((mk) => loadMonth(mk, batch))),
-      Promise.all(monthKeys.map(loadMonthSales)),
+      loadSalesByMonths(monthKeys),
     ]);
 
     const currentIdx = monthKeys.length - 1;

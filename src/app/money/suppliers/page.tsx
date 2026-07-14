@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
@@ -7,6 +8,8 @@ import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
+
+const MonthPicker = dynamic(() => import("@/components/MonthPicker"), { ssr: false });
 
 /**
  * Owner Suppliers overview — /api/money/suppliers/summary combines
@@ -101,8 +104,11 @@ export default function SuppliersPage() {
   const allowed = isOwner(user);
 
   const [monthISO, setMonthISO] = useState<string>("");
+  const [maxMonthISO, setMaxMonthISO] = useState<string>("");
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -111,7 +117,9 @@ export default function SuppliersPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setMonthISO(sydneyMonthKey());
+    const current = sydneyMonthKey();
+    setMaxMonthISO(current);
+    setMonthISO(current);
   }, []);
 
   useEffect(() => {
@@ -119,9 +127,11 @@ export default function SuppliersPage() {
     let cancelled = false;
     const cacheKey = `y.suppliers.summary.v3.${monthISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
+    const hasCache = !!cached;
     if (cached) setSummary(cached);
     else setSummary(null);
     setError(null);
+    setFetching(!hasCache);
     (async () => {
       try {
         const res = await fetch(`/api/money/suppliers/summary?month=${monthISO}`);
@@ -132,6 +142,8 @@ export default function SuppliersPage() {
         writeSession(cacheKey, data);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load suppliers");
+      } finally {
+        if (!cancelled) setFetching(false);
       }
     })();
     return () => {
@@ -184,7 +196,13 @@ export default function SuppliersPage() {
           <h1 className={styles.pageTitle}>Suppliers</h1>
           <p className={styles.pageSubtitle}>Overview of supplier spending.</p>
         </div>
-        <button type="button" className={styles.datePill} aria-label="Pick month">
+        <button
+          type="button"
+          className={styles.datePill}
+          onClick={() => setMonthPickerOpen(true)}
+          aria-label="Pick month"
+          aria-expanded={monthPickerOpen}
+        >
           <CalendarIcon />
           <span className={styles.datePillLabel}>
             {monthISO ? monthLabel(monthISO) : "—"}
@@ -192,6 +210,15 @@ export default function SuppliersPage() {
           <span className={styles.datePillChevron} aria-hidden="true">▾</span>
         </button>
       </header>
+
+      {monthPickerOpen && monthISO && maxMonthISO && (
+        <MonthPicker
+          value={monthISO}
+          maxMonth={maxMonthISO}
+          onChange={setMonthISO}
+          onClose={() => setMonthPickerOpen(false)}
+        />
+      )}
 
       {/* ── Cost % of sales + total ── */}
       <section className={styles.headerStrip}>
@@ -214,7 +241,9 @@ export default function SuppliersPage() {
         <div className={styles.stripDivider} aria-hidden="true" />
         <div className={styles.totalSide}>
           <p className={styles.stripLabel}>TOTAL SUPPLIER COST</p>
-          <p className={styles.totalBig}>{fmtCurrency(totalCost)}</p>
+          <p className={styles.totalBig}>
+            {fetching && !summary ? "—" : fmtCurrency(totalCost)}
+          </p>
           {vsPrev !== null && (
             <span className={styles.pctChip}>
               {vsPrev >= 0 ? "↑" : "↓"} {Math.abs(vsPrev).toFixed(1)}%{" "}
@@ -234,7 +263,9 @@ export default function SuppliersPage() {
           <div className={styles.cardHead}>
             <p className={styles.cardTitle}>
               LARGEST SUPPLIER{" "}
-              <span className={styles.cardTitleSub}>(THIS MONTH)</span>
+              <span className={styles.cardTitleSub}>
+                ({monthISO ? monthLabel(monthISO).toUpperCase() : "THIS MONTH"})
+              </span>
             </p>
           </div>
           <ol className={styles.largestList}>
