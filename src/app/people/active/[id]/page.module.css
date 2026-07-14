@@ -464,6 +464,29 @@
   color: var(--color-warm);
 }
 
+.docRowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.docRowReject {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: #b91c1c;
+  background: transparent;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.docRowReject:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
 /* ── Change status grid ── */
 .statusGrid {
   display: grid;

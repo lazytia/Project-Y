@@ -5,12 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
   writeBatch,
   type Timestamp,
@@ -217,6 +219,23 @@ function fullNameOf(raw: Record<string, unknown>): string {
 
 /** Best effort — the visa type isn't captured explicitly today, so infer
  *  it from a `visaType` field if present and otherwise leave blank. */
+/**
+ * When an owner rejects an already-submitted onboarding section we roll
+ * `completedStep` back and null out that section's persisted answers so
+ * the employee lands on the same step and has to complete it again.
+ * Steps: 1 Personal, 2 TFN, 3 Bank, 4 Documents, 5 Policies, 6 Review&Sign.
+ */
+const REJECT_CONFIG: Record<
+  Exclude<DocKey, "hrNotes">,
+  { label: string; prevStep: number; clearPaths: string[] }
+> = {
+  tfn:       { label: "TFN",                        prevStep: 1, clearPaths: ["tfn"] },
+  bank:      { label: "Bank & Super Details",       prevStep: 2, clearPaths: ["bank"] },
+  documents: { label: "Documents",                  prevStep: 3, clearPaths: ["documents"] },
+  contract:  { label: "Signed Contract",            prevStep: 4, clearPaths: ["policies.agreementSignedAt", "policies.privacySignedAt"] },
+  handbook:  { label: "Employee Handbook (Signed)", prevStep: 4, clearPaths: ["policies.handbookSignedAt"] },
+};
+
 function visaTypeOf(raw: Record<string, unknown>): string {
   if (typeof raw.visaType === "string" && raw.visaType.trim()) return raw.visaType.trim();
   if (typeof raw.visa === "string" && raw.visa.trim()) return raw.visa.trim();
@@ -494,6 +513,42 @@ export default function EmployeeDetailPage() {
       console.error("[terminate] failed:", err);
       alert("Failed to terminate. Please try again.");
       setTerminating(false);
+    }
+  }
+
+  async function handleReject(key: DocKey) {
+    if (!staff || key === "hrNotes") return;
+    const cfg = REJECT_CONFIG[key];
+    const ok = window.confirm(
+      `Reject "${cfg.label}"?\n\nThe employee will have to complete this section again.`,
+    );
+    if (!ok) return;
+    try {
+      const update: Record<string, unknown> = {
+        completedStep: cfg.prevStep,
+        step: cfg.prevStep + 1,
+        status: "in_progress",
+        updatedAt: serverTimestamp(),
+      };
+      for (const path of cfg.clearPaths) update[path] = deleteField();
+      await updateDoc(doc(getDb(), "staff_onboarding", staff.uid), update);
+      setOpenDoc(null);
+      setStaff((s) => {
+        if (!s) return s;
+        const next = { ...s };
+        if (key === "tfn") next.taxFileNumber = "";
+        if (key === "bank") next.bank = {};
+        if (key === "documents") next.documents = [];
+        if (key === "contract") {
+          next.agreementSignedAt = null;
+          next.privacySignedAt = null;
+        }
+        if (key === "handbook") next.handbookSignedAt = null;
+        return next;
+      });
+    } catch (err) {
+      console.error("[reject] failed:", err);
+      alert("Failed to reject. Please try again.");
     }
   }
 
@@ -931,11 +986,11 @@ export default function EmployeeDetailPage() {
       {/* Documents */}
       <p className={styles.sectionLabel}>DOCUMENTS</p>
       <section className={styles.docsCard}>
-        <DocRow icon={<DocIcon />} label="Documents" onClick={() => setOpenDoc("documents")} chev />
-        <DocRow icon={<DocIcon />} label="TFN" onClick={() => setOpenDoc("tfn")} view />
-        <DocRow icon={<DocIcon />} label="Bank & Super Details" onClick={() => setOpenDoc("bank")} view />
-        <DocRow icon={<DocIcon />} label="Signed Contract" onClick={() => setOpenDoc("contract")} view />
-        <DocRow icon={<DocIcon />} label="Employee Handbook (Signed)" onClick={() => setOpenDoc("handbook")} view />
+        <DocRow icon={<DocIcon />} label="Documents" onClick={() => setOpenDoc("documents")} onReject={() => handleReject("documents")} chev />
+        <DocRow icon={<DocIcon />} label="TFN" onClick={() => setOpenDoc("tfn")} onReject={() => handleReject("tfn")} view />
+        <DocRow icon={<DocIcon />} label="Bank & Super Details" onClick={() => setOpenDoc("bank")} onReject={() => handleReject("bank")} view />
+        <DocRow icon={<DocIcon />} label="Signed Contract" onClick={() => setOpenDoc("contract")} onReject={() => handleReject("contract")} view />
+        <DocRow icon={<DocIcon />} label="Employee Handbook (Signed)" onClick={() => setOpenDoc("handbook")} onReject={() => handleReject("handbook")} view />
         <DocRow
           icon={<DocIcon />}
           label="HR Notes"
@@ -1075,6 +1130,7 @@ function DocRow({
   icon,
   label,
   onClick,
+  onReject,
   view = false,
   chev = false,
   last = false,
@@ -1082,21 +1138,43 @@ function DocRow({
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
+  onReject?: () => void;
   view?: boolean;
   chev?: boolean;
   last?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={`${styles.docRow} ${last ? styles.docRowLast : ""}`}
     >
       <span className={styles.docRowIcon} aria-hidden="true">{icon}</span>
       <span className={styles.docRowLabel}>{label}</span>
-      {view && <span className={styles.docRowView}>View</span>}
-      {chev && <span className={styles.chev} aria-hidden="true">›</span>}
-    </button>
+      <span className={styles.docRowActions}>
+        {view && <span className={styles.docRowView}>View</span>}
+        {onReject && (
+          <button
+            type="button"
+            className={styles.docRowReject}
+            onClick={(e) => {
+              e.stopPropagation();
+              onReject();
+            }}
+          >
+            Reject
+          </button>
+        )}
+        {chev && <span className={styles.chev} aria-hidden="true">›</span>}
+      </span>
+    </div>
   );
 }
 
