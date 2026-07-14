@@ -242,17 +242,31 @@ function visaTypeOf(raw: Record<string, unknown>): string {
   return "—";
 }
 
-/** Read the handful of URL fields we know onboarding writes. */
+/**
+ * Read every uploaded document URL. Employees can attach multiple photos
+ * per section (plural `*Urls` arrays); older docs may only carry the
+ * legacy singular `*Url` string, so fall back to it when the array is
+ * missing.
+ */
 function collectDocuments(raw: Record<string, unknown>): { label: string; url: string }[] {
   const docs = (raw.documents ?? {}) as Record<string, unknown>;
-  const known: { key: string; label: string }[] = [
-    { key: "passportUrl", label: "Passport" },
-    { key: "visaUrl", label: "Visa" },
-    { key: "rsaUrl", label: "RSA Certificate" },
+  const known: { singular: string; plural: string; label: string }[] = [
+    { singular: "passportUrl", plural: "passportUrls", label: "Passport" },
+    { singular: "visaUrl",     plural: "visaUrls",     label: "Visa" },
+    { singular: "rsaUrl",      plural: "rsaUrls",      label: "RSA Certificate" },
   ];
   const out: { label: string; url: string }[] = [];
-  for (const { key, label } of known) {
-    const v = docs[key];
+  for (const { singular, plural, label } of known) {
+    const arr = docs[plural];
+    if (Array.isArray(arr) && arr.length > 0) {
+      arr.forEach((v, i) => {
+        if (typeof v === "string" && v) {
+          out.push({ label: arr.length > 1 ? `${label} (${i + 1})` : label, url: v });
+        }
+      });
+      continue;
+    }
+    const v = docs[singular];
     if (typeof v === "string" && v) out.push({ label, url: v });
   }
   return out;

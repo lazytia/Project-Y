@@ -27,6 +27,8 @@ const PERCENT = Math.round((4 / 7) * 100);
 /** Max edge length and JPEG quality for client-side resize before upload. */
 const COMPRESS_MAX_EDGE = 1600;
 const COMPRESS_QUALITY = 0.82;
+/** How many photos an employee can attach per document section. */
+const MAX_PHOTOS_PER_SECTION = 3;
 
 /**
  * Downscale + re-encode an image File to a JPEG Blob that's well under 1 MB.
@@ -72,12 +74,12 @@ export default function DocumentsPage() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const [passportFile, setPassportFile] = useState<File | null>(null);
-  const [passportPreview, setPassportPreview] = useState<string | null>(null);
-  const [visaFile, setVisaFile] = useState<File | null>(null);
-  const [visaPreview, setVisaPreview] = useState<string | null>(null);
-  const [rsaFile, setRsaFile] = useState<File | null>(null);
-  const [rsaPreview, setRsaPreview] = useState<string | null>(null);
+  const [passportFiles, setPassportFiles] = useState<File[]>([]);
+  const [passportPreviews, setPassportPreviews] = useState<string[]>([]);
+  const [visaFiles, setVisaFiles] = useState<File[]>([]);
+  const [visaPreviews, setVisaPreviews] = useState<string[]>([]);
+  const [rsaFiles, setRsaFiles] = useState<File[]>([]);
+  const [rsaPreviews, setRsaPreviews] = useState<string[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,26 +96,32 @@ export default function DocumentsPage() {
 
   function handleFileChange(
     e: React.ChangeEvent<HTMLInputElement>,
-    setFile: (f: File | null) => void,
-    setPreview: (p: string | null) => void
+    files: File[],
+    previews: string[],
+    setFiles: (f: File[]) => void,
+    setPreviews: (p: string[]) => void,
   ) {
-    const file = e.target.files?.[0] ?? null;
-    setFile(file);
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setPreview(url);
-    } else {
-      setPreview(null);
-    }
+    const picked = Array.from(e.target.files ?? []);
     e.target.value = "";
+    if (picked.length === 0) return;
+    const remaining = Math.max(0, MAX_PHOTOS_PER_SECTION - files.length);
+    if (remaining === 0) return;
+    const accepted = picked.slice(0, remaining);
+    setFiles([...files, ...accepted]);
+    setPreviews([...previews, ...accepted.map((f) => URL.createObjectURL(f))]);
   }
 
-  function removeFile(
-    setFile: (f: File | null) => void,
-    setPreview: (p: string | null) => void
+  function removeFileAt(
+    index: number,
+    files: File[],
+    previews: string[],
+    setFiles: (f: File[]) => void,
+    setPreviews: (p: string[]) => void,
   ) {
-    setFile(null);
-    setPreview(null);
+    const removed = previews[index];
+    if (removed) URL.revokeObjectURL(removed);
+    setFiles(files.filter((_, i) => i !== index));
+    setPreviews(previews.filter((_, i) => i !== index));
   }
 
   async function saveToFirestore(markComplete = false) {
@@ -126,18 +134,30 @@ export default function DocumentsPage() {
     setSaving(true);
     setError(null);
     try {
-      // Compress + upload all three documents in parallel.
+      // Compress + upload every attached photo in parallel. Files land at
+      // `<section>/0`, `<section>/1`, … so re-uploading overwrites cleanly.
       const base = `staff_onboarding/${user.uid}`;
-      const [passportUrl, visaUrl, rsaUrl] = await Promise.all([
-        passportFile ? uploadFile(passportFile, `${base}/passport`) : Promise.resolve(null),
-        visaFile     ? uploadFile(visaFile,     `${base}/visa`)     : Promise.resolve(null),
-        rsaFile      ? uploadFile(rsaFile,      `${base}/rsa`)      : Promise.resolve(null),
+      const uploadAll = (files: File[], section: string) =>
+        Promise.all(files.map((f, i) => uploadFile(f, `${base}/${section}/${i}`)));
+      const [passportUrls, visaUrls, rsaUrls] = await Promise.all([
+        uploadAll(passportFiles, "passport"),
+        uploadAll(visaFiles, "visa"),
+        uploadAll(rsaFiles, "rsa"),
       ]);
 
       const db = getDb();
       const payload: Record<string, unknown> = {
         uid: user.uid,
-        documents: { passportUrl, visaUrl, rsaUrl },
+        documents: {
+          // Plural arrays are the source of truth. Singular fields stay
+          // populated with the first photo so older readers still work.
+          passportUrls,
+          visaUrls,
+          rsaUrls,
+          passportUrl: passportUrls[0] ?? null,
+          visaUrl: visaUrls[0] ?? null,
+          rsaUrl: rsaUrls[0] ?? null,
+        },
         step: CURRENT_STEP,
         status: markComplete ? "step_complete" : "in_progress",
         updatedAt: serverTimestamp(),
@@ -159,8 +179,8 @@ export default function DocumentsPage() {
 
   async function handleSaveAndContinue() {
     const missing: string[] = [];
-    if (!passportFile) missing.push("Passport / Photo ID");
-    if (!visaFile) missing.push("Visa");
+    if (passportFiles.length === 0) missing.push("Passport / Photo ID");
+    if (visaFiles.length === 0) missing.push("Visa");
 
     if (missing.length > 0) {
       setErrorTitle("Required Documents Missing");
@@ -231,10 +251,10 @@ export default function DocumentsPage() {
     title: string;
     icon: React.ReactNode;
     infoText: string;
-    file: File | null;
-    preview: string | null;
-    setFile: (f: File | null) => void;
-    setPreview: (p: string | null) => void;
+    files: File[];
+    previews: string[];
+    setFiles: (f: File[]) => void;
+    setPreviews: (p: string[]) => void;
     cameraRef: React.RefObject<HTMLInputElement | null>;
     galleryRef: React.RefObject<HTMLInputElement | null>;
   };
@@ -244,10 +264,10 @@ export default function DocumentsPage() {
       title: "1. Passport / Photo ID *",
       icon: passportSvg,
       infoText: "We need a clear photo of your passport or either government-issued photo ID.",
-      file: passportFile,
-      preview: passportPreview,
-      setFile: setPassportFile,
-      setPreview: setPassportPreview,
+      files: passportFiles,
+      previews: passportPreviews,
+      setFiles: setPassportFiles,
+      setPreviews: setPassportPreviews,
       cameraRef: passportCameraRef,
       galleryRef: passportGalleryRef,
     },
@@ -255,10 +275,10 @@ export default function DocumentsPage() {
       title: "2. Visa *",
       icon: documentSvg,
       infoText: "We need a copy of your current visa.",
-      file: visaFile,
-      preview: visaPreview,
-      setFile: setVisaFile,
-      setPreview: setVisaPreview,
+      files: visaFiles,
+      previews: visaPreviews,
+      setFiles: setVisaFiles,
+      setPreviews: setVisaPreviews,
       cameraRef: visaCameraRef,
       galleryRef: visaGalleryRef,
     },
@@ -266,10 +286,10 @@ export default function DocumentsPage() {
       title: "3. RSA Certificate",
       icon: certificateSvg,
       infoText: "Upload your valid RSA certificate (required for all hall staff).",
-      file: rsaFile,
-      preview: rsaPreview,
-      setFile: setRsaFile,
-      setPreview: setRsaPreview,
+      files: rsaFiles,
+      previews: rsaPreviews,
+      setFiles: setRsaFiles,
+      setPreviews: setRsaPreviews,
       cameraRef: rsaCameraRef,
       galleryRef: rsaGalleryRef,
     },
@@ -334,72 +354,114 @@ export default function DocumentsPage() {
         <p className={styles.formSubtitle}>All fields marked with * are required.</p>
 
         <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
-          {sections.map((section) => (
-            <div key={section.title} className={styles.docSection}>
-              <h3 className={styles.docSectionTitle}>{section.title}</h3>
+          {sections.map((section) => {
+            const canAddMore = section.files.length < MAX_PHOTOS_PER_SECTION;
+            return (
+              <div key={section.title} className={styles.docSection}>
+                <h3 className={styles.docSectionTitle}>{section.title}</h3>
 
-              <div className={styles.docInfoBox}>
-                <span className={styles.docInfoIcon}>{section.icon}</span>
-                <p className={styles.docInfoText}>{section.infoText}</p>
+                <div className={styles.docInfoBox}>
+                  <span className={styles.docInfoIcon}>{section.icon}</span>
+                  <p className={styles.docInfoText}>
+                    {section.infoText} You can add up to {MAX_PHOTOS_PER_SECTION} photos.
+                  </p>
+                </div>
+
+                {section.previews.length > 0 && (
+                  <div className={styles.previewGrid}>
+                    {section.previews.map((src, idx) => (
+                      <div key={src} className={styles.previewWrap}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt={`Document preview ${idx + 1}`}
+                          className={styles.previewImg}
+                        />
+                        <button
+                          type="button"
+                          className={styles.removeBtn}
+                          onClick={() =>
+                            removeFileAt(
+                              idx,
+                              section.files,
+                              section.previews,
+                              section.setFiles,
+                              section.setPreviews,
+                            )
+                          }
+                          aria-label={`Remove photo ${idx + 1}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {canAddMore ? (
+                  <div className={styles.uploadRow}>
+                    <button
+                      type="button"
+                      className={styles.uploadBtn}
+                      onClick={() => section.cameraRef.current?.click()}
+                    >
+                      <span className={styles.uploadBtnIcon}>{cameraSvg}</span>
+                      <span className={styles.uploadBtnLabel}>
+                        {section.files.length > 0 ? "Add another" : "Take a photo"}
+                      </span>
+                      <span className={styles.uploadBtnSub}>Camera</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.uploadBtn}
+                      onClick={() => section.galleryRef.current?.click()}
+                    >
+                      <span className={styles.uploadBtnIcon}>{gallerySvg}</span>
+                      <span className={styles.uploadBtnLabel}>Choose file</span>
+                      <span className={styles.uploadBtnSub}>Gallery</span>
+                    </button>
+                  </div>
+                ) : (
+                  <p className={styles.docLimitNote}>
+                    Maximum of {MAX_PHOTOS_PER_SECTION} photos reached. Remove one to add another.
+                  </p>
+                )}
+
+                <input
+                  ref={section.cameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className={styles.hiddenInput}
+                  onChange={(e) =>
+                    handleFileChange(
+                      e,
+                      section.files,
+                      section.previews,
+                      section.setFiles,
+                      section.setPreviews,
+                    )
+                  }
+                />
+                <input
+                  ref={section.galleryRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className={styles.hiddenInput}
+                  onChange={(e) =>
+                    handleFileChange(
+                      e,
+                      section.files,
+                      section.previews,
+                      section.setFiles,
+                      section.setPreviews,
+                    )
+                  }
+                />
               </div>
-
-              {section.preview ? (
-                <div className={styles.previewWrap}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={section.preview}
-                    alt="Document preview"
-                    className={styles.previewImg}
-                  />
-                  <button
-                    type="button"
-                    className={styles.removeBtn}
-                    onClick={() => removeFile(section.setFile, section.setPreview)}
-                    aria-label="Remove file"
-                  >
-                    ×
-                  </button>
-                </div>
-              ) : (
-                <div className={styles.uploadRow}>
-                  <button
-                    type="button"
-                    className={styles.uploadBtn}
-                    onClick={() => section.cameraRef.current?.click()}
-                  >
-                    <span className={styles.uploadBtnIcon}>{cameraSvg}</span>
-                    <span className={styles.uploadBtnLabel}>Take a photo</span>
-                    <span className={styles.uploadBtnSub}>Camera</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.uploadBtn}
-                    onClick={() => section.galleryRef.current?.click()}
-                  >
-                    <span className={styles.uploadBtnIcon}>{gallerySvg}</span>
-                    <span className={styles.uploadBtnLabel}>Choose file</span>
-                    <span className={styles.uploadBtnSub}>Gallery</span>
-                  </button>
-                </div>
-              )}
-
-              <input
-                ref={section.cameraRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className={styles.hiddenInput}
-                onChange={(e) => handleFileChange(e, section.setFile, section.setPreview)}
-              />
-              <input
-                ref={section.galleryRef}
-                type="file"
-                accept="image/*"
-                className={styles.hiddenInput}
-                onChange={(e) => handleFileChange(e, section.setFile, section.setPreview)}
-              />
-            </div>
-          ))}
+            );
+          })}
 
           {/* Buttons */}
           <div className={styles.buttonRow}>

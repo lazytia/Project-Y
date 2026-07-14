@@ -306,6 +306,23 @@
   line-height: 1;
 }
 
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.previewGrid .previewWrap {
+  margin-top: 0;
+}
+
+.docLimitNote {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+}
+
 /* ── Hidden Input ── */
 .hiddenInput {
   display: none;
