@@ -87,9 +87,11 @@ export default function NewEmployeePage() {
   const [trainingRate, setTrainingRate] = useState("");
   const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>("First 2 Weeks");
   const [afterTrainingRate, setAfterTrainingRate] = useState("");
+  const [saturdayRate, setSaturdayRate] = useState("");
   const [notes, setNotes] = useState("");
 
   const [rateFocused, setRateFocused] = useState(false);
+  const [satRateFocused, setSatRateFocused] = useState(false);
   const [calOpen, setCalOpen] = useState<"start" | "visa" | null>(null);
   const [periodSheetOpen, setPeriodSheetOpen] = useState(false);
   const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>("First 2 Weeks");
@@ -130,6 +132,7 @@ export default function NewEmployeePage() {
         afterTrainingRate: afterTrainingRate.trim()
           ? parseFloat(afterTrainingRate)
           : null,
+        saturdayRate: saturdayRate.trim() ? parseFloat(saturdayRate) : null,
         notes: notes.trim(),
         status: DEFAULT_STATUS,
         role: "staff",
@@ -375,6 +378,34 @@ export default function NewEmployeePage() {
             placeholder="0.00"
             value={afterTrainingRate}
             onChange={(e) => setAfterTrainingRate(e.target.value)}
+          />
+          <span className={styles.rateSuffix}>/ hour</span>
+        </div>
+      </div>
+
+      {/* Saturday rate */}
+      <div className={styles.field}>
+        <label className={styles.fieldLabel}>SATURDAY RATE</label>
+        <div
+          className={`${styles.rateWrap} ${satRateFocused ? styles.rateWrapFocused : ""}`}
+        >
+          <span
+            className={`${styles.rateBadge} ${satRateFocused ? styles.rateBadgeOn : ""}`}
+            aria-hidden="true"
+          >
+            $
+          </span>
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            className={styles.rateInput}
+            placeholder="0.00"
+            value={saturdayRate}
+            onChange={(e) => setSaturdayRate(e.target.value)}
+            onFocus={() => setSatRateFocused(true)}
+            onBlur={() => setSatRateFocused(false)}
           />
           <span className={styles.rateSuffix}>/ hour</span>
         </div>
