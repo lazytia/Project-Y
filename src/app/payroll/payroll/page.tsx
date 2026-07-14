@@ -178,9 +178,17 @@ export default function PayrollOverviewPage() {
     let cancelled = false;
     // Bump the version whenever the API's response shape or values
     // change so stale sessionStorage entries don't shadow the fix.
-    const cacheKey = `y.payroll.summary.v2.${weekMondayISO}`;
+    const cacheKey = `y.payroll.summary.v3.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
-    if (cached) {
+    // Ignore an all-zero cache — it's almost always a stale entry from
+    // before the parser fix rather than a real "no data" week, and it
+    // just flashes empty numbers before the fresh fetch arrives.
+    const cachedHasData =
+      cached &&
+      (cached.current?.totals?.totalIncSuper ?? 0) +
+        (cached.current?.totals?.netPay ?? 0) >
+        0;
+    if (cachedHasData) {
       setSummary(cached);
     } else {
       setSummary(null);
