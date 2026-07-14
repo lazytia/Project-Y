@@ -161,7 +161,6 @@ export default function DocumentsPage() {
     const missing: string[] = [];
     if (!passportFile) missing.push("Passport / Photo ID");
     if (!visaFile) missing.push("Visa");
-    if (!rsaFile) missing.push("RSA Certificate");
 
     if (missing.length > 0) {
       setErrorTitle("Required Documents Missing");
@@ -264,7 +263,7 @@ export default function DocumentsPage() {
       galleryRef: visaGalleryRef,
     },
     {
-      title: "3. RSA Certificate *",
+      title: "3. RSA Certificate",
       icon: certificateSvg,
       infoText: "Upload your valid RSA certificate (required for all hall staff).",
       file: rsaFile,
