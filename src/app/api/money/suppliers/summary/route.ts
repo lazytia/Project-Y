@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { Timestamp } from "firebase-admin/firestore";
+import { fetchSupplierMonth, type MonthlySuppliers } from "@/lib/suppliers-sheet";
 
 /**
  * GET /api/money/suppliers/summary?month=YYYY-MM
  *
- * Powers /money/suppliers. Reads owner-entered supplier costs from
- * suppliers_monthly/{yyyy-mm} for the current month + 5 prior months, plus
- * the matching monthly Gross Sales totals from sales_daily so the
- * "Supplier Cost % of Sales" gauge and the vs-May chip are real figures.
+ * Powers /money/suppliers. Pulls the current month + 5 prior months of
+ * supplier costs from the shared Google Sheet, joins on matching Sydney
+ * monthly Gross Sales from Firestore sales_daily, and computes % of
+ * sales / vs-previous-month deltas. Each month's sheet parse is cached
+ * in `suppliers_month_cache/{yyyy-mm}` so scrubbing month-to-month is
+ * instant after the first hit.
  */
 
 export const dynamic = "force-dynamic";
@@ -19,12 +23,15 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=1800",
 } as const;
 
-type StoredSupplierRow = { name: string; cost: number };
-type StoredMonth = {
-  monthISO?: string;
-  suppliers?: StoredSupplierRow[];
-  targetPct?: number;
+type CachedMonth = {
+  detail: MonthlySuppliers;
+  computedAt?: Timestamp;
 };
+
+/** Past months are historical; today's month goes stale as new purchases
+ *  are entered on-sheet, so refresh at most every 15 minutes. */
+const PAST_TTL_MS = 24 * 60 * 60 * 1000;
+const CURRENT_TTL_MS = 15 * 60 * 1000;
 
 function shiftMonth(monthISO: string, delta: number): string {
   const [y, m] = monthISO.split("-").map(Number);
@@ -40,14 +47,40 @@ function monthLabel(monthISO: string): string {
   });
 }
 
-async function loadMonth(monthISO: string): Promise<StoredMonth | null> {
+function currentMonthKey(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: TIMEZONE }).slice(0, 7);
+}
+
+async function loadMonth(monthISO: string): Promise<MonthlySuppliers | null> {
+  const isPast = monthISO < currentMonthKey();
+  // Firestore write-through cache — skip the Google Sheets round-trip
+  // when the parsed detail is still fresh.
   try {
-    const snap = await adminDb().collection("suppliers_monthly").doc(monthISO).get();
-    return snap.exists ? (snap.data() as StoredMonth) : null;
+    const snap = await adminDb().collection("suppliers_month_cache").doc(monthISO).get();
+    if (snap.exists) {
+      const data = snap.data() as CachedMonth | undefined;
+      const computedAt = data?.computedAt?.toDate?.() ?? null;
+      const ttl = isPast ? PAST_TTL_MS : CURRENT_TTL_MS;
+      if (data?.detail && computedAt && Date.now() - computedAt.getTime() < ttl) {
+        return data.detail;
+      }
+    }
   } catch (err) {
-    console.warn("[suppliers/summary] month read failed", monthISO, err);
-    return null;
+    console.warn("[suppliers/summary] cache read failed", monthISO, err);
   }
+
+  const fresh = await fetchSupplierMonth(monthISO).catch((err) => {
+    console.warn("[suppliers/summary] sheet fetch failed", monthISO, err);
+    return null;
+  });
+  if (fresh) {
+    adminDb()
+      .collection("suppliers_month_cache")
+      .doc(monthISO)
+      .set({ detail: fresh, computedAt: Timestamp.now() }, { merge: true })
+      .catch((err) => console.warn("[suppliers/summary] cache write failed", err));
+  }
+  return fresh;
 }
 
 async function loadMonthSales(monthISO: string): Promise<number> {
@@ -74,8 +107,9 @@ async function loadMonthSales(monthISO: string): Promise<number> {
   }
 }
 
-function totalOf(m: StoredMonth | null): number {
-  if (!m?.suppliers) return 0;
+function totalOf(m: MonthlySuppliers | null): number {
+  if (!m) return 0;
+  if (typeof m.total === "number" && m.total > 0) return m.total;
   return Math.round(m.suppliers.reduce((s, r) => s + (r.cost ?? 0), 0) * 100) / 100;
 }
 
@@ -126,8 +160,8 @@ export async function GET(req: NextRequest) {
     for (const m of [current, prev, prev2]) {
       m?.suppliers?.forEach((s) => nameSet.add(s.name));
     }
-    function costFor(m: StoredMonth | null, name: string): number {
-      const row = m?.suppliers?.find((s) => s.name === name);
+    function costFor(m: MonthlySuppliers | null, name: string): number {
+      const row = m?.suppliers.find((s) => s.name === name);
       return row ? Math.round(row.cost * 100) / 100 : 0;
     }
     const comparison = Array.from(nameSet)
@@ -170,7 +204,7 @@ export async function GET(req: NextRequest) {
         costPctSales,
         vsPrevPctSales,
         vsPrev,
-        target: current?.targetPct ?? 28,
+        target: 28,
         suppliers: suppliersRanked,
         monthlyTrend,
         comparison,
@@ -183,5 +217,3 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Keep TIMEZONE reachable for callers importing the module.
-export const CONFIG_TIMEZONE = TIMEZONE;
