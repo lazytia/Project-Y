@@ -8,8 +8,8 @@ import { fetchSupplierMonths, type MonthlySuppliers } from "@/lib/suppliers-shee
  *
  * Powers /money/suppliers. Pulls the current month + 5 prior months of
  * supplier costs from the shared Google Sheet, joins on matching Sydney
- * monthly Gross Sales from Firestore sales_daily, and computes % of
- * sales / vs-previous-month deltas. Each month's sheet parse is cached
+ * monthly Gross Sales from Firestore (sales_daily with sales_yearly
+ * fallback), and computes % of sales / vs-previous-month deltas. Each month's sheet parse is cached
  * in `suppliers_month_cache/{yyyy-mm}` so scrubbing month-to-month is
  * instant after the first hit.
  */
@@ -121,6 +121,41 @@ async function monthsCacheWarm(monthKeys: string[]): Promise<boolean> {
   }
 }
 
+/** Load cached Square monthly totals keyed by YYYY-MM. */
+async function loadYearlySalesMap(years: number[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  await Promise.all(
+    years.map(async (year) => {
+      try {
+        const snap = await adminDb().collection("sales_yearly").doc(String(year)).get();
+        if (!snap.exists) return;
+        const data = snap.data() as { monthly?: number[] } | undefined;
+        if (!Array.isArray(data?.monthly)) return;
+        data.monthly.forEach((v, i) => {
+          if (typeof v === "number" && v > 0) {
+            out.set(`${year}-${String(i + 1).padStart(2, "0")}`, Math.round(v * 100) / 100);
+          }
+        });
+      } catch (err) {
+        console.warn("[suppliers/summary] sales_yearly read failed", year, err);
+      }
+    }),
+  );
+  return out;
+}
+
+function resolveMonthSales(
+  monthISO: string,
+  dailyTotal: number,
+  yearlyMap: Map<string, number>,
+): number {
+  const yearly = yearlyMap.get(monthISO) ?? 0;
+  const isCurrent = monthISO === currentMonthKey();
+  if (isCurrent) return dailyTotal > 0 ? dailyTotal : yearly;
+  // Past months: sales_daily is often partial — prefer full-month Square cache.
+  return yearly > 0 ? yearly : dailyTotal;
+}
+
 /** One Firestore read for the whole trend window instead of six. */
 async function loadSalesByMonths(monthKeys: string[]): Promise<number[]> {
   if (monthKeys.length === 0) return [];
@@ -146,7 +181,12 @@ async function loadSalesByMonths(monthKeys: string[]): Promise<number[]> {
   } catch (err) {
     console.warn("[suppliers/summary] sales range read failed", err);
   }
-  return monthKeys.map((mk) => Math.round((totals.get(mk) ?? 0) * 100) / 100);
+
+  const years = [...new Set(monthKeys.map((mk) => Number(mk.split("-")[0])))];
+  const yearlyMap = await loadYearlySalesMap(years);
+  return monthKeys.map((mk) =>
+    resolveMonthSales(mk, Math.round((totals.get(mk) ?? 0) * 100) / 100, yearlyMap),
+  );
 }
 
 function totalOf(m: MonthlySuppliers | null): number {
