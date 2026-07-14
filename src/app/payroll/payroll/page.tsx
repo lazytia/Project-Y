@@ -178,7 +178,7 @@ export default function PayrollOverviewPage() {
     let cancelled = false;
     // Bump the version whenever the API's response shape or values
     // change so stale sessionStorage entries don't shadow the fix.
-    const cacheKey = `y.payroll.summary.v3.${weekMondayISO}`;
+    const cacheKey = `y.payroll.summary.v4.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
     // Ignore an all-zero cache — it's almost always a stale entry from
     // before the parser fix rather than a real "no data" week, and it

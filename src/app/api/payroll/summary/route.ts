@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
-import { fetchWeekPayrollDetail, type WeekPayrollDetail } from "@/lib/payroll-sheet";
+import {
+  fetchPayrollSheetRows,
+  isEmptyPayrollDetail,
+  parseWeekPayrollDetailFromRows,
+  parseWeeklyPayrollTotalsFromRows,
+  type WeeklyPayrollRow,
+  type WeekPayrollDetail,
+} from "@/lib/payroll-sheet";
 import { shiftDateKey } from "@/lib/square";
 
 /**
@@ -58,41 +65,119 @@ function normaliseDetail(d: WeekPayrollDetail): WeekPayrollDetail {
   };
 }
 
-async function loadDetailCached(weekStart: string): Promise<WeekPayrollDetail | null> {
-  const today = todayKey();
-  const weekEnd = shiftDateKey(weekStart, 6, TIMEZONE);
-  const isPast = weekEnd < today;
-
+async function readSummaryCache(
+  weekStart: string,
+  opts: { respectTtl: boolean },
+): Promise<WeekPayrollDetail | null> {
   try {
     const snap = await adminDb().collection("payroll_summary_cache").doc(weekStart).get();
-    if (snap.exists) {
-      const data = snap.data() as CachedDetail | undefined;
-      const computedAt = data?.computedAt?.toDate?.() ?? null;
+    if (!snap.exists) return null;
+    const data = snap.data() as CachedDetail | undefined;
+    if (!data?.detail) return null;
+    const normalised = normaliseDetail(data.detail);
+    if (isEmptyPayrollDetail(normalised)) return null;
+
+    if (opts.respectTtl) {
+      const today = todayKey();
+      const weekEnd = shiftDateKey(weekStart, 6, TIMEZONE);
+      const isPast = weekEnd < today;
+      const computedAt = data.computedAt?.toDate?.() ?? null;
       const ttl = isPast ? PAST_TTL_MS : CURRENT_TTL_MS;
-      if (data?.detail && computedAt && Date.now() - computedAt.getTime() < ttl) {
-        return normaliseDetail(data.detail);
-      }
+      if (!computedAt || Date.now() - computedAt.getTime() >= ttl) return null;
     }
+    return normalised;
   } catch (err) {
     console.warn("[payroll/summary] cache read failed:", err);
-  }
-
-  const fresh = await fetchWeekPayrollDetail(weekStart).catch((err) => {
-    console.warn("[payroll/summary] sheet fetch failed for", weekStart, err);
     return null;
-  });
-  if (fresh) {
-    const normalised = normaliseDetail(fresh);
-    adminDb()
-      .collection("payroll_summary_cache")
-      .doc(weekStart)
-      .set(
-        { detail: normalised, computedAt: Timestamp.now() },
-        { merge: true },
-      )
-      .catch((err) => console.warn("[payroll/summary] cache write failed:", err));
+  }
+}
+
+async function readPayrollWeeklyFallback(weekStart: string): Promise<WeekPayrollDetail | null> {
+  try {
+    const snap = await adminDb().collection("payroll_weekly").doc(weekStart).get();
+    if (!snap.exists) return null;
+    const data = snap.data() as {
+      weekEndISO?: string;
+      totalIncSuper?: number;
+      gross?: number;
+    };
+    const totalIncSuper = data.totalIncSuper ?? data.gross;
+    if (typeof totalIncSuper !== "number" || totalIncSuper <= 0) return null;
+    return {
+      weekStartISO: weekStart,
+      weekEndISO: data.weekEndISO ?? shiftDateKey(weekStart, 6, TIMEZONE),
+      employees: [],
+      totals: {
+        netPay: 0,
+        tax: 0,
+        superAnn: 0,
+        cashPay: 0,
+        totalIncSuper: Math.round(totalIncSuper * 100) / 100,
+      },
+    };
+  } catch (err) {
+    console.warn("[payroll/summary] payroll_weekly lookup failed:", err);
+    return null;
+  }
+}
+
+function detailFromWeeklyTotal(
+  weekStart: string,
+  row: WeeklyPayrollRow,
+  partial: WeekPayrollDetail | null,
+): WeekPayrollDetail {
+  return {
+    weekStartISO: row.weekStartISO,
+    weekEndISO: row.weekEndISO,
+    employees: partial?.employees ?? [],
+    totals: {
+      netPay: partial?.totals.netPay ?? 0,
+      tax: partial?.totals.tax ?? 0,
+      superAnn: partial?.totals.superAnn ?? 0,
+      cashPay: partial?.totals.cashPay ?? 0,
+      totalIncSuper: row.totalIncSuper,
+    },
+  };
+}
+
+async function persistDetailCache(weekStart: string, detail: WeekPayrollDetail): Promise<void> {
+  adminDb()
+    .collection("payroll_summary_cache")
+    .doc(weekStart)
+    .set(
+      { detail, computedAt: Timestamp.now() },
+      { merge: true },
+    )
+    .catch((err) => console.warn("[payroll/summary] cache write failed:", err));
+}
+
+async function loadDetailCached(
+  weekStart: string,
+  sheetRows: unknown[][] | null,
+  weeklyTotals: Record<string, WeeklyPayrollRow>,
+): Promise<WeekPayrollDetail | null> {
+  const freshCache = await readSummaryCache(weekStart, { respectTtl: true });
+  if (freshCache) return freshCache;
+
+  let fresh: WeekPayrollDetail | null = null;
+  if (sheetRows) {
+    fresh = parseWeekPayrollDetailFromRows(sheetRows, weekStart);
+  }
+  if (isEmptyPayrollDetail(fresh) && weeklyTotals[weekStart]) {
+    fresh = detailFromWeeklyTotal(weekStart, weeklyTotals[weekStart], fresh);
+  }
+  if (!isEmptyPayrollDetail(fresh)) {
+    const normalised = normaliseDetail(fresh!);
+    await persistDetailCache(weekStart, normalised);
     return normalised;
   }
+
+  const weeklyFallback = await readPayrollWeeklyFallback(weekStart);
+  if (weeklyFallback) return normaliseDetail(weeklyFallback);
+
+  const staleCache = await readSummaryCache(weekStart, { respectTtl: false });
+  if (staleCache) return staleCache;
+
   return null;
 }
 
@@ -137,24 +222,20 @@ async function loadWeekSales(weekStart: string): Promise<number> {
   return 0;
 }
 
-/** loadWeekSales, but if no cache is populated for the week, kick off a
- *  background compute against /api/square/weekly-daily so the very next
- *  visit resolves against a real number. The current request still
- *  returns whatever loadWeekSales found (usually 0), so the page renders
- *  "—%" once and then the correct value on refresh. */
+/** loadWeekSales, but if no cache is populated for the week, warm
+ *  /api/square/weekly-daily and retry so the first visit gets real sales. */
 async function loadWeekSalesWithWarm(reqUrl: string, weekStart: string): Promise<number> {
   const cached = await loadWeekSales(weekStart);
   if (cached > 0) return cached;
-  // Fire and forget — no await, so the current response stays fast.
-  void (async () => {
-    try {
-      const origin = new URL(reqUrl).origin;
-      const target = `${origin}/api/square/weekly-daily?weekStart=${weekStart}`;
-      await fetch(target, { cache: "no-store" });
-    } catch (err) {
-      console.warn("[payroll/summary] warm weekly-daily failed:", err);
-    }
-  })();
+  try {
+    const origin = new URL(reqUrl).origin;
+    const target = `${origin}/api/square/weekly-daily?weekStart=${weekStart}`;
+    await fetch(target, { cache: "no-store" });
+    const warmed = await loadWeekSales(weekStart);
+    if (warmed > 0) return warmed;
+  } catch (err) {
+    console.warn("[payroll/summary] warm weekly-daily failed:", err);
+  }
   return 0;
 }
 
@@ -168,11 +249,17 @@ export async function GET(req: NextRequest) {
     const prev1 = shiftDateKey(weekStart, -7, TIMEZONE);
     const prev2 = shiftDateKey(weekStart, -14, TIMEZONE);
 
+    const sheetRows = await fetchPayrollSheetRows().catch((err) => {
+      console.warn("[payroll/summary] sheet read failed:", err);
+      return null;
+    });
+    const weeklyTotals = sheetRows ? parseWeeklyPayrollTotalsFromRows(sheetRows) : {};
+
     const [currentDetail, prev1Detail, prev2Detail, salesCurrent, salesPrev1, salesPrev2] =
       await Promise.all([
-        loadDetailCached(weekStart),
-        loadDetailCached(prev1),
-        loadDetailCached(prev2),
+        loadDetailCached(weekStart, sheetRows, weeklyTotals),
+        loadDetailCached(prev1, sheetRows, weeklyTotals),
+        loadDetailCached(prev2, sheetRows, weeklyTotals),
         loadWeekSalesWithWarm(req.url, weekStart),
         loadWeekSalesWithWarm(req.url, prev1),
         loadWeekSalesWithWarm(req.url, prev2),

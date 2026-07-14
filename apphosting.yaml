@@ -31,6 +31,9 @@ env:
   # Bearer token guarding the cron-style Google-Sheet payroll sync endpoint.
   - variable: PAYROLL_SYNC_SHARED_TOKEN
     secret: PAYROLL_SYNC_SHARED_TOKEN
+  # Service account JSON with Viewer access to the Pay History sheet.
+  - variable: PAYROLL_SHEET_SA_JSON
+    secret: PAYROLL_SHEET_SA_JSON
   # Bearer token guarding the nightly Daily Sold Out reset endpoint.
   - variable: SOLD_OUT_RESET_SHARED_TOKEN
     secret: SOLD_OUT_RESET_SHARED_TOKEN
