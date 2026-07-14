@@ -70,6 +70,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid mobile number." }, { status: 400 });
   }
 
+  // ⚠ Temporary kill-switch: the owner asked us to stop real SMS from
+  // going out to newly onboarded staff while they're onboarding a batch
+  // of real employees for the first time. Log the payload and return a
+  // successful shape so the approve flow (setToast + navigation) still
+  // completes. Flip this back to `false` (or delete the block) once the
+  // owner confirms she wants texts to resume.
+  const SMS_KILL_SWITCH = true;
+  if (SMS_KILL_SWITCH) {
+    console.log("[vonage/send-sms] KILL_SWITCH active — pretending success", {
+      to,
+      textPreview: text.slice(0, 60),
+    });
+    return NextResponse.json({ ok: true, messageId: null, skipped: true });
+  }
+
   const params = new URLSearchParams({
     api_key: apiKey,
     api_secret: apiSecret,
