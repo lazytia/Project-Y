@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
+import LanguageToggle from "@/components/LanguageToggle";
 import { ROUTES } from "@/lib/routes";
 import { registerFcmToken } from "@/lib/fcm";
 import Splash from "@/components/Splash";
@@ -26,6 +28,7 @@ import styles from "./page.module.css";
 export default function NotificationsPromptPage() {
   const router = useRouter();
   const { user, loading: authLoading, staffCompletedStep } = useAuth();
+  const { t } = useLang();
 
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
@@ -87,10 +90,8 @@ export default function NotificationsPromptPage() {
         </div>
       </div>
 
-      <h1 className={styles.title}>Enable Notifications</h1>
-      <p className={styles.subtitle}>
-        Stay up to date with important updates from Project Y.
-      </p>
+      <h1 className={styles.title}>{t("notif.title")}</h1>
+      <p className={styles.subtitle}>{t("notif.subtitle")}</p>
 
       <ul className={styles.reasons}>
         <li className={styles.reason}>
@@ -102,7 +103,7 @@ export default function NotificationsPromptPage() {
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
           </span>
-          <span>New roster published</span>
+          <span>{t("notif.reason.newRoster")}</span>
         </li>
         <li className={styles.reason}>
           <span className={styles.reasonIcon} aria-hidden="true">
@@ -111,7 +112,7 @@ export default function NotificationsPromptPage() {
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
           </span>
-          <span>Roster changes</span>
+          <span>{t("notif.reason.rosterChanges")}</span>
         </li>
         <li className={styles.reason}>
           <span className={styles.reasonIcon} aria-hidden="true">
@@ -120,7 +121,7 @@ export default function NotificationsPromptPage() {
               <polyline points="12 7 12 12 15 14" />
             </svg>
           </span>
-          <span>Shift reminders</span>
+          <span>{t("notif.reason.shiftReminders")}</span>
         </li>
         <li className={styles.reason}>
           <span className={styles.reasonIcon} aria-hidden="true">
@@ -129,19 +130,22 @@ export default function NotificationsPromptPage() {
               <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
             </svg>
           </span>
-          <span>Important company announcements</span>
+          <span>{t("notif.reason.announcements")}</span>
         </li>
       </ul>
 
+      {/* Language toggle — the first-login placement asked for by the
+          owner so Japanese staff can switch before starting onboarding. */}
+      <div className={styles.langRow}>
+        <LanguageToggle />
+      </div>
+
       <p className={styles.trustLine}>
-        <span aria-hidden="true">🛡️</span>{" "}
-        We will only send you relevant updates. You can change this anytime in settings.
+        <span aria-hidden="true">🛡️</span> {t("notif.trust")}
       </p>
 
       {denied && (
-        <p className={styles.deniedBanner}>
-          Notifications are required to continue. Please allow the prompt in your browser or check your device settings, then try again.
-        </p>
+        <p className={styles.deniedBanner}>{t("notif.denied")}</p>
       )}
 
       <button
@@ -151,7 +155,7 @@ export default function NotificationsPromptPage() {
         disabled={busy}
       >
         <span aria-hidden="true">🔔</span>{" "}
-        {busy ? "Enabling…" : "Enable Notifications"}
+        {busy ? t("notif.enabling") : t("notif.enableBtn")}
       </button>
     </div>
   );

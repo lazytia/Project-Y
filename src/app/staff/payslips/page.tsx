@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import {
   fmtCurrency,
   fmtDateLong,
@@ -20,6 +21,7 @@ type PayslipsResponse = {
 
 export default function PayslipsPage() {
   const { user, loading: authLoading } = useAuth();
+  const { t } = useLang();
   const [data, setData] = useState<PayslipsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export default function PayslipsPage() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Payslips</h1>
+      <h1 className={styles.title}>{t("pay.title")}</h1>
 
       {/* Next Pay Date */}
       <section className={styles.nextPayCard}>
@@ -69,27 +71,24 @@ export default function PayslipsPage() {
           </svg>
         </div>
         <div className={styles.nextPayBody}>
-          <p className={styles.nextPayLabel}>Next Pay Date</p>
+          <p className={styles.nextPayLabel}>{t("pay.nextPay")}</p>
           <p className={styles.nextPayDate}>
             {data?.nextPayDateISO ? fmtDateLong(data.nextPayDateISO) : "—"}
           </p>
-          <p className={styles.nextPaySub}>{data?.payFrequency ?? "Paid weekly"}</p>
+          <p className={styles.nextPaySub}>{t("pay.frequency")}</p>
         </div>
       </section>
 
       {loading ? (
-        <p className={styles.emptyHint}>Loading your payslips…</p>
+        <p className={styles.emptyHint}>{t("pay.loadingList")}</p>
       ) : error ? (
-        <p className={styles.emptyHint}>Couldn&rsquo;t load payslips. {error}</p>
+        <p className={styles.emptyHint}>{t("pay.loadError")} {error}</p>
       ) : !latest ? (
-        <p className={styles.emptyHint}>
-          No payslips yet — as soon as payroll runs the first pay week for
-          you, it will appear here.
-        </p>
+        <p className={styles.emptyHint}>{t("pay.empty")}</p>
       ) : (
         <>
           {/* Latest Payslip */}
-          <h2 className={styles.sectionTitle}>Latest Payslip</h2>
+          <h2 className={styles.sectionTitle}>{t("pay.latest")}</h2>
           <section className={styles.latestCard}>
             <div className={styles.latestHeader}>
               <div className={styles.latestIcon} aria-hidden="true">
@@ -101,7 +100,7 @@ export default function PayslipsPage() {
                 </svg>
               </div>
               <div className={styles.latestHeading}>
-                <p className={styles.latestMeta}>Pay Period</p>
+                <p className={styles.latestMeta}>{t("pay.payPeriod")}</p>
                 <p className={styles.latestPeriod}>
                   {fmtPeriod(latest.periodStart, latest.periodEnd)}
                 </p>
@@ -111,19 +110,19 @@ export default function PayslipsPage() {
             <div className={styles.latestDivider} />
 
             <div className={styles.latestSection}>
-              <p className={styles.latestMeta}>Net Pay</p>
+              <p className={styles.latestMeta}>{t("pay.netPay")}</p>
               <p className={styles.latestAmount}>{fmtCurrency(latest.netPay)}</p>
             </div>
 
             <div className={styles.latestDivider} />
 
             <div className={styles.latestSection}>
-              <p className={styles.latestMeta}>Paid</p>
+              <p className={styles.latestMeta}>{t("pay.paid")}</p>
               <p className={styles.latestPaidDate}>{fmtDateLong(latest.payDate)}</p>
             </div>
 
             <Link href={`/staff/payslips/${latest.id}`} className={styles.viewBtn}>
-              <span>View Payslip</span>
+              <span>{t("pay.viewPayslip")}</span>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="12" x2="19" y2="12" />
                 <polyline points="12 5 19 12 12 19" />
@@ -133,7 +132,7 @@ export default function PayslipsPage() {
 
           {previous.length > 0 && (
             <>
-              <h2 className={styles.sectionTitle}>Previous Payslips</h2>
+              <h2 className={styles.sectionTitle}>{t("pay.previous")}</h2>
               <ul className={styles.prevList}>
                 {previous.map((p) => (
                   <li key={p.id}>
@@ -164,9 +163,7 @@ export default function PayslipsPage() {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
         </span>
-        <p className={styles.infoBody}>
-          Payslips are available for the last 12 months.
-        </p>
+        <p className={styles.infoBody}>{t("pay.available12Months")}</p>
       </div>
     </div>
   );

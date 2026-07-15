@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
+import { useLang } from "./LanguageProvider";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import styles from "./Sidebar.module.css";
@@ -79,6 +80,7 @@ type Props = { open: boolean; onClose?: () => void };
 export default function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
   const { user, signOut, staffNeedsOnboarding } = useAuth();
+  const { t } = useLang();
   const userIsOwner = isOwner(user);
   const userIsStrictOwner = isStrictOwner(user);
   const userIsChef = isChef(user);
@@ -155,7 +157,7 @@ export default function Sidebar({ open, onClose }: Props) {
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
           <button type="button" onClick={signOut} className={styles.signOut}>
-            Sign out
+            {t("nav.signOut")}
           </button>
         </div>
       </aside>
@@ -165,19 +167,20 @@ export default function Sidebar({ open, onClose }: Props) {
   // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
   if (!userIsOwner && !userIsChef) {
     const staffNav: NavGroup[] = [
-      { icon: "🏠", label: "Home", href: "/staff" },
-      { icon: "📋", label: "Onboarding", href: "/onboarding" },
+      { icon: "🏠", label: t("nav.home"), href: "/staff" },
+      { icon: "📋", label: t("nav.onboarding"), href: "/onboarding" },
       {
         icon: "📅",
-        label: "Schedule",
+        label: t("nav.schedule"),
         children: [
-          { label: "Roster", href: "/staff/schedule/roster" },
-          { label: "Request Holiday", href: "/staff/schedule/request-holiday" },
-          { label: "Availability Change", href: "/staff/schedule/availability-change" },
+          { label: t("nav.roster"), href: "/staff/schedule/roster" },
+          { label: t("nav.requestHoliday"), href: "/staff/schedule/request-holiday" },
+          { label: t("nav.availabilityChange"), href: "/staff/schedule/availability-change" },
         ],
       },
-      { icon: "💰", label: "Payslips", href: "/staff/payslips" },
-      { icon: "📄", label: "My Documents", href: "/staff/documents" },
+      { icon: "💰", label: t("nav.payslips"), href: "/staff/payslips" },
+      { icon: "📄", label: t("nav.myDocuments"), href: "/staff/documents" },
+      { icon: "⚙️", label: t("nav.settings"), href: "/staff/settings" },
     ];
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
@@ -233,7 +236,7 @@ export default function Sidebar({ open, onClose }: Props) {
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
           <button type="button" onClick={signOut} className={styles.signOut}>
-            Sign out
+            {t("nav.signOut")}
           </button>
         </div>
       </aside>

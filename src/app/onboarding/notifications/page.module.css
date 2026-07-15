@@ -107,11 +107,17 @@
   flex-shrink: 0;
 }
 
+.langRow {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-3) 0 0;
+}
+
 .trustLine {
   font-size: 12px;
   color: var(--color-fg-muted);
   text-align: center;
-  margin: var(--space-3) 0;
+  margin: var(--space-2) 0 var(--space-3);
   max-width: 340px;
   line-height: 1.5;
 }

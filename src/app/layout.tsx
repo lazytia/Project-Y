@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
+import { LanguageProvider } from "@/components/LanguageProvider";
 import AppShell from "@/components/AppShell";
 import BootSplashDismiss from "@/components/BootSplashDismiss";
 import "./globals.css";
@@ -77,8 +78,10 @@ export default function RootLayout({
           </div>
         </div>
         <AuthProvider>
-          <BootSplashDismiss />
-          <AppShell>{children}</AppShell>
+          <LanguageProvider>
+            <BootSplashDismiss />
+            <AppShell>{children}</AppShell>
+          </LanguageProvider>
         </AuthProvider>
       </body>
     </html>
