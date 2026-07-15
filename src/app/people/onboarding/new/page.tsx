@@ -38,6 +38,9 @@ type TrainingPeriod = (typeof TRAINING_PERIODS)[number]["value"];
 
 const DEFAULT_STATUS = "Waiting for Documents";
 const FAR_FUTURE = "2030-12-31";
+/** Earliest selectable Start Date — owner needs to back-fill hires as far
+ *  back as 2022. */
+const START_DATE_MIN = "2022-01-01";
 const NOTES_MAX = 500;
 
 function todayIso(): string {
@@ -126,7 +129,9 @@ export default function NewEmployeePage() {
         position,
         visaType,
         startDate,
-        visaExpiry: visaExpiry || null,
+        // Residents have no visa expiry — always null it regardless of any
+        // stale value left in state from a previous visa-type choice.
+        visaExpiry: visaType === "Resident" ? null : visaExpiry || null,
         trainingRate: parseFloat(trainingRate),
         trainingPeriod,
         afterTrainingRate: afterTrainingRate.trim()
@@ -275,7 +280,7 @@ export default function NewEmployeePage() {
         </div>
       </div>
 
-      {/* Start date + Visa expiry (side by side) */}
+      {/* Start date + Visa expiry (Visa expiry hidden for Residents) */}
       <div className={styles.dateRow}>
         <div className={styles.field}>
           <label className={styles.fieldLabel}>START DATE</label>
@@ -289,26 +294,30 @@ export default function NewEmployeePage() {
             <ChevronDown className={styles.selectChev} />
           </button>
         </div>
-        <div className={styles.field}>
-          <label className={styles.fieldLabel}>
-            VISA EXPIRY DATE <span className={styles.required}>*</span>
-          </label>
-          <button
-            type="button"
-            className={styles.pickerBtn}
-            onClick={() => setCalOpen("visa")}
-          >
-            <CalendarIcon className={styles.pickerLeadIcon} />
-            <span className={`${styles.pickerValue} ${!visaExpiry ? styles.pickerPlaceholder : ""}`}>
-              {visaExpiry ? fmtIsoShort(visaExpiry) : "Select date"}
-            </span>
-            <ChevronDown className={styles.selectChev} />
-          </button>
-        </div>
+        {visaType !== "Resident" && (
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>
+              VISA EXPIRY DATE <span className={styles.required}>*</span>
+            </label>
+            <button
+              type="button"
+              className={styles.pickerBtn}
+              onClick={() => setCalOpen("visa")}
+            >
+              <CalendarIcon className={styles.pickerLeadIcon} />
+              <span className={`${styles.pickerValue} ${!visaExpiry ? styles.pickerPlaceholder : ""}`}>
+                {visaExpiry ? fmtIsoShort(visaExpiry) : "Select date"}
+              </span>
+              <ChevronDown className={styles.selectChev} />
+            </button>
+          </div>
+        )}
       </div>
-      <span className={styles.fieldHint}>
-        <InfoIcon className={styles.hintIcon} /> We&rsquo;ll remind you before this date.
-      </span>
+      {visaType !== "Resident" && (
+        <span className={styles.fieldHint}>
+          <InfoIcon className={styles.hintIcon} /> We&rsquo;ll remind you before this date.
+        </span>
+      )}
 
       {/* Training rate */}
       <div className={styles.field}>
@@ -445,6 +454,7 @@ export default function NewEmployeePage() {
           <div className={styles.calSheet} onClick={(e) => e.stopPropagation()}>
             <CalendarPicker
               value={(calOpen === "visa" ? visaExpiry : startDate) || todayIso()}
+              minDate={calOpen === "start" ? START_DATE_MIN : undefined}
               maxDate={FAR_FUTURE}
               singleOnly
               onChange={(dateKey) => {
