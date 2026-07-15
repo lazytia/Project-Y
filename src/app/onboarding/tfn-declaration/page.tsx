@@ -308,31 +308,31 @@ export default function TfnDeclarationPage() {
             style={{ width: `${PERCENT}%` }}
           />
         </div>
-        <span className={styles.progressText}>{PERCENT}% Complete</span>
+        <span className={styles.progressText}>{PERCENT}{t("onb.percentComplete")}</span>
       </div>
 
       {/* Form Card */}
       <div className={styles.formCard}>
-        <p className={styles.formTitle}>Complete your TFN Declaration.</p>
-        <p className={styles.formSubtitle}>All fields marked with * are required.</p>
+        <p className={styles.formTitle}>{t("onb.tfn.formTitle")}</p>
+        <p className={styles.formSubtitle}>{t("onb.tfn.formSubtitle")}</p>
 
         <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
 
           {/* ── Section 1: Personal Details ── */}
           <div className={styles.formSection}>
-            <h3 className={styles.sectionTitle}>Personal Details</h3>
+            <h3 className={styles.sectionTitle}>{t("onb.tfn.personalSection")}</h3>
 
             {/* Full Legal Name */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Full Legal Name <span className={styles.required}>*</span>
+                {t("onb.tfn.fullLegalName")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <span className={styles.inputIcon}>{personSvg}</span>
                 <input
                   type="text"
                   className={styles.input}
-                  placeholder="Enter your full legal name"
+                  placeholder={t("onb.tfn.fullLegalNamePlaceholder")}
                   value={fullLegalName}
                   onChange={(e) => setFullLegalName(e.target.value)}
                 />
@@ -342,7 +342,7 @@ export default function TfnDeclarationPage() {
             {/* Date of Birth */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Date of Birth <span className={styles.required}>*</span>
+                {t("onb.tfn.dob")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <span className={styles.inputIcon}>{calendarSvg}</span>
@@ -350,7 +350,7 @@ export default function TfnDeclarationPage() {
                   type="text"
                   readOnly
                   className={`${styles.input} ${styles.inputWithRightIcon}`}
-                  placeholder="DD / MM / YYYY"
+                  placeholder={t("onb.tfn.dobPlaceholder")}
                   value={formatDobDisplay(dateOfBirth)}
                   onClick={() => setShowCalendar(true)}
                 />
@@ -383,7 +383,7 @@ export default function TfnDeclarationPage() {
             {/* Home Address */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Home Address <span className={styles.required}>*</span>
+                {t("onb.tfn.homeAddress")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <span className={styles.inputIcon}>
@@ -395,7 +395,7 @@ export default function TfnDeclarationPage() {
                 <input
                   type="text"
                   className={styles.input}
-                  placeholder="Start typing your address"
+                  placeholder={t("onb.tfn.homeAddressPlaceholder")}
                   value={homeAddress}
                   onChange={(e) => setHomeAddress(e.target.value)}
                 />
@@ -405,13 +405,13 @@ export default function TfnDeclarationPage() {
             {/* Suburb / Town */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Suburb / Town <span className={styles.required}>*</span>
+                {t("onb.tfn.suburb")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <input
                   type="text"
                   className={`${styles.input} ${styles.inputNoIcon}`}
-                  placeholder="Enter suburb or town"
+                  placeholder={t("onb.tfn.suburbPlaceholder")}
                   value={suburb}
                   onChange={(e) => setSuburb(e.target.value)}
                 />
@@ -422,7 +422,7 @@ export default function TfnDeclarationPage() {
             <div className={styles.fieldRowTwo}>
               <div className={styles.fieldGroup}>
                 <label className={styles.label}>
-                  State <span className={styles.required}>*</span>
+                  {t("onb.tfn.state")} <span className={styles.required}>*</span>
                 </label>
                 <div className={styles.selectWrapper}>
                   <select
@@ -430,7 +430,7 @@ export default function TfnDeclarationPage() {
                     value={auState}
                     onChange={(e) => setAuState(e.target.value)}
                   >
-                    <option value="">Select</option>
+                    <option value="">{t("onb.tfn.selectDefault")}</option>
                     <option value="ACT">ACT</option>
                     <option value="NSW">NSW</option>
                     <option value="NT">NT</option>
@@ -450,13 +450,13 @@ export default function TfnDeclarationPage() {
 
               <div className={styles.fieldGroup}>
                 <label className={styles.label}>
-                  Postcode <span className={styles.required}>*</span>
+                  {t("onb.tfn.postcode")} <span className={styles.required}>*</span>
                 </label>
                 <div className={styles.inputWrapper}>
                   <input
                     type="text"
                     className={`${styles.input} ${styles.inputNoIcon}`}
-                    placeholder="e.g. 2000"
+                    placeholder={t("onb.tfn.postcodePlaceholder")}
                     value={postcode}
                     onChange={(e) => setPostcode(e.target.value)}
                     maxLength={4}
@@ -468,18 +468,18 @@ export default function TfnDeclarationPage() {
 
           {/* ── Section 2: TFN ── */}
           <div className={styles.formSection}>
-            <h3 className={styles.sectionTitle}>Your Tax File Number (TFN)</h3>
+            <h3 className={styles.sectionTitle}>{t("onb.tfn.tfnSection")}</h3>
 
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Tax File Number (TFN) <span className={styles.required}>*</span>
+                {t("onb.tfn.tfnLabel")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <span className={styles.inputIcon}>{personSvg}</span>
                 <input
                   type="text"
                   className={styles.input}
-                  placeholder="Enter your TFN"
+                  placeholder={t("onb.tfn.tfnPlaceholder")}
                   value={taxFileNumber}
                   onChange={(e) => setTaxFileNumber(e.target.value)}
                 />
@@ -489,25 +489,25 @@ export default function TfnDeclarationPage() {
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                We keep your information secure and private.
+                {t("onb.tfn.tfnSecure")}
               </p>
             </div>
           </div>
 
           {/* ── Section 3: Tax Details ── */}
           <div className={styles.formSection}>
-            <h3 className={styles.sectionTitle}>Tax Details</h3>
+            <h3 className={styles.sectionTitle}>{t("onb.tfn.taxSection")}</h3>
 
             {/* Tax Resident */}
             <div className={styles.fieldGroup}>
               <p className={styles.questionLabel}>
-                Are you an Australian tax resident? <span className={styles.required}>*</span>
+                {t("onb.tfn.taxResidentQ")} <span className={styles.required}>*</span>
               </p>
               <div className={styles.radioGroup}>
                 {[
-                  { value: "yes", label: "Yes" },
-                  { value: "no", label: "No" },
-                  { value: "working_holiday", label: "Working Holiday Visa Holder" },
+                  { value: "yes", label: t("onb.tfn.taxResidentYes") },
+                  { value: "no", label: t("onb.tfn.taxResidentNo") },
+                  { value: "working_holiday", label: t("onb.tfn.taxResidentWH") },
                 ].map((opt) => (
                   <label key={opt.value} className={styles.radioItem}>
                     <input
@@ -527,12 +527,12 @@ export default function TfnDeclarationPage() {
             {/* Tax Free Threshold */}
             <div className={styles.fieldGroup}>
               <p className={styles.questionLabel}>
-                Claim the tax-free threshold from this payer? <span className={styles.required}>*</span>
+                {t("onb.tfn.thresholdQ")} <span className={styles.required}>*</span>
               </p>
               <div className={styles.radioGroup}>
                 {[
-                  { value: "yes", label: "Yes" },
-                  { value: "no", label: "No" },
+                  { value: "yes", label: t("onb.tfn.taxResidentYes") },
+                  { value: "no", label: t("onb.tfn.taxResidentNo") },
                 ].map((opt) => (
                   <label key={opt.value} className={styles.radioItem}>
                     <input
@@ -547,14 +547,14 @@ export default function TfnDeclarationPage() {
                   </label>
                 ))}
               </div>
-              <p className={styles.mostNote}>Most employees select Yes.</p>
+              <p className={styles.mostNote}>{t("onb.tfn.thresholdMostNote")}</p>
             </div>
 
             {/* HELP Debt */}
             <div className={styles.fieldGroup}>
               <div className={styles.questionRow}>
                 <p className={styles.questionLabel}>
-                  Do you have a HELP / Student Loan debt? <span className={styles.required}>*</span>
+                  {t("onb.tfn.helpQ")} <span className={styles.required}>*</span>
                 </p>
                 <button type="button" className={styles.infoIconBtn} aria-label="More information about HELP debt">
                   {infoCircleSvg}
@@ -562,8 +562,8 @@ export default function TfnDeclarationPage() {
               </div>
               <div className={styles.radioGroup}>
                 {[
-                  { value: "yes", label: "Yes" },
-                  { value: "no", label: "No" },
+                  { value: "yes", label: t("onb.tfn.taxResidentYes") },
+                  { value: "no", label: t("onb.tfn.taxResidentNo") },
                 ].map((opt) => (
                   <label key={opt.value} className={styles.radioItem}>
                     <input
@@ -584,7 +584,7 @@ export default function TfnDeclarationPage() {
             <div className={styles.fieldGroup}>
               <div className={styles.questionRow}>
                 <p className={styles.questionLabel}>
-                  Do you have any other government education debt?
+                  {t("onb.tfn.otherGovQ")}
                 </p>
                 <button type="button" className={styles.infoIconBtn} aria-label="More information about government education debt">
                   {infoCircleSvg}
@@ -592,8 +592,8 @@ export default function TfnDeclarationPage() {
               </div>
               <div className={styles.radioGroup}>
                 {[
-                  { value: "yes", label: "Yes" },
-                  { value: "no", label: "No" },
+                  { value: "yes", label: t("onb.tfn.taxResidentYes") },
+                  { value: "no", label: t("onb.tfn.taxResidentNo") },
                 ].map((opt) => (
                   <label key={opt.value} className={styles.radioItem}>
                     <input
@@ -613,7 +613,7 @@ export default function TfnDeclarationPage() {
 
           {/* ── Section 4: Declaration ── */}
           <div className={styles.formSection}>
-            <h3 className={styles.sectionTitle}>Declaration</h3>
+            <h3 className={styles.sectionTitle}>{t("onb.tfn.declarationSection")}</h3>
 
             {/* Declaration checkbox */}
             <div className={styles.fieldGroup}>
@@ -625,7 +625,7 @@ export default function TfnDeclarationPage() {
                   onChange={(e) => setDeclarationAgreed(e.target.checked)}
                 />
                 <span className={styles.radioLabel}>
-                  Employee Declaration <span className={styles.required}>*</span> — I declare that the information I have given is true and correct.
+                  {t("onb.tfn.declarationCheckbox")} <span className={styles.required}>*</span> {t("onb.tfn.declarationText")}
                 </span>
               </label>
             </div>
@@ -633,7 +633,7 @@ export default function TfnDeclarationPage() {
             {/* Date */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Date <span className={styles.required}>*</span>
+                {t("onb.tfn.dateLabel")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <input
@@ -673,7 +673,7 @@ export default function TfnDeclarationPage() {
             <div className={styles.infoBox}>
               <div className={styles.infoBoxRow}>
                 {shieldSvg}
-                <span>Submitted electronically via Project Y</span>
+                <span>{t("onb.tfn.submittedElectronically")}</span>
               </div>
             </div>
           </div>

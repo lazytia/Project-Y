@@ -54,6 +54,12 @@ export default function EmployeeAgreementPage() {
       <header className={styles.brand}>YURICA</header>
 
       <article className={styles.doc}>
+        {/* English-only disclaimer — this legal document is not
+            translated to avoid AI-translation ambiguity. */}
+        <p className={styles.englishOnlyBanner}>
+          {t("onb.pol.englishOnlyBanner")}
+        </p>
+
         {/* Cover */}
         <section className={styles.coverSection}>
           <h1 className={styles.coverTitle}>

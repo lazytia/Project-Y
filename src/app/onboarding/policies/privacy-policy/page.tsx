@@ -55,6 +55,12 @@ export default function PrivacyPolicyPage() {
       <p className={styles.stepLabel}>Privacy Policy · 1 of 3</p>
 
       <article className={styles.doc}>
+        {/* English-only disclaimer — this legal document is not
+            translated to avoid AI-translation ambiguity. */}
+        <p className={styles.englishOnlyBanner}>
+          {t("onb.pol.englishOnlyBanner")}
+        </p>
+
         <h1 className={styles.title}>Privacy Policy</h1>
 
         <p className={styles.paragraph}>
