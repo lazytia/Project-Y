@@ -297,6 +297,8 @@ export default function EmployeeDetailPage() {
   const [editRate, setEditRate] = useState("");
   const [editReportsTo, setEditReportsTo] = useState("");
   const [calRehireOpen, setCalRehireOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -566,6 +568,37 @@ export default function EmployeeDetailPage() {
     }
   }
 
+  async function handleDeleteEmployee() {
+    if (!staff || deleting) return;
+    setMenuOpen(false);
+    const ok = window.confirm(
+      `Delete ${staff.name}'s record?\n\nThis is a hard delete — the employee's onboarding data, HR notes and any open notice will be permanently removed. Use this only for mistakes; use "Terminate" for real departures.`,
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const db = getDb();
+      // Sweep any related rows keyed on the employee's uid so we don't
+      // leave dangling notice_given / hr_notes docs behind.
+      const [noticeSnap, hrSnap] = await Promise.all([
+        getDocs(query(collection(db, "notice_given"), where("employeeUid", "==", staff.uid))),
+        getDocs(query(collection(db, "hr_notes"), where("employeeUid", "==", staff.uid))),
+      ]);
+      if (!noticeSnap.empty || !hrSnap.empty) {
+        const batch = writeBatch(db);
+        noticeSnap.docs.forEach((d) => batch.delete(d.ref));
+        hrSnap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+      await deleteDoc(doc(db, "staff_onboarding", staff.uid));
+      router.push("/people/active");
+    } catch (err) {
+      console.error("[delete-employee] failed:", err);
+      alert("Failed to delete. Please try again.");
+      setDeleting(false);
+    }
+  }
+
   function startEmploymentEdit() {
     if (!staff) return;
     setEditRehireDate(staff.rehireDate || todayIso());
@@ -687,7 +720,13 @@ export default function EmployeeDetailPage() {
 
   return (
     <div className={styles.page}>
-      <TopBar onBack={() => router.back()} />
+      <TopBar
+        onBack={() => router.back()}
+        menuOpen={menuOpen}
+        onToggleMenu={() => setMenuOpen((v) => !v)}
+        onDelete={handleDeleteEmployee}
+        deleting={deleting}
+      />
 
       {staff.isReactivated ? (
         <>
@@ -1101,16 +1140,59 @@ export default function EmployeeDetailPage() {
 
 /* ── Subcomponents ── */
 
-function TopBar({ onBack }: { onBack: () => void }) {
+function TopBar({
+  onBack,
+  menuOpen,
+  onToggleMenu,
+  onDelete,
+  deleting,
+}: {
+  onBack: () => void;
+  menuOpen?: boolean;
+  onToggleMenu?: () => void;
+  onDelete?: () => void;
+  deleting?: boolean;
+}) {
+  const hasMenu = Boolean(onToggleMenu && onDelete);
   return (
     <div className={styles.topBar}>
       <button type="button" className={styles.iconBtn} onClick={onBack} aria-label="Back">
         <ChevronLeft />
       </button>
       <h1 className={styles.topTitle}>Employee Details</h1>
-      <button type="button" className={styles.iconBtn} aria-label="More">
-        <DotsIcon />
-      </button>
+      <div className={styles.topMoreWrap}>
+        <button
+          type="button"
+          className={styles.iconBtn}
+          aria-label="More"
+          aria-haspopup={hasMenu ? "menu" : undefined}
+          aria-expanded={hasMenu ? menuOpen : undefined}
+          onClick={hasMenu ? onToggleMenu : undefined}
+        >
+          <DotsIcon />
+        </button>
+        {hasMenu && menuOpen && (
+          <>
+            <button
+              type="button"
+              className={styles.topMenuBackdrop}
+              aria-label="Close menu"
+              onClick={onToggleMenu}
+            />
+            <div className={styles.topMenu} role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                className={styles.topMenuItemDanger}
+                onClick={onDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting…" : "Delete employee"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

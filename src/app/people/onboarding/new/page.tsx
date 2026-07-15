@@ -20,7 +20,7 @@ import styles from "./page.module.css";
  * status pill.
  * ────────────────────────────────────────────────────────────────────────── */
 
-const POSITIONS = ["Hall Staff", "Kitchen Staff"] as const;
+const POSITIONS = ["Hall Staff", "Kitchen Staff", "Manager", "Head Chef"] as const;
 type Position = (typeof POSITIONS)[number];
 
 const VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
