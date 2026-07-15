@@ -217,26 +217,26 @@ export default function BankSuperDetailsPage() {
 
       {/* Form Card */}
       <div className={styles.formCard}>
-        <p className={styles.formTitle}>Complete your Bank &amp; Super Details.</p>
-        <p className={styles.formSubtitle}>All fields marked with * are required.</p>
+        <p className={styles.formTitle}>{t("onb.bank.formTitle")}</p>
+        <p className={styles.formSubtitle}>{t("onb.bank.formSubtitle")}</p>
 
         <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
 
           {/* ── Section 1: Bank Details ── */}
           <div className={styles.formSection}>
-            <h3 className={styles.sectionTitle}>Bank Details</h3>
+            <h3 className={styles.sectionTitle}>{t("onb.bank.bankSection")}</h3>
 
             {/* BSB */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                BSB <span className={styles.required}>*</span>
+                {t("onb.bank.bsb")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <span className={styles.inputIcon}>{bankSvg}</span>
                 <input
                   type="text"
                   className={styles.input}
-                  placeholder="e.g. 123-456"
+                  placeholder={t("onb.bank.bsbEg")}
                   value={bsb}
                   onChange={(e) => setBsb(e.target.value)}
                 />
@@ -246,13 +246,13 @@ export default function BankSuperDetailsPage() {
             {/* Account Number */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Account Number <span className={styles.required}>*</span>
+                {t("onb.bank.accountNumber")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <input
                   type="text"
                   className={`${styles.input} ${styles.inputNoIcon}`}
-                  placeholder="e.g. 1234 5678 90"
+                  placeholder={t("onb.bank.accountNumberEg")}
                   value={accountNumber}
                   onChange={(e) => setAccountNumber(e.target.value)}
                 />
@@ -262,13 +262,13 @@ export default function BankSuperDetailsPage() {
             {/* Account Name */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Account Name <span className={styles.required}>*</span>
+                {t("onb.bank.accountName")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <input
                   type="text"
                   className={`${styles.input} ${styles.inputNoIcon}`}
-                  placeholder="e.g. Alex Smith"
+                  placeholder={t("onb.bank.accountNameEg")}
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
                 />
@@ -278,17 +278,15 @@ export default function BankSuperDetailsPage() {
 
           {/* ── Section 2: Superannuation Details ── */}
           <div className={styles.formSection}>
-            <h3 className={styles.sectionTitle}>Superannuation Details</h3>
+            <h3 className={styles.sectionTitle}>{t("onb.bank.superSection")}</h3>
 
             {/* Info Box: Why do we need this? */}
             <div className={styles.infoBox}>
               <div className={styles.infoBoxRow}>
                 <span className={styles.infoBoxIcon}>{lightbulbSvg}</span>
                 <div>
-                  <p className={styles.infoBoxTitle}>Why do we need this?</p>
-                  <p className={styles.infoBoxBody}>
-                    Superannuation is paid in addition to your wages. Providing your super details helps ensure your retirement savings are paid correctly.
-                  </p>
+                  <p className={styles.infoBoxTitle}>{t("onb.bank.whyTitle")}</p>
+                  <p className={styles.infoBoxBody}>{t("onb.bank.whyBody")}</p>
                 </div>
               </div>
             </div>
@@ -296,14 +294,14 @@ export default function BankSuperDetailsPage() {
             {/* Super Fund Name */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Super Fund Name <span className={styles.required}>*</span>
+                {t("onb.bank.superFund")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <span className={styles.inputIcon}>{searchSvg}</span>
                 <input
                   type="text"
                   className={styles.input}
-                  placeholder="e.g. AustralianSuper"
+                  placeholder={t("onb.bank.superFundEg")}
                   value={superFundName}
                   onChange={(e) => setSuperFundName(e.target.value)}
                 />
@@ -313,13 +311,13 @@ export default function BankSuperDetailsPage() {
             {/* USI */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                USI (Unique Superannuation Identifier) <span className={styles.required}>*</span>
+                {t("onb.bank.usi")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <input
                   type="text"
                   className={`${styles.input} ${styles.inputNoIcon}`}
-                  placeholder="e.g. ABC123456789"
+                  placeholder={t("onb.bank.usiEg")}
                   value={usi}
                   onChange={(e) => setUsi(e.target.value)}
                 />
@@ -329,13 +327,13 @@ export default function BankSuperDetailsPage() {
             {/* Member Number */}
             <div className={styles.fieldGroup}>
               <label className={styles.label}>
-                Member Number <span className={styles.required}>*</span>
+                {t("onb.bank.memberNumber")} <span className={styles.required}>*</span>
               </label>
               <div className={styles.inputWrapper}>
                 <input
                   type="text"
                   className={`${styles.input} ${styles.inputNoIcon}`}
-                  placeholder="e.g. 12345678"
+                  placeholder={t("onb.bank.memberNumberEg")}
                   value={memberNumber}
                   onChange={(e) => setMemberNumber(e.target.value)}
                 />
@@ -346,9 +344,7 @@ export default function BankSuperDetailsPage() {
             <div className={styles.infoBox}>
               <div className={styles.infoBoxRow}>
                 <span className={styles.infoBoxIcon}>{infoCircleSvg}</span>
-                <p className={styles.infoBoxBody}>
-                  Don&apos;t have a super fund yet? You will need to open a superannuation account and return to complete this step before your onboarding can be submitted.
-                </p>
+                <p className={styles.infoBoxBody}>{t("onb.bank.noSuperNote")}</p>
               </div>
             </div>
           </div>

@@ -191,13 +191,13 @@ export default function PersonalInformationPage() {
             style={{ width: `${PERCENT}%` }}
           />
         </div>
-        <span className={styles.progressText}>{PERCENT}% Complete</span>
+        <span className={styles.progressText}>{PERCENT}{t("onb.percentComplete")}</span>
       </div>
 
       {/* Form Card */}
       <div className={styles.formCard}>
-        <p className={styles.formTitle}>Let&apos;s start with your personal details.</p>
-        <p className={styles.formSubtitle}>All fields marked with * are required.</p>
+        <p className={styles.formTitle}>{t("onb.personal.formTitle")}</p>
+        <p className={styles.formSubtitle}>{t("onb.personal.formSubtitle")}</p>
 
         {error && <p className={styles.errorMessage}>{error}</p>}
 
@@ -205,7 +205,7 @@ export default function PersonalInformationPage() {
           {/* Legal First Name */}
           <div className={styles.fieldGroup}>
             <label className={styles.label}>
-              Legal First Name <span className={styles.required}>*</span>
+              {t("onb.personal.legalFirstName")} <span className={styles.required}>*</span>
             </label>
             <div className={styles.inputWrapper}>
               <span className={styles.inputIcon}>
@@ -214,7 +214,7 @@ export default function PersonalInformationPage() {
               <input
                 type="text"
                 className={styles.input}
-                placeholder="e.g. Alex"
+                placeholder={t("onb.personal.firstNameEg")}
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
               />
@@ -224,7 +224,7 @@ export default function PersonalInformationPage() {
           {/* Legal Last Name */}
           <div className={styles.fieldGroup}>
             <label className={styles.label}>
-              Legal Last Name <span className={styles.required}>*</span>
+              {t("onb.personal.legalLastName")} <span className={styles.required}>*</span>
             </label>
             <div className={styles.inputWrapper}>
               <span className={styles.inputIcon}>
@@ -233,7 +233,7 @@ export default function PersonalInformationPage() {
               <input
                 type="text"
                 className={styles.input}
-                placeholder="e.g. Smith"
+                placeholder={t("onb.personal.lastNameEg")}
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
               />
@@ -242,7 +242,7 @@ export default function PersonalInformationPage() {
 
           {/* Preferred Name */}
           <div className={styles.fieldGroup}>
-            <label className={styles.label}>Preferred Name (Optional)</label>
+            <label className={styles.label}>{t("onb.personal.preferredName")}</label>
             <div className={styles.inputWrapper}>
               <span className={styles.inputIcon}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -250,7 +250,7 @@ export default function PersonalInformationPage() {
               <input
                 type="text"
                 className={styles.input}
-                placeholder="e.g. Alex"
+                placeholder={t("onb.personal.firstNameEg")}
                 value={preferredName}
                 onChange={(e) => setPreferredName(e.target.value)}
               />
@@ -260,7 +260,7 @@ export default function PersonalInformationPage() {
           {/* Date of Birth */}
           <div className={styles.fieldGroup}>
             <label className={styles.label}>
-              Date of Birth <span className={styles.required}>*</span>
+              {t("onb.personal.dob")} <span className={styles.required}>*</span>
             </label>
             <div className={styles.inputWrapper}>
               <span className={styles.inputIcon}>
@@ -270,7 +270,7 @@ export default function PersonalInformationPage() {
                 type="text"
                 readOnly
                 className={`${styles.input} ${styles.inputWithRightIcon}`}
-                placeholder="DD / MM / YYYY"
+                placeholder={t("onb.personal.dobPlaceholder")}
                 value={formatDobDisplay(dateOfBirth)}
                 onClick={() => setShowCalendar(true)}
               />
@@ -303,7 +303,7 @@ export default function PersonalInformationPage() {
           {/* Gender */}
           <div className={styles.fieldGroup}>
             <label className={styles.label}>
-              Gender <span className={styles.required}>*</span>
+              {t("onb.personal.gender")} <span className={styles.required}>*</span>
             </label>
             <div className={styles.selectWrapper}>
               <select
@@ -311,9 +311,9 @@ export default function PersonalInformationPage() {
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
               >
-                <option value="">Select</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+                <option value="">{t("onb.personal.selectDefault")}</option>
+                <option value="male">{t("onb.personal.male")}</option>
+                <option value="female">{t("onb.personal.female")}</option>
               </select>
               <span className={styles.selectIcon}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -324,7 +324,7 @@ export default function PersonalInformationPage() {
           {/* Mobile Number */}
           <div className={styles.fieldGroup}>
             <label className={styles.label}>
-              Mobile Number <span className={styles.required}>*</span>
+              {t("onb.personal.mobile")} <span className={styles.required}>*</span>
             </label>
             <div className={styles.inputWrapper}>
               <span className={styles.inputIcon}>
@@ -333,7 +333,7 @@ export default function PersonalInformationPage() {
               <input
                 type="tel"
                 className={styles.input}
-                placeholder="e.g. 0412 345 678"
+                placeholder={t("onb.personal.mobilePlaceholder")}
                 value={mobileNumber}
                 onChange={(e) => setMobileNumber(e.target.value)}
               />
@@ -343,7 +343,7 @@ export default function PersonalInformationPage() {
           {/* Email Address */}
           <div className={styles.fieldGroup}>
             <label className={styles.label}>
-              Email Address <span className={styles.required}>*</span>
+              {t("onb.personal.email")} <span className={styles.required}>*</span>
             </label>
             <div className={styles.inputWrapper}>
               <span className={styles.inputIcon}>
@@ -352,7 +352,7 @@ export default function PersonalInformationPage() {
               <input
                 type="email"
                 className={styles.input}
-                placeholder="e.g. alex.smith@email.com"
+                placeholder={t("onb.personal.emailPlaceholder")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { useLang } from "./LanguageProvider";
+import LanguageToggle from "./LanguageToggle";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import styles from "./Sidebar.module.css";
@@ -150,22 +151,18 @@ export default function Sidebar({ open, onClose }: Props) {
   // /onboarding/*, so destinations they aren't allowed to reach yet would
   // just look broken.
   if (!userIsOwner && staffNeedsOnboarding) {
-    // Mid-onboarding staff can only reach /onboarding/*, so we hide the
-    // usual staff nav — but they still need Settings so they can switch
-    // between English and Japanese while filling out the forms.
+    // Mid-onboarding staff can only reach /onboarding/*, so we don't
+    // show any nav links — but we DO drop the EN/JA toggle straight
+    // into the sidebar. Owner asked for this so the staff can flip
+    // languages in place while filling out a form; no navigation, no
+    // Settings detour, just the current page's copy switches.
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
         <div className={styles.brand}>YURICA</div>
         <nav className={styles.nav}>
-          <div className={styles.group}>
-            <Link
-              href="/staff/settings"
-              className={`${styles.groupHeader} ${pathname === "/staff/settings" ? styles.active : ""}`}
-              onClick={onClose}
-            >
-              <span className={styles.icon}>⚙️</span>
-              <span>{t("nav.settings")}</span>
-            </Link>
+          <div className={styles.sidebarLangBlock}>
+            <p className={styles.sidebarLangLabel}>{t("common.language")}</p>
+            <LanguageToggle />
           </div>
         </nav>
         <div className={styles.footer}>
