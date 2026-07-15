@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
 
@@ -106,18 +107,19 @@ function statusClass(status: HolidayRequest["status"]) {
   }
 }
 
-function statusLabel(status: HolidayRequest["status"]) {
+function statusLabelKey(status: HolidayRequest["status"]): string {
   switch (status) {
-    case "approved": return "Approved";
-    case "pending":  return "Pending";
-    case "declined": return "Declined";
-    default:         return "Pending";
+    case "approved": return "rh.status.approved";
+    case "pending":  return "rh.status.pending";
+    case "declined": return "rh.status.declined";
+    default:         return "rh.status.pending";
   }
 }
 
 export default function RequestHolidayPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
 
   const [startKey, setStartKey] = useState<string>("");
   const [endKey, setEndKey] = useState<string>("");
@@ -181,11 +183,11 @@ export default function RequestHolidayPage() {
     e.preventDefault();
     if (!user || !canSubmit) return;
     if (endKey < startKey) {
-      setError("End date must be on or after the start date.");
+      setError(t("rh.endBeforeStart"));
       return;
     }
     if (noticeRule && !noticeRule.met) {
-      setError(`This request requires at least ${noticeRule.weeks} weeks notice.`);
+      setError(t("rh.needsWeeksNotice").replace("{n}", String(noticeRule.weeks)));
       return;
     }
     setSubmitting(true);
@@ -240,10 +242,10 @@ export default function RequestHolidayPage() {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        <span>Back</span>
+        <span>{t("common.back")}</span>
       </button>
 
-      <h1 className={styles.title}>Holiday Request</h1>
+      <h1 className={styles.title}>{t("rh.title")}</h1>
 
       <div className={styles.noticeBox}>
         <div className={styles.noticeHeader}>
@@ -252,7 +254,7 @@ export default function RequestHolidayPage() {
             <line x1="12" y1="16" x2="12" y2="12" />
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
-          <span className={styles.noticeTitle}>Notice</span>
+          <span className={styles.noticeTitle}>{t("rh.notice")}</span>
         </div>
         <div className={styles.noticeRow}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -262,8 +264,8 @@ export default function RequestHolidayPage() {
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
           <p className={styles.noticeText}>
-            <strong>3 or more consecutive days:</strong> Please submit at least{" "}
-            <span className={styles.noticeAccent}>3 weeks</span> in advance.
+            <strong>{t("rh.noticeLongBefore")}</strong>{t("rh.noticeLongBody")}
+            <span className={styles.noticeAccent}>{t("rh.noticeLongWeeks")}</span>{t("rh.noticeLongAfter")}
           </p>
         </div>
         <div className={styles.noticeRow}>
@@ -274,21 +276,21 @@ export default function RequestHolidayPage() {
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
           <p className={styles.noticeText}>
-            <strong>Less than 3 consecutive days:</strong> Please submit at least{" "}
-            <span className={styles.noticeAccent}>2 weeks</span> in advance.
+            <strong>{t("rh.noticeShortBefore")}</strong>{t("rh.noticeShortBody")}
+            <span className={styles.noticeAccent}>{t("rh.noticeShortWeeks")}</span>{t("rh.noticeShortAfter")}
           </p>
         </div>
       </div>
 
       <form className={styles.form} onSubmit={handleSubmit}>
-        <label className={styles.label} htmlFor="hr-start">Start Date</label>
+        <label className={styles.label} htmlFor="hr-start">{t("rh.startDate")}</label>
         <button
           id="hr-start"
           type="button"
           className={`${styles.dateField} ${!startKey ? styles.dateFieldEmpty : ""}`}
           onClick={() => setPickerOpen("start")}
         >
-          <span>{startKey ? fmtKey(startKey) : "Select start date"}</span>
+          <span>{startKey ? fmtKey(startKey) : t("rh.selectStart")}</span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
@@ -297,14 +299,14 @@ export default function RequestHolidayPage() {
           </svg>
         </button>
 
-        <label className={styles.label} htmlFor="hr-end">End Date</label>
+        <label className={styles.label} htmlFor="hr-end">{t("rh.endDate")}</label>
         <button
           id="hr-end"
           type="button"
           className={`${styles.dateField} ${!endKey ? styles.dateFieldEmpty : ""}`}
           onClick={() => setPickerOpen("end")}
         >
-          <span>{endKey ? fmtKey(endKey) : "Select end date"}</span>
+          <span>{endKey ? fmtKey(endKey) : t("rh.selectEnd")}</span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
@@ -313,14 +315,14 @@ export default function RequestHolidayPage() {
           </svg>
         </button>
 
-        <label className={styles.label} htmlFor="hr-reason">Reason</label>
+        <label className={styles.label} htmlFor="hr-reason">{t("rh.reason")}</label>
         <input
           id="hr-reason"
           className={styles.input}
           type="text"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="e.g. Family holiday"
+          placeholder={t("rh.reasonPlaceholder")}
         />
 
         {noticeRule && (
@@ -332,12 +334,12 @@ export default function RequestHolidayPage() {
             </svg>
             <span className={styles.ruleHintText}>
               <span>
-                This request requires at least{" "}
-                <strong>{noticeRule.weeks} weeks</strong> notice.
-                {!noticeRule.met && " Please select a later start date."}
+                {t("rh.ruleRequires")}
+                <strong>{noticeRule.weeks}{t("rh.ruleWeeksSuffix")}</strong>{t("rh.ruleNotice")}
+                {!noticeRule.met && t("rh.rulePickLater")}
               </span>
               <span className={styles.ruleHintFooter}>
-                If this is urgent, please speak to your manager directly.
+                {t("rh.ruleUrgentNote")}
               </span>
             </span>
           </div>
@@ -350,16 +352,16 @@ export default function RequestHolidayPage() {
           className={styles.submitBtn}
           disabled={!canSubmit}
         >
-          {submitting ? "Submitting…" : "Submit Request"}
+          {submitting ? t("rh.submitting") : t("rh.submit")}
         </button>
       </form>
 
       <div className={styles.divider} />
 
-      <h2 className={styles.subTitle}>Previous Requests</h2>
+      <h2 className={styles.subTitle}>{t("rh.previous")}</h2>
 
       {requests.length === 0 ? (
-        <p className={styles.emptyText}>No previous requests yet.</p>
+        <p className={styles.emptyText}>{t("rh.empty")}</p>
       ) : (
         <ul className={styles.requestList}>
           {requests.map((r) => (
@@ -376,7 +378,7 @@ export default function RequestHolidayPage() {
                 {fmtRange(r.startDate, r.endDate)}
               </span>
               <span className={`${styles.statusBadge} ${statusClass(r.status)}`}>
-                {statusLabel(r.status)}
+                {t(statusLabelKey(r.status))}
               </span>
               <span className={styles.requestChevron} aria-hidden="true">›</span>
             </li>
@@ -392,9 +394,7 @@ export default function RequestHolidayPage() {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
         </span>
-        <p className={styles.infoBody}>
-          You will be notified once your request has been reviewed.
-        </p>
+        <p className={styles.infoBody}>{t("rh.reviewNote")}</p>
       </div>
 
       {pickerOpen && (
@@ -437,8 +437,8 @@ export default function RequestHolidayPage() {
               </svg>
             </div>
             <p className={styles.confirmBody}>
-              Management will review your request.<br />
-              You will receive an update once reviewed.
+              {t("rh.confirmBody1")}<br />
+              {t("rh.confirmBody2")}
             </p>
             <button
               type="button"
@@ -446,7 +446,7 @@ export default function RequestHolidayPage() {
               onClick={() => setConfirmOpen(false)}
               autoFocus
             >
-              OK
+              {t("rh.ok")}
             </button>
           </div>
         </div>

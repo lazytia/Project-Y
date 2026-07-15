@@ -12,18 +12,21 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
 type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
-const DAYS: { key: DayKey; short: string; long: string }[] = [
-  { key: "mon", short: "Mon", long: "Monday" },
-  { key: "tue", short: "Tue", long: "Tuesday" },
-  { key: "wed", short: "Wed", long: "Wednesday" },
-  { key: "thu", short: "Thu", long: "Thursday" },
-  { key: "fri", short: "Fri", long: "Friday" },
-  { key: "sat", short: "Sat", long: "Saturday" },
-  { key: "sun", short: "Sun", long: "Sunday" },
+/** Days of the week. Short/long labels are translation KEYS rather
+ *  than fixed strings so the page renders in EN or JA per the toggle. */
+const DAYS: { key: DayKey; shortKey: string; longKey: string }[] = [
+  { key: "mon", shortKey: "ac.day.mon", longKey: "ac.dayLong.mon" },
+  { key: "tue", shortKey: "ac.day.tue", longKey: "ac.dayLong.tue" },
+  { key: "wed", shortKey: "ac.day.wed", longKey: "ac.dayLong.wed" },
+  { key: "thu", shortKey: "ac.day.thu", longKey: "ac.dayLong.thu" },
+  { key: "fri", shortKey: "ac.day.fri", longKey: "ac.dayLong.fri" },
+  { key: "sat", shortKey: "ac.day.sat", longKey: "ac.dayLong.sat" },
+  { key: "sun", shortKey: "ac.day.sun", longKey: "ac.dayLong.sun" },
 ];
 
 type Availability =
@@ -81,14 +84,6 @@ function fmtTime12h(t: string): string {
   return `${h}:${m} ${period}`;
 }
 
-function labelFor(a: Availability): string {
-  switch (a.kind) {
-    case "available": return "Available";
-    case "unavailable": return "Unavailable";
-    case "partial": return `${fmtTime12h(a.from)} – ${fmtTime12h(a.until)}`;
-  }
-}
-
 /** Returns the Monday that is at least 21 days from today. */
 function nextMondayAfter3Weeks(): Date {
   const d = new Date();
@@ -111,6 +106,7 @@ function fmtEffective(d: Date): string {
 export default function AvailabilityChangePage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
   const [effectiveDate, setEffectiveDate] = useState<Date>(() => {
     const d = new Date(0);
     d.setHours(0, 0, 0, 0);
@@ -201,10 +197,10 @@ export default function AvailabilityChangePage() {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        <span>Back</span>
+        <span>{t("common.back")}</span>
       </button>
 
-      <h1 className={styles.title}>Availability Change</h1>
+      <h1 className={styles.title}>{t("ac.title")}</h1>
 
       <div className={styles.infoBox}>
         <span className={styles.infoIcon} aria-hidden="true">
@@ -214,9 +210,7 @@ export default function AvailabilityChangePage() {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
         </span>
-        <p className={styles.infoBody}>
-          Availability changes require at least 3 weeks notice.
-        </p>
+        <p className={styles.infoBody}>{t("ac.notice")}</p>
       </div>
 
       {/* Effective From card */}
@@ -230,23 +224,21 @@ export default function AvailabilityChangePage() {
           </svg>
         </div>
         <div className={styles.effectiveBody}>
-          <p className={styles.effectiveLabel}>Effective From</p>
+          <p className={styles.effectiveLabel}>{t("ac.effectiveFrom")}</p>
           <p className={styles.effectiveDate}>{fmtEffective(effectiveDate)}</p>
-          <span className={styles.effectiveBadge}>Subject to approval</span>
-          <p className={styles.effectiveNote}>
-            Your new availability will apply from this date if approved by management.
-          </p>
+          <span className={styles.effectiveBadge}>{t("ac.subjectApproval")}</span>
+          <p className={styles.effectiveNote}>{t("ac.effectiveNote")}</p>
         </div>
       </div>
 
       {/* Availability */}
-      <h2 className={styles.sectionTitle}>Availability</h2>
+      <h2 className={styles.sectionTitle}>{t("ac.section")}</h2>
       <div className={styles.proposeList}>
         {DAYS.map((d) => {
           const a = proposed[d.key];
           return (
             <div key={d.key} className={styles.proposeRow}>
-              <span className={styles.proposeDay}>{d.short}</span>
+              <span className={styles.proposeDay}>{t(d.shortKey)}</span>
               <div className={styles.proposeChoices}>
                 <button
                   type="button"
@@ -259,14 +251,14 @@ export default function AvailabilityChangePage() {
                       <polyline points="9 12 11 14 15 10" />
                     </svg>
                   )}
-                  All Day
+                  {t("ac.allDay")}
                 </button>
                 <button
                   type="button"
                   className={`${styles.choice} ${a.kind === "partial" ? styles.choicePartialActive : ""}`}
                   onClick={() => handleChoose(d.key, "partial")}
                 >
-                  Partially
+                  {t("ac.partially")}
                 </button>
                 <button
                   type="button"
@@ -280,7 +272,7 @@ export default function AvailabilityChangePage() {
                       <line x1="15" y1="9" x2="9" y2="15" />
                     </svg>
                   )}
-                  Unavailable
+                  {t("ac.unavailable")}
                 </button>
               </div>
               {a.kind === "partial" && (
@@ -294,14 +286,14 @@ export default function AvailabilityChangePage() {
       </div>
 
       <form className={styles.form} onSubmit={handleSubmit}>
-        <label className={styles.label} htmlFor="ac-reason">Reason</label>
+        <label className={styles.label} htmlFor="ac-reason">{t("ac.reason")}</label>
         <input
           id="ac-reason"
           className={styles.input}
           type="text"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="e.g. New study schedule"
+          placeholder={t("ac.reasonPlaceholder")}
         />
 
         {error && <p className={styles.error}>{error}</p>}
@@ -314,9 +306,7 @@ export default function AvailabilityChangePage() {
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
           </span>
-          <p className={styles.infoBody}>
-            Availability changes are requests only and are not approved until confirmed by management.
-          </p>
+          <p className={styles.infoBody}>{t("ac.pendingWarning")}</p>
         </div>
 
         <button
@@ -324,7 +314,7 @@ export default function AvailabilityChangePage() {
           className={styles.submitBtn}
           disabled={!canSubmit || !loaded}
         >
-          {submitting ? "Submitting…" : "Submit Availability Change"}
+          {submitting ? t("ac.submitting") : t("ac.submit")}
         </button>
       </form>
 
@@ -360,7 +350,9 @@ function PartialSheet({
   onCancel: () => void;
   onSave: (from: string, until: string) => void;
 }) {
-  const long = DAYS.find((d) => d.key === day)?.long ?? "Day";
+  const { t } = useLang();
+  const longKey = DAYS.find((d) => d.key === day)?.longKey ?? "ac.dayLong.mon";
+  const long = t(longKey);
   const [from, setFrom] = useState(initial.from);
   const [until, setUntil] = useState(initial.until);
 
@@ -391,9 +383,9 @@ function PartialSheet({
 
         <div className={styles.sheetHeader}>
           <div>
-            <h3 className={styles.sheetTitle}>{long} Availability</h3>
+            <h3 className={styles.sheetTitle}>{long}{t("ac.availabilitySuffix")}</h3>
             <p className={styles.sheetSub}>
-              You have selected: <span className={styles.sheetSubAccent}>Available Partially</span>
+              {t("ac.selectedIntro")}<span className={styles.sheetSubAccent}>{t("ac.availPartially")}</span>
             </p>
           </div>
           <button
@@ -411,7 +403,7 @@ function PartialSheet({
 
         <div className={styles.sheetDivider} />
 
-        <label className={styles.sheetLabel} htmlFor="ac-from">Available From</label>
+        <label className={styles.sheetLabel} htmlFor="ac-from">{t("ac.availableFrom")}</label>
         <div className={styles.timeWrap}>
           <input
             id="ac-from"
@@ -426,7 +418,7 @@ function PartialSheet({
           </svg>
         </div>
 
-        <label className={styles.sheetLabel} htmlFor="ac-until">Available Until</label>
+        <label className={styles.sheetLabel} htmlFor="ac-until">{t("ac.availableUntil")}</label>
         <div className={styles.timeWrap}>
           <input
             id="ac-until"
@@ -449,9 +441,7 @@ function PartialSheet({
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
           </span>
-          <p className={styles.sheetInfoBody}>
-            Please ensure the times reflect when you are available to work.
-          </p>
+          <p className={styles.sheetInfoBody}>{t("ac.partialTimeNote")}</p>
         </div>
 
         <button
@@ -460,7 +450,7 @@ function PartialSheet({
           disabled={!valid}
           onClick={() => onSave(from, until)}
         >
-          Save
+          {t("ac.save")}
         </button>
       </div>
     </div>

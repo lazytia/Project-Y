@@ -5,6 +5,7 @@ import Link from "next/link";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
 /* ── types ── */
@@ -81,8 +82,8 @@ function fmtTime12h(t: string): string {
   return `${h}:${mStr} ${period}`;
 }
 
-function mealLabel(m: "lunch" | "dinner"): string {
-  return m === "lunch" ? "Lunch" : "Dinner";
+function mealLabelKey(m: "lunch" | "dinner"): string {
+  return m === "lunch" ? "staff.lunch" : "staff.dinner";
 }
 
 function tsToDate(v: unknown): Date | null {
@@ -94,16 +95,19 @@ function tsToDate(v: unknown): Date | null {
   return null;
 }
 
-function fmtRelative(d: Date | null): string {
+function fmtRelative(
+  d: Date | null,
+  t: (key: string) => string,
+): string {
   if (!d) return "";
   const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 60) return t("staff.time.justNow");
+  if (diff < 3600) return `${Math.floor(diff / 60)}${t("staff.time.mAgo")}`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}${t("staff.time.hAgo")}`;
   const days = Math.floor(diff / 86400);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return `${days}${t("staff.time.dAgo")}`;
   const weeks = Math.floor(days / 7);
-  return `${weeks}w ago`;
+  return `${weeks}${t("staff.time.wAgo")}`;
 }
 
 /** Find the nearest upcoming shift across this week and next week rosters. */
@@ -134,6 +138,7 @@ function findNextShift(
 
 export default function StaffDashboardPage() {
   const { user } = useAuth();
+  const { t } = useLang();
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [nextShift, setNextShift] = useState<NextShiftInfo | null>(null);
@@ -175,10 +180,10 @@ export default function StaffDashboardPage() {
           const d = tsToDate(n.createdAt);
           return {
             id: n.id,
-            label: n.title ?? "Notification",
+            label: n.title ?? t("staff.notif.title"),
             detail: n.detail ?? "",
             createdAt: d,
-            ago: fmtRelative(d),
+            ago: fmtRelative(d, t),
           };
         })
         .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
@@ -189,7 +194,7 @@ export default function StaffDashboardPage() {
     } catch {
       setShiftLoaded(true);
     }
-  }, [user, thisWeekISO, nextWeekISO]);
+  }, [user, thisWeekISO, nextWeekISO, t]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -247,18 +252,18 @@ export default function StaffDashboardPage() {
           </svg>
         </div>
         <div className={styles.shiftBody}>
-          <p className={styles.shiftLabel}>Next Shift</p>
+          <p className={styles.shiftLabel}>{t("staff.nextShift")}</p>
           {!shiftLoaded ? (
-            <p className={styles.shiftDate}>Loading…</p>
+            <p className={styles.shiftDate}>{t("staff.loading")}</p>
           ) : nextShift ? (
             <>
               <p className={styles.shiftDate}>{fmtShiftDate(nextShift.date)}</p>
               <p className={styles.shiftTime}>
-                {fmtTime12h(nextShift.startTime)} - {mealLabel(nextShift.meal)}
+                {fmtTime12h(nextShift.startTime)} - {t(mealLabelKey(nextShift.meal))}
               </p>
             </>
           ) : (
-            <p className={styles.shiftDate}>No upcoming shifts</p>
+            <p className={styles.shiftDate}>{t("staff.noUpcoming")}</p>
           )}
         </div>
         <span className={styles.chevron} aria-hidden="true">›</span>
@@ -267,19 +272,19 @@ export default function StaffDashboardPage() {
       {/* Notifications */}
       <section className={styles.notifCard}>
         <div className={styles.notifHeader}>
-          <p className={styles.notifTitle}>Notifications</p>
+          <p className={styles.notifTitle}>{t("staff.notif.title")}</p>
           {notifications.length > 0 && (
             <button
               type="button"
               className={styles.notifLink}
               onClick={() => setNotifOpen(true)}
             >
-              View all <span aria-hidden="true">›</span>
+              {t("staff.notif.viewAll")} <span aria-hidden="true">›</span>
             </button>
           )}
         </div>
         {notifications.length === 0 ? (
-          <p className={styles.notifEmpty}>No notifications yet.</p>
+          <p className={styles.notifEmpty}>{t("staff.notif.empty")}</p>
         ) : (
           <ul className={styles.notifList}>
             {preview.map((n) => (
@@ -306,7 +311,7 @@ export default function StaffDashboardPage() {
           </svg>
         </div>
         <div className={styles.payBody}>
-          <p className={styles.payLabel}>Next Pay Date</p>
+          <p className={styles.payLabel}>{t("staff.nextPay")}</p>
           <p className={styles.payDate}>{nextPayDate ? fmtShiftDate(nextPayDate) : "—"}</p>
         </div>
         <span className={styles.chevron} aria-hidden="true">›</span>
@@ -314,7 +319,7 @@ export default function StaffDashboardPage() {
 
       {/* Quick Actions */}
       <section className={styles.quickSection}>
-        <h2 className={styles.quickTitle}>Quick Actions</h2>
+        <h2 className={styles.quickTitle}>{t("staff.quickActions")}</h2>
 
         <Link href="/staff/schedule/request-holiday" className={styles.quickRow}>
           <span className={styles.quickIcon} aria-hidden="true">
@@ -325,7 +330,7 @@ export default function StaffDashboardPage() {
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
           </span>
-          <span className={styles.quickLabel}>Request Holiday</span>
+          <span className={styles.quickLabel}>{t("staff.requestHoliday")}</span>
           <span className={styles.chevron} aria-hidden="true">›</span>
         </Link>
 
@@ -336,7 +341,7 @@ export default function StaffDashboardPage() {
               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
             </svg>
           </span>
-          <span className={styles.quickLabel}>Availability Change</span>
+          <span className={styles.quickLabel}>{t("staff.availabilityChange")}</span>
           <span className={styles.chevron} aria-hidden="true">›</span>
         </Link>
       </section>
@@ -354,7 +359,7 @@ export default function StaffDashboardPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Notifications</h2>
+              <h2 className={styles.modalTitle}>{t("staff.notif.modalTitle")}</h2>
               <button
                 type="button"
                 className={styles.modalClose}

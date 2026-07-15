@@ -6,6 +6,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getDb } from "@/lib/firebase";
 import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -39,6 +40,7 @@ type DocKey = "visa" | "rsa";
 
 export default function MyDocumentsPage() {
   const { user } = useAuth();
+  const { t } = useLang();
   const [loading, setLoading] = useState(true);
   const [docs, setDocs] = useState<StaffDocs>({});
   const [uploading, setUploading] = useState<DocKey | null>(null);
@@ -103,10 +105,10 @@ export default function MyDocumentsPage() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>My Documents</h1>
+      <h1 className={styles.title}>{t("docs.title")}</h1>
       <p className={styles.subtitle}>
-        View and manage your important documents.<br />
-        Upload new versions if your details have changed.
+        {t("docs.subtitleA")}<br />
+        {t("docs.subtitleB")}
       </p>
 
       {/* ── Visa ── */}
@@ -120,13 +122,13 @@ export default function MyDocumentsPage() {
             </svg>
           </span>
           <div className={styles.docCardHeading}>
-            <p className={styles.docName}>Visa</p>
+            <p className={styles.docName}>{t("docs.visa")}</p>
             <span className={visaActive ? styles.activeBadge : styles.missingBadge}>
               <span className={styles.badgeDot} aria-hidden="true" />
-              {visaActive ? "Active" : "Missing"}
+              {visaActive ? t("docs.active") : t("docs.missing")}
             </span>
             <p className={styles.docMeta}>
-              {visaActive ? `Expiry: ${fmtExpiry(visaExpiry)}` : "No file uploaded"}
+              {visaActive ? `${t("docs.expiryPrefix")}${fmtExpiry(visaExpiry)}` : t("docs.noFile")}
             </p>
           </div>
         </div>
@@ -145,7 +147,7 @@ export default function MyDocumentsPage() {
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-            <span>View Current</span>
+            <span>{t("docs.viewCurrent")}</span>
           </a>
           <button
             type="button"
@@ -158,7 +160,7 @@ export default function MyDocumentsPage() {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <span>{uploading === "visa" ? "Uploading…" : "Upload New Visa"}</span>
+            <span>{uploading === "visa" ? t("docs.uploading") : t("docs.uploadNewVisa")}</span>
           </button>
           <input
             ref={visaInputRef}
@@ -180,13 +182,13 @@ export default function MyDocumentsPage() {
             </svg>
           </span>
           <div className={styles.docCardHeading}>
-            <p className={styles.docName}>RSA Certificate</p>
+            <p className={styles.docName}>{t("docs.rsa")}</p>
             <span className={rsaActive ? styles.activeBadge : styles.missingBadge}>
               <span className={styles.badgeDot} aria-hidden="true" />
-              {rsaActive ? "Active" : "Missing"}
+              {rsaActive ? t("docs.active") : t("docs.missing")}
             </span>
             <p className={styles.docMeta}>
-              {rsaActive ? "No expiry date" : "No file uploaded"}
+              {rsaActive ? t("docs.noExpiry") : t("docs.noFile")}
             </p>
           </div>
         </div>
@@ -205,7 +207,7 @@ export default function MyDocumentsPage() {
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-            <span>View Current</span>
+            <span>{t("docs.viewCurrent")}</span>
           </a>
           <button
             type="button"
@@ -218,7 +220,7 @@ export default function MyDocumentsPage() {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <span>{uploading === "rsa" ? "Uploading…" : "Upload New Certificate"}</span>
+            <span>{uploading === "rsa" ? t("docs.uploading") : t("docs.uploadNewCert")}</span>
           </button>
           <input
             ref={rsaInputRef}
@@ -241,8 +243,8 @@ export default function MyDocumentsPage() {
           </svg>
         </span>
         <p className={styles.infoBody}>
-          Your new document will be reviewed by an administrator.<br />
-          You will be notified once it has been approved.
+          {t("docs.reviewA")}<br />
+          {t("docs.reviewB")}
         </p>
       </div>
     </div>
