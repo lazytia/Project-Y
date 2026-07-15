@@ -1079,16 +1079,20 @@ function buildTrendChart(
         y: padTop + ((yMax - v) / (yMax - yMin)) * (height - padTop - padBottom),
       });
     }
-    // Inject the target line as an extra label if it isn't already present.
-    if (!yLabels.some((l) => l.value === targetPct)) {
+    // The target already has its own "Target 25.0%" label anchored on the
+    // right of the chart, so we only inject a left-axis tick for it when
+    // it lands far enough from every existing tick to read cleanly. Within
+    // half a tick step it just piles on top of the neighbouring number
+    // (e.g. "25%" sitting on "24%").
+    const targetTooClose = yLabels.some(
+      (l) => Math.abs(l.value - targetPct) < tickStep / 2,
+    );
+    if (!targetTooClose) {
       yLabels.push({
         value: targetPct,
         y: padTop + ((yMax - targetPct) / (yMax - yMin)) * (height - padTop - padBottom),
         isTarget: true,
       });
-    } else {
-      const t = yLabels.find((l) => l.value === targetPct);
-      if (t) t.isTarget = true;
     }
     const targetY = padTop + ((yMax - targetPct) / (yMax - yMin)) * (height - padTop - padBottom);
 
