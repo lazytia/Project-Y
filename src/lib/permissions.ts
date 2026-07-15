@@ -16,7 +16,7 @@ export const OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica", "y
  * sensitive areas (Staff +, Onboarding management, Payroll, Test) should
  * still be hidden from them. Use this set for those gates.
  */
-export const STRICT_OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica"]);
+export const STRICT_OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica", "eddie"]);
 
 /**
  * Chef accounts — kitchen leadership with their own dashboard.
