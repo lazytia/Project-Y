@@ -446,3 +446,19 @@ export async function fetchWeekPayrollDetail(
   const rows = await readPayrollSheetRows();
   return parseWeekPayrollDetailFromRows(rows, weekStartISO);
 }
+
+/**
+ * Return the per-employee breakdown for every Pay History week visible
+ * on the sheet, keyed by weekStartISO. Powers the staff Payslips page
+ * which needs to iterate every week to build one row per pay date.
+ */
+export async function fetchAllWeekPayrollDetails(): Promise<WeekPayrollDetail[]> {
+  const rows = await readPayrollSheetRows();
+  const weekly = parseWeeklyPayrollTotalsFromRows(rows);
+  const out: WeekPayrollDetail[] = [];
+  for (const weekStartISO of Object.keys(weekly)) {
+    const d = parseWeekPayrollDetailFromRows(rows, weekStartISO);
+    if (d && d.employees.length > 0) out.push(d);
+  }
+  return out;
+}

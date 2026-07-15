@@ -1,19 +1,58 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/components/AuthProvider";
 import {
-  PAYSLIPS,
-  NEXT_PAY_DATE_ISO,
-  PAY_FREQUENCY,
   fmtCurrency,
   fmtDateLong,
   fmtPeriod,
+  type Payslip,
 } from "./_data";
 import styles from "./page.module.css";
 
+type PayslipsResponse = {
+  employeeName: string | null;
+  nextPayDateISO: string | null;
+  payFrequency: string;
+  payslips: Payslip[];
+};
+
 export default function PayslipsPage() {
-  const latest = PAYSLIPS[0];
-  const previous = PAYSLIPS.slice(1);
+  const { user, loading: authLoading } = useAuth();
+  const [data, setData] = useState<PayslipsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch("/api/staff/payslips", {
+          headers: { Authorization: `Bearer ${idToken}` },
+          cache: "no-store",
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload?.error ?? `Failed (${res.status}).`);
+        if (!cancelled) setData(payload as PayslipsResponse);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, user]);
+
+  const payslips = data?.payslips ?? [];
+  const latest = payslips[0];
+  const previous = payslips.slice(1);
 
   return (
     <div className={styles.page}>
@@ -31,73 +70,91 @@ export default function PayslipsPage() {
         </div>
         <div className={styles.nextPayBody}>
           <p className={styles.nextPayLabel}>Next Pay Date</p>
-          <p className={styles.nextPayDate}>{fmtDateLong(NEXT_PAY_DATE_ISO)}</p>
-          <p className={styles.nextPaySub}>{PAY_FREQUENCY}</p>
+          <p className={styles.nextPayDate}>
+            {data?.nextPayDateISO ? fmtDateLong(data.nextPayDateISO) : "—"}
+          </p>
+          <p className={styles.nextPaySub}>{data?.payFrequency ?? "Paid weekly"}</p>
         </div>
       </section>
 
-      {/* Latest Payslip */}
-      <h2 className={styles.sectionTitle}>Latest Payslip</h2>
-      <section className={styles.latestCard}>
-        <div className={styles.latestHeader}>
-          <div className={styles.latestIcon} aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-          </div>
-          <div className={styles.latestHeading}>
-            <p className={styles.latestMeta}>Pay Period</p>
-            <p className={styles.latestPeriod}>
-              {fmtPeriod(latest.periodStart, latest.periodEnd)}
-            </p>
-          </div>
-        </div>
-
-        <div className={styles.latestDivider} />
-
-        <div className={styles.latestSection}>
-          <p className={styles.latestMeta}>Net Pay</p>
-          <p className={styles.latestAmount}>{fmtCurrency(latest.netPay)}</p>
-        </div>
-
-        <div className={styles.latestDivider} />
-
-        <div className={styles.latestSection}>
-          <p className={styles.latestMeta}>Paid</p>
-          <p className={styles.latestPaidDate}>{fmtDateLong(latest.payDate)}</p>
-        </div>
-
-        <Link href={`/staff/payslips/${latest.id}`} className={styles.viewBtn}>
-          <span>View Payslip</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="12 5 19 12 12 19" />
-          </svg>
-        </Link>
-      </section>
-
-      {/* Previous Payslips */}
-      <h2 className={styles.sectionTitle}>Previous Payslips</h2>
-      <ul className={styles.prevList}>
-        {previous.map((p) => (
-          <li key={p.id}>
-            <Link href={`/staff/payslips/${p.id}`} className={styles.prevRow}>
-              <span className={styles.prevIcon} aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {loading ? (
+        <p className={styles.emptyHint}>Loading your payslips…</p>
+      ) : error ? (
+        <p className={styles.emptyHint}>Couldn&rsquo;t load payslips. {error}</p>
+      ) : !latest ? (
+        <p className={styles.emptyHint}>
+          No payslips yet — as soon as payroll runs the first pay week for
+          you, it will appear here.
+        </p>
+      ) : (
+        <>
+          {/* Latest Payslip */}
+          <h2 className={styles.sectionTitle}>Latest Payslip</h2>
+          <section className={styles.latestCard}>
+            <div className={styles.latestHeader}>
+              <div className={styles.latestIcon} aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
                 </svg>
-              </span>
-              <span className={styles.prevDate}>{fmtDateLong(p.payDate).replace(/^[A-Za-z]+, /, "")}</span>
-              <span className={styles.prevAmount}>{fmtCurrency(p.netPay)}</span>
-              <span className={styles.prevChevron} aria-hidden="true">›</span>
+              </div>
+              <div className={styles.latestHeading}>
+                <p className={styles.latestMeta}>Pay Period</p>
+                <p className={styles.latestPeriod}>
+                  {fmtPeriod(latest.periodStart, latest.periodEnd)}
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.latestDivider} />
+
+            <div className={styles.latestSection}>
+              <p className={styles.latestMeta}>Net Pay</p>
+              <p className={styles.latestAmount}>{fmtCurrency(latest.netPay)}</p>
+            </div>
+
+            <div className={styles.latestDivider} />
+
+            <div className={styles.latestSection}>
+              <p className={styles.latestMeta}>Paid</p>
+              <p className={styles.latestPaidDate}>{fmtDateLong(latest.payDate)}</p>
+            </div>
+
+            <Link href={`/staff/payslips/${latest.id}`} className={styles.viewBtn}>
+              <span>View Payslip</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
             </Link>
-          </li>
-        ))}
-      </ul>
+          </section>
+
+          {previous.length > 0 && (
+            <>
+              <h2 className={styles.sectionTitle}>Previous Payslips</h2>
+              <ul className={styles.prevList}>
+                {previous.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/staff/payslips/${p.id}`} className={styles.prevRow}>
+                      <span className={styles.prevIcon} aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </span>
+                      <span className={styles.prevDate}>{fmtDateLong(p.payDate).replace(/^[A-Za-z]+, /, "")}</span>
+                      <span className={styles.prevAmount}>{fmtCurrency(p.netPay)}</span>
+                      <span className={styles.prevChevron} aria-hidden="true">›</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
 
       <div className={styles.infoBox}>
         <span className={styles.infoIcon} aria-hidden="true">
