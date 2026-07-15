@@ -147,9 +147,13 @@ export default function NewEmployeePage() {
       });
       setShowToast(true);
       window.setTimeout(() => router.push("/people/onboarding"), 900);
-    } catch {
+    } catch (err) {
+      // Surface the real message so the owner can tell "permission denied"
+      // (Firestore rules) apart from a network error at a glance.
+      console.error("[people/onboarding/new] create failed:", err);
+      const msg = err instanceof Error ? err.message : String(err);
       setSaving(false);
-      alert("Failed to create employee. Please try again.");
+      alert(`Failed to create employee. ${msg}`);
     }
   }
 
