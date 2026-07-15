@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import CalendarPicker from "@/components/CalendarPicker";
 import Toast from "@/components/Toast";
+import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -26,6 +27,7 @@ const PERCENT = Math.round((CURRENT_STEP / TOTAL_STEPS) * 100);
 export default function PersonalInformationPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -156,8 +158,8 @@ export default function PersonalInformationPage() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <p className={styles.stepLabel}>Step {CURRENT_STEP} of {TOTAL_STEPS}</p>
-        <h1 className={styles.title}>Personal Information</h1>
+        <p className={styles.stepLabel}>{t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}</p>
+        <h1 className={styles.title}>{t("onb.personal.title")}</h1>
       </div>
 
       {/* Step Indicators */}
@@ -365,7 +367,7 @@ export default function PersonalInformationPage() {
               onClick={handleSaveAndExit}
               disabled={saving}
             >
-              {saving ? "Saving..." : "Save & Exit"}
+              {saving ? t("common.loading") : t("common.saveAndExit")}
             </button>
             <button
               type="submit"
@@ -373,7 +375,7 @@ export default function PersonalInformationPage() {
               onClick={handleSaveAndContinue}
               disabled={saving}
             >
-              {saving ? "Saving..." : <><span>Save &amp; Continue</span> <span className={styles.btnArrow}>›</span></>}
+              {saving ? t("common.loading") : <><span>{t("common.saveAndContinue")}</span> <span className={styles.btnArrow}>›</span></>}
             </button>
           </div>
         </form>

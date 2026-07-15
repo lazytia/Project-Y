@@ -6,6 +6,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import SignaturePad from "@/components/SignaturePad";
+import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
 const HANDBOOK_VERSION = "1.0";
@@ -14,6 +15,7 @@ const HANDBOOK_UPDATED = "June 2026";
 export default function StaffHandbookPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -326,8 +328,7 @@ export default function StaffHandbookPage() {
 
           <div className={styles.signatureBlock}>
             <span className={styles.signatureLabel}>
-              Signature — by signing you confirm you have read, understood, and
-              agree to follow the YURICA Staff Handbook.
+              {t("onb.pol.signatureIntroHandbook")}
             </span>
             {signatureDataUrl ? (
               <div className={styles.signaturePreview}>
@@ -342,7 +343,7 @@ export default function StaffHandbookPage() {
                   className={styles.signatureResign}
                   onClick={() => setShowSignaturePad(true)}
                 >
-                  Re-sign
+                  {t("onb.pol.resign")}
                 </button>
               </div>
             ) : (
@@ -351,7 +352,7 @@ export default function StaffHandbookPage() {
                 className={styles.signatureEmpty}
                 onClick={() => setShowSignaturePad(true)}
               >
-                Sign here
+                {t("onb.pol.signBtn")}
               </button>
             )}
           </div>
@@ -375,14 +376,14 @@ export default function StaffHandbookPage() {
             onClick={handleAgree}
             disabled={!canSubmit}
           >
-            {submitting ? "…" : "AGREE & CONTINUE"}
+            {submitting ? t("common.loading") : t("onb.pol.agreeContinue")}
           </button>
           <button
             type="button"
             className={styles.secondaryBtn}
             onClick={() => router.push("/onboarding/policies")}
           >
-            BACK
+            {t("common.back")}
           </button>
         </section>
       </article>

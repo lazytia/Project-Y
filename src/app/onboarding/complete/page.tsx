@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { doc, getDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -28,6 +29,7 @@ function fmtDate(d: Date | null): string {
 
 export default function OnboardingCompletePage() {
   const { user } = useAuth();
+  const { t } = useLang();
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState<Date | null>(null);
 
@@ -68,11 +70,8 @@ export default function OnboardingCompletePage() {
           </div>
         </div>
 
-        <h1 className={styles.title}>Onboarding Submitted!</h1>
-        <p className={styles.subtitle}>
-          Thank you! Your onboarding has been submitted and is now under
-          review.
-        </p>
+        <h1 className={styles.title}>{t("onb.complete.title")}</h1>
+        <p className={styles.subtitle}>{t("onb.complete.subtitle")}</p>
       </div>
 
       <section className={styles.infoCard}>
@@ -83,10 +82,7 @@ export default function OnboardingCompletePage() {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
         </div>
-        <p className={styles.infoBody}>
-          We&apos;ll review your information and documents. You will receive a
-          notification once your profile has been approved.
-        </p>
+        <p className={styles.infoBody}>{t("onb.complete.reviewNote")}</p>
       </section>
 
       <div className={styles.statRow}>
@@ -99,7 +95,7 @@ export default function OnboardingCompletePage() {
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
           </div>
-          <p className={styles.statLabel}>Start Date</p>
+          <p className={styles.statLabel}>{t("onb.startDate")}</p>
           <p className={styles.statValue}>{fmtDate(startDate)}</p>
         </div>
 
@@ -110,8 +106,8 @@ export default function OnboardingCompletePage() {
               <polyline points="12 6 12 12 16 14" />
             </svg>
           </div>
-          <p className={styles.statLabel}>Status</p>
-          <span className={styles.statusBadge}>Under Review</span>
+          <p className={styles.statLabel}>{t("onb.complete.status")}</p>
+          <span className={styles.statusBadge}>{t("onb.complete.underReview")}</span>
         </div>
       </div>
     </div>

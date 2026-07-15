@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -93,6 +94,7 @@ function fmtDate(t: Timestamp | Date | null | undefined): string {
 export default function PoliciesPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
   const [signedAt, setSignedAt] = useState<Record<DocKey, Timestamp | null>>({
     handbook: null,
     privacy: null,
@@ -169,8 +171,8 @@ export default function PoliciesPage() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <p className={styles.stepLabel}>Step {CURRENT_STEP} of {TOTAL_STEPS}</p>
-        <h1 className={styles.title}>Policies</h1>
+        <p className={styles.stepLabel}>{t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}</p>
+        <h1 className={styles.title}>{t("onb.pol.title")}</h1>
       </div>
 
       {/* Step Indicators */}
@@ -289,7 +291,7 @@ export default function PoliciesPage() {
           className={styles.btnSecondary}
           onClick={() => router.push("/onboarding")}
         >
-          Save &amp; Exit
+          {t("common.saveAndExit")}
         </button>
         <button
           type="button"
@@ -297,7 +299,7 @@ export default function PoliciesPage() {
           onClick={handleSaveAndContinue}
           disabled={!allSigned || saving}
         >
-          <span>{saving ? "…" : "Save & Continue"}</span>
+          <span>{saving ? t("common.loading") : t("common.saveAndContinue")}</span>
           <span className={styles.btnArrow}>›</span>
         </button>
       </div>

@@ -9,6 +9,7 @@ import { emailToUsername } from "@/lib/username";
 import { isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
+import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
 /** Returns the Wednesday of the calendar week AFTER the given date. */
@@ -33,14 +34,16 @@ function fmtDate(d: Date): string {
 
 const TOTAL_STEPS = 7;
 
+/** Each step keeps a translation KEY instead of a hardcoded English
+ *  label so the page can render EN or JA based on the language toggle. */
 const ALL_STEPS = [
-  { num: 1, label: "Personal Information",  path: "/onboarding/personal-information", icon: "👤", desc: "Add your personal details",         time: "Est. 2 mins" },
-  { num: 2, label: "TFN Declaration",        path: "/onboarding/tfn-declaration",       icon: "📄", desc: "Submit your tax file number",        time: "Est. 3 mins" },
-  { num: 3, label: "Bank & Super Details",   path: "/onboarding/bank-super-details",    icon: "🏦", desc: "Add your bank and super details",    time: "Est. 2 mins" },
-  { num: 4, label: "Documents",              path: "/onboarding/documents",             icon: "🪪", desc: "Upload required documents",          time: "Est. 5 mins" },
-  { num: 5, label: "Policies",               path: "/onboarding/policies",              icon: "📖", desc: "Read and acknowledge policies",       time: "Est. 3 mins" },
-  { num: 6, label: "Review & Sign",          path: "/onboarding/review-sign",           icon: "✍️", desc: "Review and sign your documents",     time: "Est. 2 mins" },
-  { num: 7, label: "Complete",               path: "/onboarding/complete",              icon: "🎉", desc: "You are all set!",                   time: "" },
+  { num: 1, labelKey: "onb.steps.personal",  path: "/onboarding/personal-information", icon: "👤" },
+  { num: 2, labelKey: "onb.steps.tfn",       path: "/onboarding/tfn-declaration",      icon: "📄" },
+  { num: 3, labelKey: "onb.steps.bank",      path: "/onboarding/bank-super-details",   icon: "🏦" },
+  { num: 4, labelKey: "onb.steps.documents", path: "/onboarding/documents",            icon: "🪪" },
+  { num: 5, labelKey: "onb.steps.policies",  path: "/onboarding/policies",             icon: "📖" },
+  { num: 6, labelKey: "onb.steps.review",    path: "/onboarding/review-sign",          icon: "✍️" },
+  { num: 7, labelKey: "onb.steps.complete",  path: "/onboarding/complete",             icon: "🎉" },
 ];
 
 // Circular progress SVG constants
@@ -50,6 +53,7 @@ const CIRC = 2 * Math.PI * R;
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
   const name = emailToUsername(user?.email ?? "");
   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
 
@@ -136,31 +140,29 @@ export default function OnboardingPage() {
     <div className={styles.page}>
       {/* Greeting */}
       <div className={styles.greeting}>
-        <h1 className={styles.greetingTitle}>Welcome, {displayName} 👋</h1>
-        <p className={styles.greetingSubtitle}>Let&apos;s get you all set up.</p>
+        <h1 className={styles.greetingTitle}>{t("onb.welcome")}, {displayName} 👋</h1>
+        <p className={styles.greetingSubtitle}>{t("onb.subGreeting")}</p>
       </div>
 
       {/* Onboarding Overview */}
       <section className={styles.card}>
-        <p className={styles.sectionLabel}>ONBOARDING OVERVIEW</p>
+        <p className={styles.sectionLabel}>{t("onb.overviewHeader")}</p>
 
         <div className={styles.overviewBody}>
           <div className={styles.overviewDates}>
             <div className={styles.dateRow}>
               <span className={styles.dateIcon}>📅</span>
               <div>
-                <p className={styles.dateLabel}>Start Date</p>
+                <p className={styles.dateLabel}>{t("onb.startDate")}</p>
                 <p className={styles.dateValue}>{startDate ? fmtDate(startDate) : "—"}</p>
               </div>
             </div>
             <div className={styles.dateRow}>
               <span className={styles.dateIcon}>🕐</span>
               <div>
-                <p className={styles.dateLabel}>Payroll Cut-off</p>
+                <p className={styles.dateLabel}>{t("onb.payrollCutoff")}</p>
                 <p className={styles.dateValue}>{payrollCutoff ? fmtDate(payrollCutoff) : "—"}</p>
-                <p className={styles.dateSub}>
-                  Submit by this date to be paid in the following week.
-                </p>
+                <p className={styles.dateSub}>{t("onb.payrollCutoffHelp")}</p>
               </div>
             </div>
           </div>
@@ -186,9 +188,9 @@ export default function OnboardingPage() {
             </div>
             <div className={styles.progressMeta}>
               <span className={styles.progressCount}>
-                <span className={styles.progressCountOrange}>{loading ? "—" : completedStep} of {TOTAL_STEPS}</span>
+                <span className={styles.progressCountOrange}>{loading ? "—" : completedStep} {t("onb.stepOf")} {TOTAL_STEPS}</span>
               </span>
-              <span className={styles.progressCompleted}>Completed</span>
+              <span className={styles.progressCompleted}>{t("onb.completed")}</span>
             </div>
           </div>
         </div>
@@ -198,20 +200,20 @@ export default function OnboardingPage() {
           onClick={() => router.push(continueStep.path)}
           disabled={loading}
         >
-          Continue Onboarding <span className={styles.continueBtnArrow}>›</span>
+          {t("onb.continueOnboarding")} <span className={styles.continueBtnArrow}>›</span>
         </button>
       </section>
 
       {/* Remaining Items */}
       {remainingSteps.length > 0 && (
         <section className={styles.card}>
-          <p className={styles.sectionLabel}>REMAINING ITEMS</p>
+          <p className={styles.sectionLabel}>{t("onb.remaining")}</p>
           <ul className={styles.itemList}>
             {remainingSteps.map((step) => (
-              <li key={step.label} className={styles.item}>
+              <li key={step.labelKey} className={styles.item}>
                 <span className={styles.itemIcon}>{step.icon}</span>
-                <span className={styles.itemLabel}>{step.label}</span>
-                <span className={styles.itemStatus}>Pending</span>
+                <span className={styles.itemLabel}>{t(step.labelKey)}</span>
+                <span className={styles.itemStatus}>{t("onb.pending")}</span>
               </li>
             ))}
           </ul>
@@ -220,10 +222,8 @@ export default function OnboardingPage() {
 
       {completedStep >= TOTAL_STEPS && (
         <section className={styles.card}>
-          <p className={styles.sectionLabel}>ALL DONE 🎉</p>
-          <p className={styles.allDoneNote}>
-            You have completed all onboarding steps. Welcome to the team!
-          </p>
+          <p className={styles.sectionLabel}>{t("onb.allDone")}</p>
+          <p className={styles.allDoneNote}>{t("onb.allDoneMsg")}</p>
         </section>
       )}
     </div>

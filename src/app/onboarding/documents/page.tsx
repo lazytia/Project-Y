@@ -7,6 +7,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getDb } from "@/lib/firebase";
 import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import Toast from "@/components/Toast";
 import styles from "./page.module.css";
 
@@ -73,6 +74,7 @@ async function uploadFile(file: File, path: string): Promise<string> {
 export default function DocumentsPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
 
   const [passportFiles, setPassportFiles] = useState<File[]>([]);
   const [passportPreviews, setPassportPreviews] = useState<string[]>([]);
@@ -261,9 +263,9 @@ export default function DocumentsPage() {
 
   const sections: DocSection[] = [
     {
-      title: "1. Passport / Photo ID *",
+      title: t("onb.docs.passportTitle"),
       icon: passportSvg,
-      infoText: "We need a clear photo of your passport or either government-issued photo ID.",
+      infoText: t("onb.docs.passportHelp"),
       files: passportFiles,
       previews: passportPreviews,
       setFiles: setPassportFiles,
@@ -272,9 +274,9 @@ export default function DocumentsPage() {
       galleryRef: passportGalleryRef,
     },
     {
-      title: "2. Visa *",
+      title: t("onb.docs.visaTitle"),
       icon: documentSvg,
-      infoText: "We need a copy of your current visa.",
+      infoText: t("onb.docs.visaHelp"),
       files: visaFiles,
       previews: visaPreviews,
       setFiles: setVisaFiles,
@@ -283,9 +285,9 @@ export default function DocumentsPage() {
       galleryRef: visaGalleryRef,
     },
     {
-      title: "3. RSA Certificate",
+      title: t("onb.docs.rsaTitle"),
       icon: certificateSvg,
-      infoText: "Upload your valid RSA certificate (required for all hall staff).",
+      infoText: t("onb.docs.rsaHelp"),
       files: rsaFiles,
       previews: rsaPreviews,
       setFiles: setRsaFiles,
@@ -309,9 +311,9 @@ export default function DocumentsPage() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <p className={styles.stepLabel}>Step {CURRENT_STEP} of {TOTAL_STEPS}</p>
-        <h1 className={styles.title}>Documents</h1>
-        <p className={styles.subtitle}>Please upload clear photos of the required documents.</p>
+        <p className={styles.stepLabel}>{t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}</p>
+        <h1 className={styles.title}>{t("onb.docs.title")}</h1>
+        <p className={styles.subtitle}>{t("onb.docs.subtitle")}</p>
       </div>
 
       {/* Step Indicators */}
@@ -350,8 +352,8 @@ export default function DocumentsPage() {
 
       {/* Form Card */}
       <div className={styles.formCard}>
-        <p className={styles.formTitle}>Upload your documents.</p>
-        <p className={styles.formSubtitle}>All fields marked with * are required.</p>
+        <p className={styles.formTitle}>{t("onb.docs.formTitle")}</p>
+        <p className={styles.formSubtitle}>{t("onb.docs.formSubtitle")}</p>
 
         <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
           {sections.map((section) => {
@@ -407,9 +409,9 @@ export default function DocumentsPage() {
                     >
                       <span className={styles.uploadBtnIcon}>{cameraSvg}</span>
                       <span className={styles.uploadBtnLabel}>
-                        {section.files.length > 0 ? "Add another" : "Take a photo"}
+                        {section.files.length > 0 ? t("onb.docs.addAnother") : t("onb.docs.takePhoto")}
                       </span>
-                      <span className={styles.uploadBtnSub}>Camera</span>
+                      <span className={styles.uploadBtnSub}>{t("onb.docs.camera")}</span>
                     </button>
                     <button
                       type="button"
@@ -417,14 +419,12 @@ export default function DocumentsPage() {
                       onClick={() => section.galleryRef.current?.click()}
                     >
                       <span className={styles.uploadBtnIcon}>{gallerySvg}</span>
-                      <span className={styles.uploadBtnLabel}>Choose file</span>
-                      <span className={styles.uploadBtnSub}>Gallery</span>
+                      <span className={styles.uploadBtnLabel}>{t("onb.docs.chooseFile")}</span>
+                      <span className={styles.uploadBtnSub}>{t("onb.docs.gallery")}</span>
                     </button>
                   </div>
                 ) : (
-                  <p className={styles.docLimitNote}>
-                    Maximum of {MAX_PHOTOS_PER_SECTION} photos reached. Remove one to add another.
-                  </p>
+                  <p className={styles.docLimitNote}>{t("onb.docs.limit")}</p>
                 )}
 
                 <input
@@ -471,7 +471,7 @@ export default function DocumentsPage() {
               onClick={handleSaveAndExit}
               disabled={saving}
             >
-              {saving ? "Saving..." : "Save & Exit"}
+              {saving ? t("common.loading") : t("common.saveAndExit")}
             </button>
             <button
               type="submit"
@@ -479,9 +479,9 @@ export default function DocumentsPage() {
               onClick={handleSaveAndContinue}
               disabled={saving}
             >
-              {saving ? "Saving..." : (
+              {saving ? t("common.loading") : (
                 <>
-                  <span>Save &amp; Continue</span>
+                  <span>{t("common.saveAndContinue")}</span>
                   <span className={styles.btnArrow}>›</span>
                 </>
               )}

@@ -184,6 +184,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user && !userIsOwnerNow && !userIsChefNow && staffCompletedStep === null) return;
 
     const inOnboarding = pathname.startsWith(ROUTES.staffOnboarding);
+    // Staff mid-onboarding still need access to /staff/settings so they
+    // can toggle EN/JA while filling out the forms — treat it as an
+    // allowed escape hatch alongside the onboarding routes themselves.
+    const inSettings = pathname === "/staff/settings";
 
     if (user && isPublic) {
       // Just signed in. Staff who still owe us onboarding go straight to it,
@@ -204,8 +208,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Staff who haven't finished onboarding are locked to /onboarding/*.
-    if (user && staffNeedsOnboarding && !inOnboarding) {
+    // Staff who haven't finished onboarding are locked to /onboarding/*
+    // (plus /staff/settings so they can flip the language toggle).
+    if (user && staffNeedsOnboarding && !inOnboarding && !inSettings) {
       // New staff who haven't accepted the notifications prompt yet get
       // sent to that gate first, not straight into the onboarding form.
       if (notificationsPromptSeen === false) {

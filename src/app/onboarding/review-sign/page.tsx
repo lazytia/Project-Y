@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
@@ -25,6 +26,7 @@ const PERCENT = Math.round((CURRENT_STEP / TOTAL_STEPS) * 100);
 export default function ReviewSignPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
   const [submitting, setSubmitting] = useState(false);
 
   async function handleFinish() {
@@ -67,8 +69,8 @@ export default function ReviewSignPage() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <p className={styles.stepLabel}>Step {CURRENT_STEP} of {TOTAL_STEPS}</p>
-        <h1 className={styles.title}>Review &amp; Sign</h1>
+        <p className={styles.stepLabel}>{t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}</p>
+        <h1 className={styles.title}>{t("onb.review.title")}</h1>
       </div>
 
       <div className={styles.stepsContainer}>
@@ -123,7 +125,7 @@ export default function ReviewSignPage() {
           onClick={handleFinish}
           disabled={submitting}
         >
-          <span>{submitting ? "…" : "Finish Onboarding"}</span>
+          <span>{submitting ? t("common.loading") : t("onb.review.submit")}</span>
           <span className={styles.btnArrow}>›</span>
         </button>
       </div>

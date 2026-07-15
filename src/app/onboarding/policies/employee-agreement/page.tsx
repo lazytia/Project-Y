@@ -6,6 +6,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import SignaturePad from "@/components/SignaturePad";
+import { useLang } from "@/components/LanguageProvider";
 import styles from "../staff-handbook/page.module.css";
 
 const AGREEMENT_VERSION = "1.0";
@@ -14,6 +15,7 @@ const AGREEMENT_UPDATED = "June 2026";
 export default function EmployeeAgreementPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -168,8 +170,7 @@ export default function EmployeeAgreementPage() {
 
           <div className={styles.signatureBlock}>
             <span className={styles.signatureLabel}>
-              Signature — by signing you confirm you have read, understood,
-              and agree to be bound by this Employment Agreement.
+              {t("onb.pol.signatureIntroAgreement")}
             </span>
             {signatureDataUrl ? (
               <div className={styles.signaturePreview}>
@@ -184,7 +185,7 @@ export default function EmployeeAgreementPage() {
                   className={styles.signatureResign}
                   onClick={() => setShowSignaturePad(true)}
                 >
-                  Re-sign
+                  {t("onb.pol.resign")}
                 </button>
               </div>
             ) : (
@@ -193,7 +194,7 @@ export default function EmployeeAgreementPage() {
                 className={styles.signatureEmpty}
                 onClick={() => setShowSignaturePad(true)}
               >
-                Sign here
+                {t("onb.pol.signBtn")}
               </button>
             )}
           </div>
@@ -217,14 +218,14 @@ export default function EmployeeAgreementPage() {
             onClick={handleAgree}
             disabled={!canSubmit}
           >
-            {submitting ? "…" : "AGREE & CONTINUE"}
+            {submitting ? t("common.loading") : t("onb.pol.agreeContinue")}
           </button>
           <button
             type="button"
             className={styles.secondaryBtn}
             onClick={() => router.push("/onboarding/policies")}
           >
-            BACK
+            {t("common.back")}
           </button>
         </section>
       </article>

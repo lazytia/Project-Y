@@ -150,10 +150,24 @@ export default function Sidebar({ open, onClose }: Props) {
   // /onboarding/*, so destinations they aren't allowed to reach yet would
   // just look broken.
   if (!userIsOwner && staffNeedsOnboarding) {
+    // Mid-onboarding staff can only reach /onboarding/*, so we hide the
+    // usual staff nav — but they still need Settings so they can switch
+    // between English and Japanese while filling out the forms.
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
         <div className={styles.brand}>YURICA</div>
-        <nav className={styles.nav} aria-hidden="true" />
+        <nav className={styles.nav}>
+          <div className={styles.group}>
+            <Link
+              href="/staff/settings"
+              className={`${styles.groupHeader} ${pathname === "/staff/settings" ? styles.active : ""}`}
+              onClick={onClose}
+            >
+              <span className={styles.icon}>⚙️</span>
+              <span>{t("nav.settings")}</span>
+            </Link>
+          </div>
+        </nav>
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
           <button type="button" onClick={signOut} className={styles.signOut}>

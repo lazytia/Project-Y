@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useLang } from "@/components/LanguageProvider";
 import Toast from "@/components/Toast";
 import styles from "./page.module.css";
 
@@ -25,6 +26,7 @@ const PERCENT = Math.round((3 / 7) * 100);
 export default function BankSuperDetailsPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLang();
 
   const [bsb, setBsb] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -175,8 +177,8 @@ export default function BankSuperDetailsPage() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <p className={styles.stepLabel}>Step {CURRENT_STEP} of {TOTAL_STEPS}</p>
-        <h1 className={styles.title}>Bank &amp; Super Details</h1>
+        <p className={styles.stepLabel}>{t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}</p>
+        <h1 className={styles.title}>{t("onb.bank.title")}</h1>
       </div>
 
       {/* Step Indicators */}
@@ -359,7 +361,7 @@ export default function BankSuperDetailsPage() {
               onClick={handleSaveAndExit}
               disabled={saving}
             >
-              {saving ? "Saving..." : "Save & Exit"}
+              {saving ? t("common.loading") : t("common.saveAndExit")}
             </button>
             <button
               type="submit"
@@ -367,9 +369,9 @@ export default function BankSuperDetailsPage() {
               onClick={handleSaveAndContinue}
               disabled={saving}
             >
-              {saving ? "Saving..." : (
+              {saving ? t("common.loading") : (
                 <>
-                  <span>Save &amp; Continue</span>
+                  <span>{t("common.saveAndContinue")}</span>
                   <span className={styles.btnArrow}>›</span>
                 </>
               )}
