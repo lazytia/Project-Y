@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import SignaturePad from "@/components/SignaturePad";
 import styles from "./page.module.css";
 
 const HANDBOOK_VERSION = "1.0";
@@ -13,12 +14,12 @@ const HANDBOOK_UPDATED = "June 2026";
 export default function StaffHandbookPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [readChecked, setReadChecked] = useState(false);
-  const [agreeChecked, setAgreeChecked] = useState(false);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = readChecked && agreeChecked && !submitting;
+  const canSubmit = !!signatureDataUrl && !submitting;
 
   async function handleAgree() {
     if (!user || !canSubmit) return;
@@ -33,6 +34,7 @@ export default function StaffHandbookPage() {
             handbookVersion: HANDBOOK_VERSION,
             handbookReadAcknowledged: true,
             handbookPoliciesAgreed: true,
+            handbookSignature: signatureDataUrl,
           },
           updatedAt: serverTimestamp(),
         },
@@ -322,30 +324,37 @@ export default function StaffHandbookPage() {
             Handbook.
           </p>
 
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              className={styles.checkbox}
-              checked={readChecked}
-              onChange={(e) => setReadChecked(e.target.checked)}
-            />
-            <span className={styles.checkboxLabel}>
-              I have read and understood the YURICA Staff Handbook.
+          <div className={styles.signatureBlock}>
+            <span className={styles.signatureLabel}>
+              Signature — by signing you confirm you have read, understood, and
+              agree to follow the YURICA Staff Handbook.
             </span>
-          </label>
-
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              className={styles.checkbox}
-              checked={agreeChecked}
-              onChange={(e) => setAgreeChecked(e.target.checked)}
-            />
-            <span className={styles.checkboxLabel}>
-              I agree to follow the policies, standards and expectations
-              outlined above.
-            </span>
-          </label>
+            {signatureDataUrl ? (
+              <div className={styles.signaturePreview}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={signatureDataUrl}
+                  alt="Your signature"
+                  className={styles.signatureImg}
+                />
+                <button
+                  type="button"
+                  className={styles.signatureResign}
+                  onClick={() => setShowSignaturePad(true)}
+                >
+                  Re-sign
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={styles.signatureEmpty}
+                onClick={() => setShowSignaturePad(true)}
+              >
+                Sign here
+              </button>
+            )}
+          </div>
 
           <div className={styles.metaRow}>
             <div className={styles.metaItem}>
@@ -377,6 +386,16 @@ export default function StaffHandbookPage() {
           </button>
         </section>
       </article>
+
+      {showSignaturePad && (
+        <SignaturePad
+          onConfirm={(dataUrl) => {
+            setSignatureDataUrl(dataUrl);
+            setShowSignaturePad(false);
+          }}
+          onClose={() => setShowSignaturePad(false)}
+        />
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import SignaturePad from "@/components/SignaturePad";
 import styles from "../staff-handbook/page.module.css";
 
 const AGREEMENT_VERSION = "1.0";
@@ -13,12 +14,12 @@ const AGREEMENT_UPDATED = "June 2026";
 export default function EmployeeAgreementPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [readChecked, setReadChecked] = useState(false);
-  const [agreeChecked, setAgreeChecked] = useState(false);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = readChecked && agreeChecked && !submitting;
+  const canSubmit = !!signatureDataUrl && !submitting;
 
   async function handleAgree() {
     if (!user || !canSubmit) return;
@@ -33,6 +34,7 @@ export default function EmployeeAgreementPage() {
             agreementVersion: AGREEMENT_VERSION,
             agreementReadAcknowledged: true,
             agreementAgreed: true,
+            agreementSignature: signatureDataUrl,
           },
           updatedAt: serverTimestamp(),
         },
@@ -164,29 +166,37 @@ export default function EmployeeAgreementPage() {
             its terms.
           </p>
 
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              className={styles.checkbox}
-              checked={readChecked}
-              onChange={(e) => setReadChecked(e.target.checked)}
-            />
-            <span className={styles.checkboxLabel}>
-              I have read and understood this Employment Agreement.
+          <div className={styles.signatureBlock}>
+            <span className={styles.signatureLabel}>
+              Signature — by signing you confirm you have read, understood,
+              and agree to be bound by this Employment Agreement.
             </span>
-          </label>
-
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              className={styles.checkbox}
-              checked={agreeChecked}
-              onChange={(e) => setAgreeChecked(e.target.checked)}
-            />
-            <span className={styles.checkboxLabel}>
-              I agree to be bound by the terms of this Employment Agreement.
-            </span>
-          </label>
+            {signatureDataUrl ? (
+              <div className={styles.signaturePreview}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={signatureDataUrl}
+                  alt="Your signature"
+                  className={styles.signatureImg}
+                />
+                <button
+                  type="button"
+                  className={styles.signatureResign}
+                  onClick={() => setShowSignaturePad(true)}
+                >
+                  Re-sign
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={styles.signatureEmpty}
+                onClick={() => setShowSignaturePad(true)}
+              >
+                Sign here
+              </button>
+            )}
+          </div>
 
           <div className={styles.metaRow}>
             <div className={styles.metaItem}>
@@ -218,6 +228,16 @@ export default function EmployeeAgreementPage() {
           </button>
         </section>
       </article>
+
+      {showSignaturePad && (
+        <SignaturePad
+          onConfirm={(dataUrl) => {
+            setSignatureDataUrl(dataUrl);
+            setShowSignaturePad(false);
+          }}
+          onClose={() => setShowSignaturePad(false)}
+        />
+      )}
     </div>
   );
 }

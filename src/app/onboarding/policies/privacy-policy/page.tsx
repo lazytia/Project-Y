@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import SignaturePad from "@/components/SignaturePad";
 import styles from "./page.module.css";
 
 const POLICY_VERSION = "1.0";
@@ -12,12 +13,13 @@ const POLICY_VERSION = "1.0";
 export default function PrivacyPolicyPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [acknowledged, setAcknowledged] = useState(false);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleContinue() {
-    if (!user || !acknowledged || submitting) return;
+    if (!user || !signatureDataUrl || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -28,6 +30,7 @@ export default function PrivacyPolicyPage() {
             privacySignedAt: serverTimestamp(),
             privacyVersion: POLICY_VERSION,
             privacyAcknowledged: true,
+            privacySignature: signatureDataUrl,
           },
           updatedAt: serverTimestamp(),
         },
@@ -107,17 +110,38 @@ export default function PrivacyPolicyPage() {
           employment-related purposes.
         </p>
 
-        <label className={styles.checkboxRow}>
-          <input
-            type="checkbox"
-            className={styles.checkbox}
-            checked={acknowledged}
-            onChange={(e) => setAcknowledged(e.target.checked)}
-          />
-          <span className={styles.checkboxLabel}>
-            I have read and understood this Privacy Policy.
+        <div className={styles.signatureBlock}>
+          <span className={styles.signatureLabel}>
+            Signature — by signing you confirm you have read and understood
+            this Privacy Policy and consent to the collection and use of your
+            personal information.
           </span>
-        </label>
+          {signatureDataUrl ? (
+            <div className={styles.signaturePreview}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={signatureDataUrl}
+                alt="Your signature"
+                className={styles.signatureImg}
+              />
+              <button
+                type="button"
+                className={styles.signatureResign}
+                onClick={() => setShowSignaturePad(true)}
+              >
+                Re-sign
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={styles.signatureEmpty}
+              onClick={() => setShowSignaturePad(true)}
+            >
+              Sign here
+            </button>
+          )}
+        </div>
 
         <p className={styles.reassurance}>
           We collect only the information we need, use it only for legitimate
@@ -130,7 +154,7 @@ export default function PrivacyPolicyPage() {
           type="button"
           className={styles.continueBtn}
           onClick={handleContinue}
-          disabled={!acknowledged || submitting}
+          disabled={!signatureDataUrl || submitting}
         >
           {submitting ? "…" : "Continue"}
         </button>
@@ -142,6 +166,16 @@ export default function PrivacyPolicyPage() {
           Back
         </button>
       </article>
+
+      {showSignaturePad && (
+        <SignaturePad
+          onConfirm={(dataUrl) => {
+            setSignatureDataUrl(dataUrl);
+            setShowSignaturePad(false);
+          }}
+          onClose={() => setShowSignaturePad(false)}
+        />
+      )}
     </div>
   );
 }
