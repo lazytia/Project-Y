@@ -56,10 +56,22 @@ function sydneyTodayKey(): string {
 function startOfSydneyToday(): Date {
   const key = sydneyTodayKey();
   const [y, m, d] = key.split("-").map(Number);
-  // Anchor at UTC 00:00 of the Sydney date. Straddles DST slightly but
-  // is fine for a "created today" filter — worst case we miss items
-  // created in the last few hours before midnight Sydney.
-  return new Date(Date.UTC(y, m - 1, d));
+  // Return the actual UTC instant of 00:00 Sydney on the given date.
+  // Sydney is UTC+10 (AEST) or UTC+11 (AEDT) — figure out which is in
+  // effect on this date by asking what hour noon-UTC lands on in
+  // Sydney: +10 → "22", +11 → "23".
+  const sampleUtc = new Date(Date.UTC(y, m - 1, d, 12));
+  const sydHour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: SYDNEY_TZ,
+      hour: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(sampleUtc)
+      .find((p) => p.type === "hour")?.value ?? "22",
+  );
+  const offsetHours = sydHour - 12; // 10 or 11
+  return new Date(Date.UTC(y, m - 1, d) - offsetHours * 60 * 60 * 1000);
 }
 
 function tsDate(v: unknown): Date | null {
