@@ -8,7 +8,7 @@ import { emailToUsername } from "./username";
  * "yurina" is a manager — for now she gets the same UI/permissions as the
  * real owners. Will be split into a separate "manager" tier later.
  */
-export const OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica", "yurina"]);
+export const OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica", "yurina", "eddie"]);
 
 /**
  * Strict-owner accounts (real business owners). Managers like yurina are
