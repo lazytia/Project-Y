@@ -58,273 +58,194 @@ export default function StaffHandbookPage() {
         <section className={styles.coverSection}>
           <h1 className={styles.coverTitle}>
             YURICA<br />
-            <span className={styles.coverTitleSub}>STAFF HANDBOOK</span>
+            <span className={styles.coverTitleSub}>{t("onb.pol.hb.coverSub")}</span>
           </h1>
           <div className={styles.coverDivider} />
-          <p className={styles.coverWelcome}>Welcome to YURICA</p>
-          <p className={styles.coverParagraph}>Thank you for joining our team.</p>
-          <p className={styles.coverParagraph}>
-            At YURICA, we believe great hospitality comes from professionalism,
-            respect, teamwork, and attention to detail. Every team member plays
-            an important role in creating the experience our guests remember.
-          </p>
+          <p className={styles.coverWelcome}>{t("onb.pol.hb.coverWelcome")}</p>
+          <p className={styles.coverParagraph}>{t("onb.pol.hb.coverThanks")}</p>
+          <p className={styles.coverParagraph}>{t("onb.pol.hb.coverIntro")}</p>
           <div className={styles.coverQuote}>
             <span className={styles.quoteMark}>&ldquo;</span>
-            <p>Every plate matters.</p>
-            <p>Every guest matters.</p>
-            <p>Every detail matters.</p>
+            <p>{t("onb.pol.hb.quote1")}</p>
+            <p>{t("onb.pol.hb.quote2")}</p>
+            <p>{t("onb.pol.hb.quote3")}</p>
             <span className={styles.quoteMarkClose}>&rdquo;</span>
           </div>
         </section>
 
         {/* 1. Our Values */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>1. OUR VALUES</h2>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s1.h")}</h2>
           <ul className={styles.valueList}>
             <li>
-              <p className={styles.valueLabel}>RESPECT</p>
-              <p className={styles.valueDesc}>
-                Treat guests, colleagues, and management with respect.
-              </p>
+              <p className={styles.valueLabel}>{t("onb.pol.hb.s1.respect")}</p>
+              <p className={styles.valueDesc}>{t("onb.pol.hb.s1.respectDesc")}</p>
             </li>
             <li>
-              <p className={styles.valueLabel}>TEAMWORK</p>
-              <p className={styles.valueDesc}>
-                Support one another and work together.
-              </p>
+              <p className={styles.valueLabel}>{t("onb.pol.hb.s1.teamwork")}</p>
+              <p className={styles.valueDesc}>{t("onb.pol.hb.s1.teamworkDesc")}</p>
             </li>
             <li>
-              <p className={styles.valueLabel}>PROFESSIONALISM</p>
-              <p className={styles.valueDesc}>
-                Be punctual, reliable, and presentable.
-              </p>
+              <p className={styles.valueLabel}>{t("onb.pol.hb.s1.professionalism")}</p>
+              <p className={styles.valueDesc}>{t("onb.pol.hb.s1.professionalismDesc")}</p>
             </li>
             <li>
-              <p className={styles.valueLabel}>ATTENTION TO DETAIL</p>
-              <p className={styles.valueDesc}>
-                Small details create exceptional guest experiences.
-              </p>
+              <p className={styles.valueLabel}>{t("onb.pol.hb.s1.detail")}</p>
+              <p className={styles.valueDesc}>{t("onb.pol.hb.s1.detailDesc")}</p>
             </li>
           </ul>
         </section>
 
         {/* 2. Attendance */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>2. ATTENDANCE &amp; SHIFT RESPONSIBILITIES</h2>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s2.h")}</h2>
           <ul className={styles.bulletList}>
-            <li>Arrive ready to work at your scheduled start time.</li>
-            <li>If you are running late, notify your manager as soon as possible.</li>
-            <li>Unapproved absences are not acceptable.</li>
+            <li>{t("onb.pol.hb.s2.b1")}</li>
+            <li>{t("onb.pol.hb.s2.b2")}</li>
+            <li>{t("onb.pol.hb.s2.b3")}</li>
           </ul>
-          <p className={styles.subH}>Opening Shifts</p>
-          <p className={styles.paragraph}>
-            If you are rostered for an opening shift, all setup and preparation
-            tasks must be completed before service begins.
-          </p>
-          <p className={styles.paragraph}>
-            Employees are expected to remain on-site during working hours unless
-            taking an authorised break or receiving manager approval.
-          </p>
+          <p className={styles.subH}>{t("onb.pol.hb.s2.sub")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s2.p1")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s2.p2")}</p>
         </section>
 
         {/* 3. Rosters */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>3. ROSTERS, AVAILABILITY &amp; HOLIDAYS</h2>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s3.h")}</h2>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s3.p1")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s3.p2")}</p>
           <p className={styles.paragraph}>
-            Project Y is YURICA&apos;s official staff communication and scheduling
-            platform.
+            {t("onb.pol.hb.s3.p3Before")}
+            <strong>{t("onb.pol.hb.s3.p3Strong")}</strong>
+            {t("onb.pol.hb.s3.p3After")}
           </p>
-          <p className={styles.paragraph}>
-            Employees are responsible for checking Project Y regularly.
-          </p>
-          <p className={styles.paragraph}>
-            Any request to change availability or request holiday leave must be
-            submitted through Project Y at least{" "}
-            <strong>3 weeks in advance</strong> whenever possible.
-          </p>
-          <p className={styles.paragraph}>
-            Submitting a request does not mean it has been approved.
-          </p>
-          <p className={styles.paragraph}>
-            All requests require management approval through Project Y.
-          </p>
-          <p className={styles.paragraph}>
-            Employees must continue to work their scheduled shifts unless
-            approval has been provided through Project Y.
-          </p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s3.p4")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s3.p5")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s3.p6")}</p>
         </section>
 
         {/* 4. Appearance & Uniform */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>4. APPEARANCE &amp; UNIFORM</h2>
-          <p className={styles.paragraph}>
-            Employees are expected to maintain a clean, neat, and professional
-            appearance at all times.
-          </p>
-          <p className={styles.subH}>HALL STAFF</p>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s4.h")}</h2>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s4.p1")}</p>
+          <p className={styles.subH}>{t("onb.pol.hb.s4.hall")}</p>
           <ul className={styles.bulletList}>
-            <li>Wear a clean white top.</li>
-            <li>Wear the YURICA apron and cap provided.</li>
-            <li>Wear closed non-slip shoes.</li>
+            <li>{t("onb.pol.hb.s4.hall1")}</li>
+            <li>{t("onb.pol.hb.s4.hall2")}</li>
+            <li>{t("onb.pol.hb.s4.hall3")}</li>
           </ul>
-          <p className={styles.subH}>KITCHEN STAFF</p>
+          <p className={styles.subH}>{t("onb.pol.hb.s4.kitchen")}</p>
           <ul className={styles.bulletList}>
-            <li>Wear the designated chef uniform or YURICA uniform.</li>
-            <li>Wear the required cap or kitchen headwear.</li>
-            <li>Wear closed non-slip shoes.</li>
+            <li>{t("onb.pol.hb.s4.kitchen1")}</li>
+            <li>{t("onb.pol.hb.s4.kitchen2")}</li>
+            <li>{t("onb.pol.hb.s4.kitchen3")}</li>
           </ul>
-          <p className={styles.subH}>Company Uniform Property</p>
-          <p className={styles.paragraph}>
-            All uniforms, aprons, caps, name tags, and other items supplied by
-            YURICA remain company property.
-          </p>
-          <p className={styles.paragraph}>
-            Upon termination of employment, all company-issued items must be
-            returned.
-          </p>
-          <p className={styles.paragraph}>
-            Failure to return company property may result in the cost of
-            replacement being recovered where permitted by law.
-          </p>
+          <p className={styles.subH}>{t("onb.pol.hb.s4.propertyH")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s4.property1")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s4.property2")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s4.property3")}</p>
         </section>
 
         {/* 5. Guest Service */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>5. GUEST SERVICE STANDARDS</h2>
-          <p className={styles.subH}>Always</p>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s5.h")}</h2>
+          <p className={styles.subH}>{t("onb.pol.hb.s5.always")}</p>
           <ul className={styles.bulletList}>
-            <li>Greet guests politely.</li>
-            <li>Listen carefully.</li>
-            <li>Remain positive and professional.</li>
-            <li>Thank guests when they leave.</li>
+            <li>{t("onb.pol.hb.s5.always1")}</li>
+            <li>{t("onb.pol.hb.s5.always2")}</li>
+            <li>{t("onb.pol.hb.s5.always3")}</li>
+            <li>{t("onb.pol.hb.s5.always4")}</li>
           </ul>
-          <p className={styles.subH}>Never</p>
+          <p className={styles.subH}>{t("onb.pol.hb.s5.never")}</p>
           <ul className={styles.bulletList}>
-            <li>Argue with guests.</li>
-            <li>Use inappropriate language.</li>
-            <li>Discuss personal issues during service.</li>
-            <li>Use mobile phones while serving guests.</li>
+            <li>{t("onb.pol.hb.s5.never1")}</li>
+            <li>{t("onb.pol.hb.s5.never2")}</li>
+            <li>{t("onb.pol.hb.s5.never3")}</li>
+            <li>{t("onb.pol.hb.s5.never4")}</li>
           </ul>
           <p className={styles.paragraph}>
-            <strong>If you need assistance, speak with a manager.</strong>
+            <strong>{t("onb.pol.hb.s5.help")}</strong>
           </p>
         </section>
 
         {/* 6. Food Safety */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>6. FOOD SAFETY &amp; HYGIENE</h2>
-          <p className={styles.paragraph}>All staff are expected to:</p>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s6.h")}</h2>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s6.intro")}</p>
           <ul className={styles.bulletList}>
-            <li>Wash hands regularly.</li>
-            <li>Follow food handling procedures.</li>
-            <li>Keep work areas clean and organised.</li>
-            <li>Report food safety concerns immediately.</li>
-            <li>Follow all workplace food safety requirements.</li>
+            <li>{t("onb.pol.hb.s6.b1")}</li>
+            <li>{t("onb.pol.hb.s6.b2")}</li>
+            <li>{t("onb.pol.hb.s6.b3")}</li>
+            <li>{t("onb.pol.hb.s6.b4")}</li>
+            <li>{t("onb.pol.hb.s6.b5")}</li>
           </ul>
         </section>
 
         {/* 7. Phone */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>7. MOBILE PHONE &amp; EARPHONE POLICY</h2>
-          <p className={styles.paragraph}>
-            Personal mobile phone use should be kept to a minimum during working
-            hours.
-          </p>
-          <p className={styles.paragraph}>
-            Phones may only be used during breaks, for approved work purposes,
-            or in emergencies.
-          </p>
-          <p className={styles.paragraph}>
-            Personal earphones, AirPods, headphones, or similar devices must not
-            be worn during working hours.
-          </p>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s7.h")}</h2>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s7.p1")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s7.p2")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s7.p3")}</p>
         </section>
 
         {/* 8. Conduct */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>8. WORKPLACE CONDUCT</h2>
-          <p className={styles.paragraph}>Employees are expected to:</p>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s8.h")}</h2>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s8.expected")}</p>
           <ul className={styles.bulletList}>
-            <li>Work together as a team.</li>
-            <li>Support fellow team members.</li>
-            <li>Remain focused on their duties.</li>
-            <li>Represent YURICA professionally.</li>
-            <li>Not smoke or vape during working hours.</li>
+            <li>{t("onb.pol.hb.s8.e1")}</li>
+            <li>{t("onb.pol.hb.s8.e2")}</li>
+            <li>{t("onb.pol.hb.s8.e3")}</li>
+            <li>{t("onb.pol.hb.s8.e4")}</li>
+            <li>{t("onb.pol.hb.s8.e5")}</li>
           </ul>
-          <p className={styles.paragraph}>
-            The following behaviour will not be tolerated:
-          </p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s8.notTolerated")}</p>
           <ul className={styles.bulletList}>
-            <li>Bullying</li>
-            <li>Harassment</li>
-            <li>Discrimination</li>
-            <li>Aggressive behaviour</li>
-            <li>Theft</li>
-            <li>Dishonesty</li>
-            <li>Working under the influence of alcohol or illegal drugs</li>
+            <li>{t("onb.pol.hb.s8.n1")}</li>
+            <li>{t("onb.pol.hb.s8.n2")}</li>
+            <li>{t("onb.pol.hb.s8.n3")}</li>
+            <li>{t("onb.pol.hb.s8.n4")}</li>
+            <li>{t("onb.pol.hb.s8.n5")}</li>
+            <li>{t("onb.pol.hb.s8.n6")}</li>
+            <li>{t("onb.pol.hb.s8.n7")}</li>
           </ul>
-          <p className={styles.paragraph}>
-            Serious misconduct may result in disciplinary action, including
-            termination of employment.
-          </p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s8.consequence")}</p>
         </section>
 
         {/* 9. Confidentiality */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>9. CONFIDENTIALITY</h2>
-          <p className={styles.paragraph}>
-            Information relating to YURICA&apos;s customers, systems, suppliers,
-            recipes, pricing, and business operations is confidential.
-          </p>
-          <p className={styles.paragraph}>
-            Employees must not share confidential information during or after
-            their employment.
-          </p>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s9.h")}</h2>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s9.p1")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s9.p2")}</p>
         </section>
 
         {/* 10. Service Philosophy */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>10. SERVICE PHILOSOPHY</h2>
-          <p className={styles.paragraph}>
-            At YURICA, we do not simply serve food. We create an experience.
-          </p>
-          <p className={styles.paragraph}>
-            The cleanliness of the restaurant, the presentation of every plate,
-            the speed of service, and the way we speak to guests all matter.
-          </p>
-          <p className={styles.paragraph}>Take pride in the small details.</p>
-          <p className={styles.paragraph}>
-            Exceptional hospitality is built one detail at a time.
-          </p>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.s10.h")}</h2>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s10.p1")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s10.p2")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s10.p3")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.s10.p4")}</p>
         </section>
 
         {/* Final Message */}
         <section className={styles.section}>
-          <h2 className={styles.sectionH}>FINAL MESSAGE</h2>
-          <p className={styles.paragraph}>
-            At YURICA, we are proud of the standards we maintain and the culture
-            we build together.
-          </p>
-          <p className={styles.paragraph}>We ask every team member to:</p>
-          <p className={styles.paragraphStrong}>Be respectful.</p>
-          <p className={styles.paragraphStrong}>Be reliable.</p>
-          <p className={styles.paragraphStrong}>Take pride in your work.</p>
-          <p className={styles.paragraphStrong}>Support your team.</p>
-          <p className={styles.paragraph}>
-            Thank you for being part of YURICA. We look forward to growing
-            together and creating exceptional experiences for our guests.
-          </p>
+          <h2 className={styles.sectionH}>{t("onb.pol.hb.final.h")}</h2>
+          <p className={styles.paragraph}>{t("onb.pol.hb.final.p1")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.final.ask")}</p>
+          <p className={styles.paragraphStrong}>{t("onb.pol.hb.final.a1")}</p>
+          <p className={styles.paragraphStrong}>{t("onb.pol.hb.final.a2")}</p>
+          <p className={styles.paragraphStrong}>{t("onb.pol.hb.final.a3")}</p>
+          <p className={styles.paragraphStrong}>{t("onb.pol.hb.final.a4")}</p>
+          <p className={styles.paragraph}>{t("onb.pol.hb.final.thanks")}</p>
         </section>
 
         {/* Acknowledgement */}
         <section className={styles.section}>
-          <h2 className={styles.ackTitle}>EMPLOYEE ACKNOWLEDGEMENT</h2>
+          <h2 className={styles.ackTitle}>{t("onb.pol.hb.ack.title")}</h2>
           <div className={styles.ackUnderline} />
-          <p className={styles.ackBody}>
-            Please acknowledge that you have read, understood, and agree to
-            follow the policies and expectations outlined in the YURICA Staff
-            Handbook.
-          </p>
+          <p className={styles.ackBody}>{t("onb.pol.hb.ack.body")}</p>
 
           <div className={styles.signatureBlock}>
             <span className={styles.signatureLabel}>
@@ -359,11 +280,11 @@ export default function StaffHandbookPage() {
 
           <div className={styles.metaRow}>
             <div className={styles.metaItem}>
-              <span>Version</span>
+              <span>{t("onb.pol.hb.meta.version")}</span>
               <span>{HANDBOOK_VERSION}</span>
             </div>
             <div className={styles.metaItem}>
-              <span>Last Updated</span>
+              <span>{t("onb.pol.hb.meta.updated")}</span>
               <span>{HANDBOOK_UPDATED}</span>
             </div>
           </div>
