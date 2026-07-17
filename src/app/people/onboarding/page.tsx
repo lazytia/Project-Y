@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { collection, getDocs, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner, isChef } from "@/lib/permissions";
+import { isOwner, isChef, canViewStaffRequest } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isOnboardingListEmployee } from "@/lib/staff-active";
 import { registerFcmToken } from "@/lib/fcm";
@@ -40,6 +40,8 @@ type StaffOnboarding = {
   approvedAt?: Date | null;
   addedToScheduling?: boolean;
   accountCreated?: boolean;
+  requestedByRole?: string;
+  requestedByName?: string;
 };
 
 type TabKey = "all" | "submitted" | "approved";
@@ -185,6 +187,8 @@ export default function ManagerOnboardingPage() {
             approvedAt: toDate(raw.approvedAt),
             addedToScheduling: raw.addedToScheduling as boolean | undefined,
             accountCreated: raw.accountCreated as boolean | undefined,
+            requestedByRole: raw.requestedByRole as string | undefined,
+            requestedByName: raw.requestedByName as string | undefined,
           };
         });
         if (cancelled) return;
@@ -199,12 +203,18 @@ export default function ManagerOnboardingPage() {
             email: r.email,
           }),
         );
-        staffOnly.sort((a, b) => {
+        const visible = staffOnly.filter((r) =>
+          canViewStaffRequest(user, {
+            requestedByRole: r.requestedByRole,
+            requestedByName: r.requestedByName,
+          }),
+        );
+        visible.sort((a, b) => {
           const at = a.startDate?.getTime() ?? Infinity;
           const bt = b.startDate?.getTime() ?? Infinity;
           return at - bt;
         });
-        setRows(staffOnly);
+        setRows(visible);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load");
@@ -214,7 +224,7 @@ export default function ManagerOnboardingPage() {
     return () => {
       cancelled = true;
     };
-  }, [allowed]);
+  }, [allowed, user]);
 
   const { total, submitted, approved, filtered } = useMemo(() => {
     if (!rows) return { total: 0, submitted: 0, approved: 0, filtered: [] };

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwnerOrChef } from "@/lib/permissions";
+import { isOwnerOrChef, submitterRoleForUser } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -143,6 +143,7 @@ export default function NewEmployeePage() {
         role: "staff",
         requestedByUid: user?.uid ?? null,
         requestedByName: requesterDisplayName(user?.email),
+        requestedByRole: submitterRoleForUser(user),
         createdAt: serverTimestamp(),
       });
       setShowToast(true);
