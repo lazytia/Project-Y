@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { fetchAllWeekPayrollDetails } from "@/lib/payroll-sheet";
 import { shiftDateKey } from "@/lib/square";
+import { emailToUsername } from "@/lib/username";
 
 /**
  * GET /api/staff/payslips
@@ -61,28 +62,38 @@ function nameMatches(candidate: string, sheetName: string): boolean {
   return candTokens.every((t) => sheetTokens.has(t));
 }
 
-async function resolveEmployeeName(uid: string): Promise<{
-  fullName: string;
-  givenName: string;
-  familyName: string;
-} | null> {
+async function resolveEmployeeName(
+  uid: string,
+  email: string | null,
+): Promise<{ fullName: string; givenName: string; familyName: string } | null> {
+  // Prefer the onboarding doc — regular staff always have one.
   try {
     const snap = await adminDb().collection("staff_onboarding").doc(uid).get();
-    if (!snap.exists) return null;
-    const d = snap.data() as Record<string, unknown>;
-    const fullName = String(d.fullName ?? "").trim();
-    const givenName = String(d.givenName ?? "").trim();
-    const familyName = String(d.familyName ?? "").trim();
-    if (!fullName && !givenName && !familyName) return null;
-    return {
-      fullName: fullName || [givenName, familyName].filter(Boolean).join(" "),
-      givenName,
-      familyName,
-    };
+    if (snap.exists) {
+      const d = snap.data() as Record<string, unknown>;
+      const fullName = String(d.fullName ?? "").trim();
+      const givenName = String(d.givenName ?? "").trim();
+      const familyName = String(d.familyName ?? "").trim();
+      if (fullName || givenName || familyName) {
+        return {
+          fullName: fullName || [givenName, familyName].filter(Boolean).join(" "),
+          givenName,
+          familyName,
+        };
+      }
+    }
   } catch (err) {
     console.warn("[staff/payslips] name lookup failed:", err);
-    return null;
   }
+  // Owner/manager accounts (yurina, tia, yurica, eddie) are created
+  // directly in Firebase Auth and never touch staff_onboarding — fall
+  // back to the login username so their name still matches sheet rows
+  // like "Yurina Yoshida" via the token-based nameMatches helper.
+  const username = emailToUsername(email ?? "").trim();
+  if (username) {
+    return { fullName: username, givenName: username, familyName: "" };
+  }
+  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -91,9 +102,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing bearer token." }, { status: 401 });
   }
   let uid: string;
+  let callerEmail: string | null = null;
   try {
     const decoded = await adminAuth().verifyIdToken(idToken);
     uid = decoded.uid;
+    callerEmail = decoded.email ?? null;
   } catch (err) {
     return NextResponse.json(
       { error: `Token verification failed: ${err instanceof Error ? err.message : String(err)}` },
@@ -101,7 +114,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const nameInfo = await resolveEmployeeName(uid);
+  const nameInfo = await resolveEmployeeName(uid, callerEmail);
   if (!nameInfo) {
     return NextResponse.json({
       employeeName: null,
