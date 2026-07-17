@@ -10,7 +10,7 @@
 
 .title {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--page-title-size);
   font-weight: 800;
   color: var(--color-fg);
   text-align: center;
@@ -24,7 +24,7 @@
   line-height: 1.6;
 }
 
-/* â”€â”€ Document card (full-width, stacked) â”€â”€ */
+/* ?€?€ Document card (full-width, stacked) ?€?€ */
 .docCard {
   display: flex;
   flex-direction: column;
@@ -115,7 +115,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Divider + action row â”€â”€ */
+/* ?€?€ Divider + action row ?€?€ */
 .divider {
   height: 1px;
   background: var(--color-border);
@@ -180,7 +180,7 @@
   font-size: 14px;
 }
 
-/* â”€â”€ Info box â”€â”€ */
+/* ?€?€ Info box ?€?€ */
 .infoBox {
   display: flex;
   align-items: flex-start;

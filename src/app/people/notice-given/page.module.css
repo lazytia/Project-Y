@@ -8,7 +8,7 @@
   gap: var(--space-4);
 }
 
-/* â”€â”€ Header â”€â”€ */
+/* ?€?€ Header ?€?€ */
 .header {
   display: grid;
   grid-template-columns: 36px 1fr 36px;
@@ -45,7 +45,7 @@
   letter-spacing: -0.01em;
 }
 
-/* â”€â”€ Info box â”€â”€ */
+/* ?€?€ Info box ?€?€ */
 .infoBox {
   display: flex;
   align-items: flex-start;
@@ -74,7 +74,7 @@
   font-weight: 700;
 }
 
-/* â”€â”€ Tabs â”€â”€ */
+/* ?€?€ Tabs ?€?€ */
 .tabs {
   display: flex;
   gap: var(--space-1);
@@ -106,7 +106,7 @@
   color: var(--color-warm);
 }
 
-/* â”€â”€ List â”€â”€ */
+/* ?€?€ List ?€?€ */
 .empty {
   margin: 0;
   padding: var(--space-6);
@@ -260,7 +260,7 @@
   color: var(--color-warm);
 }
 
-/* â”€â”€ Bottom bar â”€â”€ */
+/* ?€?€ Bottom bar ?€?€ */
 .bottomBar {
   position: fixed;
   bottom: 0;
@@ -291,7 +291,7 @@
 
 .ctaBtn:hover { opacity: 0.92; }
 
-/* â”€â”€ Owner view (Tia / Yurica) â”€â”€ */
+/* ?€?€ Owner view (Tia / Yurica) ?€?€ */
 .ownerPage {
   font-family: var(--font-sans);
   max-width: 520px;

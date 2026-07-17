@@ -53,6 +53,13 @@
   --font-size-2xl: 28px;
   --font-size-3xl: 48px;
 
+  /* Compact page header (title + hero icon row) */
+  --page-title-size: 20px;
+  --page-subtitle-size: 12px;
+  --page-hero-icon-size: 44px;
+  --page-padding: var(--space-4);
+  --page-gap: var(--space-3);
+
   /* Layout */
   --sidebar-width: 260px;
   --header-height: 56px;

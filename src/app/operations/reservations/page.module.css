@@ -3,7 +3,7 @@
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
-/* â”€â”€ Header â”€â”€ */
+/* ?€?€ Header ?€?€ */
 .header {
   display: flex;
   align-items: center;
@@ -19,7 +19,7 @@
 
 .title {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--page-title-size);
   font-weight: 800;
   color: var(--color-fg);
 }
@@ -50,7 +50,7 @@
   padding: 0;
 }
 
-/* â”€â”€ Hero â”€â”€ */
+/* ?€?€ Hero ?€?€ */
 .hero {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -76,7 +76,7 @@
   color: var(--color-warm);
 }
 
-/* â”€â”€ Service summary cards (Lunch / Dinner) â”€â”€ */
+/* ?€?€ Service summary cards (Lunch / Dinner) ?€?€ */
 .serviceCards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -183,7 +183,7 @@
   color: var(--color-fg);
 }
 
-/* â”€â”€ Activity strip (cancelled / new / updated) â”€â”€ */
+/* ?€?€ Activity strip (cancelled / new / updated) ?€?€ */
 .activityList {
   list-style: none;
   margin: 0 0 var(--space-3) 0;
@@ -278,7 +278,7 @@
 }
 .activityUpdated .activityIcon { color: var(--color-fg-muted); }
 
-/* â”€â”€ Cancel banner (legacy, kept for compat) â”€â”€ */
+/* ?€?€ Cancel banner (legacy, kept for compat) ?€?€ */
 .cancelBanner {
   display: flex;
   align-items: center;
@@ -331,7 +331,7 @@
   text-decoration: none;
 }
 
-/* â”€â”€ Search â”€â”€ */
+/* ?€?€ Search ?€?€ */
 .searchWrap {
   display: flex;
   align-items: center;
@@ -355,7 +355,7 @@
   color: var(--color-fg);
 }
 
-/* â”€â”€ Section â”€â”€ */
+/* ?€?€ Section ?€?€ */
 .section {
   margin-bottom: var(--space-4);
 }
@@ -494,7 +494,7 @@
   background: var(--color-surface);
 }
 
-/* â”€â”€ Add reservation button (sticky) â”€â”€ */
+/* ?€?€ Add reservation button (sticky) ?€?€ */
 .addBtn {
   position: fixed;
   left: 0;
@@ -530,7 +530,7 @@
   padding: var(--space-3);
 }
 
-/* â”€â”€ Detail Sheet (bottom modal) â”€â”€ */
+/* ?€?€ Detail Sheet (bottom modal) ?€?€ */
 .sheetBackdrop {
   position: fixed;
   inset: 0;
@@ -685,7 +685,7 @@
   margin-bottom: var(--space-3);
 }
 
-/* â”€â”€ Full-screen edit sheet (matches mockup) â”€â”€ */
+/* ?€?€ Full-screen edit sheet (matches mockup) ?€?€ */
 .fullSheet {
   position: fixed;
   inset: 0;
@@ -906,7 +906,7 @@
 
 .fullSheetSave:disabled { opacity: 0.5; cursor: progress; }
 
-/* Seating toggle (older simpler variant â€” kept for compatibility) */
+/* Seating toggle (older simpler variant ??kept for compatibility) */
 .seatToggle {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;

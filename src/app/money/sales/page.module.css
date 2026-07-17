@@ -8,7 +8,7 @@
   gap: var(--space-4);
 }
 
-/* â”€â”€ Page header â”€â”€ */
+/* ?€?€ Page header ?€?€ */
 .pageHeader {
   display: grid;
   grid-template-columns: 32px 1fr auto;
@@ -40,7 +40,7 @@
 
 .pageTitle {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--page-title-size);
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.02em;
@@ -76,7 +76,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Cards â”€â”€ */
+/* ?€?€ Cards ?€?€ */
 .card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -130,11 +130,11 @@
   cursor: pointer;
 }
 
-/* â”€â”€ Number row â”€â”€
+/* ?€?€ Number row ?€?€
    3-col grid: [this-year] [last-year] [delta]. Numbers can be long
    ($1,170,302.31 kind of long) so we keep the delta text nowrap and
    dial back the font a notch so it fits on narrow phones without
-   splitting "â†“ 46.7%" onto two lines. */
+   splitting "??46.7%" onto two lines. */
 .numberRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -209,7 +209,7 @@
   white-space: nowrap;
 }
 
-/* â”€â”€ Bar chart â”€â”€ */
+/* ?€?€ Bar chart ?€?€ */
 .chart {
   display: flex;
   flex-direction: column;
@@ -251,7 +251,7 @@
   padding-top: 4px;
 }
 
-/* Horizontal gridlines sit behind the bars â€” one line per Y-tick. */
+/* Horizontal gridlines sit behind the bars ??one line per Y-tick. */
 .chartGrid {
   position: absolute;
   inset: 4px 0 22px 0;
@@ -348,10 +348,10 @@
   font-size: 12px;
 }
 
-/* â”€â”€ Category donut â”€â”€
+/* ?€?€ Category donut ?€?€
    Two-column layout on desktop (donut + list side-by-side). On narrow
    phones the list column would end up ~40 px wide, which caused names
-   like "Bento box" to break letter-by-letter â€” so we stack instead,
+   like "Bento box" to break letter-by-letter ??so we stack instead,
    donut on top and full-width list below. */
 .categoryBody {
   display: grid;

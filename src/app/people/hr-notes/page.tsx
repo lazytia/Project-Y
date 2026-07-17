@@ -317,7 +317,7 @@ export default function HrNotesPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>HR Notes</h1>
-        <p className={styles.subtitle}>Manager only. Important records only.</p>
+        <p className={styles.subtitle}>Manager &amp; Chef. Important records only.</p>
       </header>
 
       <div className={styles.viewToggle} role="tablist">
@@ -385,24 +385,34 @@ export default function HrNotesPage() {
                   <div className={styles.timelineDateCol}>
                     <p className={styles.timelineDate}>{fmtDate(n.createdAt)}</p>
                     <p className={styles.timelineTime}>{fmtTime(n.createdAt)}</p>
+                    <button
+                      type="button"
+                      className={styles.timelineMenuBtn}
+                      aria-label={`Options for ${n.employeeName}`}
+                      onClick={() => openNote(n)}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <circle cx="5" cy="12" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="19" cy="12" r="2" />
+                      </svg>
+                    </button>
                   </div>
                   <button
                     type="button"
                     className={styles.timelineBody}
                     onClick={() => openNote(n)}
                   >
-                    <span className={`${styles.timelineKindIcon} ${kindClass(n.kind)}`} aria-hidden="true">
-                      {kindIcon(n.kind, 22)}
-                    </span>
                     <div className={styles.timelineBodyText}>
-                      <div className={styles.timelineHead}>
-                        <span className={styles.timelineName}>{n.employeeName}</span>
-                        <span className={styles.timelineAddedBy}>Added by {n.addedBy}</span>
-                      </div>
-                      <p className={styles.timelineKind}>{n.kind}</p>
+                      <p className={styles.timelineName}>{n.employeeName}</p>
+                      <p className={styles.timelineRole}>{n.employeeRole || "Employee"}</p>
+                      <span className={`${styles.kindBadge} ${kindClass(n.kind)}`}>{n.kind}</span>
                       {n.body && <p className={styles.timelineNote}>{n.body}</p>}
                     </div>
-                    <span className={styles.chev} aria-hidden="true">›</span>
+                    <div className={styles.timelineMeta}>
+                      <span className={styles.timelineAddedBy}>Added by {n.addedBy}</span>
+                      <span className={styles.chev} aria-hidden="true">›</span>
+                    </div>
                   </button>
                 </li>
               ))}

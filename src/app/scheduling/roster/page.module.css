@@ -8,7 +8,7 @@
   gap: var(--space-4);
 }
 
-/* â”€â”€ Header â”€â”€ */
+/* ?€?€ Header ?€?€ */
 .header {
   display: flex;
   align-items: center;
@@ -43,7 +43,7 @@
 
 .title {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--page-title-size);
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
@@ -55,7 +55,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Week strip grid â”€â”€ */
+/* ?€?€ Week strip grid ?€?€ */
 .grid {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -179,7 +179,7 @@
   color: var(--color-warm);
 }
 
-/* â”€â”€ Cards (shared shell) â”€â”€ */
+/* ?€?€ Cards (shared shell) ?€?€ */
 .card {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -196,7 +196,7 @@
   flex-wrap: wrap;
 }
 
-/* Thin variant for Notes â€” slim single-line header */
+/* Thin variant for Notes ??slim single-line header */
 .cardHeadThin {
   padding: 8px var(--space-4);
   flex-wrap: nowrap;
@@ -292,7 +292,7 @@
 .chev { transition: transform 0.15s; }
 .chevOpen { transform: rotate(180deg); }
 
-/* â”€â”€ Notes list â”€â”€ */
+/* ?€?€ Notes list ?€?€ */
 .notesList {
   list-style: none;
   margin: 0;
@@ -359,7 +359,7 @@
   outline: none;
 }
 
-/* â”€â”€ Request rows â”€â”€ */
+/* ?€?€ Request rows ?€?€ */
 .reqList {
   list-style: none;
   margin: 0;
@@ -453,7 +453,7 @@
   text-align: center;
 }
 
-/* â”€â”€ Availability overview â”€â”€ */
+/* ?€?€ Availability overview ?€?€ */
 .availList {
   list-style: none;
   margin: 0;
@@ -523,7 +523,7 @@
   color: #b8870a;
 }
 
-/* â”€â”€ Modal â”€â”€ */
+/* ?€?€ Modal ?€?€ */
 .modalBackdrop {
   position: fixed;
   inset: 0;
@@ -884,21 +884,21 @@
 
 .modalDoneBtn:hover { opacity: 0.85; }
 
-/* â”€â”€ Card subtitle (date range) â”€â”€ */
+/* ?€?€ Card subtitle (date range) ?€?€ */
 .cardSubtitle {
   margin: 0;
   font-size: 12px;
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Grid nested inside a card (no own border/radius) â”€â”€ */
+/* ?€?€ Grid nested inside a card (no own border/radius) ?€?€ */
 .cardGrid {
   border-top: 1px solid var(--color-border);
   background: var(--color-bg);
   overflow: hidden;
 }
 
-/* â”€â”€ Sub-section header inside a card (Notes within Next/Prev week) â”€â”€ */
+/* ?€?€ Sub-section header inside a card (Notes within Next/Prev week) ?€?€ */
 .cardSubHead {
   display: flex;
   align-items: center;
@@ -911,7 +911,7 @@
   border-top: none;
 }
 
-/* â”€â”€ Wrapper that makes prev-week Notes look like a standalone card â”€â”€ */
+/* ?€?€ Wrapper that makes prev-week Notes look like a standalone card ?€?€ */
 .prevNotesWrap {
   margin: var(--space-3) var(--space-3) var(--space-3);
   background: var(--color-bg);
@@ -921,7 +921,7 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
-/* â”€â”€ Read-only grid cell (no hover, no cursor pointer) â”€â”€ */
+/* ?€?€ Read-only grid cell (no hover, no cursor pointer) ?€?€ */
 .gridCellReadOnly {
   display: flex;
   align-items: center;
@@ -929,13 +929,13 @@
   padding: 6px 0;
 }
 
-/* â”€â”€ Read-only note text â”€â”€ */
+/* ?€?€ Read-only note text ?€?€ */
 .noteReadOnly {
   font-size: 13px;
   color: var(--color-fg);
 }
 
-/* â”€â”€ Notes modal â€” centered dialog â”€â”€ */
+/* ?€?€ Notes modal ??centered dialog ?€?€ */
 
 .noteModalBackdrop {
   position: fixed;
@@ -1366,7 +1366,7 @@
   line-height: 1.35;
 }
 
-/* â”€â”€ Chef Staff Details Modal â”€â”€ */
+/* ?€?€ Chef Staff Details Modal ?€?€ */
 
 .chefStaffModalBox {
   width: 100%;
@@ -1430,7 +1430,7 @@
   text-align: center;
 }
 
-/* â”€â”€ Phone â”€â”€ */
+/* ?€?€ Phone ?€?€ */
 @media (max-width: 520px) {
   .gridHeadRow,
   .gridRow {
@@ -1443,7 +1443,7 @@
   .availPill { font-size: 9px; padding: 2px 4px; }
 }
 
-/* â”€â”€ Confirm-assign overlay â”€â”€ */
+/* ?€?€ Confirm-assign overlay ?€?€ */
 .confirmOverlay {
   position: absolute;
   inset: 0;

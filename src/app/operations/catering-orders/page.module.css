@@ -4,14 +4,14 @@
 }
 
 .title {
-  font-size: 26px;
+  font-size: var(--page-title-size);
   font-weight: 800;
   letter-spacing: -0.01em;
   margin: 0 0 var(--space-4) 0;
   color: var(--color-fg);
 }
 
-/* â”€â”€ Stat row â”€â”€ */
+/* ?€?€ Stat row ?€?€ */
 .statRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -52,7 +52,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Calendar header â”€â”€ */
+/* ?€?€ Calendar header ?€?€ */
 .calendarHeader {
   display: flex;
   align-items: center;
@@ -79,7 +79,7 @@
   color: var(--color-fg);
 }
 
-/* â”€â”€ Weekday header â”€â”€ */
+/* ?€?€ Weekday header ?€?€ */
 .weekRow {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -95,7 +95,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Calendar body â”€â”€ */
+/* ?€?€ Calendar body ?€?€ */
 .gridBody {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -187,7 +187,7 @@
   margin-top: 1px;
 }
 
-/* â”€â”€ Upcoming order â”€â”€ */
+/* ?€?€ Upcoming order ?€?€ */
 .upcomingHead {
   display: flex;
   align-items: baseline;
@@ -337,7 +337,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Modal â”€â”€ */
+/* ?€?€ Modal ?€?€ */
 .modalBackdrop {
   position: fixed;
   inset: 0;

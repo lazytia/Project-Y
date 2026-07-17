@@ -8,7 +8,7 @@
   gap: var(--space-4);
 }
 
-/* â”€â”€ Page header â”€â”€ */
+/* ?€?€ Page header ?€?€ */
 .pageHeader {
   display: flex;
   flex-direction: column;
@@ -17,7 +17,7 @@
 
 .pageTitle {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--page-title-size);
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
@@ -35,7 +35,7 @@
   background: var(--color-border);
 }
 
-/* â”€â”€ Section bar â”€â”€ */
+/* ?€?€ Section bar ?€?€ */
 .sectionBar {
   display: flex;
   align-items: center;
@@ -62,7 +62,7 @@
   color: var(--color-fg);
 }
 
-/* â”€â”€ Tab bar â”€â”€ */
+/* ?€?€ Tab bar ?€?€ */
 .tabBar {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -98,7 +98,7 @@
   font-weight: 700;
 }
 
-/* â”€â”€ States â”€â”€ */
+/* ?€?€ States ?€?€ */
 .loading {
   margin: 0;
   padding: var(--space-6);
@@ -117,7 +117,7 @@
   color: var(--color-negative);
 }
 
-/* â”€â”€ Empty state â”€â”€ */
+/* ?€?€ Empty state ?€?€ */
 .emptyWrap {
   display: flex;
   flex-direction: column;
@@ -175,7 +175,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Card list â”€â”€ */
+/* ?€?€ Card list ?€?€ */
 .list {
   list-style: none;
   margin: 0;
@@ -205,7 +205,7 @@
   background: var(--color-surface);
 }
 
-/* â”€â”€ Card top row: avatar + name + status â”€â”€ */
+/* ?€?€ Card top row: avatar + name + status ?€?€ */
 .cardTop {
   display: flex;
   align-items: center;
@@ -287,7 +287,7 @@
   white-space: nowrap;
 }
 
-/* â”€â”€ Card info row: 4 columns â”€â”€ */
+/* ?€?€ Card info row: 4 columns ?€?€ */
 .infoRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -333,7 +333,7 @@
   color: var(--color-fg);
 }
 
-/* â”€â”€ Approved checkmarks â”€â”€ */
+/* ?€?€ Approved checkmarks ?€?€ */
 .checksRow {
   display: flex;
   align-items: center;
@@ -357,7 +357,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Bottom bar â”€â”€ */
+/* ?€?€ Bottom bar ?€?€ */
 .bottomBar {
   position: fixed;
   bottom: 0;

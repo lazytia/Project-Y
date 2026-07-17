@@ -8,7 +8,7 @@
   gap: var(--space-4);
 }
 
-/* â”€â”€ Header â”€â”€ */
+/* ?€?€ Header ?€?€ */
 .pageHeader {
   display: grid;
   grid-template-columns: 32px 1fr auto;
@@ -40,7 +40,7 @@
 
 .pageTitle {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--page-title-size);
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.02em;
@@ -76,7 +76,7 @@
   color: var(--color-fg-muted);
 }
 
-/* â”€â”€ Payroll % card â”€â”€ */
+/* ?€?€ Payroll % card ?€?€ */
 .pctCard {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -176,7 +176,7 @@
   font-weight: 500;
 }
 
-/* â”€â”€ Card â”€â”€ */
+/* ?€?€ Card ?€?€ */
 .card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -218,7 +218,7 @@
   color: var(--color-warm);
 }
 
-/* â”€â”€ Summary tiles â”€â”€ */
+/* ?€?€ Summary tiles ?€?€ */
 .summaryGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -317,7 +317,7 @@
   .datePillLabel { font-size: 12px; }
 }
 
-/* â”€â”€ Total row â”€â”€
+/* ?€?€ Total row ?€?€
    Flex row that lets the [delta + subtext] chip wrap to a second line
    when the label + value + chip don't all fit on one line. Prevents
    the "Total Payroll Cost" label from breaking mid-word or the value
@@ -393,7 +393,7 @@
   white-space: nowrap;
 }
 
-/* â”€â”€ Weekly comparison â”€â”€ */
+/* ?€?€ Weekly comparison ?€?€ */
 .legendRow {
   display: flex;
   gap: var(--space-3);
@@ -513,7 +513,7 @@
   margin: 2px 0;
 }
 
-/* â”€â”€ Table â”€â”€ */
+/* ?€?€ Table ?€?€ */
 .tableWrap {
   overflow-x: auto;
 }
@@ -589,7 +589,7 @@
   font-size: 12px;
 }
 
-/* â”€â”€ Meta â”€â”€ */
+/* ?€?€ Meta ?€?€ */
 .errorMsg {
   margin: 0;
   padding: var(--space-3);
