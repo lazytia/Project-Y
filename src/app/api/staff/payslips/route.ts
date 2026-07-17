@@ -37,6 +37,16 @@ import { emailToUsername } from "@/lib/username";
 export const dynamic = "force-dynamic";
 
 const TIMEZONE = "Australia/Sydney";
+/** How many past weeks to read from the Firestore cache. 60 covers
+ *  a full year — payslip UI only shows the last 12 months anyway. */
+const CACHE_WEEKS_LIMIT = 60;
+/** Cache the JSON response at the edge for 5 min, serve stale for
+ *  another 30 min while we revalidate. Numbers barely change during
+ *  a pay cycle, and the cache read is already fast — this lets a
+ *  second page load return instantly. */
+const CACHE_HEADERS = {
+  "Cache-Control": "private, max-age=300, stale-while-revalidate=1800",
+} as const;
 
 type Payslip = {
   id: string;
@@ -120,34 +130,44 @@ export async function GET(req: NextRequest) {
 
   const nameInfo = await resolveEmployeeName(uid, callerEmail);
   if (!nameInfo) {
-    return NextResponse.json({
-      employeeName: null,
-      nextPayDateISO: null,
-      payFrequency: "Paid weekly",
-      payslips: [],
-    });
+    return NextResponse.json(
+      {
+        employeeName: null,
+        nextPayDateISO: null,
+        payFrequency: "Paid weekly",
+        payslips: [],
+      },
+      { headers: CACHE_HEADERS },
+    );
   }
 
-  // Prefer a live sheet read (fresh) but fall back to whatever weeks
-  // the /payroll/payroll page has already cached in Firestore
-  // (payroll_summary_cache/<weekStart>). This keeps the page usable in
-  // local dev where the Google Sheets service-account creds aren't
-  // installed, and shields production readers if the Sheets API is
-  // briefly down.
+  // Cache-first: read the last N weeks from Firestore. This is fast
+  // (single collection query, bounded rows) and matches the numbers
+  // the owner-facing /payroll/payroll page has already cached. Only
+  // fall back to a full Google Sheets scan if the cache is empty
+  // (fresh install, cache purged, etc.). The old logic did it the
+  // other way around — sheet first, cache fallback — which meant
+  // every page load paid the 2-5s sheet round-trip.
   let allWeeks: WeekPayrollDetail[] = [];
   try {
-    allWeeks = await fetchAllWeekPayrollDetails();
+    // Doc IDs are weekStartISO (YYYY-MM-DD) so ordering by __name__
+    // desc gives the newest weeks first — cheap and index-free.
+    const snap = await adminDb()
+      .collection("payroll_summary_cache")
+      .orderBy("__name__", "desc")
+      .limit(CACHE_WEEKS_LIMIT)
+      .get();
+    allWeeks = snap.docs
+      .map((d) => (d.data() as { detail?: WeekPayrollDetail }).detail ?? null)
+      .filter((d): d is WeekPayrollDetail => !!d && !isEmptyPayrollDetail(d));
   } catch (err) {
-    console.warn("[staff/payslips] sheet fetch failed — trying cache:", err);
+    console.warn("[staff/payslips] cache read failed:", err);
   }
   if (allWeeks.length === 0) {
     try {
-      const snap = await adminDb().collection("payroll_summary_cache").get();
-      allWeeks = snap.docs
-        .map((d) => (d.data() as { detail?: WeekPayrollDetail }).detail ?? null)
-        .filter((d): d is WeekPayrollDetail => !!d && !isEmptyPayrollDetail(d));
+      allWeeks = await fetchAllWeekPayrollDetails();
     } catch (err) {
-      console.error("[staff/payslips] cache fallback failed:", err);
+      console.error("[staff/payslips] sheet fetch failed:", err);
     }
   }
   if (allWeeks.length === 0) {
@@ -190,10 +210,13 @@ export async function GET(req: NextRequest) {
     ? shiftDateKey(payslips[0].payDate, 7, TIMEZONE)
     : null;
 
-  return NextResponse.json({
-    employeeName: nameInfo.fullName,
-    nextPayDateISO,
-    payFrequency: "Paid weekly",
-    payslips,
-  });
+  return NextResponse.json(
+    {
+      employeeName: nameInfo.fullName,
+      nextPayDateISO,
+      payFrequency: "Paid weekly",
+      payslips,
+    },
+    { headers: CACHE_HEADERS },
+  );
 }

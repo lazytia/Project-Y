@@ -5,7 +5,11 @@ import {
   createPlatterCateringOrderFromForm,
   listPlatterCateringOrders,
 } from "@/lib/catering-square";
-import { syncOrderToFirestore, syncOrdersToFirestore } from "@/lib/catering-firestore";
+import {
+  fetchHiddenOrderIds,
+  syncOrderToFirestore,
+  syncOrdersToFirestore,
+} from "@/lib/catering-firestore";
 import type { CateringOrderForm } from "@/lib/catering-orders";
 
 /**
@@ -35,9 +39,18 @@ export async function GET(req: NextRequest) {
   const auth = await verifyAuth(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   try {
-    const orders = await listPlatterCateringOrders();
-    syncOrdersToFirestore(orders);
-    return NextResponse.json({ orders });
+    const [orders, hiddenIds] = await Promise.all([
+      listPlatterCateringOrders(),
+      fetchHiddenOrderIds(),
+    ]);
+    // Filter out orders the owner has hidden in our app (Square is
+    // the source of truth and stays untouched — we only skip these
+    // from the calendar view).
+    const visible = hiddenIds.size > 0
+      ? orders.filter((o) => !hiddenIds.has(o.id))
+      : orders;
+    syncOrdersToFirestore(visible);
+    return NextResponse.json({ orders: visible });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load Square orders.";
     return NextResponse.json({ error: msg }, { status: 500 });

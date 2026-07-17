@@ -106,6 +106,14 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Catering orders the owner has chosen to hide from the app's
+    // calendar (Square remains untouched — this collection is the only
+    // record of the hide). Written only by /api/catering-orders/[orderId]
+    // DELETE via the admin SDK; the client never reads or writes it.
+    match /catering_hidden/{orderId} {
+      allow read, write: if isOwner();
+    }
+
     // Owner's daily "Today's Sales Review" notes on the dashboard, keyed
     // by YYYY-MM-DD. Owner-only for both reads and writes — this is
     // internal commentary that shouldn't leak beyond owner-level accounts.

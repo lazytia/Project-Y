@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
-import { cancelPlatterCateringOrder, getPlatterCateringOrder } from "@/lib/catering-square";
-import { syncOrderToFirestore } from "@/lib/catering-firestore";
+import { getPlatterCateringOrder } from "@/lib/catering-square";
+import { hideCateringOrder, syncOrderToFirestore } from "@/lib/catering-firestore";
 import { STRICT_OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 
@@ -55,26 +55,25 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: st
  * DELETE /api/catering-orders/[orderId]
  * Header: Authorization: Bearer <Firebase ID token>
  *
- * Cancels the order in Square (state -> CANCELED). Used by the owner
- * to prune test / duplicate orders that Square's dashboard shouldn't
- * be showing. Cancelled orders drop off the calendar because
- * listPlatterCateringOrders filters state = [OPEN, COMPLETED].
+ * Hides the order from our calendar by writing to Firestore
+ * `catering_hidden/{orderId}`. Square is treated as the source of
+ * truth — we never mutate it from the app. The list endpoint filters
+ * out any Square order whose id is in that collection.
  */
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
   const auth = await verifyAuth(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   // Server-side owner gate — managers (yurina) and chefs (chuck) must
-  // never be able to cancel a Square order, even by hitting the API
-  // directly. Only strict owners (Tia / Yurica / Eddie) are allowed.
+  // never be able to hide orders, even by hitting the API directly.
   if (!isStrictOwnerEmail(auth.email)) {
     return NextResponse.json({ error: "Owner only." }, { status: 403 });
   }
   const { orderId } = await ctx.params;
   try {
-    await cancelPlatterCateringOrder(orderId);
-    return NextResponse.json({ ok: true });
+    await hideCateringOrder(orderId, auth.email);
+    return NextResponse.json({ ok: true, hidden: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to cancel Square order.";
+    const msg = err instanceof Error ? err.message : "Failed to hide order.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

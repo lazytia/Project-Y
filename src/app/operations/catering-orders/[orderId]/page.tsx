@@ -143,7 +143,7 @@ export default function CateringOrderDetailPage() {
       ? `${order.clientName}'s order`
       : "this order";
     const ok = window.confirm(
-      `Cancel ${label} in Square?\n\nThis marks the order as CANCELED and removes it from the calendar. This cannot be undone.`,
+      `Hide ${label} from the calendar?\n\nThe order stays in Square untouched — this only removes it from our app's calendar. Use for test or duplicate rows.`,
     );
     if (!ok) return;
     setCancelling(true);
@@ -374,10 +374,10 @@ export default function CateringOrderDetailPage() {
             disabled={cancelling}
             onClick={handleCancel}
           >
-            {cancelling ? "Cancelling…" : "Cancel this order"}
+            {cancelling ? "Hiding…" : "Hide from calendar"}
           </button>
           <p className={styles.dangerHint}>
-            Marks the Square order as CANCELED and removes it from the calendar. Use for test or duplicate orders.
+            Removes this order from our app&rsquo;s calendar only. Square is the source of truth and is never modified.
           </p>
         </section>
       )}

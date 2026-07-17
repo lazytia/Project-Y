@@ -19,6 +19,33 @@ type PayslipsResponse = {
   payslips: Payslip[];
 };
 
+/** SessionStorage key + version. Bump the version whenever the API's
+ *  response shape changes so old cached blobs don't render weirdly. */
+const CACHE_KEY_PREFIX = "y.payslips.v1.";
+/** Serve cached copy for 5 min before revalidating in the background. */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+type CachedEnvelope = { data: PayslipsResponse; cachedAt: number };
+
+function readCache(uid: string): CachedEnvelope | null {
+  try {
+    const raw = window.sessionStorage.getItem(CACHE_KEY_PREFIX + uid);
+    if (!raw) return null;
+    return JSON.parse(raw) as CachedEnvelope;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(uid: string, data: PayslipsResponse): void {
+  try {
+    const env: CachedEnvelope = { data, cachedAt: Date.now() };
+    window.sessionStorage.setItem(CACHE_KEY_PREFIX + uid, JSON.stringify(env));
+  } catch {
+    // sessionStorage full / private mode — silently skip.
+  }
+}
+
 export default function PayslipsPage() {
   const { user, loading: authLoading } = useAuth();
   const { t } = useLang();
@@ -33,18 +60,34 @@ export default function PayslipsPage() {
       return;
     }
     let cancelled = false;
+
+    // Instant paint from the sessionStorage cache if we have a fresh
+    // copy — the network fetch below still runs in the background so
+    // the numbers stay accurate.
+    const cached = readCache(user.uid);
+    const cacheFresh = cached && Date.now() - cached.cachedAt < CACHE_TTL_MS;
+    if (cached) {
+      setData(cached.data);
+      if (cacheFresh) setLoading(false);
+    }
+
     (async () => {
       try {
         const idToken = await user.getIdToken();
         const res = await fetch("/api/staff/payslips", {
           headers: { Authorization: `Bearer ${idToken}` },
-          cache: "no-store",
         });
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(payload?.error ?? `Failed (${res.status}).`);
-        if (!cancelled) setData(payload as PayslipsResponse);
+        if (cancelled) return;
+        setData(payload as PayslipsResponse);
+        writeCache(user.uid, payload as PayslipsResponse);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        // If we already painted from cache, keep those numbers on screen
+        // and swallow the error — the user isn't left staring at nothing.
+        if (!cancelled && !cached) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

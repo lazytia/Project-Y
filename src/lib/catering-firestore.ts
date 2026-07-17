@@ -119,6 +119,40 @@ export async function saveOwnerNoteToFirestore(
   });
 }
 
+const HIDDEN_COLLECTION = "catering_hidden";
+
+/**
+ * Mark a Square order as "hidden" in our app only — the source of
+ * truth stays in Square (owner direction: Square must never be
+ * mutated by the app). The calendar filters these out on read.
+ */
+export async function hideCateringOrder(
+  orderId: string,
+  hiddenBy: string | null,
+): Promise<void> {
+  await adminDb()
+    .collection(HIDDEN_COLLECTION)
+    .doc(orderId)
+    .set(
+      {
+        hiddenAt: FieldValue.serverTimestamp(),
+        hiddenBy: hiddenBy ?? null,
+      },
+      { merge: true },
+    );
+}
+
+/** Return the set of Square order IDs the owner has hidden from the app. */
+export async function fetchHiddenOrderIds(): Promise<Set<string>> {
+  try {
+    const snap = await adminDb().collection(HIDDEN_COLLECTION).get();
+    return new Set(snap.docs.map((d) => d.id));
+  } catch (err) {
+    console.warn("[catering-firestore] hidden lookup failed:", err);
+    return new Set();
+  }
+}
+
 /**
  * Batch-sync multiple orders (used by the list endpoint).
  */
