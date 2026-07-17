@@ -175,6 +175,9 @@ export default function ReservationsPage() {
   }, [dateISO, user]);
 
   const active = useMemo(() => list.filter((r) => r.status !== "cancelled" && r.status !== "no-show"), [list]);
+  // Cancelled bookings stay visible in the day list (with a badge) but are
+  // excluded from guest/booking totals via `active` above.
+  const listed = useMemo(() => list.filter((r) => r.status !== "no-show"), [list]);
 
   // Recent activity to surface in the alert strip: cancellations first, then
   // brand-new bookings, then customer-updated edits. Each row carries a tag
@@ -219,25 +222,25 @@ export default function ReservationsPage() {
     return { lunch: l, dinner: d, total: l.guests + d.guests };
   }, [active]);
 
-  const filteredActive = useMemo(() => {
+  const filteredListed = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return active;
+    if (!q) return listed;
     const digits = q.replace(/\D/g, "");
-    return active.filter((r) => {
+    return listed.filter((r) => {
       if (digits && r.phone.replace(/\D/g, "").includes(digits)) return true;
       return r.name.toLowerCase().includes(q);
     });
-  }, [active, query]);
+  }, [listed, query]);
 
   const sections = useMemo(() => {
     const groups: Record<"LUNCH" | "DINNER", Reservation[]> = { LUNCH: [], DINNER: [] };
-    for (const r of filteredActive) groups[serviceFor(r.time)].push(r);
+    for (const r of filteredListed) groups[serviceFor(r.time)].push(r);
     // Always show both sections; pages should scroll naturally between them.
     return [
       { key: "LUNCH" as const, label: "LUNCH", window: "11:30 – 14:00", rows: groups.LUNCH },
       { key: "DINNER" as const, label: "DINNER", window: "17:00 – 21:00", rows: groups.DINNER },
     ];
-  }, [filteredActive]);
+  }, [filteredListed]);
 
   async function applyStatus(id: string, status: "confirmed" | "seated" | "no-show" | "cancelled") {
     if (!user) return;
@@ -400,13 +403,14 @@ export default function ReservationsPage() {
         <p className={styles.error}>{error}</p>
       ) : (
         sections.map((sec) => {
-          const guests = sec.rows.reduce((s, r) => s + r.count, 0);
+          const activeRows = sec.rows.filter((r) => r.status !== "cancelled");
+          const guests = activeRows.reduce((s, r) => s + r.count, 0);
           return (
             <section key={sec.key} className={styles.section}>
               <div className={styles.sectionHead}>
                 <span className={styles.sectionLabel}>{sec.label}</span>
                 <span className={styles.sectionWindow}>{sec.window}</span>
-                <span className={styles.sectionStats}>{guests} Guests · {sec.rows.length} Bookings</span>
+                <span className={styles.sectionStats}>{guests} Guests · {activeRows.length} Bookings</span>
               </div>
               {sec.rows.length === 0 ? (
                 <p className={styles.sectionEmpty}>No reservations.</p>
@@ -431,10 +435,13 @@ export default function ReservationsPage() {
                             case "seated":
                               return <span className={`${styles.statusPill} ${styles.statusPillSeated}`}>Seated</span>;
                             case "cancelled":
-                              return <span className={`${styles.statusPill} ${styles.statusPillCancelled}`}>Cancelled</span>;
+                              return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Cancelled</span>;
                             case "updated":
                               return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Updated</span>;
                             default:
+                              if (r.customerUpdated) {
+                                return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Updated</span>;
+                              }
                               return null;
                           }
                         })()}
