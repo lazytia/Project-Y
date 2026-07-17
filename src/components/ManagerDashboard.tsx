@@ -357,6 +357,11 @@ export default function ManagerDashboard({
 
   const team = (kitchenStaff ?? 0) + (hallStaff ?? 0);
 
+  const salesPct = useMemo(() => {
+    if (todaySales === null || dailyTarget <= 0) return null;
+    return Math.min(100, Math.round((todaySales / dailyTarget) * 100));
+  }, [todaySales, dailyTarget]);
+
   return (
     <div className={styles.page}>
       <header className={styles.greeting}>
@@ -481,17 +486,32 @@ export default function ManagerDashboard({
       <section>
         <p className={styles.sectionLabel}>SALES</p>
         <div className={styles.salesCard}>
-          <div className={styles.salesBlock}>
-            <p className={styles.salesLabel}>Today Sales</p>
-            <p className={styles.salesValue}>
-              {todaySales === null ? "—" : fmtCurrency(todaySales)}
-            </p>
+          <div className={styles.salesTop}>
+            <div className={styles.salesBlock}>
+              <p className={styles.salesLabel}>Today Sales</p>
+              <p className={styles.salesValue}>
+                {todaySales === null ? "—" : fmtCurrency(todaySales)}
+              </p>
+            </div>
+            <div className={styles.salesDivider} aria-hidden="true" />
+            <div className={styles.salesBlock}>
+              <p className={styles.salesLabel}>Target Sales</p>
+              <p className={styles.salesValue}>{fmtCurrency(dailyTarget)}</p>
+            </div>
           </div>
-          <div className={styles.salesDivider} />
-          <div className={styles.salesBlock}>
-            <p className={styles.salesLabel}>Target Sales</p>
-            <p className={styles.salesValue}>{fmtCurrency(dailyTarget)}</p>
-          </div>
+          {dailyTarget > 0 && (
+            <div className={styles.salesProgressWrap}>
+              <div
+                className={styles.salesProgressTrack}
+                style={{ "--sales-progress": `${salesPct ?? 0}%` } as React.CSSProperties}
+              >
+                <div className={styles.salesProgressFill} />
+              </div>
+              {todaySales !== null && salesPct !== null && (
+                <p className={styles.salesProgressPct}>{salesPct}% of target</p>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
