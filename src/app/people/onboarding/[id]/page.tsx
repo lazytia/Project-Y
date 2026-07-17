@@ -9,23 +9,22 @@ import Splash from "@/components/Splash";
 import OwnerRequestDetail from "./OwnerRequestDetail";
 import ManagerEditForm from "./ManagerEditForm";
 
-/** Owner sees approval detail; manager (Yurina) keeps the edit form. */
+/** Strict owners approve; managers and chefs edit the request. */
 export default function OnboardingDetailPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const strictOwner = isStrictOwner(user);
-  const manager = isOwner(user) && !strictOwner;
+  const canEditRequest = (isOwner(user) && !strictOwner) || isChef(user);
 
   useEffect(() => {
     if (loading) return;
-    if (!strictOwner && !manager) {
+    if (!strictOwner && !canEditRequest) {
       router.replace(ROUTES.home);
     }
-  }, [loading, strictOwner, manager, router]);
+  }, [loading, strictOwner, canEditRequest, router]);
 
   if (loading) return <Splash />;
   if (strictOwner) return <OwnerRequestDetail />;
-  if (manager) return <ManagerEditForm />;
-  if (isChef(user)) return <Splash />;
+  if (canEditRequest) return <ManagerEditForm />;
   return null;
 }

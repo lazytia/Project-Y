@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
@@ -100,7 +100,7 @@ export default function ManagerEditForm() {
   const id = typeof params.id === "string" ? params.id : (params.id?.[0] ?? "");
 
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  const allowed = isOwnerOrChef(user);
 
   useEffect(() => {
     if (authLoading) return;
