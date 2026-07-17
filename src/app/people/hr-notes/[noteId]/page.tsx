@@ -159,22 +159,22 @@ function kindClass(kind: NoteKind): string {
 
 function parseFollowUps(raw: unknown): FollowUpNote[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const o = item as Record<string, unknown>;
-      const id = typeof o.id === "string" ? o.id : "";
-      if (!id) return null;
-      return {
-        id,
-        fields: (o.fields as Record<string, string>) ?? {},
-        checkboxes: (o.checkboxes as StoredCheckbox[]) ?? [],
-        addedByUid: String(o.addedByUid ?? ""),
-        addedByName: String(o.addedByName ?? ""),
-        createdAt: (o.createdAt as Timestamp | null | undefined) ?? null,
-      };
-    })
-    .filter((x): x is FollowUpNote => x !== null);
+  const out: FollowUpNote[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const id = typeof o.id === "string" ? o.id : "";
+    if (!id) continue;
+    out.push({
+      id,
+      fields: (o.fields as Record<string, string>) ?? {},
+      checkboxes: (o.checkboxes as StoredCheckbox[]) ?? [],
+      addedByUid: String(o.addedByUid ?? ""),
+      addedByName: String(o.addedByName ?? ""),
+      createdAt: (o.createdAt as Timestamp | null | undefined) ?? null,
+    });
+  }
+  return out;
 }
 
 function emptyFollowUp(category: string, user: { uid: string; email: string | null }): FollowUpNote {
@@ -297,6 +297,7 @@ export default function HrNoteDetailPage({
 
   const createdAt = tsDate(note.createdAt);
   const hasDrafts = followUps.some(isDraftFollowUp);
+  const category = note.category;
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
@@ -309,7 +310,7 @@ export default function HrNoteDetailPage({
 
   function handleAddFollowUp() {
     if (!user) return;
-    const draft = emptyFollowUp(note.category, user);
+    const draft = emptyFollowUp(category, user);
     setFollowUps((prev) => [...prev, draft]);
     setExpanded((prev) => new Set([...prev, draft.id]));
   }
@@ -374,7 +375,7 @@ export default function HrNoteDetailPage({
   }
 
   function handleEdit() {
-    router.push(`/people/hr-notes/add/${note.category}?edit=${noteId}`);
+    router.push(`/people/hr-notes/add/${category}?edit=${noteId}`);
   }
 
   return (
