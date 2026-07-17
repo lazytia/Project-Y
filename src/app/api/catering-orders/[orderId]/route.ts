@@ -2,8 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getPlatterCateringOrder } from "@/lib/catering-square";
 import { hideCateringOrder, syncOrderToFirestore } from "@/lib/catering-firestore";
-import { STRICT_OWNER_USERNAMES } from "@/lib/permissions";
-import { emailToUsername } from "@/lib/username";
+import { isStrictOwnerEmail } from "@/lib/permissions";
 
 /**
  * GET /api/catering-orders/[orderId]
@@ -28,9 +27,8 @@ async function verifyAuth(req: NextRequest) {
 }
 
 /** Strict owners (Tia / Yurica / Eddie) — managers and chefs excluded. */
-function isStrictOwnerEmail(email: string | null): boolean {
-  const u = emailToUsername(email ?? "").toLowerCase();
-  return STRICT_OWNER_USERNAMES.has(u);
+function isStrictOwnerFromAuth(email: string | null): boolean {
+  return isStrictOwnerEmail(email);
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
@@ -65,7 +63,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ orderId:
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   // Server-side owner gate — managers (yurina) and chefs (chuck) must
   // never be able to hide orders, even by hitting the API directly.
-  if (!isStrictOwnerEmail(auth.email)) {
+  if (!isStrictOwnerFromAuth(auth.email)) {
     return NextResponse.json({ error: "Owner only." }, { status: 403 });
   }
   const { orderId } = await ctx.params;

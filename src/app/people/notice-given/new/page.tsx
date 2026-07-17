@@ -10,7 +10,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
+import { isOwnerOrChef, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
@@ -66,7 +66,7 @@ export default function NoticeGivenNewPage() {
   const searchParams = useSearchParams();
   const preselectUid = searchParams?.get("uid") ?? "";
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  const allowed = isOwnerOrChef(user);
 
   useEffect(() => {
     if (authLoading) return;

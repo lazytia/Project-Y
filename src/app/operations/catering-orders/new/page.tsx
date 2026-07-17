@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { isStrictOwner } from "@/lib/permissions";
+import { ROUTES } from "@/lib/routes";
+import Splash from "@/components/Splash";
 import type {
   CateringFulfillmentType,
   CateringOrder,
@@ -178,8 +181,15 @@ function fmtFriendlyDate(iso: string): string {
 }
 
 export default function NewCateringOrderPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const allowed = isStrictOwner(user);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!allowed) router.replace(ROUTES.home);
+  }, [authLoading, allowed, router]);
+
   const search = useSearchParams();
   const presetDate = search?.get("date") || todayISO();
   // Edit mode removed — orders are read-only once created.
@@ -378,6 +388,9 @@ export default function NewCateringOrderPage() {
       setSubmitting(false);
     }
   }
+
+  if (authLoading) return <Splash />;
+  if (!allowed) return null;
 
   return (
     <div className={styles.page}>

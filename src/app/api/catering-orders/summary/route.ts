@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { adminAuth } from "@/lib/firebase-admin";
+import { listPlatterCateringOrders } from "@/lib/catering-square";
+import { fetchHiddenOrderIds, syncOrdersToFirestore } from "@/lib/catering-firestore";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +39,7 @@ type SummaryOrder = {
 };
 
 /**
- * Dashboard-only catering summary from the Firestore mirror (no Square round-trip).
+ * Dashboard catering summary from Square (same source as /api/catering-orders).
  */
 export async function GET(req: NextRequest) {
   const auth = await verifyAuth(req);
@@ -54,30 +56,30 @@ export async function GET(req: NextRequest) {
   const sundayKey = new Date(Date.UTC(my, mm - 1, md + 6)).toISOString().slice(0, 10);
 
   try {
-    const snap = await adminDb()
-      .collection("catering_orders")
-      .where("deliveryDateISO", ">=", todayKey)
-      .limit(120)
-      .get();
+    const [ordersRaw, hiddenIds] = await Promise.all([
+      listPlatterCateringOrders(),
+      fetchHiddenOrderIds(),
+    ]);
+    const orders =
+      hiddenIds.size > 0 ? ordersRaw.filter((o) => !hiddenIds.has(o.id)) : ordersRaw;
+    syncOrdersToFirestore(orders);
 
-    const orders: SummaryOrder[] = [];
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      const status = String(data.status ?? "");
-      if (status === "CANCELLED") continue;
-      orders.push({
-        id: doc.id,
-        clientName: String(data.clientName ?? ""),
-        status,
-        deliveryDateISO: String(data.deliveryDateISO ?? ""),
-        deliveryTime: String(data.deliveryTime ?? ""),
-      });
-    }
+    const upcoming = orders
+      .filter(
+        (o) =>
+          (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey,
+      )
+      .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
 
-    orders.sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
-
-    const nextOrder =
-      orders.find((o) => (o.status === "CONFIRMED" || o.status === "PENDING")) ?? null;
+    const nextOrder: SummaryOrder | null = upcoming[0]
+      ? {
+          id: upcoming[0].id,
+          clientName: upcoming[0].clientName,
+          status: upcoming[0].status,
+          deliveryDateISO: upcoming[0].deliveryDateISO,
+          deliveryTime: upcoming[0].deliveryTime,
+        }
+      : null;
 
     const weekCount = orders.filter(
       (o) =>

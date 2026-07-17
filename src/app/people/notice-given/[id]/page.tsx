@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner, isStrictOwner, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
+import { isOwnerOrChef, isStrictOwner, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
 import { noticeLastWorkingDay } from "@/lib/notice-last-day";
@@ -82,7 +82,7 @@ export default function NoticeGivenIdPage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  const allowed = isOwnerOrChef(user);
   const ownerView = isStrictOwner(user);
   const editMode = searchParams.get("edit") === "1";
 

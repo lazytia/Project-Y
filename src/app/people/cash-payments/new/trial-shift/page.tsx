@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -72,7 +72,7 @@ async function compressImageToDataUrl(file: File): Promise<string> {
 export default function TrialShiftDetailsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  const allowed = isOwnerOrChef(user);
 
   useEffect(() => {
     if (authLoading) return;

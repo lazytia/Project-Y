@@ -41,3 +41,14 @@ export function isChef(user: User | null | undefined): boolean {
   if (!user) return false;
   return CHEF_USERNAMES.has(emailToUsername(user.email).toLowerCase());
 }
+
+/** Owner, manager, or chef — people-management UI (excludes strict-owner-only areas). */
+export function isOwnerOrChef(user: User | null | undefined): boolean {
+  return isOwner(user) || isChef(user);
+}
+
+/** Server-side strict-owner check from a Firebase Auth email claim. */
+export function isStrictOwnerEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return STRICT_OWNER_USERNAMES.has(emailToUsername(email).toLowerCase());
+}

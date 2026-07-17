@@ -113,12 +113,91 @@ function mapStatus(state: string | undefined): CateringOrderStatus {
 
 function pickFulfillment(o: SqOrder): SqFulfillment | undefined {
   const list = o.fulfillments ?? [];
-  // Prefer DELIVERY → PICKUP → first.
+  // Prefer real pickup/delivery schedules — DIGITAL is usually a payment
+  // shell with no catering date.
   return (
     list.find((f) => f.type === "DELIVERY") ??
     list.find((f) => f.type === "PICKUP") ??
+    list.find((f) => f.type !== "DIGITAL") ??
     list[0]
   );
+}
+
+const MONTH_BY_NAME: Record<string, number> = {
+  january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4,
+  may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8,
+  september: 9, sept: 9, sep: 9, october: 10, oct: 10, november: 11, nov: 11,
+  december: 12, dec: 12,
+};
+
+/** Parse "Catering for Friday, 26 June" → YYYY-MM-DD when Square omits pickupAt. */
+function parseCateringDateFromText(text: string, fallbackYear: number): string | null {
+  const dayMonth =
+    /\b(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/i.exec(
+      text,
+    );
+  const monthDay =
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})\b/i.exec(
+      text,
+    );
+  let day: number | null = null;
+  let month: number | null = null;
+  if (dayMonth) {
+    day = parseInt(dayMonth[1], 10);
+    month = MONTH_BY_NAME[dayMonth[2].toLowerCase()] ?? null;
+  } else if (monthDay) {
+    month = MONTH_BY_NAME[monthDay[1].toLowerCase()] ?? null;
+    day = parseInt(monthDay[2], 10);
+  }
+  if (!day || !month || day < 1 || day > 31 || month < 1 || month > 12) return null;
+  return `${fallbackYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseCateringDateFromOrder(o: SqOrder): string | null {
+  const fallbackYear = o.createdAt
+    ? new Date(o.createdAt).getFullYear()
+    : new Date().getFullYear();
+  for (const li of o.lineItems ?? []) {
+    if (li.name) {
+      const iso = parseCateringDateFromText(li.name, fallbackYear);
+      if (iso) return iso;
+    }
+    if (li.note) {
+      const iso = parseCateringDateFromText(li.note, fallbackYear);
+      if (iso) return iso;
+    }
+  }
+  for (const note of notesFor(o)) {
+    const iso = parseCateringDateFromText(note, fallbackYear);
+    if (iso) return iso;
+  }
+  return null;
+}
+
+/** Square Online often creates a companion DIGITAL order for payment only. */
+function isDigitalPaymentShell(o: SqOrder): boolean {
+  const fulfillments = o.fulfillments ?? [];
+  if (fulfillments.length === 0) return false;
+  if (!fulfillments.every((f) => f.type === "DIGITAL")) return false;
+  if (fulfillments.some((f) => fulfillmentTimeIso(f))) return false;
+  const hasNamedItem = (o.lineItems ?? []).some((li) => li.name?.trim());
+  return !hasNamedItem;
+}
+
+function deliveryWhenIso(o: SqOrder): string | undefined {
+  const f = pickFulfillment(o);
+  const fromFulfillment = fulfillmentTimeIso(f);
+  if (fromFulfillment) return fromFulfillment;
+
+  const parsedDate = parseCateringDateFromOrder(o);
+  if (parsedDate && o.createdAt) {
+    const timezone = tz();
+    return combineLocalDateTime(parsedDate, timeInTZ(o.createdAt, timezone), timezone);
+  }
+  if (parsedDate) {
+    return combineLocalDateTime(parsedDate, "12:00 PM", tz());
+  }
+  return o.createdAt;
 }
 
 function fulfillmentTimeIso(f: SqFulfillment | undefined): string | undefined {
@@ -275,7 +354,8 @@ function parseMetadata(rawNotes: string[]): {
 export function toCateringOrder(o: SqOrder): CateringOrder | null {
   if (!o.id) return null;
   const f = pickFulfillment(o);
-  const whenIso = fulfillmentTimeIso(f) ?? o.createdAt;
+  const whenIso = deliveryWhenIso(o);
+  if (!whenIso) return null;
   const r = recipient(f);
   const timezone = tz();
   const ftype: CateringFulfillmentType | undefined =
@@ -364,6 +444,7 @@ export async function listPlatterCateringOrders(opts?: {
 
   const mapped: CateringOrder[] = [];
   for (const o of collected) {
+    if (isDigitalPaymentShell(o)) continue;
     const co = toCateringOrder(o);
     if (!co) continue;
     // Skip skeleton/empty orders — an actual catering job has either a

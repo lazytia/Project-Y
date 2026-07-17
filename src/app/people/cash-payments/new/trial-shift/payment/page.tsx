@@ -7,7 +7,7 @@ import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage
 import { getDb } from "@/lib/firebase";
 import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -49,7 +49,7 @@ async function uploadDataUrl(dataUrl: string, folder: string): Promise<string> {
 export default function TrialShiftPaymentStepPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  const allowed = isOwnerOrChef(user);
 
   const [draft, setDraft] = useState<TrialShiftDraft | null>(null);
   const [hydrated, setHydrated] = useState(false);

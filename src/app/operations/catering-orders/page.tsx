@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { isStrictOwner } from "@/lib/permissions";
 import {
   type CateringOrder,
   dCountdownLabel,
@@ -58,6 +59,7 @@ function ChevronRight() {
 
 export default function CateringOrdersPage() {
   const { user } = useAuth();
+  const canCreateOrder = isStrictOwner(user);
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -275,6 +277,7 @@ export default function CateringOrdersPage() {
         <DayModal
           day={modalDay}
           orders={ordersByDate[modalDay] ?? []}
+          canCreateOrder={canCreateOrder}
           onClose={() => setModalDay(null)}
         />
       )}
@@ -283,10 +286,11 @@ export default function CateringOrdersPage() {
 }
 
 function DayModal({
-  day, orders, onClose,
+  day, orders, canCreateOrder, onClose,
 }: {
   day: string;
   orders: CateringOrder[];
+  canCreateOrder: boolean;
   onClose: () => void;
 }) {
   return (
@@ -312,7 +316,7 @@ function DayModal({
             ))}
           </ul>
         ) : null}
-        {orders.length === 0 && (
+        {orders.length === 0 && canCreateOrder && (
           <Link
             href={`/operations/catering-orders/new?date=${encodeURIComponent(day)}`}
             className={styles.modalPrimary}

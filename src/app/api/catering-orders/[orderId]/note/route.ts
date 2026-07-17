@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getOwnerNote, saveOwnerNoteToFirestore } from "@/lib/catering-firestore";
+import { isStrictOwnerEmail } from "@/lib/permissions";
 
 async function verifyAuth(req: NextRequest) {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!idToken) return { ok: false as const, status: 401, error: "Missing bearer token." };
   try {
-    await adminAuth().verifyIdToken(idToken);
-    return { ok: true as const };
+    const decoded = await adminAuth().verifyIdToken(idToken);
+    return { ok: true as const, email: decoded.email ?? null };
   } catch (err) {
     return {
       ok: false as const,
@@ -36,6 +37,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: st
 export async function PUT(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
   const auth = await verifyAuth(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if (!isStrictOwnerEmail(auth.email)) {
+    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  }
   const { orderId } = await ctx.params;
   let body: { ownerNote?: string };
   try {

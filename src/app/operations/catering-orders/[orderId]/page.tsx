@@ -113,6 +113,7 @@ export default function CateringOrderDetailPage() {
   // (chuck) intentionally can't cancel; only Tia / Yurica / Eddie can.
   const [cancelling, setCancelling] = useState(false);
   const canCancel = isStrictOwner(user);
+  const canEditNotes = isStrictOwner(user);
 
   useEffect(() => {
     if (!params?.orderId || !user) return;
@@ -335,7 +336,7 @@ export default function CateringOrderDetailPage() {
         </div>
       </section>
 
-      {/* Internal Note (editable, Firestore only) */}
+      {/* Internal Note (editable by strict owners only, Firestore) */}
       <section className={styles.section}>
         <div className={styles.sectionIcon}><EditIcon /></div>
         <div className={styles.sectionBody}>
@@ -344,23 +345,26 @@ export default function CateringOrderDetailPage() {
             className={styles.ownerNoteInput}
             value={ownerNote}
             onChange={(e) => { setOwnerNote(e.target.value); setNoteSaved(false); }}
-            placeholder="Add a note for this order…"
+            placeholder={canEditNotes ? "Add a note for this order…" : "Owner only."}
             rows={3}
             maxLength={500}
+            readOnly={!canEditNotes}
           />
           <div className={styles.ownerNoteFooter}>
             <span className={styles.ownerNoteCount}>{ownerNote.length} / 500</span>
-            {noteSaved ? (
-              <span className={styles.ownerNoteSavedLabel}>✓ Saved</span>
-            ) : (
-              <button
-                type="button"
-                className={styles.ownerNoteSaveBtn}
-                disabled={noteSaving || ownerNote === ownerNoteOriginal}
-                onClick={handleSaveNote}
-              >
-                {noteSaving ? "Saving…" : "Save Note"}
-              </button>
+            {canEditNotes && (
+              noteSaved ? (
+                <span className={styles.ownerNoteSavedLabel}>✓ Saved</span>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.ownerNoteSaveBtn}
+                  disabled={noteSaving || ownerNote === ownerNoteOriginal}
+                  onClick={handleSaveNote}
+                >
+                  {noteSaving ? "Saving…" : "Save Note"}
+                </button>
+              )
             )}
           </div>
         </div>

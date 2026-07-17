@@ -33,7 +33,7 @@ service cloud.firestore {
     //    Staff + page, sending reminders, pruning invalid FCM tokens, etc.).
     match /staff_onboarding/{uid} {
       allow read: if request.auth != null;
-      allow write: if isOwner()
+      allow write: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid);
     }
 
@@ -69,20 +69,20 @@ service cloud.firestore {
     // Cash payments: owner + manager only. Tracks every recorded
     // cash payment to candidates or active employees.
     match /cash_payments/{paymentId} {
-      allow read, write: if isOwner();
+      allow read, write: if isOwner() || isChef();
     }
 
     // HR notes: manager-only. Each note records a Formal Warning,
     // Performance Review, Incident Report, or Other note for a staff
     // member. Staff never see this collection.
     match /hr_notes/{noteId} {
-      allow read, write: if isOwner();
+      allow read, write: if isOwner() || isChef();
     }
 
     // Notice Given: records employees who have submitted resignation notice.
     // Owner-only read/write.
     match /notice_given/{noticeId} {
-      allow read, write: if isOwner();
+      allow read, write: if isOwner() || isChef();
     }
 
     // Sold-out category definitions — static config written by owners,

@@ -11,6 +11,7 @@ import {
   syncOrdersToFirestore,
 } from "@/lib/catering-firestore";
 import type { CateringOrderForm } from "@/lib/catering-orders";
+import { isStrictOwnerEmail } from "@/lib/permissions";
 
 /**
  * GET /api/catering-orders
@@ -20,12 +21,15 @@ import type { CateringOrderForm } from "@/lib/catering-orders";
  * within the last 60 days or scheduled within the next 180), mapped into
  * the CateringOrder shape consumed by /operations/catering-orders.
  */
-async function verifyAuth(req: NextRequest): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+async function verifyAuth(req: NextRequest): Promise<
+  | { ok: true; email: string | null }
+  | { ok: false; status: number; error: string }
+> {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!idToken) return { ok: false, status: 401, error: "Missing bearer token." };
   try {
-    await adminAuth().verifyIdToken(idToken);
-    return { ok: true };
+    const decoded = await adminAuth().verifyIdToken(idToken);
+    return { ok: true, email: decoded.email ?? null };
   } catch (err) {
     return {
       ok: false,
@@ -60,6 +64,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await verifyAuth(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if (!isStrictOwnerEmail(auth.email)) {
+    return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  }
   let body: Partial<CateringOrderForm> & {
     totalAmount?: number;
     guestsCount?: number;

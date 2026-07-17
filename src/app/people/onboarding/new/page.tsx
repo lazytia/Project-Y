@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -73,7 +73,7 @@ function fmtIsoShort(iso: string): string {
 export default function NewEmployeePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  const allowed = isOwnerOrChef(user);
 
   useEffect(() => {
     if (authLoading) return;
