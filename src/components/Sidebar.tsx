@@ -106,9 +106,9 @@ export default function Sidebar({ open, onClose }: Props) {
         { label: "Notice Given", href: "/people/notice-given" },
         { label: "HR Notes", href: "/people/hr-notes" },
         { label: "Cash Payments", href: "/people/cash-payments" },
-        { label: "Payslips", href: "/people/payslips" },
     ],
   },
+  { icon: "💰", label: "Payslips", href: "/payslips" },
   {
     icon: "📅",
       label: "Scheduling",
