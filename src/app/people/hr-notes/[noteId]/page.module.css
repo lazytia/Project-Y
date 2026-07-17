@@ -336,3 +336,235 @@
   font-size: 13px;
   color: var(--color-fg-muted);
 }
+
+/* ── Notes section (original + follow-ups) ── */
+.notesSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.notesSectionTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.noteEntry {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.noteEntryHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: left;
+}
+
+.noteEntryHead:hover {
+  background: var(--color-surface);
+}
+
+.noteEntryHeadLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.noteEntryHeadRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.noteNumber {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.noteBadge {
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.noteBadgeCurrent {
+  background: rgba(234, 88, 12, 0.12);
+  color: var(--color-warm);
+}
+
+.noteBadgeDraft {
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+}
+
+.noteBadgeSaved {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--color-positive);
+}
+
+.noteMeta {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+}
+
+.chevronClosed {
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
+}
+
+.noteEntryBody {
+  padding: 0 var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.noteFieldBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fieldTextarea {
+  width: 100%;
+  min-height: 96px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-fg);
+  line-height: 1.55;
+  resize: vertical;
+  background: var(--color-bg);
+}
+
+.fieldTextarea:focus {
+  outline: none;
+  border-color: var(--color-warm);
+}
+
+.notePhoto {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  display: block;
+}
+
+.checkListEditable {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.checkRowBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: left;
+}
+
+.addFollowUpBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-warm);
+  border-radius: var(--radius-md);
+  color: var(--color-warm);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.addFollowUpBtn:hover {
+  background: var(--color-warm-bg);
+}
+
+.infoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+.infoIcon {
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.infoText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg);
+  line-height: 1.55;
+}
+
+.footerActions {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: var(--space-3);
+}
+
+.saveBtn {
+  height: 56px;
+  background: var(--color-warm);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.saveBtn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.saveBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

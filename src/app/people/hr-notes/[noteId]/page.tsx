@@ -1,25 +1,36 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter, notFound } from "next/navigation";
 import {
-  deleteDoc,
   doc,
   getDoc,
+  serverTimestamp,
+  updateDoc,
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
+import {
+  followUpCheckboxesForCategory,
+  followUpFieldsForCategory,
+} from "@/lib/hr-note-config";
+import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
-
-/* ──────────────────────────────────────────────────────────────────────
- * HR Note Details — read-only view of a saved note loaded from the
- * `hr_notes` Firestore collection.
- * ──────────────────────────────────────────────────────────────────── */
 
 type NoteKind = "Formal Warning" | "Performance Review" | "Incident Report" | "Other";
 
 type StoredCheckbox = { label: string; checked: boolean };
+
+type FollowUpNote = {
+  id: string;
+  fields: Record<string, string>;
+  checkboxes: StoredCheckbox[];
+  addedByUid: string;
+  addedByName: string;
+  createdAt?: Timestamp | null;
+};
 
 type StoredNote = {
   category: string;
@@ -33,13 +44,20 @@ type StoredNote = {
   addedByUid: string;
   addedByName: string;
   createdAt?: Timestamp;
+  followUps?: FollowUpNote[];
 };
+
+const MAX_LEN = 500;
 
 function tsDate(v: unknown): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
   if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
-    try { return (v as Timestamp).toDate(); } catch { return null; }
+    try {
+      return (v as Timestamp).toDate();
+    } catch {
+      return null;
+    }
   }
   return null;
 }
@@ -69,6 +87,11 @@ function fmtTime(d: Date | null): string {
   });
 }
 
+function fmtDateTime(d: Date | null): string {
+  if (!d) return "";
+  return `${fmtDate(d)} ${fmtTime(d)}`;
+}
+
 function fmtDateIso(iso: string): string {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
@@ -78,6 +101,12 @@ function fmtDateIso(iso: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+function addedByNameFromEmail(email: string | null | undefined): string {
+  const u = emailToUsername(email ?? "");
+  if (!u) return "Manager";
+  return u.charAt(0).toUpperCase() + u.slice(1);
 }
 
 function kindIcon(kind: NoteKind, size = 28) {
@@ -117,23 +146,114 @@ function kindIcon(kind: NoteKind, size = 28) {
 
 function kindClass(kind: NoteKind): string {
   switch (kind) {
-    case "Formal Warning":     return styles.kindWarning;
-    case "Performance Review": return styles.kindReview;
-    case "Incident Report":    return styles.kindIncident;
-    case "Other":              return styles.kindOther;
+    case "Formal Warning":
+      return styles.kindWarning;
+    case "Performance Review":
+      return styles.kindReview;
+    case "Incident Report":
+      return styles.kindIncident;
+    case "Other":
+      return styles.kindOther;
   }
 }
 
-function summaryOf(fields: Record<string, string>): string {
-  for (const [label, v] of Object.entries(fields ?? {})) {
-    if (typeof v !== "string") continue;
-    const t = v.trim();
-    if (!t || t.startsWith("data:image/")) continue;
-    // Skip legacy photo-field filenames so they don't appear as the snippet.
-    if (/photo|attach/i.test(label)) continue;
-    return t.length > 80 ? t.slice(0, 80) + "…" : t;
+function parseFollowUps(raw: unknown): FollowUpNote[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const o = item as Record<string, unknown>;
+      const id = typeof o.id === "string" ? o.id : "";
+      if (!id) return null;
+      return {
+        id,
+        fields: (o.fields as Record<string, string>) ?? {},
+        checkboxes: (o.checkboxes as StoredCheckbox[]) ?? [],
+        addedByUid: String(o.addedByUid ?? ""),
+        addedByName: String(o.addedByName ?? ""),
+        createdAt: (o.createdAt as Timestamp | null | undefined) ?? null,
+      };
+    })
+    .filter((x): x is FollowUpNote => x !== null);
+}
+
+function emptyFollowUp(category: string, user: { uid: string; email: string | null }): FollowUpNote {
+  const fields = followUpFieldsForCategory(category);
+  const checkboxes = followUpCheckboxesForCategory(category);
+  return {
+    id: crypto.randomUUID(),
+    fields: Object.fromEntries(fields.map((f) => [f.label, ""])),
+    checkboxes: checkboxes.map((label) => ({ label, checked: false })),
+    addedByUid: user.uid,
+    addedByName: addedByNameFromEmail(user.email),
+    createdAt: null,
+  };
+}
+
+function isDraftFollowUp(fu: FollowUpNote): boolean {
+  return !tsDate(fu.createdAt);
+}
+
+function ChevronDown({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={open ? styles.chevronOpen : styles.chevronClosed}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  const isImage =
+    value.startsWith("data:image/") || value.startsWith("https://") || value.startsWith("http://");
+  if (/photo|attach/i.test(label)) {
+    if (isImage) {
+      return (
+        <div className={styles.noteFieldBlock}>
+          <h3 className={styles.contentTitle}>{label}</h3>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt={label} className={styles.notePhoto} />
+        </div>
+      );
+    }
+    return null;
   }
-  return "";
+  if (!value.trim()) return null;
+  return (
+    <div className={styles.noteFieldBlock}>
+      <h3 className={styles.contentTitle}>{label}</h3>
+      <div className={styles.bodyBox}>{value}</div>
+    </div>
+  );
+}
+
+function ReadOnlyChecks({ items }: { items: StoredCheckbox[] }) {
+  if (items.length === 0) return null;
+  return (
+    <ul className={styles.checkList}>
+      {items.map((c) => (
+        <li key={c.label} className={styles.checkRow}>
+          <span className={`${styles.checkMark} ${c.checked ? styles.checkMarkOn : ""}`} aria-hidden="true">
+            {c.checked && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </span>
+          <span className={styles.checkLabel}>{c.label}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export default function HrNoteDetailPage({
@@ -142,17 +262,29 @@ export default function HrNoteDetailPage({
   params: Promise<{ noteId: string }>;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const { noteId } = use(params);
   const [note, setNote] = useState<StoredNote | null>(null);
+  const [followUps, setFollowUps] = useState<FollowUpNote[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["original"]));
   const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const fieldDefs = useMemo(
+    () => (note ? followUpFieldsForCategory(note.category) : []),
+    [note],
+  );
 
   useEffect(() => {
     (async () => {
       try {
         const snap = await getDoc(doc(getDb(), "hr_notes", noteId));
         if (snap.exists()) {
-          setNote(snap.data() as StoredNote);
+          const data = snap.data() as StoredNote;
+          setNote(data);
+          const parsed = parseFollowUps(data.followUps);
+          setFollowUps(parsed);
+          setExpanded(new Set(["original", ...parsed.filter(isDraftFollowUp).map((f) => f.id)]));
         }
       } finally {
         setLoading(false);
@@ -164,31 +296,89 @@ export default function HrNoteDetailPage({
   if (!note) notFound();
 
   const createdAt = tsDate(note.createdAt);
+  const hasDrafts = followUps.some(isDraftFollowUp);
 
-  async function handleDelete() {
-    if (!confirm("Delete this HR note?")) return;
-    setDeleting(true);
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleAddFollowUp() {
+    if (!user) return;
+    const draft = emptyFollowUp(note.category, user);
+    setFollowUps((prev) => [...prev, draft]);
+    setExpanded((prev) => new Set([...prev, draft.id]));
+  }
+
+  function updateFollowUpField(id: string, label: string, value: string) {
+    setFollowUps((prev) =>
+      prev.map((fu) =>
+        fu.id === id
+          ? { ...fu, fields: { ...fu.fields, [label]: value.slice(0, MAX_LEN) } }
+          : fu,
+      ),
+    );
+  }
+
+  function toggleFollowUpCheck(id: string, label: string) {
+    setFollowUps((prev) =>
+      prev.map((fu) =>
+        fu.id === id
+          ? {
+              ...fu,
+              checkboxes: fu.checkboxes.map((c) =>
+                c.label === label ? { ...c, checked: !c.checked } : c,
+              ),
+            }
+          : fu,
+      ),
+    );
+  }
+
+  async function handleSaveChanges() {
+    if (!user) return;
+    const drafts = followUps.filter(isDraftFollowUp);
+    for (const fu of drafts) {
+      const hasText = Object.values(fu.fields).some((v) => v.trim().length > 0);
+      if (!hasText) {
+        alert("Please fill in at least one field before saving a follow-up note.");
+        return;
+      }
+    }
+    setSaving(true);
     try {
-      await deleteDoc(doc(getDb(), "hr_notes", noteId));
-      router.push("/people/hr-notes");
+      const payload = followUps.map((fu) => ({
+        id: fu.id,
+        fields: fu.fields,
+        checkboxes: fu.checkboxes,
+        addedByUid: fu.addedByUid || user.uid,
+        addedByName: fu.addedByName || addedByNameFromEmail(user.email),
+        createdAt: fu.createdAt ?? serverTimestamp(),
+      }));
+      await updateDoc(doc(getDb(), "hr_notes", noteId), { followUps: payload });
+      const snap = await getDoc(doc(getDb(), "hr_notes", noteId));
+      if (snap.exists()) {
+        const refreshed = parseFollowUps((snap.data() as StoredNote).followUps);
+        setFollowUps(refreshed);
+        setExpanded(new Set(["original"]));
+      }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete.");
-      setDeleting(false);
+      alert(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setSaving(false);
     }
   }
 
   function handleEdit() {
-    if (!note) return;
     router.push(`/people/hr-notes/add/${note.category}?edit=${noteId}`);
-  }
-
-  function handleFollowUp() {
-    router.push("/people/hr-notes");
   }
 
   return (
     <div className={styles.page}>
-      {/* Light top bar — back left, delete right */}
       <div className={styles.topbar}>
         <button
           type="button"
@@ -201,24 +391,9 @@ export default function HrNoteDetailPage({
           </svg>
         </button>
         <span />
-        <button
-          type="button"
-          className={styles.iconBtn}
-          onClick={handleDelete}
-          disabled={deleting}
-          aria-label="Delete"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6" />
-            <path d="M14 11v6" />
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-          </svg>
-        </button>
+        <span />
       </div>
 
-      {/* Hero */}
       <header className={styles.hero}>
         <span className={`${styles.heroIcon} ${kindClass(note.kind)}`} aria-hidden="true">
           {kindIcon(note.kind, 28)}
@@ -234,7 +409,6 @@ export default function HrNoteDetailPage({
         </div>
       </header>
 
-      {/* Employee */}
       <section className={styles.empCard}>
         <span className={styles.empAvatar} aria-hidden="true">
           {initials(note.employeeName)}
@@ -245,7 +419,6 @@ export default function HrNoteDetailPage({
         </div>
       </section>
 
-      {/* Date / Time / Added by */}
       <section className={styles.metaCard}>
         <div className={styles.metaRow}>
           <span className={styles.metaIcon} aria-hidden="true">
@@ -285,97 +458,140 @@ export default function HrNoteDetailPage({
         </div>
       </section>
 
-      {/* Render each saved field */}
-      <section className={styles.contentCard}>
-        {Object.entries(note.fields ?? {}).map(([label, value], idx) => {
-          const isPhotoField = /photo|attach/i.test(label);
-          const isImage =
-            typeof value === "string" &&
-            (value.startsWith("data:image/") ||
-              value.startsWith("https://") ||
-              value.startsWith("http://"));
-          if (!value && !isPhotoField) return null;
-          return (
-            <div key={label} style={idx > 0 ? { marginTop: "var(--space-5)" } : undefined}>
-              <h2 className={styles.contentTitle}>{label}</h2>
-              {isPhotoField ? (
-                isImage ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={value}
-                      alt={label}
-                      onError={(e) => {
-                        const img = e.currentTarget;
-                        img.style.display = "none";
-                        const fallback = img.nextElementSibling as HTMLElement | null;
-                        if (fallback) fallback.style.display = "block";
-                      }}
-                      style={{
-                        width: "100%",
-                        maxHeight: 320,
-                        objectFit: "cover",
-                        borderRadius: "var(--radius-md)",
-                        border: "1px solid var(--color-border)",
-                        display: "block",
-                      }}
-                    />
-                    <div
-                      className={styles.bodyBox}
-                      style={{ display: "none", color: "var(--color-fg-muted)", fontStyle: "italic" }}
-                    >
-                      Photo unavailable — re-attach via Edit.
-                    </div>
-                  </>
-                ) : (
-                  <div
-                    className={styles.bodyBox}
-                    style={{ color: "var(--color-fg-muted)", fontStyle: "italic" }}
-                  >
-                    {value ? "Photo unavailable — re-attach via Edit." : "No photo attached."}
-                  </div>
-                )
-              ) : isImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={value}
-                  alt={label}
-                  style={{
-                    width: "100%",
-                    maxHeight: 320,
-                    objectFit: "cover",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px solid var(--color-border)",
-                    display: "block",
-                  }}
-                />
-              ) : (
-                <div className={styles.bodyBox}>{value}</div>
-              )}
+      <section className={styles.notesSection}>
+        <h2 className={styles.notesSectionTitle}>Notes</h2>
+
+        <article className={styles.noteEntry}>
+          <button
+            type="button"
+            className={styles.noteEntryHead}
+            onClick={() => toggleExpanded("original")}
+            aria-expanded={expanded.has("original")}
+          >
+            <div className={styles.noteEntryHeadLeft}>
+              <span className={styles.noteNumber}>Note #1</span>
+              <span className={`${styles.noteBadge} ${styles.noteBadgeCurrent}`}>Current</span>
             </div>
+            <div className={styles.noteEntryHeadRight}>
+              <span className={styles.noteMeta}>
+                {fmtDateTime(createdAt)} by {note.addedByName}
+              </span>
+              <ChevronDown open={expanded.has("original")} />
+            </div>
+          </button>
+          {expanded.has("original") && (
+            <div className={styles.noteEntryBody}>
+              {Object.entries(note.fields ?? {}).map(([label, value]) => (
+                <ReadOnlyField key={label} label={label} value={value} />
+              ))}
+              <ReadOnlyChecks items={note.checkboxes ?? []} />
+            </div>
+          )}
+        </article>
+
+        {followUps.map((fu, idx) => {
+          const draft = isDraftFollowUp(fu);
+          const fuDate = tsDate(fu.createdAt);
+          const isOpen = expanded.has(fu.id);
+          return (
+            <article key={fu.id} className={styles.noteEntry}>
+              <button
+                type="button"
+                className={styles.noteEntryHead}
+                onClick={() => toggleExpanded(fu.id)}
+                aria-expanded={isOpen}
+              >
+                <div className={styles.noteEntryHeadLeft}>
+                  <span className={styles.noteNumber}>Note #{idx + 2}</span>
+                  <span className={`${styles.noteBadge} ${draft ? styles.noteBadgeDraft : styles.noteBadgeSaved}`}>
+                    {draft ? "Draft" : "Follow-up"}
+                  </span>
+                </div>
+                <div className={styles.noteEntryHeadRight}>
+                  <span className={styles.noteMeta}>
+                    {draft ? "Unsaved" : fmtDateTime(fuDate)} by {fu.addedByName}
+                  </span>
+                  <ChevronDown open={isOpen} />
+                </div>
+              </button>
+              {isOpen && (
+                <div className={styles.noteEntryBody}>
+                  {draft ? (
+                    <>
+                      {fieldDefs.map((f) => (
+                        <div key={f.label} className={styles.noteFieldBlock}>
+                          <h3 className={styles.contentTitle}>{f.label}</h3>
+                          {f.hint ? <p className={styles.contentHint}>{f.hint}</p> : null}
+                          <textarea
+                            className={styles.fieldTextarea}
+                            value={fu.fields[f.label] ?? ""}
+                            placeholder={f.placeholder}
+                            rows={4}
+                            maxLength={f.maxLength ?? MAX_LEN}
+                            onChange={(e) => updateFollowUpField(fu.id, f.label, e.target.value)}
+                          />
+                        </div>
+                      ))}
+                      {fu.checkboxes.length > 0 && (
+                        <ul className={styles.checkListEditable}>
+                          {fu.checkboxes.map((c) => (
+                            <li key={c.label}>
+                              <button
+                                type="button"
+                                className={styles.checkRowBtn}
+                                onClick={() => toggleFollowUpCheck(fu.id, c.label)}
+                              >
+                                <span className={`${styles.checkMark} ${c.checked ? styles.checkMarkOn : ""}`}>
+                                  {c.checked && (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  )}
+                                </span>
+                                <span className={styles.checkLabel}>{c.label}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {Object.entries(fu.fields).map(([label, value]) => (
+                        <ReadOnlyField key={label} label={label} value={value} />
+                      ))}
+                      <ReadOnlyChecks items={fu.checkboxes} />
+                    </>
+                  )}
+                </div>
+              )}
+            </article>
           );
         })}
 
-        {(note.checkboxes ?? []).length > 0 && (
-          <ul className={styles.checkList}>
-            {(note.checkboxes ?? []).map((c) => (
-              <li key={c.label} className={styles.checkRow}>
-                <span className={`${styles.checkMark} ${c.checked ? styles.checkMarkOn : ""}`} aria-hidden="true">
-                  {c.checked && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </span>
-                <span className={styles.checkLabel}>{c.label}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <button type="button" className={styles.addFollowUpBtn} onClick={handleAddFollowUp}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Add Follow-up Note
+        </button>
       </section>
 
-      {/* Action buttons */}
-      <div className={styles.actionRow}>
+      <div className={styles.infoBox}>
+        <span className={styles.infoIcon} aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+        </span>
+        <p className={styles.infoText}>
+          To keep a clear record, notes cannot be deleted. If a note was added in error, please edit it to update the information.
+        </p>
+      </div>
+
+      <div className={styles.footerActions}>
         <button type="button" className={styles.editBtn} onClick={handleEdit}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 20h9" />
@@ -383,8 +599,13 @@ export default function HrNoteDetailPage({
           </svg>
           <span>Edit</span>
         </button>
-        <button type="button" className={styles.followUpBtn} onClick={handleFollowUp}>
-          Add Follow-up Note
+        <button
+          type="button"
+          className={styles.saveBtn}
+          onClick={handleSaveChanges}
+          disabled={saving || !hasDrafts}
+        >
+          {saving ? "Saving…" : "Save Changes"}
         </button>
       </div>
 
