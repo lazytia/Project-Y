@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
-import { getPlatterCateringOrder } from "@/lib/catering-square";
+import { cancelPlatterCateringOrder, getPlatterCateringOrder } from "@/lib/catering-square";
 import { syncOrderToFirestore } from "@/lib/catering-firestore";
 
 /**

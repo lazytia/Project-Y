@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { fetchAllWeekPayrollDetails } from "@/lib/payroll-sheet";
+import {
+  fetchAllWeekPayrollDetails,
+  isEmptyPayrollDetail,
+  type WeekPayrollDetail,
+} from "@/lib/payroll-sheet";
 import { shiftDateKey } from "@/lib/square";
 import { emailToUsername } from "@/lib/username";
 
@@ -124,11 +128,29 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  let allWeeks: Awaited<ReturnType<typeof fetchAllWeekPayrollDetails>> = [];
+  // Prefer a live sheet read (fresh) but fall back to whatever weeks
+  // the /payroll/payroll page has already cached in Firestore
+  // (payroll_summary_cache/<weekStart>). This keeps the page usable in
+  // local dev where the Google Sheets service-account creds aren't
+  // installed, and shields production readers if the Sheets API is
+  // briefly down.
+  let allWeeks: WeekPayrollDetail[] = [];
   try {
     allWeeks = await fetchAllWeekPayrollDetails();
   } catch (err) {
-    console.error("[staff/payslips] sheet fetch failed:", err);
+    console.warn("[staff/payslips] sheet fetch failed — trying cache:", err);
+  }
+  if (allWeeks.length === 0) {
+    try {
+      const snap = await adminDb().collection("payroll_summary_cache").get();
+      allWeeks = snap.docs
+        .map((d) => (d.data() as { detail?: WeekPayrollDetail }).detail ?? null)
+        .filter((d): d is WeekPayrollDetail => !!d && !isEmptyPayrollDetail(d));
+    } catch (err) {
+      console.error("[staff/payslips] cache fallback failed:", err);
+    }
+  }
+  if (allWeeks.length === 0) {
     return NextResponse.json(
       { error: "Failed to read payroll sheet." },
       { status: 502 },
