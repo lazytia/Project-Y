@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { isOwner } from "@/lib/permissions";
 import {
   type CateringOrder,
   daysUntil,
@@ -107,6 +108,11 @@ export default function CateringOrderDetailPage() {
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
 
+  // Owner-only Cancel (Delete) — flips the Square order to CANCELED so
+  // it drops off the calendar. Used to prune test / duplicate orders.
+  const [cancelling, setCancelling] = useState(false);
+  const canCancel = isOwner(user);
+
   useEffect(() => {
     if (!params?.orderId || !user) return;
     const controller = new AbortController();
@@ -129,6 +135,34 @@ export default function CateringOrderDetailPage() {
     })();
     return () => controller.abort();
   }, [params?.orderId, user]);
+
+  async function handleCancel() {
+    if (!user || !params?.orderId || cancelling) return;
+    const label = order?.clientName
+      ? `${order.clientName}'s order`
+      : "this order";
+    const ok = window.confirm(
+      `Cancel ${label} in Square?\n\nThis marks the order as CANCELED and removes it from the calendar. This cannot be undone.`,
+    );
+    if (!ok) return;
+    setCancelling(true);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(
+        `/api/catering-orders/${encodeURIComponent(params.orderId)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${idToken}` },
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Cancel failed (${res.status}).`);
+      router.push("/operations/catering-orders");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to cancel order.");
+      setCancelling(false);
+    }
+  }
 
   async function handleSaveNote() {
     if (!user || !params?.orderId) return;
@@ -330,6 +364,22 @@ export default function CateringOrderDetailPage() {
           </div>
         </div>
       </section>
+
+      {canCancel && (
+        <section className={styles.dangerZone}>
+          <button
+            type="button"
+            className={styles.cancelBtn}
+            disabled={cancelling}
+            onClick={handleCancel}
+          >
+            {cancelling ? "Cancelling…" : "Cancel this order"}
+          </button>
+          <p className={styles.dangerHint}>
+            Marks the Square order as CANCELED and removes it from the calendar. Use for test or duplicate orders.
+          </p>
+        </section>
+      )}
     </div>
   );
 }

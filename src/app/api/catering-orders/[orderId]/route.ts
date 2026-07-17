@@ -40,5 +40,27 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: st
   }
 }
 
-// PATCH and DELETE removed — catering orders are now read-only from Square.
-// Owner's Note is saved via /api/catering-orders/[orderId]/note (Firestore only).
+// PATCH removed — catering orders are read-only from Square (owner's
+// note lives at /api/catering-orders/[orderId]/note, Firestore only).
+
+/**
+ * DELETE /api/catering-orders/[orderId]
+ * Header: Authorization: Bearer <Firebase ID token>
+ *
+ * Cancels the order in Square (state -> CANCELED). Used by the owner
+ * to prune test / duplicate orders that Square's dashboard shouldn't
+ * be showing. Cancelled orders drop off the calendar because
+ * listPlatterCateringOrders filters state = [OPEN, COMPLETED].
+ */
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
+  const auth = await verifyAuth(req);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const { orderId } = await ctx.params;
+  try {
+    await cancelPlatterCateringOrder(orderId);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to cancel Square order.";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
