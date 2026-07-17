@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner } from "@/lib/permissions";
+import { isStrictOwner } from "@/lib/permissions";
 import {
   type CateringOrder,
   daysUntil,
@@ -108,10 +108,11 @@ export default function CateringOrderDetailPage() {
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
 
-  // Owner-only Cancel (Delete) — flips the Square order to CANCELED so
-  // it drops off the calendar. Used to prune test / duplicate orders.
+  // Strict-owner-only Cancel (Delete) — flips the Square order to
+  // CANCELED so it drops off the calendar. Managers (yurina) and chefs
+  // (chuck) intentionally can't cancel; only Tia / Yurica / Eddie can.
   const [cancelling, setCancelling] = useState(false);
-  const canCancel = isOwner(user);
+  const canCancel = isStrictOwner(user);
 
   useEffect(() => {
     if (!params?.orderId || !user) return;
