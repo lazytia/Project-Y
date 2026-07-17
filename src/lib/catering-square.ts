@@ -349,7 +349,10 @@ export async function listPlatterCateringOrders(opts?: {
       query: {
         filter: {
           dateTimeFilter: { createdAt: { startAt, endAt } },
-          stateFilter: { states: ["OPEN", "COMPLETED", "DRAFT"] },
+          // Only orders customers actually placed — DRAFT is Square's
+          // scratch state (never fully confirmed) and pollutes the
+          // calendar with test/half-created rows.
+          stateFilter: { states: ["OPEN", "COMPLETED"] },
         },
         sort: { sortField: "CREATED_AT", sortOrder: "DESC" },
       },
@@ -362,7 +365,12 @@ export async function listPlatterCateringOrders(opts?: {
   const mapped: CateringOrder[] = [];
   for (const o of collected) {
     const co = toCateringOrder(o);
-    if (co) mapped.push(co);
+    if (!co) continue;
+    // Skip skeleton/empty orders — an actual catering job has either a
+    // paid total or at least one line item. Zero-total + empty-menu
+    // rows are almost always Square drafts we couldn't finalise.
+    if (co.totalAmount <= 0 && co.menu.length === 0) continue;
+    mapped.push(co);
   }
   // Sort by delivery date ascending so the page's "next order" logic is happy.
   mapped.sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));

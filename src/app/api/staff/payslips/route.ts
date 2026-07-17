@@ -2,8 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { fetchAllWeekPayrollDetails } from "@/lib/payroll-sheet";
 import { shiftDateKey } from "@/lib/square";
-import { OWNER_USERNAMES } from "@/lib/permissions";
-import { emailToUsername } from "@/lib/username";
 
 /**
  * GET /api/staff/payslips
@@ -93,30 +91,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing bearer token." }, { status: 401 });
   }
   let uid: string;
-  let callerEmail: string | null = null;
   try {
     const decoded = await adminAuth().verifyIdToken(idToken);
     uid = decoded.uid;
-    callerEmail = decoded.email ?? null;
   } catch (err) {
     return NextResponse.json(
       { error: `Token verification failed: ${err instanceof Error ? err.message : String(err)}` },
       { status: 401 },
     );
-  }
-
-  // Owner/manager can look up any staff member's payslips by passing
-  // ?uid=<staffUid>. Regular staff can only see their own.
-  const targetUid = req.nextUrl.searchParams.get("uid");
-  if (targetUid && targetUid !== uid) {
-    const callerUsername = emailToUsername(callerEmail ?? "").toLowerCase();
-    if (!OWNER_USERNAMES.has(callerUsername)) {
-      return NextResponse.json(
-        { error: "Owner only." },
-        { status: 403 },
-      );
-    }
-    uid = targetUid;
   }
 
   const nameInfo = await resolveEmployeeName(uid);
