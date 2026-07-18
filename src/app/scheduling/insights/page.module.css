@@ -308,6 +308,9 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.55);
+  /* "PAYROLL COST" was wrapping onto two lines and knocking the three
+     columns out of vertical alignment. Force a single row. */
+  white-space: nowrap;
 }
 
 .snapshotValue {
@@ -335,6 +338,9 @@
   border-radius: 99px;
   font-size: 10px;
   font-weight: 700;
+  /* Same rationale as .snapshotLabel — "Over Target" was breaking
+     across two lines and squeezing the middle column vertically. */
+  white-space: nowrap;
 }
 
 .targetPillOk {
