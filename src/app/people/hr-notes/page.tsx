@@ -113,11 +113,16 @@ function fmtTime(d: Date | null): string {
 }
 
 function pickBody(fields: Record<string, string>): string {
-  // First non-empty field is what we show as the timeline body. Skip
-  // image data URLs and legacy photo-field filenames so the snippet is
-  // always readable text.
+  // Prefer the explicit "Title" field the add-note form now captures —
+  // that's what managers gave the note when creating it, so it's the
+  // most scannable line for the timeline. Falls back to the first
+  // non-empty non-photo field so older notes without a title still
+  // surface something readable.
+  const title = (fields?.Title ?? "").trim();
+  if (title) return title;
   for (const [label, v] of Object.entries(fields ?? {})) {
     if (typeof v !== "string") continue;
+    if (label === "Title") continue;
     const t = v.trim();
     if (!t || t.startsWith("data:image/")) continue;
     if (/photo|attach/i.test(label)) continue;

@@ -5,9 +5,8 @@ import { useRouter, notFound } from "next/navigation";
 import {
   doc,
   getDoc,
-  serverTimestamp,
+  Timestamp,
   updateDoc,
-  type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
@@ -352,13 +351,18 @@ export default function HrNoteDetailPage({
     }
     setSaving(true);
     try {
+      // Firestore rejects serverTimestamp() inside array elements
+      // ("serverTimestamp() is not currently supported inside arrays"),
+      // so stamp new follow-ups with a client-side Timestamp.now() — it's
+      // milliseconds-off from a server timestamp but keeps the timeline
+      // usable and matches what other apps do for array items.
       const payload = followUps.map((fu) => ({
         id: fu.id,
         fields: fu.fields,
         checkboxes: fu.checkboxes,
         addedByUid: fu.addedByUid || user.uid,
         addedByName: fu.addedByName || addedByNameFromEmail(user.email),
-        createdAt: fu.createdAt ?? serverTimestamp(),
+        createdAt: fu.createdAt ?? Timestamp.now(),
       }));
       await updateDoc(doc(getDb(), "hr_notes", noteId), { followUps: payload });
       const snap = await getDoc(doc(getDb(), "hr_notes", noteId));

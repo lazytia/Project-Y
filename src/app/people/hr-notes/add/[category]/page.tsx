@@ -118,6 +118,10 @@ const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
     iconClass: "iconWarning",
     icon: iconWarning,
     fields: [
+      // Title is what surfaces on the HR Notes timeline list — keep it
+      // short and specific so managers can scan the timeline without
+      // opening every card.
+      { key: "title",       label: "Title",        hint: "Give this warning a short title.",                          placeholder: "e.g. Late arrival without prior notice", kind: "input", maxLength: 100 },
       { key: "details",     label: "Details",      hint: "Describe the issue and why this warning is being issued.", placeholder: "e.g. Arrived 25 minutes late on 15 Jun 2026 without prior notice." },
       { key: "actionTaken", label: "Action Taken", hint: "Describe what was discussed and any action taken.",         placeholder: "e.g. Discussed attendance expectations and store policy. A formal warning was issued." },
     ],
@@ -130,6 +134,7 @@ const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
     iconClass: "iconReview",
     icon: iconReview,
     fields: [
+      { key: "title", label: "Title", hint: "Give this review a short title.", placeholder: "e.g. Monthly performance review – Jun 2026", kind: "input", maxLength: 100 },
       { key: "concerns", label: "Performance Concerns", hint: "Describe the performance concerns or areas for improvement.", placeholder: "e.g. Discussed punctuality, communication and roster reliability…" },
       { key: "expectations", label: "Action / Expectations", hint: "Describe what was discussed and the expected improvements.", placeholder: "e.g. Employee was advised to improve attendance and prepare for shifts in advance…" },
     ],
@@ -142,6 +147,7 @@ const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
     iconClass: "iconIncident",
     icon: iconIncident,
     fields: [
+      { key: "title",       label: "Title",          hint: "Give this incident a short title.",              placeholder: "e.g. Spill incident in kitchen during dinner service", kind: "input", maxLength: 100 },
       { key: "time",        label: "Time (Approx.)", hint: "",                                                kind: "time" },
       { key: "details",     label: "Details",        hint: "Describe what happened.",                          placeholder: "e.g. Customer complained about incorrect order and poor service." },
       { key: "witness",     label: "Witness",        hint: "Who witnessed the incident?",                      placeholder: "e.g. John Smith", kind: "input", optional: true, maxLength: 100 },
@@ -157,6 +163,7 @@ const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
     iconClass: "iconOther",
     icon: iconOther,
     fields: [
+      { key: "title",     label: "Title",            hint: "Give this note a short title.",                     placeholder: "e.g. Unknown visitor asking about staff", kind: "input", maxLength: 100 },
       { key: "details",   label: "Details",          hint: "Describe the matter.",                              placeholder: "e.g. Employee reported that an unknown person visited the store asking questions about staff rosters and management." },
       { key: "outcome",   label: "Action / Outcome", hint: "Describe any action taken or next steps.",          placeholder: "e.g. Management was notified and staff were reminded not to disclose internal information.", optional: true },
     ],

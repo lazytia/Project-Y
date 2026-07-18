@@ -1,6 +1,10 @@
 .page {
   font-family: var(--font-sans);
-  max-width: 720px;
+  /* Widened from 720px so timeline rows can fit their preview text
+     (Title + snippet) without wrapping mid-word on desktop. Owner
+     asked for the fuller horizontal layout matching the reference
+     screenshot. */
+  max-width: 1080px;
   margin: 0;
   padding: var(--page-padding);
   display: flex;
