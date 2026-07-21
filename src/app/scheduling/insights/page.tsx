@@ -833,7 +833,11 @@ export default function InsightsPage() {
           {chart.points.every((p) => p.value === 0) ? (
             <p className={styles.emptyChart}>No roster data for the last {TREND_WEEKS} weeks.</p>
           ) : (
-            <svg className={styles.trendSvg} viewBox={`0 0 ${chart.width} ${chart.height}`} preserveAspectRatio="none">
+            // Keep aspect ratio ("xMidYMid meet") so text glyphs stay
+            // round on wide desktop cards. With preserveAspectRatio="none"
+            // the SVG stretched horizontally to fill the container and
+            // the "54.5%" / "38.9%" labels came out visibly squished.
+            <svg className={styles.trendSvg} viewBox={`0 0 ${chart.width} ${chart.height}`} preserveAspectRatio="xMidYMid meet">
               {chart.yLabels.map((y) => (
                 <text key={y.value} x={chart.padLeft - 6} y={y.y + 3} className={styles.trendAxis} textAnchor="end">
                   {chart.pctMode ? `${y.value}%` : fmtCurrency(y.value)}
