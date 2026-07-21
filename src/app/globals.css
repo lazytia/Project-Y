@@ -182,4 +182,20 @@ button {
   main > * {
     margin-inline: auto !important;
   }
+
+  /* Fixed bottom action bars (Add Notice Given, Save & Continue, etc.)
+     used to span left:0 → right:0 including the sidebar area, so their
+     centered button rendered relative to the whole viewport instead of
+     the visible main column. Shift them right by the sidebar width so
+     the button lines up vertically with the centered page above.
+     Class-name substring match works because CSS Modules preserve the
+     source name as a prefix in the hashed class (e.g. `page_bottomBar__xYz`). */
+  [class*="bottomBar"],
+  [class*="BottomBar"],
+  [class*="actionBar"],
+  [class*="ActionBar"],
+  [class*="footerBar"],
+  [class*="FooterBar"] {
+    left: var(--sidebar-width) !important;
+  }
 }
