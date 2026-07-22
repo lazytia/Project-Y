@@ -4,15 +4,20 @@ import { useEffect, useState } from "react";
 import { getDb } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
+import {
+  readSoldOutMenuCache,
+  writeSoldOutMenuCache,
+  type SoldOutMenuCategory,
+} from "@/lib/sold-out-menu-cache";
 import styles from "./page.module.css";
 
-type Category = {
-  id: string;
-  name: string;
-  subName?: string;
-  items: string[];
-  icon: "squid" | "fish";
-};
+const SYDNEY_TZ = "Australia/Sydney";
+
+function sydneyTodayKey(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
+}
+
+type Category = SoldOutMenuCategory;
 
 type ApiCategory = {
   categoryId: string;
@@ -96,12 +101,14 @@ export default function DailySoldOutPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    setToday(new Date().toLocaleDateString("en-CA"));
+    setToday(sydneyTodayKey());
   }, []);
 
   const [soldOutIds, setSoldOutIds] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [categories, setCategories] = useState<Category[]>([]);
+  const cachedMenu = readSoldOutMenuCache();
+  const [categories, setCategories] = useState<Category[]>(() => cachedMenu ?? []);
+  const [menuLoading, setMenuLoading] = useState(() => !cachedMenu?.length);
   const [menuError, setMenuError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -120,28 +127,39 @@ export default function DailySoldOutPage() {
   }, [today]);
 
   // Pull the live menu from Square so the page always reflects the
-  // catalog rather than a hard-coded item list.
+  // catalog rather than a hard-coded item list. Stale session cache
+  // paints instantly; background refresh keeps data fresh.
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      if (!cachedMenu?.length) setMenuLoading(true);
       try {
-        const res = await fetch("/api/menu/sold-out-categories", { cache: "no-store" });
+        const res = await fetch("/api/menu/sold-out-categories");
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
         const list = (data?.dailySoldOutCategories ?? []) as ApiCategory[];
-        setCategories(
-          list.map((c) => ({
-            id: c.categoryId,
-            name: c.displayName.toUpperCase(),
-            subName: c.subName,
-            items: c.affectedItems,
-            icon: c.categoryId === "squid" ? "squid" : "fish",
-          })),
-        );
+        const next = list.map((c) => ({
+          id: c.categoryId,
+          name: c.displayName.toUpperCase(),
+          subName: c.subName,
+          items: c.affectedItems,
+          icon: (c.categoryId === "squid" ? "squid" : "fish") as Category["icon"],
+        }));
+        if (cancelled) return;
+        setCategories(next);
+        writeSoldOutMenuCache(next);
         setMenuError(null);
       } catch (err) {
-        setMenuError(err instanceof Error ? err.message : "Could not load menu.");
+        if (cancelled) return;
+        if (!categories.length) {
+          setMenuError(err instanceof Error ? err.message : "Could not load menu.");
+        }
+      } finally {
+        if (!cancelled) setMenuLoading(false);
       }
     })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function toggleSoldOut(id: string) {
@@ -209,11 +227,24 @@ export default function DailySoldOutPage() {
       </div>
 
       {menuError && (
-        <p style={{ fontSize: 12, color: "#c14545", textAlign: "center", margin: "8px 0 0" }}>
-          {menuError}
-        </p>
+        <p className={styles.menuError}>{menuError}</p>
       )}
 
+      {menuLoading && categories.length === 0 ? (
+        <ul className={styles.list} aria-busy="true" aria-label="Loading menu categories">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className={`${styles.categoryCard} ${styles.categoryCardSkeleton}`}>
+              <div className={styles.categoryRow}>
+                <div className={styles.skeletonIcon} />
+                <div className={styles.skeletonText}>
+                  <div className={styles.skeletonLine} />
+                  <div className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
       <ul className={styles.list}>
         {categories.map((cat) => {
           const isSoldOut = soldOutIds.includes(cat.id);
@@ -297,6 +328,7 @@ export default function DailySoldOutPage() {
           );
         })}
       </ul>
+      )}
 
       <div className={styles.summary}>
         <div className={styles.summaryBadge}>{soldOutCount}</div>

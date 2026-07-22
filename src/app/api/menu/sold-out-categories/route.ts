@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { squareClient } from "@/lib/square";
 import { SOLD_OUT_EXCLUDED_NAME } from "@/lib/sold-out-square";
 
+/** Avoid re-walking the full Square catalog on every page open. */
+const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
+let catalogCache: { savedAt: number; body: { dailySoldOutCategories: unknown[] } } | null = null;
+
 /**
  * GET /api/menu/sold-out-categories
  *
@@ -43,6 +47,12 @@ type CatalogObject = {
 
 export async function GET() {
   try {
+    if (catalogCache && Date.now() - catalogCache.savedAt < CATALOG_CACHE_TTL_MS) {
+      return NextResponse.json(catalogCache.body, {
+        headers: { "cache-control": "private, max-age=300" },
+      });
+    }
+
     // Pull every ITEM + CATEGORY from the catalog (Square paginates
     // so we walk the cursor until the page iterator yields no more).
     const all: CatalogObject[] = [];
@@ -105,8 +115,11 @@ export async function GET() {
       };
     });
 
+    const body = { dailySoldOutCategories: out };
+    catalogCache = { savedAt: Date.now(), body };
+
     return NextResponse.json(
-      { dailySoldOutCategories: out },
+      body,
       // 5-minute browser cache so the page doesn't hammer Square on every
       // refresh; Square menu changes rarely.
       { headers: { "cache-control": "private, max-age=300" } },
