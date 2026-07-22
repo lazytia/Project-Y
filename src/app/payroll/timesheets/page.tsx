@@ -21,7 +21,7 @@ import {
   type PayrollStaffRecord,
 } from "@/lib/payroll-attention";
 import Splash from "@/components/Splash";
-import CalendarPicker from "@/components/CalendarPicker";
+import { DayExpandedPanel } from "./DayExpandedPanel";
 import styles from "./page.module.css";
 
 /*
@@ -207,6 +207,23 @@ function colorForMemberId(id: string): string {
 /* ── page ────────────────────────────────────────────────────────── */
 
 type ViewMode = "day" | "staff";
+type DatePreset = "today" | "yesterday" | "this-week" | "last-7" | "last-30" | "custom";
+
+function rangeForPreset(preset: DatePreset): { start: string; end: string } {
+  const today = sydneyTodayISO();
+  if (preset === "today") return { start: today, end: today };
+  if (preset === "yesterday") {
+    const y = addDaysISO(today, -1);
+    return { start: y, end: y };
+  }
+  if (preset === "this-week") {
+    const mon = isoMondayOf(today);
+    return { start: mon, end: isoSundayOfWeek(mon) };
+  }
+  if (preset === "last-30") return { start: addDaysISO(today, -29), end: today };
+  // last-7 (default)
+  return { start: addDaysISO(today, -6), end: today };
+}
 
 export default function TimesheetsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -214,11 +231,11 @@ export default function TimesheetsPage() {
 
   const [startISO, setStartISO] = useState<string>("");
   const [endISO, setEndISO] = useState<string>("");
+  const [datePreset, setDatePreset] = useState<DatePreset>("last-7");
   const [view, setView] = useState<ViewMode>("day");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState<null | "start" | "end">(null);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState<{
     teamMemberId: string;
@@ -237,10 +254,10 @@ export default function TimesheetsPage() {
   const [attentionBusy, setAttentionBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    const today = sydneyTodayISO();
-    const mon = isoMondayOf(today);
-    setStartISO(mon);
-    setEndISO(isoSundayOfWeek(mon));
+    const { start, end } = rangeForPreset("last-7");
+    setStartISO(start);
+    setEndISO(end);
+    setDatePreset("last-7");
   }, []);
 
   const load = useCallback(async () => {
@@ -425,39 +442,23 @@ export default function TimesheetsPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <p className={styles.eyebrow}>LABOUR</p>
         <h1 className={styles.title}>Timesheets</h1>
         <p className={styles.subtitle}>
-          <CalIcon /> {startISO && endISO ? fmtRangeSubtitle(startISO, endISO) : ""}
+          {startISO && endISO ? fmtRangeSubtitle(startISO, endISO) : ""}
           {totalStaff > 0 && ` · ${totalStaff} staff`}
         </p>
       </header>
 
       <section className={styles.summaryRow}>
-        <div className={styles.summaryCard}>
-          <span className={styles.summaryIcon}><ClockIcon /></span>
-          <div>
-            <p className={styles.summaryLabel}>TOTAL PAID HOURS</p>
-            <p className={styles.summaryValue}>
-              {totalHours.toFixed(2)} <span className={styles.summaryUnit}>h</span>
-            </p>
-            <p className={styles.summarySub}>{totalStaff} staff · {totalShifts} shifts</p>
-          </div>
+        <div className={`${styles.summaryCard} ${styles.summaryCardBlue}`}>
+          <p className={styles.summaryLabel}>Total paid hours</p>
+          <p className={styles.summaryValue}>{totalHours.toFixed(2)} h</p>
+          <p className={styles.summarySub}>{totalStaff} staff · {totalShifts} shifts</p>
         </div>
-        <div className={styles.summaryCard}>
-          <span className={`${styles.summaryIcon} ${styles.summaryIconWarm}`}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="1" x2="12" y2="23" />
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-          </span>
-          <div>
-            <p className={styles.summaryLabel}>EST. GROSS PAY</p>
-            <p className={`${styles.summaryValue} ${styles.summaryValueWarm}`}>
-              {fmtMoney(totalGross)}
-            </p>
-            <p className={styles.summarySub}>Shift date rate × paid hours</p>
-          </div>
+        <div className={`${styles.summaryCard} ${styles.summaryCardGreen}`}>
+          <p className={styles.summaryLabel}>Est. gross pay</p>
+          <p className={styles.summaryValue}>{fmtMoney(totalGross)}</p>
+          <p className={styles.summarySub}>Shift date rate × paid hours</p>
         </div>
       </section>
 
@@ -516,35 +517,58 @@ export default function TimesheetsPage() {
         </section>
       )}
 
+      <p className={styles.sectionLabel}>DATE RANGE</p>
       <section className={styles.filterCard}>
+        <div className={styles.chipsRow}>
+          {(
+            [
+              ["today", "Today"],
+              ["yesterday", "Yesterday"],
+              ["this-week", "This week"],
+              ["last-7", "Last 7 days"],
+              ["last-30", "Last 30 days"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`${styles.chip} ${datePreset === key ? styles.chipActive : ""}`}
+              onClick={() => {
+                const { start, end } = rangeForPreset(key);
+                setDatePreset(key);
+                setStartISO(start);
+                setEndISO(end);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className={styles.rangeGrid}>
           <div className={styles.rangeField}>
             <span className={styles.rangeLabel}>Start</span>
-            <button
-              type="button"
-              className={styles.rangeInput}
-              onClick={() => setPickerOpen("start")}
-              aria-label="Pick start date"
-            >
-              <CalIconSm />
-              <span className={styles.rangeInputText}>
-                {startISO ? `${fmtDayLabel(startISO)} ${startISO.slice(0, 4)}` : "—"}
-              </span>
-            </button>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={startISO}
+              onChange={(e) => {
+                setStartISO(e.target.value);
+                setDatePreset("custom");
+              }}
+            />
           </div>
           <div className={styles.rangeField}>
             <span className={styles.rangeLabel}>End</span>
-            <button
-              type="button"
-              className={styles.rangeInput}
-              onClick={() => setPickerOpen("end")}
-              aria-label="Pick end date"
-            >
-              <CalIconSm />
-              <span className={styles.rangeInputText}>
-                {endISO ? `${fmtDayLabel(endISO)} ${endISO.slice(0, 4)}` : "—"}
-              </span>
-            </button>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={endISO}
+              min={startISO || undefined}
+              onChange={(e) => {
+                setEndISO(e.target.value);
+                setDatePreset("custom");
+              }}
+            />
           </div>
           <button
             type="button"
@@ -557,157 +581,133 @@ export default function TimesheetsPage() {
         </div>
       </section>
 
-      {pickerOpen && (
-        <CalendarPicker
-          value={pickerOpen === "start" ? startISO : endISO}
-          minDate={pickerOpen === "end" ? startISO : undefined}
-          /* CalendarPicker requires a maxDate — when picking End we cap
-             at one year past today so future scheduling is possible;
-             when picking Start we cap at the current End so we can't
-             pick a start after the end. */
-          maxDate={
-            pickerOpen === "start"
-              ? (endISO || addDaysISO(sydneyTodayISO(), 365))
-              : addDaysISO(sydneyTodayISO(), 365)
-          }
-          singleOnly
-          onChange={(d) => {
-            if (pickerOpen === "start") setStartISO(d);
-            else setEndISO(d);
-          }}
-          onRangeChange={() => { /* range mode disabled via singleOnly */ }}
-          onClose={() => setPickerOpen(null)}
-        />
-      )}
-
       {fetchError && (
         <p className={styles.errorBanner}>Square Labor: {fetchError}</p>
       )}
 
-      <div className={styles.summaryHeader}>
-        <p className={styles.sectionEyebrow}>BY {view === "day" ? "DAY" : "STAFF"} SUMMARY</p>
-        <Link href="/scheduling/roster" className={styles.viewCalLink}>
-          <CalIconSm /> View roster
-        </Link>
-      </div>
-
-      <div className={styles.actionRow}>
-        <div className={styles.viewToggle} role="tablist" aria-label="View mode">
+      <div className={styles.listSectionHead}>
+        <div>
+          <p className={styles.sectionLabel}>BY {view === "day" ? "DAY" : "STAFF"}</p>
+          <p className={styles.listSectionMeta}>
+            {startISO} ~ {endISO}
+            {view === "day" ? ` · ${days.length} days` : ` · ${byStaff.length}`}
+          </p>
+        </div>
+        <div className={styles.actionRow}>
+          <div className={styles.viewToggle} role="tablist" aria-label="View mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "day"}
+              className={`${styles.toggleBtn} ${view === "day" ? styles.toggleBtnActive : ""}`}
+              onClick={() => { setView("day"); setExpandedDay(null); }}
+            >
+              Day
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "staff"}
+              className={`${styles.toggleBtn} ${view === "staff" ? styles.toggleBtnActive : ""}`}
+              onClick={() => { setView("staff"); setExpandedDay(null); }}
+            >
+              Staff
+            </button>
+          </div>
           <button
             type="button"
-            role="tab"
-            aria-selected={view === "day"}
-            className={`${styles.toggleBtn} ${view === "day" ? styles.toggleBtnActive : ""}`}
-            onClick={() => { setView("day"); setExpandedRow(null); }}
+            className={styles.addShiftBtn}
+            onClick={() => {
+              setAddError(null);
+              setAddForm((p) => ({ ...p, dateISO: startISO || endISO || "" }));
+              setAddOpen(true);
+            }}
           >
-            Day
+            + Add shift
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={view === "staff"}
-            className={`${styles.toggleBtn} ${view === "staff" ? styles.toggleBtnActive : ""}`}
-            onClick={() => { setView("staff"); setExpandedRow(null); }}
+            className={styles.refreshBtn}
+            onClick={() => void load()}
+            disabled={busy}
           >
-            Staff
+            <RefreshIcon /> Refresh
           </button>
         </div>
-        <button
-          type="button"
-          className={styles.addShiftBtn}
-          onClick={() => {
-            setAddError(null);
-            setAddForm((p) => ({ ...p, dateISO: startISO || endISO || "" }));
-            setAddOpen(true);
-          }}
-        >
-          + Add shift
-        </button>
-        <button
-          type="button"
-          className={styles.refreshBtn}
-          onClick={() => void load()}
-          disabled={busy}
-        >
-          <RefreshIcon /> Refresh
-        </button>
       </div>
 
       {view === "day" ? (
         <ul className={styles.list}>
           {days.map((d) => {
             const chip = fmtDayChip(d.dateISO);
+            const open = expandedDay === d.dateISO;
             return (
               <li key={d.dateISO} className={styles.rowBlock}>
-                <Link
-                  href={`/payroll/timesheets/${d.dateISO}`}
-                  className={styles.row}
+                <button
+                  type="button"
+                  className={`${styles.dayHeaderBtn} ${open ? styles.dayHeaderBtnExpanded : ""}`}
+                  aria-expanded={open}
+                  onClick={() => setExpandedDay(open ? null : d.dateISO)}
                 >
                   <span className={styles.dayChip}>
                     <span className={styles.dayChipDow}>{chip.dow}</span>
-                    <span className={styles.dayChipNum}>{chip.day}</span>
                   </span>
                   <div className={styles.rowBody}>
-                    <p className={styles.rowTitle}>{fmtDayLabel(d.dateISO)}</p>
+                    <div className={styles.rowTitleLine}>
+                      <p className={styles.rowTitle}>{fmtDayLabel(d.dateISO)}</p>
+                      <span className={styles.hoursPill}>{d.hours.toFixed(2)}h</span>
+                    </div>
                     <p className={styles.rowMeta}>
                       {d.staff} staff · {d.shifts} shifts
                     </p>
                   </div>
-                  <span className={styles.rowValue}>{fmtHours(d.hours)}</span>
-                  <span className={styles.rowChev} aria-hidden="true">›</span>
-                </Link>
+                  <span className={`${styles.rowChev} ${open ? styles.rowChevOpen : ""}`} aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+                {open && user && (
+                  <DayExpandedPanel
+                    dateISO={d.dateISO}
+                    entries={d.entries}
+                    teamMembers={teamMembers}
+                    userId={user.uid}
+                  />
+                )}
               </li>
             );
           })}
           {days.length === 0 && <p className={styles.empty}>No shifts in this range.</p>}
         </ul>
       ) : (
-        <>
-          <div className={styles.staffColHeader}>
-            <span>STAFF</span>
-            <span>HOURS</span>
-            <span>SHIFTS</span>
-            <span />
-          </div>
-          <ul className={styles.list}>
-            {byStaff.map((s) => {
-              const firstStart = s.entries.reduce<string | null>(
-                (a, b) => (a === null || b.startAt < a ? b.startAt : a),
-                null,
-              );
-              const lastEnd = s.entries.reduce<string | null>(
-                (a, b) => (b.endAt && (a === null || b.endAt > a) ? b.endAt : a),
-                null,
-              );
-              return (
-                <li key={s.teamMemberId} className={styles.rowBlock}>
-                  <Link
-                    href={`/payroll/timesheets/staff/${encodeURIComponent(s.teamMemberId)}?start=${startISO}&end=${endISO}`}
-                    className={`${styles.row} ${styles.rowStaff}`}
-                  >
-                    <div className={styles.rowBody}>
-                      <p className={styles.rowTitle}>{s.name}</p>
-                      <p className={styles.rowMeta}>
-                        {s.shifts} shifts · {fmtMoney(s.gross)}
-                      </p>
-                    </div>
-                    <div className={styles.staffHoursCol}>
-                      <p className={styles.staffHoursMain}>{fmtHours(s.hours)}</p>
-                      {firstStart && (
-                        <p className={styles.staffHoursSub}>
-                          {fmtClockTime(firstStart)} – {fmtClockTime(lastEnd)}
-                        </p>
-                      )}
-                    </div>
-                    <span className={styles.staffShiftsCol}>{s.shifts}</span>
-                    <span className={styles.rowChev} aria-hidden="true">›</span>
-                  </Link>
-                </li>
-              );
-            })}
-            {byStaff.length === 0 && <p className={styles.empty}>No staff shifts in this range.</p>}
-          </ul>
-        </>
+        <ul className={styles.list}>
+          {byStaff.map((s) => (
+            <li key={s.teamMemberId} className={styles.rowBlock}>
+              <Link
+                href={`/payroll/timesheets/staff/${encodeURIComponent(s.teamMemberId)}?start=${startISO}&end=${endISO}`}
+                className={styles.staffRowLink}
+              >
+                <span
+                  className={styles.avatarColor}
+                  style={{ background: colorForMemberId(s.teamMemberId) }}
+                  aria-hidden="true"
+                >
+                  {initialsOf(s.name)}
+                </span>
+                <div className={styles.rowBody}>
+                  <div className={styles.rowTitleLine}>
+                    <p className={styles.rowTitle}>{s.name}</p>
+                    <span className={styles.hoursPill}>{s.hours.toFixed(2)}h</span>
+                  </div>
+                  <p className={styles.rowMeta}>
+                    {s.shifts} shifts · {fmtMoney(s.gross)}
+                  </p>
+                </div>
+                <span className={styles.rowChev} aria-hidden="true">›</span>
+              </Link>
+            </li>
+          ))}
+          {byStaff.length === 0 && <p className={styles.empty}>No staff shifts in this range.</p>}
+        </ul>
       )}
 
       {pushMessage && <p className={styles.pushBanner}>{pushMessage}</p>}
