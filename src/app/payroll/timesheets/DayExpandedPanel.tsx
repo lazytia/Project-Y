@@ -75,9 +75,10 @@ type Props = {
   entries: ShiftFromApi[];
   teamMembers: Record<string, TeamMemberFromApi>;
   userId: string;
+  onChanged?: () => void;
 };
 
-export function DayExpandedPanel({ dateISO, entries, teamMembers, userId }: Props) {
+export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [edits, setEdits] = useState<Record<string, EditDoc>>({});
   const [extras, setExtras] = useState<ShiftFromApi[]>([]);
@@ -171,6 +172,7 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId }: Prop
       );
       setEdits((prev) => ({ ...prev, [shift.id]: patch }));
       setEditingField(null);
+      onChanged?.();
     } catch (err) {
       console.error("[timesheet_edits] save failed:", err);
       setEditError(err instanceof Error ? err.message : "Save failed.");

@@ -11,11 +11,9 @@ import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
 
 /*
- * Day Details — drill-down from /payroll/timesheets showing every Square
- * Labor shift recorded for a single calendar day. Read-only for now;
- * "Add shift" is a stub, delete is a placeholder that only clears the
- * row from the local view. The intention is that Square Labor stays
- * the authoritative record and this page mirrors it.
+ * Day Details — drill-down from /payroll/timesheets showing every shift
+ * for a single calendar day. Square supplies the base import; time edits
+ * and backfills are saved in Firestore only (never sent to Square).
  */
 
 type ShiftFromApi = {
@@ -31,9 +29,8 @@ type ShiftFromApi = {
 type TeamMemberFromApi = { firstName?: string; lastName?: string };
 
 /**
- * A per-shift override document stored in Firestore. We NEVER push these
- * values back to Square — Square Labor stays authoritative for the
- * underlying record. This just lets the owner tidy up the local view.
+ * A per-shift override document stored in Firestore. Square is read-only;
+ * corrected start/end times live here and are merged for display/payroll.
  */
 type EditDoc = {
   shiftId: string;

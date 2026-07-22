@@ -4,25 +4,8 @@ import { squareClient, squareEnv } from "@/lib/square";
 /**
  * GET /api/square/timesheets?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
  *
- * Returns every Square Labor "Shift" (clock-in / clock-out record) that
- * intersects the requested date range at the configured location, along
- * with a lookup table of team members so the client can render names.
- *
- * Response:
- *   {
- *     shifts: Array<{
- *       id: string;
- *       teamMemberId: string;
- *       dateISO: string;               // shift start's LOCAL calendar day
- *       startAt: string;               // ISO in Sydney local ("...+10:00")
- *       endAt: string | null;          // null while the shift is still open
- *       hours: number;                 // paid hours (breaks excluded)
- *       hourlyRateCents: number | null;
- *     }>,
- *     teamMembers: Record<string, { firstName?: string; lastName?: string }>,
- *     locationId: string,
- *     timezone: string,
- *   }
+ * Read-only import from Square Labor. Returns raw clock-in/out shifts;
+ * local edits live in Firestore and are merged by /api/payroll/timesheets.
  */
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);

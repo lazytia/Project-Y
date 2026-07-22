@@ -1,6 +1,6 @@
 /**
- * Server-side timesheet shift aggregation for payroll push.
- * Merges Square Labor, local edits, and back-filled extra shifts.
+ * Server-side timesheet shift aggregation.
+ * Square Labor (read-only) + Firestore edits + app backfills.
  */
 import { squareClient, squareEnv } from "@/lib/square";
 import { adminDb } from "@/lib/firebase-admin";

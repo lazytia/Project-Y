@@ -25,14 +25,10 @@ import { DayExpandedPanel } from "./DayExpandedPanel";
 import styles from "./page.module.css";
 
 /*
- * Timesheets — pulls live Square Labor shifts (real clock-in / clock-out
- * records with break subtraction) from /api/square/timesheets. Aggregates
- * per calendar day and per team member; owner can also open individual
- * days/staff to see raw shift times.
- *
- * Legacy path: an earlier version read rosters_published and estimated
- * lunch=4h/dinner=5h. The Square feed replaces that estimate with the
- * actual paid hours the location recorded.
+ * Timesheets — Square Labor is read-only: we import clock-in/out and paid
+ * hours from /api/square/timesheets (via the merged payroll feed below).
+ * Owner edits and backfilled shifts are stored in Firestore only
+ * (`timesheet_edits`, `timesheet_extra_shifts`) and never pushed to Square.
  */
 
 const SYDNEY_TZ = "Australia/Sydney";
@@ -266,7 +262,7 @@ export default function TimesheetsPage() {
     setFetchError(null);
     try {
       const res = await fetch(
-        `/api/square/timesheets?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`,
+        `/api/payroll/timesheets?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`,
         { cache: "no-store" },
       );
       const data = await res.json().catch(() => ({}));
@@ -278,7 +274,7 @@ export default function TimesheetsPage() {
           : {},
       );
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Square unreachable.";
+      const msg = err instanceof Error ? err.message : "Timesheet fetch failed.";
       console.error("[timesheets] fetch failed:", err);
       setFetchError(msg);
       setShifts([]);
@@ -582,7 +578,7 @@ export default function TimesheetsPage() {
       </section>
 
       {fetchError && (
-        <p className={styles.errorBanner}>Square Labor: {fetchError}</p>
+        <p className={styles.errorBanner}>Timesheets: {fetchError}</p>
       )}
 
       <div className={styles.listSectionHead}>
@@ -671,6 +667,7 @@ export default function TimesheetsPage() {
                     entries={d.entries}
                     teamMembers={teamMembers}
                     userId={user.uid}
+                    onChanged={() => void load()}
                   />
                 )}
               </li>
@@ -768,7 +765,7 @@ export default function TimesheetsPage() {
             <div className={styles.modalHead}>
               <div>
                 <h2 className={styles.modalTitle}>Add shift</h2>
-                <p className={styles.modalSub}>Back-fill a missed clock-in / clock-out. Saved in-app only, not pushed to Square.</p>
+                <p className={styles.modalSub}>Back-fill a missed clock-in / clock-out. Saved on our server only — not sent to Square.</p>
               </div>
               <button type="button" className={styles.modalClose} onClick={() => setAddOpen(false)} aria-label="Close">×</button>
             </div>
