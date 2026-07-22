@@ -6,6 +6,7 @@ export default function ServerDashboardPreparing() {
   return (
     <div
       id="ssr-dash-preparing"
+      data-app-shell="true"
       style={{
         display: "flex",
         minHeight: "60vh",

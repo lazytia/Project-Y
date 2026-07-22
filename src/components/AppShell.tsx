@@ -73,6 +73,14 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   }
 
   if (loading) {
+    if (hasSessionGuess) {
+      return (
+        <>
+          <AppReadyMarker />
+          <AppShellSkeleton>{children}</AppShellSkeleton>
+        </>
+      );
+    }
     return null;
   }
 

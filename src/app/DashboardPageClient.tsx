@@ -112,19 +112,17 @@ function Progress({ value, max, pctRight, tone = "orange" }: { value: number; ma
 
 export default function DashboardPageClient({
   sessionRole = null,
-  initialOwnerDash = null,
 }: {
   sessionRole?: string | null;
-  initialOwnerDash?: OwnerDashServerSnapshot | null;
 }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    if (initialOwnerDash && sessionRole === "owner") {
+    if (sessionRole === "owner") {
       return (
         <>
           <DismissSsrPreparing />
-          <OwnerDashboard initialServerDash={initialOwnerDash} />
+          <OwnerDashboard sessionRole={sessionRole} />
         </>
       );
     }
@@ -151,7 +149,7 @@ export default function DashboardPageClient({
   return (
     <>
       <DismissSsrPreparing />
-      <OwnerDashboard initialServerDash={initialOwnerDash} />
+      <OwnerDashboard sessionRole={sessionRole} />
     </>
   );
 }
@@ -196,24 +194,13 @@ function statsFromCache(cached: DashCache | null): Stats | null {
 }
 
 function OwnerDashboard({
-  initialServerDash = null,
+  sessionRole = null,
 }: {
-  initialServerDash?: OwnerDashServerSnapshot | null;
+  sessionRole?: string | null;
 }) {
   const { user } = useAuth();
-  const serverDateKey = initialServerDash?.dateKey;
-  const serverCache = initialServerDash?.cache;
-
-  useEffect(() => {
-    if (serverCache && serverDateKey) writeDashCache(serverDateKey, serverCache);
-  }, [serverCache, serverDateKey]);
-
-  const initialDate =
-    serverDateKey ||
-    (typeof window !== "undefined" ? sydneyTodayKey() : "");
-  const initialCache =
-    serverCache ||
-    (initialDate ? readDashCache(initialDate) : null);
+  const initialDate = typeof window !== "undefined" ? sydneyTodayKey() : "";
+  const initialCache = initialDate ? readDashCache(initialDate) : null;
   const [todayKey, setTodayKey] = useState(initialDate);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -266,11 +253,7 @@ function OwnerDashboard({
   const [reviewError, setReviewError] = useState<string | null>(null);
   /** False until today's sales path finishes on a cache-miss visit. */
   const [uiReady, setUiReady] = useState(() =>
-    initialServerDash
-      ? true
-      : initialDate
-        ? hasDashCache(initialDate)
-        : false,
+    initialDate ? hasDashCache(initialDate) : false,
   );
 
   const fetchStats = useCallback(async (dateKey: string) => {
@@ -463,6 +446,28 @@ function OwnerDashboard({
     return hasDashCache(dateKey);
   }
 
+  useEffect(() => {
+    if (sessionRole !== "owner" || !selectedDate) return;
+    let cancelled = false;
+    void fetch(
+      `/api/dashboard/owner-snapshot?date=${encodeURIComponent(selectedDate)}`,
+      { cache: "no-store" },
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: OwnerDashServerSnapshot | null) => {
+        if (cancelled || !data?.cache) return;
+        writeDashCache(data.dateKey, data.cache);
+        hydrateFromCache(data.dateKey);
+        setUiReady(true);
+      })
+      .catch(() => {
+        /* Phase 1 client fetch still runs */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionRole, selectedDate]);
+
   // Phase 1: Firestore sales_daily only (fast). Square + the rest in background.
   useEffect(() => {
     if (!selectedDate) return;
@@ -473,12 +478,8 @@ function OwnerDashboard({
     else setUiReady(false);
 
     (async () => {
-      if (initialServerDash && selectedDate === initialServerDash.dateKey) {
-        setUiReady(true);
-      } else {
-        await fetchSavedDaySales(selectedDate);
-        if (!cancelled) setUiReady(true);
-      }
+      await fetchSavedDaySales(selectedDate);
+      if (!cancelled) setUiReady(true);
 
       void Promise.allSettled([
         fetchStats(selectedDate),

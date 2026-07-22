@@ -5,24 +5,30 @@ export function hideBootSplash() {
   if (el) el.classList.add("bootSplashHidden");
 }
 
-/**
- * Hide boot splash only after the app shell has layout (CSS applied).
- * Avoids a white flash when CSS modules arrive after the first React commit.
- */
-export function hideBootSplashWhenSafe(maxAttempts = 90) {
-  let attempts = 0;
+function hasSsrChrome() {
+  return (
+    !!document.getElementById("ssr-dash-preparing") ||
+    !!document.getElementById("server-app-shell")
+  );
+}
 
+/**
+ * Hide boot splash once SSR chrome or the client shell is painted.
+ */
+export function hideBootSplashWhenSafe(maxAttempts = 30) {
+  if (hasSsrChrome()) {
+    hideBootSplash();
+    return;
+  }
+
+  let attempts = 0;
   const tryHide = () => {
     const shell = document.querySelector("[data-app-shell='true']");
     const rect = shell?.getBoundingClientRect();
     const shellPainted = !!rect && rect.width > 0 && rect.height > 0;
 
-    if (shellPainted || attempts >= maxAttempts) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          hideBootSplash();
-        });
-      });
+    if (shellPainted || hasSsrChrome() || attempts >= maxAttempts) {
+      hideBootSplash();
       return;
     }
 
@@ -30,6 +36,5 @@ export function hideBootSplashWhenSafe(maxAttempts = 90) {
     requestAnimationFrame(tryHide);
   };
 
-  void document.fonts?.ready.then(tryHide).catch(tryHide);
-  if (!document.fonts?.ready) tryHide();
+  tryHide();
 }

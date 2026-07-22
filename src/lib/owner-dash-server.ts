@@ -11,6 +11,7 @@ export type OwnerDashServerSnapshot = {
 /** Server-side owner dashboard snapshot — paints before client Firebase auth. */
 export async function prefetchOwnerDash(
   dateKey = sydneyTodayKey(),
+  options?: { includeTodayCounts?: boolean },
 ): Promise<OwnerDashServerSnapshot> {
   const weekMonday = isoMondayOf(dateKey);
   const prevMonday = addDaysISO(weekMonday, -7);
@@ -31,7 +32,9 @@ export async function prefetchOwnerDash(
     db.collection("payroll_weekly").doc(weekMonday).get(),
     db.collection("sales_reviews").doc(dateKey).get(),
     db.collection("rosters_published").doc(weekMonday).get(),
-    fetchSystemYuricaTodayCounts(dateKey).catch(() => null),
+    options?.includeTodayCounts
+      ? fetchSystemYuricaTodayCounts(dateKey).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const cache: DashCache = { cachedAt: Date.now() };

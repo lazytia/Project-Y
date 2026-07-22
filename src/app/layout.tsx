@@ -66,6 +66,8 @@ export default async function RootLayout({
               .bootSplashDots span:nth-child(2){animation-delay:.15s}
               .bootSplashDots span:nth-child(3){animation-delay:.3s}
               @keyframes bootDotBounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
+              #server-app-shell:not([hidden]){min-height:100vh;position:relative;background:#fff}
+              #server-app-shell:not([hidden]) aside{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #ececec;box-sizing:border-box;padding:24px}
             `,
           }}
         />
@@ -115,6 +117,11 @@ export default async function RootLayout({
             <span />
           </div>
         </div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){function hideBoot(){var prep=document.getElementById("ssr-dash-preparing");var shell=document.getElementById("server-app-shell");if(!prep&&!shell)return;var b=document.getElementById("boot-splash");if(b)b.classList.add("bootSplashHidden");}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",hideBoot);else hideBoot();})();`,
+          }}
+        />
         <AuthProvider>
           <LanguageProvider>
             <AuthSessionKeeper />
