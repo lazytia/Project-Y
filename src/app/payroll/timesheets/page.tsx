@@ -20,7 +20,7 @@ import {
   type PayrollAttentionItem,
   type PayrollStaffRecord,
 } from "@/lib/payroll-attention";
-import Splash from "@/components/Splash";
+import { readTimesheetsCache, writeTimesheetsCache } from "@/lib/timesheets-cache";
 import { DayExpandedPanel } from "./DayExpandedPanel";
 import styles from "./page.module.css";
 
@@ -205,11 +205,17 @@ export default function TimesheetsPage() {
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
 
-  const [startISO, setStartISO] = useState<string>("");
-  const [endISO, setEndISO] = useState<string>("");
+  const initialRange = useMemo(() => rangeForPreset("last-7"), []);
+  const initialCache = useMemo(
+    () => readTimesheetsCache(initialRange.start, initialRange.end),
+    [initialRange.start, initialRange.end],
+  );
+
+  const [startISO, setStartISO] = useState(initialRange.start);
+  const [endISO, setEndISO] = useState(initialRange.end);
   const [datePreset, setDatePreset] = useState<DatePreset>("last-7");
   const [view, setView] = useState<ViewMode>("day");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !initialCache);
   const [busy, setBusy] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -221,20 +227,17 @@ export default function TimesheetsPage() {
   }>({ teamMemberId: "", dateISO: "", startHHMM: "10:00", endHHMM: "14:30" });
   const [savingAdd, setSavingAdd] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-  const [shifts, setShifts] = useState<ShiftFromApi[]>([]);
-  const [teamMembers, setTeamMembers] = useState<Record<string, TeamMemberFromApi>>({});
+  const [shifts, setShifts] = useState<ShiftFromApi[]>(
+    () => (initialCache?.shifts as ShiftFromApi[] | undefined) ?? [],
+  );
+  const [teamMembers, setTeamMembers] = useState<Record<string, TeamMemberFromApi>>(
+    () => (initialCache?.teamMembers as Record<string, TeamMemberFromApi> | undefined) ?? {},
+  );
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
   const [payrollStaff, setPayrollStaff] = useState<PayrollStaffRecord[]>([]);
   const [attentionBusy, setAttentionBusy] = useState<string | null>(null);
-
-  useEffect(() => {
-    const { start, end } = rangeForPreset("last-7");
-    setStartISO(start);
-    setEndISO(end);
-    setDatePreset("last-7");
-  }, []);
 
   const load = useCallback(async () => {
     if (!startISO || !endISO) return;
@@ -243,22 +246,25 @@ export default function TimesheetsPage() {
     try {
       const res = await fetch(
         `/api/payroll/timesheets?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`,
-        { cache: "no-store" },
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? `Fetch failed (${res.status})`);
-      setShifts(Array.isArray(data.shifts) ? (data.shifts as ShiftFromApi[]) : []);
-      setTeamMembers(
+      const nextShifts = Array.isArray(data.shifts) ? (data.shifts as ShiftFromApi[]) : [];
+      const nextMembers =
         data.teamMembers && typeof data.teamMembers === "object"
           ? (data.teamMembers as Record<string, TeamMemberFromApi>)
-          : {},
-      );
+          : {};
+      setShifts(nextShifts);
+      setTeamMembers(nextMembers);
+      writeTimesheetsCache(startISO, endISO, nextShifts, nextMembers);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Timesheet fetch failed.";
       console.error("[timesheets] fetch failed:", err);
       setFetchError(msg);
-      setShifts([]);
-      setTeamMembers({});
+      setShifts((prev) => {
+        if (prev.length === 0) setTeamMembers({});
+        return prev.length === 0 ? [] : prev;
+      });
     } finally {
       setBusy(false);
       setLoading(false);
@@ -296,9 +302,21 @@ export default function TimesheetsPage() {
 
   useEffect(() => {
     if (authLoading || !allowed) return;
-    void load();
     void loadStaff();
-  }, [authLoading, allowed, load, loadStaff]);
+  }, [authLoading, allowed, loadStaff]);
+
+  useEffect(() => {
+    if (authLoading || !allowed || !startISO || !endISO) return;
+    const cached = readTimesheetsCache(startISO, endISO);
+    if (cached) {
+      setShifts(cached.shifts as ShiftFromApi[]);
+      setTeamMembers(cached.teamMembers as Record<string, TeamMemberFromApi>);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    void load();
+  }, [authLoading, allowed, startISO, endISO, load]);
 
   /* Re-fetch staff when returning from onboarding approval so the alert
      appears without a manual refresh. */
@@ -412,8 +430,22 @@ export default function TimesheetsPage() {
     }
   }
 
-  if (authLoading || loading) return <Splash />;
+  if (authLoading) {
+    return (
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Timesheets</h1>
+        </header>
+        <section className={styles.summaryRow} aria-busy="true">
+          <div className={`${styles.summaryCard} ${styles.summaryCardBlue} ${styles.summarySkeleton}`} />
+          <div className={`${styles.summaryCard} ${styles.summaryCardGreen} ${styles.summarySkeleton}`} />
+        </section>
+      </div>
+    );
+  }
   if (!allowed) return <div className={styles.page}><p>Owner access only.</p></div>;
+
+  const showShiftSkeleton = loading && shifts.length === 0;
 
   return (
     <div className={styles.page}>
@@ -426,14 +458,16 @@ export default function TimesheetsPage() {
       </header>
 
       <section className={styles.summaryRow}>
-        <div className={`${styles.summaryCard} ${styles.summaryCardBlue}`}>
+        <div className={`${styles.summaryCard} ${styles.summaryCardBlue} ${showShiftSkeleton ? styles.summarySkeleton : ""}`}>
           <p className={styles.summaryLabel}>Total paid hours</p>
-          <p className={styles.summaryValue}>{totalHours.toFixed(2)} h</p>
-          <p className={styles.summarySub}>{totalStaff} staff · {totalShifts} shifts</p>
+          <p className={styles.summaryValue}>{showShiftSkeleton ? "—" : `${totalHours.toFixed(2)} h`}</p>
+          <p className={styles.summarySub}>
+            {showShiftSkeleton ? "Loading…" : `${totalStaff} staff · ${totalShifts} shifts`}
+          </p>
         </div>
-        <div className={`${styles.summaryCard} ${styles.summaryCardGreen}`}>
+        <div className={`${styles.summaryCard} ${styles.summaryCardGreen} ${showShiftSkeleton ? styles.summarySkeleton : ""}`}>
           <p className={styles.summaryLabel}>Est. gross pay</p>
-          <p className={styles.summaryValue}>{fmtMoney(totalGross)}</p>
+          <p className={styles.summaryValue}>{showShiftSkeleton ? "—" : fmtMoney(totalGross)}</p>
           <p className={styles.summarySub}>Shift date rate × paid hours</p>
         </div>
       </section>

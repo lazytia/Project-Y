@@ -12,6 +12,12 @@ import { squareEnv } from "@/lib/square";
  */
 export const dynamic = "force-dynamic";
 
+const TIMESHEETS_CACHE_TTL_MS = 90 * 1000;
+const timesheetsCache = new Map<
+  string,
+  { savedAt: number; body: { shifts: unknown[]; teamMembers: Record<string, unknown> } }
+>();
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const startDate = url.searchParams.get("startDate") ?? "";
@@ -29,10 +35,21 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const cacheKey = `${startDate}_${endDate}`;
+    const hit = timesheetsCache.get(cacheKey);
+    if (hit && Date.now() - hit.savedAt < TIMESHEETS_CACHE_TTL_MS) {
+      return NextResponse.json({
+        ...hit.body,
+        locationId,
+        timezone: timezone ?? "UTC",
+      });
+    }
+
     const { shifts, teamMembers } = await fetchMergedTimesheetShifts(startDate, endDate);
+    const body = { shifts, teamMembers };
+    timesheetsCache.set(cacheKey, { savedAt: Date.now(), body });
     return NextResponse.json({
-      shifts,
-      teamMembers,
+      ...body,
       locationId,
       timezone: timezone ?? "UTC",
     });

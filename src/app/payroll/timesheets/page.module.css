@@ -84,6 +84,15 @@
   margin: 4px 0 0;
 }
 
+.summarySkeleton {
+  animation: timesheetPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes timesheetPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 /* ── payroll attention ── */
 .attentionCard {
   background: var(--color-warm-bg);

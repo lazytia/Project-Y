@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { readRosterCache, writeRosterCache } from "@/lib/roster-cache";
 import {
   decideHolidayRequest,
   decideAvailabilityRequest,
@@ -14,7 +15,6 @@ import {
 import { onboardingProgressPatch, type StaffOnboardingFlags } from "@/lib/staff-active";
 import { isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
-import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -463,14 +463,27 @@ function DotCount({ n }: { n: number }) {
 export default function ManagerRosterPage() {
   const { user } = useAuth();
   const isChefUser = isChef(user);
-  const [staffDocs, setStaffDocs] = useState<StaffDoc[]>([]);
-  const [weekDoc, setWeekDoc] = useState<RosterWeekDoc>({});
-  const [loading, setLoading] = useState(true);
+  const [today, setTodayDate] = useState<Date>(() => sydneyTodayDate());
+  const weekStart = useMemo(() => startOfWeek(today), [today]);
+  const weekStartISO = useMemo(() => isoDate(weekStart), [weekStart]);
+  const initialRosterCache = useMemo(() => readRosterCache(weekStartISO), [weekStartISO]);
+
+  const [staffDocs, setStaffDocs] = useState<StaffDoc[]>(
+    () => (initialRosterCache?.staffDocs as StaffDoc[] | undefined) ?? [],
+  );
+  const [weekDoc, setWeekDoc] = useState<RosterWeekDoc>(
+    () => (initialRosterCache?.weekDoc as RosterWeekDoc | undefined) ?? {},
+  );
+  const [loading, setLoading] = useState(() => !initialRosterCache);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAvail, setShowAvail] = useState(false);
   const [showPrevWeek, setShowPrevWeek] = useState(false);
-  const [nextWeekDoc, setNextWeekDoc] = useState<RosterWeekDoc>({});
-  const [prevWeekDoc, setPrevWeekDoc] = useState<RosterWeekDoc>({});
+  const [nextWeekDoc, setNextWeekDoc] = useState<RosterWeekDoc>(
+    () => (initialRosterCache?.nextWeekDoc as RosterWeekDoc | undefined) ?? {},
+  );
+  const [prevWeekDoc, setPrevWeekDoc] = useState<RosterWeekDoc>(
+    () => (initialRosterCache?.prevWeekDoc as RosterWeekDoc | undefined) ?? {},
+  );
   const [modalCell, setModalCell] = useState<{ iso: string; meal: Meal; weekKey: string } | null>(null);
   const [warnSectionOpen, setWarnSectionOpen] = useState(true);
   const [confirmAssign, setConfirmAssign] = useState<{
@@ -497,29 +510,18 @@ export default function ManagerRosterPage() {
   const [savingShift, setSavingShift] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
-  const [today, setTodayDate] = useState<Date>(() => {
-    const d = new Date(0);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
-
-  useEffect(() => {
-    setTodayDate(sydneyTodayDate());
-  }, []);
-  const weekStart = useMemo(() => startOfWeek(today), [today]);
-  const weekStartISO = useMemo(() => isoDate(weekStart), [weekStart]);
-  const weekEnd = useMemo(() => addDays(weekStart, DAYS_IN_WEEK - 1), [weekStart]);
-  const weekDays = useMemo(
-    () => Array.from({ length: DAYS_IN_WEEK }, (_, i) => addDays(weekStart, i)),
-    [weekStart],
-  );
-
   const nextWeekStart = useMemo(() => addDays(weekStart, 7), [weekStart]);
   const nextWeekStartISO = useMemo(() => isoDate(nextWeekStart), [nextWeekStart]);
   const nextWeekEnd = useMemo(() => addDays(nextWeekStart, DAYS_IN_WEEK - 1), [nextWeekStart]);
   const nextWeekDays = useMemo(
     () => Array.from({ length: DAYS_IN_WEEK }, (_, i) => addDays(nextWeekStart, i)),
     [nextWeekStart],
+  );
+
+  const weekEnd = useMemo(() => addDays(weekStart, DAYS_IN_WEEK - 1), [weekStart]);
+  const weekDays = useMemo(
+    () => Array.from({ length: DAYS_IN_WEEK }, (_, i) => addDays(weekStart, i)),
+    [weekStart],
   );
 
   const prevWeekStart = useMemo(() => addDays(weekStart, -7), [weekStart]);
@@ -531,14 +533,21 @@ export default function ManagerRosterPage() {
   );
 
   const load = useCallback(async () => {
+    const db = getDb();
     try {
-      const staffSnap = await getDocs(collection(getDb(), "staff_onboarding"));
+      const [staffSnap, activeSnap, weekSnap, nextSnap, prevSnap] = await Promise.all([
+        getDocs(collection(db, "staff_onboarding")),
+        getDocs(collection(db, "staff")).catch(() => null),
+        getDoc(doc(db, "rosters_published", weekStartISO)),
+        getDoc(doc(db, "rosters_published", nextWeekStartISO)),
+        getDoc(doc(db, "rosters_published", prevWeekStartISO)),
+      ]);
+
       const byUid = new Map<string, StaffDoc>();
       for (const d of staffSnap.docs) {
         byUid.set(d.id, { uid: d.id, ...(d.data() as Omit<StaffDoc, "uid">) });
       }
-      try {
-        const activeSnap = await getDocs(collection(getDb(), "staff"));
+      if (activeSnap) {
         for (const d of activeSnap.docs) {
           const data = d.data() as Omit<StaffDoc, "uid"> & { firstName?: string; lastName?: string };
           const existing = byUid.get(d.id);
@@ -551,25 +560,27 @@ export default function ManagerRosterPage() {
             role: data.role ?? existing?.role,
           });
         }
-      } catch {
-        /* staff collection optional */
       }
-      setStaffDocs([...byUid.values()].filter((d) => d.role !== "owner"));
+      const nextStaff = [...byUid.values()].filter((d) => d.role !== "owner");
+      setStaffDocs(nextStaff);
+
+      const nextWeek = (weekSnap.exists() ? (weekSnap.data() as RosterWeekDoc) : {}) ?? {};
+      const nextNextWeek = (nextSnap.exists() ? (nextSnap.data() as RosterWeekDoc) : {}) ?? {};
+      const nextPrevWeek = (prevSnap.exists() ? (prevSnap.data() as RosterWeekDoc) : {}) ?? {};
+      setWeekDoc(nextWeek);
+      setNextWeekDoc(nextNextWeek);
+      setPrevWeekDoc(nextPrevWeek);
+
+      writeRosterCache({
+        weekStartISO,
+        staffDocs: nextStaff,
+        weekDoc: nextWeek,
+        nextWeekDoc: nextNextWeek,
+        prevWeekDoc: nextPrevWeek,
+      });
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error("[roster] staff load failed", err);
-    }
-    try {
-      const weekSnap = await getDocs(collection(getDb(), "rosters_published"));
-      const match = weekSnap.docs.find((d) => d.id === weekStartISO);
-      setWeekDoc((match?.data() as RosterWeekDoc) ?? {});
-      const matchNext = weekSnap.docs.find((d) => d.id === nextWeekStartISO);
-      setNextWeekDoc((matchNext?.data() as RosterWeekDoc) ?? {});
-      const matchPrev = weekSnap.docs.find((d) => d.id === prevWeekStartISO);
-      setPrevWeekDoc((matchPrev?.data() as RosterWeekDoc) ?? {});
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("[roster] week doc load failed", err);
+      console.error("[roster] load failed", err);
       setWeekDoc({});
       setNextWeekDoc({});
       setPrevWeekDoc({});
@@ -890,7 +901,22 @@ export default function ManagerRosterPage() {
     }
   }
 
-  if (loading) return <Splash />;
+  if (loading && staffDocs.length === 0 && Object.keys(weekDoc.assignments ?? {}).length === 0) {
+    return (
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <div className={styles.headerText}>
+            <h1 className={styles.title}>Roster</h1>
+            <p className={styles.subtitle}>{fmtRange(weekStart, weekEnd)}</p>
+          </div>
+        </header>
+        <section className={styles.grid} aria-busy="true" aria-label="Loading roster">
+          <div className={styles.gridSkeletonRow} />
+          <div className={styles.gridSkeletonRow} />
+        </section>
+      </div>
+    );
+  }
 
   /* ── Derived note data for open modal ── */
   const noteModalAllNotes = noteModal
