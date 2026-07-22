@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -131,6 +131,18 @@ function memberRates(shifts: ShiftFromApi[]): { weekday: number | null; saturday
   return { weekday, saturday };
 }
 
+function useSplitStaffLayout(): boolean {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const mq = window.matchMedia("(min-width: 768px)");
+      mq.addEventListener("change", onStoreChange);
+      return () => mq.removeEventListener("change", onStoreChange);
+    },
+    () => window.matchMedia("(min-width: 768px)").matches,
+    () => false,
+  );
+}
+
 export default function StaffDetailPage() {
   const router = useRouter();
   const params = useParams<{ teamMemberId: string }>();
@@ -139,6 +151,7 @@ export default function StaffDetailPage() {
 
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
+  const splitLayout = useSplitStaffLayout();
 
   const [startISO, setStartISO] = useState("");
   const [endISO, setEndISO] = useState("");
@@ -580,7 +593,8 @@ export default function StaffDetailPage() {
                     <p className={styles.detailGrossLabel}>Est. gross pay</p>
                     <p className={styles.detailGross}>{fmtMoney(staff.gross)}</p>
                   </div>
-                  {renderShiftsBlock(shiftsForStaff(staff.teamMemberId), styles.inlineShifts)}
+                  {!splitLayout &&
+                    renderShiftsBlock(shiftsForStaff(staff.teamMemberId), styles.inlineShifts)}
                 </li>
               );
             }
@@ -608,9 +622,11 @@ export default function StaffDetailPage() {
           {byStaff.length === 0 && <li className={styles.empty}>No staff in this range.</li>}
         </ul>
 
-        <section className={styles.shiftsPanelDesktop}>
-          {renderShiftsBlock(memberShifts)}
-        </section>
+        {splitLayout && (
+          <section className={styles.shiftsPanelDesktop}>
+            {renderShiftsBlock(memberShifts)}
+          </section>
+        )}
       </div>
 
       {addOpen && (

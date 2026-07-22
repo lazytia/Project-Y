@@ -6,6 +6,12 @@
   max-width: 980px;
 }
 
+@media (min-width: 768px) {
+  .page {
+    max-width: 1100px;
+  }
+}
+
 .sectionLabel {
   font-family: var(--font-display);
   font-size: 11px;
@@ -327,22 +333,11 @@
 }
 
 .shiftsPanelDesktop {
-  display: none;
   min-width: 0;
 }
 
 .inlineShifts {
   margin-top: 12px;
-}
-
-@media (min-width: 768px) {
-  .shiftsPanelDesktop {
-    display: block;
-  }
-
-  .inlineShifts {
-    display: none;
-  }
 }
 
 .shiftsHeading {
