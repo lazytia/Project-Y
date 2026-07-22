@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import AppShell from "@/components/AppShell";
 import AuthSessionKeeper from "@/components/AuthSessionKeeper";
 import BootSplashDismiss from "@/components/BootSplashDismiss";
+import SerwistRegister from "@/components/SerwistRegister";
 import ServerAppShell from "@/components/ServerAppShell";
 import { readServerSession } from "@/lib/dashboard-session";
 import "./globals.css";
@@ -59,6 +60,7 @@ export default async function RootLayout({
               .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
               .bootSplashMark{color:#fff;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:40px;line-height:1}
               .bootSplashWordmark{font-family:Arial,sans-serif;font-size:16px;font-weight:600;color:#111;letter-spacing:.04em}
+              .bootSplashStatus{font-family:Arial,sans-serif;font-size:13px;color:#6E6E73;margin-top:4px}
               .bootSplashDots{display:flex;gap:6px;margin-top:8px}
               .bootSplashDots span{width:6px;height:6px;border-radius:50%;background:#6E6E73;animation:bootDotBounce 1.2s ease-in-out infinite}
               .bootSplashDots span:nth-child(2){animation-delay:.15s}
@@ -106,6 +108,7 @@ export default async function RootLayout({
             <span className="bootSplashMark">Y</span>
           </div>
           <div className="bootSplashWordmark">Project Y</div>
+          <div className="bootSplashStatus">Loading…</div>
           <div className="bootSplashDots" aria-hidden="true">
             <span />
             <span />
@@ -115,6 +118,7 @@ export default async function RootLayout({
         <AuthProvider>
           <LanguageProvider>
             <AuthSessionKeeper />
+            <SerwistRegister />
             <BootSplashDismiss />
             <ServerAppShell session={session} />
             <AppShell initialHasSession={session.authenticated}>{children}</AppShell>

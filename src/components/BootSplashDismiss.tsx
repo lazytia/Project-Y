@@ -1,48 +1,44 @@
 "use client";
 
 import { useEffect } from "react";
-import { APP_READY_EVENT } from "@/lib/app-ready";
+import { useAuth } from "./AuthProvider";
+import { APP_READY_EVENT, isAppReady } from "@/lib/app-ready";
+import { hideBootSplashWhenSafe } from "@/lib/boot-splash";
 
-function hideBootSplash() {
-  const el = document.getElementById("boot-splash");
-  if (el) el.classList.add("bootSplashHidden");
-}
-
-/** Wait two animation frames so the browser has actually painted before we hide. */
-function hideAfterPaint() {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      hideBootSplash();
-    });
-  });
-}
-
-const FALLBACK_MS = 12_000;
+const FALLBACK_MS = 15_000;
 
 /**
- * Keeps the inline HTML boot splash visible until the client app mounts real UI.
- * Previously we hid it as soon as a session cookie existed — that left a long
- * blank white gap while JS bundles downloaded on cold start.
+ * Keeps the inline HTML boot splash until Firebase auth finishes restoring
+ * AND the styled client shell has mounted. Hiding on first React commit left
+ * a multi-second white gap while CSS modules were still downloading.
  */
 export default function BootSplashDismiss() {
+  const { loading } = useAuth();
+
   useEffect(() => {
+    if (loading) return;
+
     let hidden = false;
     const hideOnce = () => {
       if (hidden) return;
       hidden = true;
-      hideAfterPaint();
+      hideBootSplashWhenSafe();
     };
 
-    const onReady = () => hideOnce();
-    window.addEventListener(APP_READY_EVENT, onReady);
+    if (isAppReady()) {
+      hideOnce();
+      return;
+    }
 
+    const onShellReady = () => hideOnce();
+    window.addEventListener(APP_READY_EVENT, onShellReady);
     const fallback = window.setTimeout(hideOnce, FALLBACK_MS);
 
     return () => {
-      window.removeEventListener(APP_READY_EVENT, onReady);
+      window.removeEventListener(APP_READY_EVENT, onShellReady);
       window.clearTimeout(fallback);
     };
-  }, []);
+  }, [loading]);
 
   return null;
 }

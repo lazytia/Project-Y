@@ -2,7 +2,7 @@ import { getMessaging, getToken } from "firebase/messaging";
 import { arrayUnion, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb, getFirebaseApp } from "./firebase";
 
-const SW_PATH = "/firebase-messaging-sw.js";
+const SW_PATH = "/sw.js";
 
 /**
  * Request notification permission, register the FCM service worker, get a

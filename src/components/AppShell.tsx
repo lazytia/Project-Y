@@ -62,28 +62,19 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   }, [user, loading, showShellSkeleton, initialHasSession]);
 
   if (showShellSkeleton) {
-    return (
-      <>
-        <AppReadyMarker />
-        <AppShellSkeleton>{children}</AppShellSkeleton>
-      </>
-    );
+    return <AppShellSkeleton>{children}</AppShellSkeleton>;
   }
 
   if (loading) {
-    return (
-      <>
-        <AppReadyMarker />
-        <Splash />
-      </>
-    );
+    /* Boot splash (inline HTML) stays visible — no client Splash here. */
+    return null;
   }
 
   if (isPublic) {
     return (
       <>
         <AppReadyMarker />
-        <div className={styles.public}>{children}</div>
+        <div className={styles.public} data-app-shell="true">{children}</div>
       </>
     );
   }
@@ -96,7 +87,6 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
       </>
     );
   }
-
   if (!isOwner(user) && !isChef(user) && staffCompletedStep === null) {
     return (
       <>
@@ -173,7 +163,7 @@ function Shell({
   }
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-app-shell="true">
       <div className={styles.mobileHeader}>
         <button
           className={styles.hamburger}

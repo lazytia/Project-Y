@@ -5,6 +5,8 @@ node_modules/
 .next/
 out/
 build/
+public/sw.js
+public/sw.js.map
 *.tsbuildinfo
 
 # Environment
