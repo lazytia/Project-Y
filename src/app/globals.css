@@ -215,3 +215,7 @@ button {
     left: var(--sidebar-width) !important;
   }
 }
+
+#server-app-shell[hidden] {
+  display: none !important;
+}

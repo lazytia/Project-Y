@@ -152,6 +152,12 @@
   }
 }
 
+/* SSR shell: reserve header control space without showing inert buttons */
+.serverChromePlaceholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ── Bell modal ── */
 .bellBackdrop {
   position: fixed;

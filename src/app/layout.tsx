@@ -5,6 +5,8 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import AppShell from "@/components/AppShell";
 import AuthSessionKeeper from "@/components/AuthSessionKeeper";
 import BootSplashDismiss from "@/components/BootSplashDismiss";
+import ServerAppShell from "@/components/ServerAppShell";
+import { readServerSession } from "@/lib/dashboard-session";
 import "./globals.css";
 
 const inter = Inter({
@@ -36,11 +38,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await readServerSession();
+
   return (
     <html lang="en" className={inter.variable}>
       <head>
@@ -110,8 +114,10 @@ export default function RootLayout({
         <AuthProvider>
           <LanguageProvider>
             <AuthSessionKeeper />
-            <BootSplashDismiss />
-            <AppShell>{children}</AppShell>
+            <BootSplashDismiss initialHasSession={session.authenticated} />
+            <ServerAppShell session={session}>
+              <AppShell initialHasSession={session.authenticated}>{children}</AppShell>
+            </ServerAppShell>
           </LanguageProvider>
         </AuthProvider>
       </body>

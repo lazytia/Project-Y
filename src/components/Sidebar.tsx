@@ -8,73 +8,8 @@ import { useLang } from "./LanguageProvider";
 import LanguageToggle from "./LanguageToggle";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
+import { MANAGER_NAV, OWNER_NAV, type NavGroup } from "@/lib/sidebar-nav";
 import styles from "./Sidebar.module.css";
-
-type NavItem = { label: string; href: string; ownerOnly?: boolean; chefHidden?: boolean };
-type NavGroup = {
-  icon: string;
-  label: string;
-  href?: string;
-  children?: NavItem[];
-  /** Hidden from managers (yurina); shown only to strict owners. */
-  ownerOnly?: boolean;
-};
-
-// Owner nav (Tia / Yurica). Managers (Yurina) and chefs use MANAGER_NAV
-// below — this list is intentionally broader and owner-shaped.
-const NAV: NavGroup[] = [
-  { icon: "🏠", label: "Dashboard", href: "/" },
-  {
-    icon: "🍽",
-    label: "Operations",
-    children: [
-      { label: "Reservations", href: "/operations/reservations" },
-      { label: "Catering", href: "/operations/catering-orders" },
-      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
-      { label: "Roster", href: "/scheduling/roster" },
-      { label: "Timesheets", href: "/payroll/timesheets" },
-    ],
-  },
-  {
-    icon: "👥",
-    label: "People",
-    children: [
-      { label: "New Employees", href: "/people/onboarding" },
-      { label: "Active Employees", href: "/people/active" },
-      { label: "Notice Given", href: "/people/notice-given" },
-      { label: "Terminated", href: "/people/terminated" },
-      { label: "HR Notes", href: "/people/hr-notes" },
-      { label: "Cash Payments", href: "/people/cash-payments" },
-    ],
-  },
-  {
-    icon: "📦",
-    label: "Inventory",
-    children: [
-      { label: "Stock Levels", href: "/inventory/inventory" },
-      { label: "Suppliers", href: "/inventory/suppliers" },
-    ],
-  },
-  {
-    icon: "💵",
-    label: "Money",
-    children: [
-      { label: "Sales", href: "/money/sales" },
-      { label: "Payroll", href: "/payroll/payroll" },
-      { label: "Suppliers", href: "/money/suppliers" },
-      { label: "Utilities", href: "/money/utilities" },
-      { label: "Maintenance", href: "/money/maintenance" },
-    ],
-  },
-  {
-    icon: "⚙️",
-    label: "System",
-    children: [
-      { label: "Settings", href: "/system/settings" },
-      { label: "Notifications", href: "/system/notifications" },
-    ],
-  },
-];
 
 type Props = { open: boolean; onClose?: () => void };
 
@@ -96,40 +31,7 @@ export default function Sidebar({ open, onClose }: Props) {
 
   // Managers (yurina) get a curated nav — narrower than the owner nav and
   // explicit so the structure isn't accidentally widened later.
-  const MANAGER_NAV: NavGroup[] = [
-    { icon: "🏠", label: "Dashboard", href: "/" },
-    {
-      icon: "👥",
-      label: "People",
-      children: [
-        { label: "New Staff Request", href: "/people/onboarding" },
-        { label: "Notice Given", href: "/people/notice-given" },
-        { label: "HR Notes", href: "/people/hr-notes" },
-        { label: "Cash Payments", href: "/people/cash-payments" },
-    ],
-  },
-  { icon: "💰", label: "Payslips", href: "/payslips" },
-  {
-    icon: "📅",
-      label: "Scheduling",
-      children: [
-        { label: "Roster", href: "/scheduling/roster" },
-        { label: "Roster Insights", href: "/scheduling/insights" },
-      ],
-    },
-    {
-      icon: "🍽",
-      label: "Operations",
-      children: [
-        { label: "Daily Sold Out", href: "/operations/daily-sold-out", chefHidden: true },
-        { label: "Reservations", href: "/operations/reservations" },
-        { label: "Catering Orders", href: "/operations/catering-orders" },
-      ],
-    },
-  ];
-
-  // ownerOnly (on groups and on children) hides the entry from managers.
-  const ownerNav = NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
+  const ownerNav = OWNER_NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
     .map((group) => ({
       ...group,
       children: group.children?.filter((c) => !c.ownerOnly || userIsStrictOwner),

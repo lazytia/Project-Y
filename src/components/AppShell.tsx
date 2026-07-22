@@ -15,34 +15,59 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import styles from "./AppShell.module.css";
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+type AppShellProps = {
+  children: React.ReactNode;
+  /** Set from the server uid cookie — enables optimistic shell before /api/auth/session. */
+  initialHasSession?: boolean;
+};
+
+export default function AppShell({ children, initialHasSession = false }: AppShellProps) {
   const pathname = usePathname();
   const { user, loading, staffCompletedStep } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sessionHint, setSessionHint] = useState<boolean | null>(null);
+  const [sessionVerified, setSessionVerified] = useState<boolean | null>(
+    initialHasSession ? true : null,
+  );
 
   useEffect(() => {
     if (isPublic) {
-      setSessionHint(false);
+      setSessionVerified(false);
       return;
     }
+    if (initialHasSession) return;
     let cancelled = false;
     void fetchSessionHint().then((hint) => {
-      if (!cancelled) setSessionHint(hint.authenticated);
+      if (!cancelled) setSessionVerified(hint.authenticated);
     });
     return () => { cancelled = true; };
-  }, [isPublic, pathname]);
+  }, [isPublic, pathname, initialHasSession]);
+
+  const hasSessionGuess = initialHasSession || sessionVerified === true;
+  const deferToServerShell = initialHasSession && loading && !user;
+
+  useEffect(() => {
+    const el = document.getElementById("server-app-shell");
+    if (!el) return;
+    if (user && !loading) {
+      el.setAttribute("hidden", "");
+    } else if (deferToServerShell) {
+      el.removeAttribute("hidden");
+    }
+  }, [user, loading, deferToServerShell]);
+
+  if (deferToServerShell) {
+    return <>{children}</>;
+  }
 
   const showShellSkeleton =
     !isPublic &&
     loading &&
-    sessionHint === true;
+    hasSessionGuess &&
+    !initialHasSession;
 
   if (showShellSkeleton) {
-    return (
-      <AppShellSkeleton>{children}</AppShellSkeleton>
-    );
+    return <AppShellSkeleton>{children}</AppShellSkeleton>;
   }
 
   if (loading) {
@@ -64,10 +89,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return <Shell sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>{children}</Shell>;
 }
 
-/**
- * Inner shell — split out so we can use the useBellDot hook after the early
- * returns above without violating the rules of hooks.
- */
 function Shell({
   sidebarOpen,
   setSidebarOpen,
