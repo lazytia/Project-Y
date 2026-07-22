@@ -43,28 +43,25 @@ function ServerNavGroup({ group }: { group: NavGroup }) {
  * SSR app chrome when the uid session cookie is present. Paints sidebar +
  * mobile header in the first HTML response so PWA cold starts never sit on a
  * blank screen while Firebase Auth hydrates on the client.
+ *
+ * Sibling to AppShell — must NOT wrap page content. Hiding #server-app-shell
+ * when the client shell mounts would otherwise hide the entire React tree.
  */
-export default function ServerAppShell({
-  session,
-  children,
-}: {
-  session: ServerSession;
-  children: React.ReactNode;
-}) {
-  if (!session.authenticated) return children;
+export default function ServerAppShell({ session }: { session: ServerSession }) {
+  if (!session.authenticated) return null;
 
   const nav = navForSessionRole(session.role);
 
   return (
-    <div id="server-app-shell" className={shellStyles.shell}>
-      <div className={shellStyles.mobileHeader} aria-hidden="true">
-        <div className={`${shellStyles.hamburger} ${shellStyles.serverChromePlaceholder}`} aria-hidden="true">
+    <div id="server-app-shell" className={shellStyles.shell} aria-hidden="true">
+      <div className={shellStyles.mobileHeader}>
+        <div className={`${shellStyles.hamburger} ${shellStyles.serverChromePlaceholder}`}>
           <span className={shellStyles.bar} />
           <span className={shellStyles.bar} />
           <span className={shellStyles.bar} />
         </div>
         <span className={shellStyles.mobileBrand}>YURICA</span>
-        <div className={`${shellStyles.bellBtn} ${shellStyles.serverChromePlaceholder}`} aria-hidden="true">
+        <div className={`${shellStyles.bellBtn} ${shellStyles.serverChromePlaceholder}`}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -79,7 +76,6 @@ export default function ServerAppShell({
           ))}
         </nav>
       </aside>
-      <main className={shellStyles.main}>{children}</main>
     </div>
   );
 }

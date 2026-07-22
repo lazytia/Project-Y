@@ -53,11 +53,13 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
       el.setAttribute("hidden", "");
     } else if (deferToServerShell) {
       el.removeAttribute("hidden");
+    } else if (!loading && !user) {
+      el.setAttribute("hidden", "");
     }
   }, [user, loading, deferToServerShell]);
 
   if (deferToServerShell) {
-    return <>{children}</>;
+    return <main className={styles.main}>{children}</main>;
   }
 
   const showShellSkeleton =

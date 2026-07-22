@@ -115,9 +115,8 @@ export default async function RootLayout({
           <LanguageProvider>
             <AuthSessionKeeper />
             <BootSplashDismiss initialHasSession={session.authenticated} />
-            <ServerAppShell session={session}>
-              <AppShell initialHasSession={session.authenticated}>{children}</AppShell>
-            </ServerAppShell>
+            <ServerAppShell session={session} />
+            <AppShell initialHasSession={session.authenticated}>{children}</AppShell>
           </LanguageProvider>
         </AuthProvider>
       </body>
