@@ -1,9 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { CHEF_USERNAMES, OWNER_USERNAMES } from "@/lib/permissions";
+import { dashboardKindFromEmail } from "@/lib/session-dashboard";
 import { emailToUsername } from "@/lib/username";
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+function setSessionCookies(
+  res: NextResponse,
+  secure: boolean,
+  uid: string,
+  role: string,
+  dashboard: string,
+) {
+  const base = { path: "/", maxAge: ONE_YEAR_SECONDS, sameSite: "lax" as const, secure, httpOnly: true };
+  res.cookies.set("uid", uid, base);
+  res.cookies.set("role", role, base);
+  res.cookies.set("dash", dashboard, base);
+}
+
+function clearSessionCookies(res: NextResponse, secure: boolean) {
+  const base = { path: "/", maxAge: 0, sameSite: "lax" as const, secure, httpOnly: true };
+  for (const name of ["uid", "role", "dash"]) {
+    res.cookies.set(name, "", base);
+  }
+}
 
 function roleFromEmail(email: string | null | undefined): string {
   if (!email) return "staff";
@@ -21,15 +42,18 @@ export async function GET(request: NextRequest) {
   try {
     const user = await adminAuth().getUser(uid);
     const role = roleFromEmail(user.email);
-    return NextResponse.json(
-      { authenticated: true, uid, role },
+    const dashboard = dashboardKindFromEmail(user.email);
+    const res = NextResponse.json(
+      { authenticated: true, uid, role, dashboard },
       { status: 200 },
     );
+    const secure = request.nextUrl.protocol === "https:";
+    setSessionCookies(res, secure, uid, role, dashboard);
+    return res;
   } catch {
     const res = NextResponse.json({ authenticated: false }, { status: 200 });
     const secure = request.nextUrl.protocol === "https:";
-    res.cookies.set("uid", "", { path: "/", maxAge: 0, sameSite: "lax", secure, httpOnly: true });
-    res.cookies.set("role", "", { path: "/", maxAge: 0, sameSite: "lax", secure, httpOnly: true });
+    clearSessionCookies(res, secure);
     return res;
   }
 }
@@ -45,23 +69,11 @@ export async function POST(request: NextRequest) {
     const decoded = await adminAuth().verifyIdToken(token);
     const uid = decoded.uid;
     const role = roleFromEmail(decoded.email);
+    const dashboard = dashboardKindFromEmail(decoded.email);
 
-    const res = NextResponse.json({ ok: true, uid, role }, { status: 200 });
+    const res = NextResponse.json({ ok: true, uid, role, dashboard }, { status: 200 });
     const secure = request.nextUrl.protocol === "https:";
-    res.cookies.set("uid", uid, {
-      path: "/",
-      maxAge: ONE_YEAR_SECONDS,
-      sameSite: "lax",
-      secure,
-      httpOnly: true,
-    });
-    res.cookies.set("role", role, {
-      path: "/",
-      maxAge: ONE_YEAR_SECONDS,
-      sameSite: "lax",
-      secure,
-      httpOnly: true,
-    });
+    setSessionCookies(res, secure, uid, role, dashboard);
     return res;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid token.";
@@ -72,14 +84,6 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const res = NextResponse.json({ ok: true }, { status: 200 });
   const secure = request.nextUrl.protocol === "https:";
-  for (const name of ["uid", "role"]) {
-    res.cookies.set(name, "", {
-      path: "/",
-      maxAge: 0,
-      sameSite: "lax",
-      secure,
-      httpOnly: true,
-    });
-  }
+  clearSessionCookies(res, secure);
   return res;
 }

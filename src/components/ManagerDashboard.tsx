@@ -9,6 +9,16 @@ import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import { dCountdownLabel } from "@/lib/catering-orders";
 import { fetchReservationsForDate, type Reservation } from "@/lib/reservations";
+import {
+  hasManagerDashCache,
+  readManagerDashCache,
+  writeManagerDashCache,
+  type ManagerDashCache,
+} from "@/lib/manager-dash-cache";
+import type { ManagerDashServerSnapshot } from "@/lib/manager-dash-server";
+import type { DashboardKind } from "@/lib/session-dashboard";
+import { isManagerDashboardKind } from "@/lib/session-dashboard";
+import { sydneyTodayKey } from "@/lib/sydney-date";
 import styles from "./ManagerDashboard.module.css";
 
 type AttentionCounts = {
@@ -29,34 +39,12 @@ type StaffDoc = {
   availabilityRequests?: StoredRequest[];
 };
 
-type CateringSummaryOrder = {
-  deliveryDateISO: string;
-};
-
-type DashboardCache = {
-  date: string;
-  todaySales: number | null;
-  totalPax: number | null;
-  totalBookings: number | null;
-  nextCatering: CateringSummaryOrder | null;
-  weekCateringCount: number | null;
-  kitchenStaff: number | null;
-  hallStaff: number | null;
-};
-
 const VISA_EXPIRING_WINDOW_DAYS = 60;
-const DASH_CACHE_KEY = "y.managerDash";
 
 /** day-of-week daily sales targets (0=Sun … 6=Sat) */
 const DAILY_TARGETS: Record<number, number> = {
   0: 0, 1: 3_800, 2: 5_200, 3: 5_500, 4: 6_500, 5: 6_000, 6: 3_000,
 };
-
-const SYDNEY_TZ = "Australia/Sydney";
-
-function sydneyTodayKey(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
-}
 
 function isoDateToMonday(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
@@ -101,24 +89,18 @@ function firstNameFromUsername(username: string): string {
   return username.charAt(0).toUpperCase() + username.slice(1);
 }
 
-function readDashboardCache(date: string): DashboardCache | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(DASH_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DashboardCache;
-    return parsed.date === date ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeDashboardCache(data: DashboardCache) {
-  try {
-    sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify(data));
-  } catch {
-    /* ignore quota / private mode */
-  }
+function applyManagerCache(cache: ManagerDashCache) {
+  return {
+    todaySales: cache.todaySales,
+    cachedResCounts:
+      cache.totalPax !== null && cache.totalBookings !== null
+        ? { totalPax: cache.totalPax, totalBookings: cache.totalBookings }
+        : null,
+    nextCatering: cache.nextCatering,
+    weekCateringCount: cache.weekCateringCount,
+    kitchenStaff: cache.kitchenStaff,
+    hallStaff: cache.hallStaff,
+  };
 }
 
 async function authHeader(user: User | null | undefined): Promise<HeadersInit> {
@@ -146,7 +128,7 @@ async function fetchRolesForUids(uids: string[]): Promise<Map<string, string>> {
 async function fetchCateringSummary(
   user: User | null | undefined,
   dateKey: string,
-): Promise<{ nextOrder: CateringSummaryOrder | null; weekCount: number }> {
+): Promise<{ nextOrder: { deliveryDateISO: string } | null; weekCount: number }> {
   const res = await fetch(`/api/catering-orders/summary?date=${encodeURIComponent(dateKey)}`, {
     cache: "no-store",
     headers: await authHeader(user),
@@ -190,12 +172,14 @@ type DashboardProps = {
   roleLabel?: string;
   displayName?: string;
   hideAttention?: boolean;
+  sessionDashboard?: DashboardKind | null;
 };
 
 export default function ManagerDashboard({
   roleLabel = "Store Manager",
   displayName,
   hideAttention = false,
+  sessionDashboard = null,
 }: DashboardProps = {}) {
   const { user } = useAuth();
   const [firstName, setFirstName] = useState<string>("");
@@ -221,23 +205,52 @@ export default function ManagerDashboard({
   const [todaySales, setTodaySales] = useState<number | null>(null);
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
   const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(null);
-  const [nextCatering, setNextCatering] = useState<CateringSummaryOrder | null>(null);
+  const [nextCatering, setNextCatering] = useState<{ deliveryDateISO: string } | null>(null);
   const [weekCateringCount, setWeekCateringCount] = useState<number | null>(null);
   const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
   const [hallStaff, setHallStaff] = useState<number | null>(null);
 
   useEffect(() => {
-    const cached = readDashboardCache(sydneyTodayKey());
+    const date = sydneyTodayKey();
+    const cached = readManagerDashCache(date);
     if (!cached) return;
-    setTodaySales(cached.todaySales);
-    if (cached.totalPax !== null && cached.totalBookings !== null) {
-      setCachedResCounts({ totalPax: cached.totalPax, totalBookings: cached.totalBookings });
-    }
-    setNextCatering(cached.nextCatering);
-    setWeekCateringCount(cached.weekCateringCount);
-    setKitchenStaff(cached.kitchenStaff);
-    setHallStaff(cached.hallStaff);
+    const applied = applyManagerCache(cached);
+    setTodaySales(applied.todaySales);
+    if (applied.cachedResCounts) setCachedResCounts(applied.cachedResCounts);
+    setNextCatering(applied.nextCatering);
+    setWeekCateringCount(applied.weekCateringCount);
+    setKitchenStaff(applied.kitchenStaff);
+    setHallStaff(applied.hallStaff);
   }, []);
+
+  useEffect(() => {
+    if (!isManagerDashboardKind(sessionDashboard)) return;
+    const date = todayKey || sydneyTodayKey();
+    if (hasManagerDashCache(date)) return;
+    let cancelled = false;
+    void fetch(
+      `/api/dashboard/manager-snapshot?date=${encodeURIComponent(date)}`,
+      { cache: "no-store" },
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: ManagerDashServerSnapshot | null) => {
+        if (cancelled || !data?.cache) return;
+        writeManagerDashCache(data.cache);
+        const applied = applyManagerCache(data.cache);
+        setTodaySales(applied.todaySales);
+        if (applied.cachedResCounts) setCachedResCounts(applied.cachedResCounts);
+        setNextCatering(applied.nextCatering);
+        setWeekCateringCount(applied.weekCateringCount);
+        setKitchenStaff(applied.kitchenStaff);
+        setHallStaff(applied.hallStaff);
+      })
+      .catch(() => {
+        /* live fetch below still runs */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionDashboard, todayKey]);
 
   const todayDow = (() => {
     const [y, m, d] = todayKey.split("-").map(Number);
@@ -301,7 +314,7 @@ export default function ManagerDashboard({
       setCachedResCounts({ totalPax, totalBookings });
     }
 
-    let nextOrder: CateringSummaryOrder | null = null;
+    let nextOrder: { deliveryDateISO: string } | null = null;
     let weekCount: number | null = null;
     if (cateringResult.status === "fulfilled") {
       nextOrder = cateringResult.value.nextOrder;
@@ -319,7 +332,7 @@ export default function ManagerDashboard({
       setHallStaff(hall);
     }
 
-    writeDashboardCache({
+    writeManagerDashCache({
       date: todayKey,
       todaySales: sales,
       totalPax,

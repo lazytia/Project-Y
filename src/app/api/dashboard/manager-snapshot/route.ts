@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prefetchOwnerDash } from "@/lib/owner-dash-server";
+import { prefetchManagerDash } from "@/lib/manager-dash-server";
+import { isManagerDashboardKind } from "@/lib/session-dashboard";
 import { sydneyTodayKey } from "@/lib/sydney-date";
 
 export const dynamic = "force-dynamic";
 
-/** Owner dashboard snapshot — fetched client-side so HTML is never blocked. */
+/** Manager / chef dashboard snapshot — fetched client-side after instant HTML. */
 export async function GET(request: NextRequest) {
   const uid = request.cookies.get("uid")?.value?.trim();
   const dash = request.cookies.get("dash")?.value?.trim();
-  if (!uid || dash !== "owner") {
+  if (!uid || !isManagerDashboardKind(dash)) {
     return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
   }
 
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get("date")?.trim() || sydneyTodayKey();
 
   try {
-    const snapshot = await prefetchOwnerDash(dateKey);
+    const snapshot = await prefetchManagerDash(dateKey);
     return NextResponse.json(snapshot, {
       headers: { "Cache-Control": "private, max-age=15" },
     });

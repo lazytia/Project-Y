@@ -9,6 +9,7 @@ import styles from "./page.module.css";
 import Splash from "@/components/Splash";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import DismissSsrPreparing from "@/components/DismissSsrPreparing";
+import ManagerDashboard from "@/components/ManagerDashboard";
 import {
   hasDashCache,
   readDashCache,
@@ -16,6 +17,8 @@ import {
   type DashCache,
 } from "@/lib/owner-dash-cache";
 import type { OwnerDashServerSnapshot } from "@/lib/owner-dash-server";
+import type { DashboardKind } from "@/lib/session-dashboard";
+import { isManagerDashboardKind } from "@/lib/session-dashboard";
 import {
   addDaysISO,
   dowOfDateKey,
@@ -23,12 +26,7 @@ import {
   sydneyTodayKey,
 } from "@/lib/sydney-date";
 
-// Manager dashboard is only rendered for non-strict-owner managers/chefs, so
-// owners (the majority) don't need it in their initial bundle. Calendar
-// picker is only mounted when the user actually taps the date pill.
-const ManagerDashboard = dynamic(() => import("@/components/ManagerDashboard"), {
-  loading: () => <Splash label="Loading…" />,
-});
+// Calendar picker is only mounted when the user actually taps the date pill.
 const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
   ssr: false,
 });
@@ -112,17 +110,34 @@ function Progress({ value, max, pctRight, tone = "orange" }: { value: number; ma
 
 export default function DashboardPageClient({
   sessionRole = null,
+  sessionDashboard = null,
 }: {
   sessionRole?: string | null;
+  sessionDashboard?: DashboardKind | null;
 }) {
   const { user, loading } = useAuth();
 
+  const managerProps = {
+    hideAttention: sessionDashboard === "chef",
+    roleLabel: sessionDashboard === "chef" ? "Head Chef" : "Store Manager",
+    displayName: sessionDashboard === "chef" ? "Chuck" : undefined,
+    sessionDashboard,
+  };
+
   if (loading) {
-    if (sessionRole === "owner") {
+    if (sessionDashboard === "owner") {
       return (
         <>
           <DismissSsrPreparing />
-          <OwnerDashboard sessionRole={sessionRole} />
+          <OwnerDashboard sessionDashboard={sessionDashboard} />
+        </>
+      );
+    }
+    if (isManagerDashboardKind(sessionDashboard)) {
+      return (
+        <>
+          <DismissSsrPreparing />
+          <ManagerDashboard {...managerProps} />
         </>
       );
     }
@@ -141,6 +156,8 @@ export default function DashboardPageClient({
         <ManagerDashboard
           hideAttention={userIsChef}
           roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
+          displayName={userIsChef ? "Chuck" : undefined}
+          sessionDashboard={userIsChef ? "chef" : "manager"}
         />
       </>
     );
@@ -149,7 +166,7 @@ export default function DashboardPageClient({
   return (
     <>
       <DismissSsrPreparing />
-      <OwnerDashboard sessionRole={sessionRole} />
+      <OwnerDashboard sessionDashboard="owner" />
     </>
   );
 }
@@ -194,9 +211,9 @@ function statsFromCache(cached: DashCache | null): Stats | null {
 }
 
 function OwnerDashboard({
-  sessionRole = null,
+  sessionDashboard = null,
 }: {
-  sessionRole?: string | null;
+  sessionDashboard?: DashboardKind | null;
 }) {
   const { user } = useAuth();
   const initialDate = typeof window !== "undefined" ? sydneyTodayKey() : "";
@@ -447,7 +464,7 @@ function OwnerDashboard({
   }
 
   useEffect(() => {
-    if (sessionRole !== "owner" || !selectedDate) return;
+    if (sessionDashboard !== "owner" || !selectedDate) return;
     let cancelled = false;
     void fetch(
       `/api/dashboard/owner-snapshot?date=${encodeURIComponent(selectedDate)}`,
@@ -466,7 +483,7 @@ function OwnerDashboard({
     return () => {
       cancelled = true;
     };
-  }, [sessionRole, selectedDate]);
+  }, [sessionDashboard, selectedDate]);
 
   // Phase 1: Firestore sales_daily only (fast). Square + the rest in background.
   useEffect(() => {
