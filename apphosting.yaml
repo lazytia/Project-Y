@@ -6,6 +6,10 @@ runConfig:
   memoryMiB: 512
 
 env:
+  - variable: NODE_OPTIONS
+    value: --max-old-space-size=4096
+    availability:
+      - BUILD
   - variable: SQUARE_ACCESS_TOKEN
     secret: SQUARE_ACCESS_TOKEN
   - variable: SQUARE_LOCATION_ID

@@ -12,7 +12,7 @@
     }
   ],
   "apphosting": {
-    "backendId": "project-y",
+    "backendId": "project-y-asia",
     "rootDir": "/",
     "ignore": [
       "node_modules",
