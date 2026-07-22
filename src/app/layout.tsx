@@ -53,6 +53,7 @@ export default async function RootLayout({
         <style
           dangerouslySetInnerHTML={{
             __html: `
+              html,body{margin:0;background:#fff}
               .bootSplash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fff}
               .bootSplashHidden{display:none!important}
               .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
@@ -114,7 +115,7 @@ export default async function RootLayout({
         <AuthProvider>
           <LanguageProvider>
             <AuthSessionKeeper />
-            <BootSplashDismiss initialHasSession={session.authenticated} />
+            <BootSplashDismiss />
             <ServerAppShell session={session} />
             <AppShell initialHasSession={session.authenticated}>{children}</AppShell>
           </LanguageProvider>

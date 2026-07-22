@@ -1,55 +1,48 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
-import { useAuth } from "./AuthProvider";
-import { PUBLIC_ROUTES } from "@/lib/routes";
-import { isOwner, isChef } from "@/lib/permissions";
-import { fetchSessionHint } from "@/lib/auth-session-client";
+import { APP_READY_EVENT } from "@/lib/app-ready";
 
 function hideBootSplash() {
   const el = document.getElementById("boot-splash");
   if (el) el.classList.add("bootSplashHidden");
 }
 
-export default function BootSplashDismiss({
-  initialHasSession = false,
-}: {
-  initialHasSession?: boolean;
-}) {
-  const { user, loading, staffCompletedStep } = useAuth();
-  const pathname = usePathname();
+/** Wait two animation frames so the browser has actually painted before we hide. */
+function hideAfterPaint() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      hideBootSplash();
+    });
+  });
+}
 
+const FALLBACK_MS = 12_000;
+
+/**
+ * Keeps the inline HTML boot splash visible until the client app mounts real UI.
+ * Previously we hid it as soon as a session cookie existed — that left a long
+ * blank white gap while JS bundles downloaded on cold start.
+ */
+export default function BootSplashDismiss() {
   useEffect(() => {
-    if (loading) {
-      if (PUBLIC_ROUTES.has(pathname)) return;
-      if (initialHasSession) {
-        hideBootSplash();
-        return;
-      }
-      let cancelled = false;
-      void fetchSessionHint().then((hint) => {
-        if (cancelled || !hint.authenticated) return;
-        hideBootSplash();
-      });
-      return () => { cancelled = true; };
-    }
+    let hidden = false;
+    const hideOnce = () => {
+      if (hidden) return;
+      hidden = true;
+      hideAfterPaint();
+    };
 
-    const isPublic = PUBLIC_ROUTES.has(pathname);
-    if (isPublic) {
-      hideBootSplash();
-      return;
-    }
+    const onReady = () => hideOnce();
+    window.addEventListener(APP_READY_EVENT, onReady);
 
-    if (!user) {
-      hideBootSplash();
-      return;
-    }
+    const fallback = window.setTimeout(hideOnce, FALLBACK_MS);
 
-    if (isOwner(user) || isChef(user) || staffCompletedStep !== null) {
-      hideBootSplash();
-    }
-  }, [user, loading, pathname, staffCompletedStep, initialHasSession]);
+    return () => {
+      window.removeEventListener(APP_READY_EVENT, onReady);
+      window.clearTimeout(fallback);
+    };
+  }, []);
 
   return null;
 }

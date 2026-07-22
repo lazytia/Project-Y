@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Splash from "./Splash";
 import AppShellSkeleton from "./AppShellSkeleton";
+import AppReadyMarker from "./AppReadyMarker";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
@@ -44,51 +45,73 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   }, [isPublic, pathname, initialHasSession]);
 
   const hasSessionGuess = initialHasSession || sessionVerified === true;
-  const deferToServerShell = initialHasSession && loading && !user;
+  const showShellSkeleton = !isPublic && loading && hasSessionGuess;
 
   useEffect(() => {
     const el = document.getElementById("server-app-shell");
     if (!el) return;
     if (user && !loading) {
       el.setAttribute("hidden", "");
-    } else if (deferToServerShell) {
+    } else if (showShellSkeleton) {
+      el.setAttribute("hidden", "");
+    } else if (initialHasSession && loading && !user) {
       el.removeAttribute("hidden");
     } else if (!loading && !user) {
       el.setAttribute("hidden", "");
     }
-  }, [user, loading, deferToServerShell]);
-
-  if (deferToServerShell) {
-    return <main className={styles.main}>{children}</main>;
-  }
-
-  const showShellSkeleton =
-    !isPublic &&
-    loading &&
-    hasSessionGuess &&
-    !initialHasSession;
+  }, [user, loading, showShellSkeleton, initialHasSession]);
 
   if (showShellSkeleton) {
-    return <AppShellSkeleton>{children}</AppShellSkeleton>;
+    return (
+      <>
+        <AppReadyMarker />
+        <AppShellSkeleton>{children}</AppShellSkeleton>
+      </>
+    );
   }
 
   if (loading) {
-    return <Splash />;
+    return (
+      <>
+        <AppReadyMarker />
+        <Splash />
+      </>
+    );
   }
 
   if (isPublic) {
-    return <div className={styles.public}>{children}</div>;
+    return (
+      <>
+        <AppReadyMarker />
+        <div className={styles.public}>{children}</div>
+      </>
+    );
   }
 
   if (!user) {
-    return <Splash label="Redirecting…" />;
+    return (
+      <>
+        <AppReadyMarker />
+        <Splash label="Redirecting…" />
+      </>
+    );
   }
 
   if (!isOwner(user) && !isChef(user) && staffCompletedStep === null) {
-    return <AppShellSkeleton>{children}</AppShellSkeleton>;
+    return (
+      <>
+        <AppReadyMarker />
+        <AppShellSkeleton>{children}</AppShellSkeleton>
+      </>
+    );
   }
 
-  return <Shell sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>{children}</Shell>;
+  return (
+    <>
+      <AppReadyMarker />
+      <Shell sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>{children}</Shell>
+    </>
+  );
 }
 
 function Shell({
