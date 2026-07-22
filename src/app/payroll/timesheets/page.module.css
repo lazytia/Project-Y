@@ -49,16 +49,16 @@
   gap: 4px;
   min-height: 108px;
   color: #fff;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 .summaryCardBlue {
-  background: linear-gradient(145deg, #4f8ef7 0%, #2563eb 100%);
+  background: linear-gradient(145deg, #333333 0%, #111111 100%);
 }
 
 .summaryCardGreen {
-  background: linear-gradient(145deg, #34d399 0%, #059669 100%);
-  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.18);
+  background: linear-gradient(145deg, #ff8533 0%, var(--color-warm) 100%);
+  box-shadow: 0 8px 24px rgba(255, 106, 19, 0.22);
 }
 
 .summaryLabel {
@@ -256,7 +256,7 @@
 }
 
 .chipActive {
-  background: #2563eb;
+  background: #111111;
   color: #fff;
 }
 
@@ -291,13 +291,13 @@
 }
 
 .dateInput:focus {
-  outline: 2px solid #2563eb;
+  outline: 2px solid #111111;
   outline-offset: -1px;
 }
 
 .applyBtn {
   padding: 10px 18px;
-  background: #2563eb;
+  background: #111111;
   color: #fff;
   border: none;
   border-radius: 999px;
@@ -362,7 +362,7 @@
 }
 
 .toggleBtnActive {
-  background: #2563eb;
+  background: #111111;
   color: #fff;
 }
 
@@ -374,7 +374,7 @@
 
 .addShiftBtn {
   padding: 9px 16px;
-  background: #2563eb;
+  background: #111111;
   color: #fff;
   border: none;
   border-radius: 999px;
@@ -438,7 +438,7 @@
 }
 
 .dayHeaderBtnExpanded {
-  background: #eff6ff;
+  background: #f5f5f5;
 }
 
 .dayChip {
@@ -448,7 +448,7 @@
   justify-content: center;
   width: 46px;
   height: 46px;
-  background: #2563eb;
+  background: #111111;
   color: #fff;
   border-radius: 12px;
   line-height: 1;
@@ -647,7 +647,7 @@
 .timeInput {
   padding: 6px 12px;
   background: var(--color-bg);
-  border: 1px solid #2563eb;
+  border: 1px solid #111111;
   border-radius: 10px;
   font-family: inherit;
   font-size: 13px;
@@ -692,7 +692,7 @@
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 700;
-  color: #2563eb;
+  color: #111111;
   white-space: nowrap;
 }
 
@@ -823,7 +823,7 @@
 
 .modalPrimaryBtn {
   padding: 10px 18px;
-  background: #2563eb;
+  background: #111111;
   color: #fff;
   border: none;
   border-radius: 999px;
