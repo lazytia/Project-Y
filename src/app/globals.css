@@ -172,24 +172,40 @@ button {
    to fill the width (dashboards, wide tables) can opt back to left-
    align by setting `margin-inline: 0` at higher specificity.
    ── */
-@media (min-width: 1025px) {
-  /* Module CSS on each page loads after globals and usually declares
-     `margin: 0` on the root `.page` div, which cancels margin-inline:
-     auto. Bumping to !important is the cheapest way to override every
-     page without touching 59 individual CSS modules. Pages that want
-     the old flush-left behaviour can re-override with their own
-     `!important` — but that hasn't been needed so far. */
+/* ── Tablet + Desktop centring (≥640px) ──
+   Pages are mobile-first with max-width ~480–520px and `margin: 0`
+   on the root .page div. On any screen wider than a phone (iPad
+   portrait/landscape included) that lands them flush against the
+   left edge with lots of empty space on the right. Centering every
+   direct child of <main> makes the mobile layout look intentional
+   on tablets and desktops alike. !important is needed because the
+   module CSS with `margin: 0` loads after globals. */
+@media (min-width: 640px) {
   main > * {
     margin-inline: auto !important;
   }
+}
 
-  /* Fixed bottom action bars (Add Notice Given, Save & Continue, etc.)
-     used to span left:0 → right:0 including the sidebar area, so their
-     centered button rendered relative to the whole viewport instead of
-     the visible main column. Shift them right by the sidebar width so
-     the button lines up vertically with the centered page above.
-     Class-name substring match works because CSS Modules preserve the
-     source name as a prefix in the hashed class (e.g. `page_bottomBar__xYz`). */
+/* ── Tablet padding tweak (640–1024px) ──
+   AppShell's mobile .main sets padding: var(--space-4) which feels
+   cramped on iPad. A bit more breathing room without touching the
+   AppShell component. */
+@media (min-width: 640px) and (max-width: 1024px) {
+  main {
+    padding-inline: var(--space-6) !important;
+  }
+}
+
+/* ── Desktop-only bottom-bar alignment (≥1025px) ──
+   Fixed bottom action bars (Add Notice Given, Save & Continue, etc.)
+   span left:0 → right:0 including the sidebar area, so on desktop
+   their centered button drifts left of the centered page column.
+   Shift them right by the sidebar width so the button lines up with
+   the page above. On tablet the sidebar is hidden (overlay only) so
+   no shift is needed there. Class-name substring match works because
+   CSS Modules keep the source name as prefix in the hashed class
+   (e.g. `page_bottomBar__xYz`). */
+@media (min-width: 1025px) {
   [class*="bottomBar"],
   [class*="BottomBar"],
   [class*="actionBar"],
