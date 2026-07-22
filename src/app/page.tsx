@@ -7,6 +7,13 @@ import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firest
 import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
 import Splash from "@/components/Splash";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
+import {
+  hasDashCache,
+  readDashCache,
+  writeDashCache,
+  type DashCache,
+} from "@/lib/owner-dash-cache";
 
 // Manager dashboard is only rendered for non-strict-owner managers/chefs, so
 // owners (the majority) don't need it in their initial bundle. Calendar
@@ -51,54 +58,6 @@ const DAILY_TARGETS: Record<number, number> = {
 };
 
 const POLL_INTERVAL_MS = 30_000;
-
-/**
- * sessionStorage-backed cache for the owner dashboard. Keyed by date so
- * flipping days is instant and returning to today skips the fetch-flash.
- * Every field is optional — a stale/missing value just means "we'll show
- * "—" until the live fetch fills it".
- */
-type DashCache = Partial<{
-  todaySales: number;
-  restaurantSales: number;
-  platterSales: number;
-  weeklyProgress: number;
-  bestSellers: { name: string; sales: number; quantity: number }[];
-  savedDaySales: number;
-  lunchPax: number;
-  dinnerPax: number;
-  lunchStaff: number;
-  dinnerStaff: number;
-  prevWeekSales: number;
-  weekSalesDoc: number;
-  weeklyPayroll: number;
-  reviewNote: string;
-  nextCateringISO: string;
-  weekCateringCount: number;
-}>;
-
-const DASH_CACHE_KEY = "y.ownerDash";
-
-function readDashCache(dateKey: string): DashCache | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(`${DASH_CACHE_KEY}.${dateKey}`);
-    return raw ? (JSON.parse(raw) as DashCache) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeDashCache(dateKey: string, patch: DashCache) {
-  if (typeof window === "undefined") return;
-  try {
-    const key = `${DASH_CACHE_KEY}.${dateKey}`;
-    const prev = readDashCache(dateKey) ?? {};
-    sessionStorage.setItem(key, JSON.stringify({ ...prev, ...patch }));
-  } catch {
-    /* quota / private mode — ignore */
-  }
-}
 
 function sydneyTodayKey(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
@@ -197,46 +156,89 @@ type Stats = {
   bestSellers: { name: string; sales: number; quantity: number }[];
 };
 
+function statsFromCache(cached: DashCache | null): Stats | null {
+  if (!cached) return null;
+  if (
+    typeof cached.todaySales !== "number" &&
+    typeof cached.restaurantSales !== "number" &&
+    typeof cached.platterSales !== "number" &&
+    typeof cached.weeklyProgress !== "number"
+  ) {
+    return null;
+  }
+  return {
+    todaySales: cached.todaySales ?? 0,
+    transactions: 0,
+    transactionsChange: 0,
+    avgSpendPerTable: 0,
+    avgSpendChange: 0,
+    restaurantSales: cached.restaurantSales ?? 0,
+    platterSales: cached.platterSales ?? 0,
+    weeklyProgress: cached.weeklyProgress ?? 0,
+    peakHour: null,
+    peakHourOrders: 0,
+    bestSellers: cached.bestSellers ?? [],
+  };
+}
+
 function OwnerDashboard() {
   const { user } = useAuth();
-  const [todayKey, setTodayKey] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  const initialDate = typeof window !== "undefined" ? sydneyTodayKey() : "";
+  const initialCache = initialDate ? readDashCache(initialDate) : null;
+  const [todayKey, setTodayKey] = useState(initialDate);
+  const [selectedDate, setSelectedDate] = useState(initialDate);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
+    if (initialDate) return;
     const key = sydneyTodayKey();
     setTodayKey(key);
     setSelectedDate(key);
-  }, []);
+  }, [initialDate]);
 
   const isToday = !!selectedDate && selectedDate === todayKey;
   const dailyTarget = selectedDate ? DAILY_TARGETS[dowOfDateKey(selectedDate)] ?? 0 : 0;
   const weekMondayISO = selectedDate ? isoMondayOf(selectedDate) : "";
   const prevMondayISO = weekMondayISO ? addDaysISO(weekMondayISO, -7) : "";
 
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<Stats | null>(() => statsFromCache(initialCache));
   const [statsError, setStatsError] = useState(false);
   // Firestore snapshot of the day's gross sales — shown instantly on load
   // (so past dates don't need to wait for Square), and refreshed to
   // Firestore whenever the live Square call returns a fresh number.
-  const [savedDaySales, setSavedDaySales] = useState<number | null>(null);
+  const [savedDaySales, setSavedDaySales] = useState<number | null>(
+    () => initialCache?.savedDaySales ?? null,
+  );
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
   const [cateringOrders, setCateringOrders] = useState<CateringOrder[] | null>(null);
-  const [lunchStaff, setLunchStaff] = useState<number | null>(null);
-  const [dinnerStaff, setDinnerStaff] = useState<number | null>(null);
-  const [prevWeekSales, setPrevWeekSales] = useState<number | null>(null);
+  const [lunchStaff, setLunchStaff] = useState<number | null>(
+    () => initialCache?.lunchStaff ?? null,
+  );
+  const [dinnerStaff, setDinnerStaff] = useState<number | null>(
+    () => initialCache?.dinnerStaff ?? null,
+  );
+  const [prevWeekSales, setPrevWeekSales] = useState<number | null>(
+    () => initialCache?.prevWeekSales ?? null,
+  );
   // Weekly sales for the SELECTED week. Read from sales_weekly Firestore so
   // past weeks show their real total; the live Square API only knows the
   // current week's running progress.
-  const [weekSalesDoc, setWeekSalesDoc] = useState<number | null>(null);
-  const [weeklyPayroll, setWeeklyPayroll] = useState<number | null>(null);
-  const [reviewNote, setReviewNote] = useState<string>("");
+  const [weekSalesDoc, setWeekSalesDoc] = useState<number | null>(
+    () => initialCache?.weekSalesDoc ?? null,
+  );
+  const [weeklyPayroll, setWeeklyPayroll] = useState<number | null>(
+    () => initialCache?.weeklyPayroll ?? null,
+  );
+  const [reviewNote, setReviewNote] = useState<string>(() => initialCache?.reviewNote ?? "");
   const [reviewEditing, setReviewEditing] = useState(false);
-  const [reviewDraft, setReviewDraft] = useState("");
+  const [reviewDraft, setReviewDraft] = useState(() => initialCache?.reviewNote ?? "");
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [dataLoading, setDataLoading] = useState(true);
+  /** False until today's sales path finishes on a cache-miss visit. */
+  const [uiReady, setUiReady] = useState(() =>
+    initialDate ? hasDashCache(initialDate) : false,
+  );
 
   const fetchStats = useCallback(async (dateKey: string) => {
     try {
@@ -309,10 +311,23 @@ function OwnerDashboard() {
     try {
       const orders = await fetchCateringOrders(user);
       setCateringOrders(orders);
+      if (weekMondayISO && todayKey) {
+        const end = addDaysISO(weekMondayISO, 6);
+        const weekCount = orders.filter(
+          (o) => o.deliveryDateISO >= weekMondayISO && o.deliveryDateISO <= end && o.status !== "CANCELLED",
+        ).length;
+        const upcoming = orders
+          .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey)
+          .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
+        writeDashCache(selectedDate, {
+          weekCateringCount: weekCount,
+          nextCateringISO: upcoming[0]?.deliveryDateISO,
+        });
+      }
     } catch (err) {
       console.error("[catering] fetch error:", err);
     }
-  }, [user]);
+  }, [user, weekMondayISO, todayKey, selectedDate]);
 
   const fetchRosterStaff = useCallback(async (dateKey: string) => {
     try {
@@ -399,27 +414,9 @@ function OwnerDashboard() {
 
   function hydrateFromCache(dateKey: string) {
     const cached = readDashCache(dateKey);
-    if (!cached) return;
-    if (
-      typeof cached.todaySales === "number" ||
-      typeof cached.restaurantSales === "number" ||
-      typeof cached.platterSales === "number" ||
-      typeof cached.weeklyProgress === "number"
-    ) {
-      setStats((prev) => ({
-        todaySales: cached.todaySales ?? prev?.todaySales ?? 0,
-        transactions: prev?.transactions ?? 0,
-        transactionsChange: prev?.transactionsChange ?? 0,
-        avgSpendPerTable: prev?.avgSpendPerTable ?? 0,
-        avgSpendChange: prev?.avgSpendChange ?? 0,
-        restaurantSales: cached.restaurantSales ?? prev?.restaurantSales ?? 0,
-        platterSales: cached.platterSales ?? prev?.platterSales ?? 0,
-        weeklyProgress: cached.weeklyProgress ?? prev?.weeklyProgress ?? 0,
-        peakHour: prev?.peakHour ?? null,
-        peakHourOrders: prev?.peakHourOrders ?? 0,
-        bestSellers: cached.bestSellers ?? prev?.bestSellers ?? [],
-      }));
-    }
+    if (!cached) return false;
+    const fromCache = statsFromCache(cached);
+    if (fromCache) setStats(fromCache);
     if (typeof cached.savedDaySales === "number") setSavedDaySales(cached.savedDaySales);
     if (typeof cached.lunchStaff === "number") setLunchStaff(cached.lunchStaff);
     if (typeof cached.dinnerStaff === "number") setDinnerStaff(cached.dinnerStaff);
@@ -430,20 +427,27 @@ function OwnerDashboard() {
       setReviewNote(cached.reviewNote);
       setReviewDraft(cached.reviewNote);
     }
+    return hasDashCache(dateKey);
   }
 
-  // Load every metric in parallel, then reveal the dashboard. Polling
-  // refreshes happen in the background without re-showing the splash.
+  // Phase 1: today's sales (Firestore snapshot + Square). Phase 2: everything
+  // else in the background. Cached visits paint immediately.
   useEffect(() => {
     if (!selectedDate) return;
     let cancelled = false;
 
+    const cached = hydrateFromCache(selectedDate);
+    if (cached) setUiReady(true);
+    else setUiReady(false);
+
     (async () => {
-      setDataLoading(true);
-      hydrateFromCache(selectedDate);
       await Promise.allSettled([
         fetchSavedDaySales(selectedDate),
         fetchStats(selectedDate),
+      ]);
+      if (!cancelled) setUiReady(true);
+
+      void Promise.allSettled([
         fetchReservations(selectedDate),
         fetchCatering(),
         fetchRosterStaff(selectedDate),
@@ -452,7 +456,6 @@ function OwnerDashboard() {
         fetchWeeklyPayroll(weekMondayISO, selectedDate),
         fetchReviewNote(selectedDate),
       ]);
-      if (!cancelled) setDataLoading(false);
     })();
 
     return () => { cancelled = true; };
@@ -466,31 +469,47 @@ function OwnerDashboard() {
   }, [selectedDate, isToday, fetchStats, fetchReservations]);
 
   const resCounts = useMemo(() => {
-    if (!reservations) return null;
-    const active = reservations.filter((r) => r.status !== "cancelled" && r.status !== "no-show");
-    const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
-    const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
-    return {
-      lunchPax: lunch.reduce((s, r) => s + r.count, 0),
-      dinnerPax: dinner.reduce((s, r) => s + r.count, 0),
-    };
-  }, [reservations]);
+    if (reservations) {
+      const active = reservations.filter((r) => r.status !== "cancelled" && r.status !== "no-show");
+      const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
+      const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
+      return {
+        lunchPax: lunch.reduce((s, r) => s + r.count, 0),
+        dinnerPax: dinner.reduce((s, r) => s + r.count, 0),
+      };
+    }
+    const cached = selectedDate ? readDashCache(selectedDate) : null;
+    if (cached && typeof cached.lunchPax === "number") {
+      return { lunchPax: cached.lunchPax, dinnerPax: cached.dinnerPax ?? 0 };
+    }
+    return null;
+  }, [reservations, selectedDate]);
 
   const nextCatering = useMemo(() => {
-    if (!cateringOrders || !todayKey) return null;
-    const upcoming = cateringOrders
-      .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey)
-      .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
-    return upcoming[0] ?? null;
-  }, [cateringOrders, todayKey]);
+    if (cateringOrders && todayKey) {
+      const upcoming = cateringOrders
+        .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey)
+        .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
+      return upcoming[0] ?? null;
+    }
+    const cached = selectedDate ? readDashCache(selectedDate) : null;
+    if (cached?.nextCateringISO) {
+      return { deliveryDateISO: cached.nextCateringISO } as CateringOrder;
+    }
+    return null;
+  }, [cateringOrders, todayKey, selectedDate]);
 
   const weekCateringCount = useMemo(() => {
-    if (!cateringOrders || !weekMondayISO) return null;
-    const end = addDaysISO(weekMondayISO, 6);
-    return cateringOrders.filter(
-      (o) => o.deliveryDateISO >= weekMondayISO && o.deliveryDateISO <= end && o.status !== "CANCELLED",
-    ).length;
-  }, [cateringOrders, weekMondayISO]);
+    if (cateringOrders && weekMondayISO) {
+      const end = addDaysISO(weekMondayISO, 6);
+      return cateringOrders.filter(
+        (o) => o.deliveryDateISO >= weekMondayISO && o.deliveryDateISO <= end && o.status !== "CANCELLED",
+      ).length;
+    }
+    const cached = selectedDate ? readDashCache(selectedDate) : null;
+    if (typeof cached?.weekCateringCount === "number") return cached.weekCateringCount;
+    return null;
+  }, [cateringOrders, weekMondayISO, selectedDate]);
 
   // Prefer the Firestore snapshot (works for past weeks); fall back to the
   // live Square progress figure for the current in-progress week.
@@ -552,8 +571,8 @@ function OwnerDashboard() {
     }
   };
 
-  if (dataLoading || !selectedDate) {
-    return <Splash label="Loading dashboard…" />;
+  if (!selectedDate || !uiReady) {
+    return <DashboardSkeleton />;
   }
 
   return (

@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Splash from "./Splash";
+import AppShellSkeleton from "./AppShellSkeleton";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
+import { fetchSessionHint } from "@/lib/auth-session-client";
 import { useBellInbox, type BellItem } from "@/hooks/useBellDot";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -16,8 +18,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading, staffCompletedStep } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
-  // 모바일: 기본 닫힘 / 데스크탑: CSS에서 항상 강제 표시
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sessionHint, setSessionHint] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (isPublic) {
+      setSessionHint(false);
+      return;
+    }
+    let cancelled = false;
+    void fetchSessionHint().then((hint) => {
+      if (!cancelled) setSessionHint(hint.authenticated);
+    });
+    return () => { cancelled = true; };
+  }, [isPublic, pathname]);
+
+  const showShellSkeleton =
+    !isPublic &&
+    loading &&
+    sessionHint === true;
+
+  if (showShellSkeleton) {
+    return (
+      <AppShellSkeleton>{children}</AppShellSkeleton>
+    );
+  }
 
   if (loading) {
     return <Splash />;
@@ -31,10 +56,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <Splash label="Redirecting…" />;
   }
 
-  // Staff: wait for completedStep to load before rendering anything, so we
-  // don't flash /staff before AuthProvider bounces them to /onboarding.
   if (!isOwner(user) && !isChef(user) && staffCompletedStep === null) {
-    return <Splash />;
+    return <AppShellSkeleton>{children}</AppShellSkeleton>;
   }
 
   return <Shell sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>{children}</Shell>;
@@ -60,7 +83,6 @@ function Shell({
   const seenMs = bellSeenAt?.getTime() ?? 0;
   const showBellDot = items.some((it) => (it.occurredAt?.getTime() ?? 0) > seenMs);
 
-  // Lock body scroll while the modal is open.
   useEffect(() => {
     if (!bellOpen) return;
     const prev = document.body.style.overflow;
@@ -68,7 +90,6 @@ function Shell({
     return () => { document.body.style.overflow = prev; };
   }, [bellOpen]);
 
-  // Close on Escape.
   useEffect(() => {
     if (!bellOpen) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") setBellOpen(false); }
@@ -77,13 +98,8 @@ function Shell({
   }, [bellOpen]);
 
   async function handleBellClick() {
-    // Open the modal regardless of dot state so the user can still review
-    // pending items (e.g. managers checking what's outstanding).
     setBellOpen(true);
     if (!user) return;
-    // Stamp bellSeenAt = now() on the user's own doc. The next reload
-    // recomputes the dot — every current item.occurredAt is now ≤ seenAt,
-    // so the dot goes dark even though the modal can still show items.
     try {
       await setDoc(
         doc(getDb(), "staff_onboarding", user.uid),

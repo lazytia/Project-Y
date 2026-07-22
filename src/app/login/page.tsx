@@ -8,6 +8,7 @@ import { usernameToEmail } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
 import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
+import { refreshAuthSession } from "@/lib/auth-session-client";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
@@ -73,6 +74,8 @@ export default function LoginPage() {
       if (notifPermission === "granted") {
         registerFcmToken(cred.user.uid).catch(() => { /* silent */ });
       }
+
+      await refreshAuthSession(cred.user);
 
       // Owners + managers land on the dashboard; staff land on their staff
       // Home page (onboarding is still reachable from their sidebar).

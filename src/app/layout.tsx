@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import AppShell from "@/components/AppShell";
+import AuthSessionKeeper from "@/components/AuthSessionKeeper";
 import BootSplashDismiss from "@/components/BootSplashDismiss";
 import "./globals.css";
 
@@ -108,6 +109,7 @@ export default function RootLayout({
         </div>
         <AuthProvider>
           <LanguageProvider>
+            <AuthSessionKeeper />
             <BootSplashDismiss />
             <AppShell>{children}</AppShell>
           </LanguageProvider>

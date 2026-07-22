@@ -5,6 +5,7 @@ import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/au
 import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth, getDb } from "@/lib/firebase";
+import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
@@ -86,8 +87,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!u) {
         setStaffCompletedStep(null);
         clearStaffStepCache();
+        void clearAuthSession();
         return;
       }
+      void refreshAuthSession(u);
       if (isOwner(u)) {
         setStaffCompletedStep(null);
       } else if (isChef(u)) {
@@ -250,6 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     clearStaffStepCache();
+    await clearAuthSession();
     await fbSignOut(getAuth());
     router.replace(ROUTES.login);
   };
