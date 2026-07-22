@@ -172,7 +172,7 @@
   align-items: start;
 }
 
-@media (min-width: 860px) {
+@media (min-width: 768px) {
   .splitLayout {
     grid-template-columns: minmax(280px, 340px) 1fr;
   }
@@ -335,7 +335,7 @@
   margin-top: 12px;
 }
 
-@media (min-width: 860px) {
+@media (min-width: 768px) {
   .shiftsPanelDesktop {
     display: block;
   }
