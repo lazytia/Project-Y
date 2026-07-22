@@ -33,7 +33,17 @@
 }
 
 /* ── summary cards ── */
-.summaryRow { display: grid; grid-template-columns: 1fr; gap: 12px; }
+/* Two hero cards side-by-side on tablet+ (Total paid hours + Est.
+   gross pay). On narrow phones they stack. Black/white/orange only,
+   never the blue/green gradient mockups the design reference showed. */
+.summaryRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 500px) {
+  .summaryRow { grid-template-columns: 1fr; }
+}
 .summaryCard {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -54,6 +64,13 @@
   border-radius: 999px;
   flex-shrink: 0;
 }
+/* Warm variant for the "Est. gross pay" card icon so the two cards
+   read as a matched pair (dark clock + orange dollar) rather than a
+   monotone row. */
+.summaryIconWarm {
+  background: var(--color-warm);
+  color: #fff;
+}
 .summaryLabel {
   font-family: var(--font-display);
   font-size: 10px;
@@ -70,6 +87,7 @@
   margin: 0;
   letter-spacing: -0.01em;
 }
+.summaryValueWarm { color: var(--color-warm); }
 .summaryUnit { font-size: 12px; color: var(--color-fg-muted); font-weight: 600; margin-left: 2px; }
 .summarySub { font-size: 11px; color: var(--color-fg-muted); margin: 4px 0 0; }
 
