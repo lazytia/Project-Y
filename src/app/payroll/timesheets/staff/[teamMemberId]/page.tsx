@@ -109,19 +109,6 @@ function nameOfMember(id: string, tm: TeamMemberFromApi | undefined): string {
   const l = (tm?.lastName ?? "").trim();
   return f || l ? `${f}${l ? " " + l : ""}` : id.slice(0, 6);
 }
-function initialsOf(name: string): string {
-  const p = name.trim().split(/\s+/);
-  return ((p[0]?.[0] ?? "?") + (p[1]?.[0] ?? "")).toUpperCase();
-}
-const STAFF_COLORS = [
-  "#e91e63", "#9c27b0", "#ff7043", "#26a69a", "#42a5f5",
-  "#ffb300", "#ec407a", "#26c6da", "#7e57c2", "#66bb6a",
-];
-function colorForId(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return STAFF_COLORS[h % STAFF_COLORS.length];
-}
 function replaceHHMM(iso: string, hhmm: string): string {
   return iso.slice(0, 11) + hhmm + iso.slice(16);
 }
@@ -447,7 +434,6 @@ export default function StaffDetailPage() {
         <ul className={styles.staffSidebar}>
           {byStaff.map((staff) => {
             const selected = staff.teamMemberId === teamMemberId;
-            const color = colorForId(staff.teamMemberId);
             const staffRates = memberRates(
               shifts.filter((s) => s.teamMemberId === staff.teamMemberId && !dismissed.has(s.id)),
             );
@@ -456,9 +442,6 @@ export default function StaffDetailPage() {
               return (
                 <li key={staff.teamMemberId} className={`${styles.staffSidebarItem} ${styles.staffSidebarItemExpanded}`}>
                   <div className={styles.staffRowBtn}>
-                    <span className={styles.avatar} style={{ background: color }} aria-hidden="true">
-                      {initialsOf(staff.name)}
-                    </span>
                     <div className={styles.rowBody}>
                       <div className={styles.rowTitleLine}>
                         <p className={styles.rowTitle}>{staff.name}</p>
@@ -491,9 +474,6 @@ export default function StaffDetailPage() {
                   href={`/payroll/timesheets/staff/${encodeURIComponent(staff.teamMemberId)}?start=${startISO}&end=${endISO}`}
                   className={styles.staffRowLink}
                 >
-                  <span className={styles.avatar} style={{ background: color }} aria-hidden="true">
-                    {initialsOf(staff.name)}
-                  </span>
                   <div className={styles.rowBody}>
                     <div className={styles.rowTitleLine}>
                       <p className={styles.rowTitle}>{staff.name}</p>

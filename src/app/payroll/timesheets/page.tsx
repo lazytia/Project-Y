@@ -157,13 +157,6 @@ function nameOfTeamMember(id: string, tm: TeamMemberFromApi | undefined): string
   return id.slice(0, 6);
 }
 
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  const a = (parts[0]?.[0] ?? "?").toUpperCase();
-  const b = (parts[1]?.[0] ?? "").toUpperCase();
-  return (a + b) || "??";
-}
-
 function fmtRateHr(n: number): string {
   return `$${n.toFixed(2)}/hr`;
 }
@@ -185,19 +178,6 @@ function staffNameOf(raw: Record<string, unknown>): string {
   const first = String(raw.firstName ?? "").trim();
   const last = String(raw.lastName ?? "").trim();
   return `${first}${last ? ` ${last}` : ""}`.trim() || "Unknown";
-}
-
-// Stable colour per team member id — matches the palette used on the
-// roster page + day-details Staff view, so the same person always shows
-// up in the same tint across the app.
-const STAFF_COLORS = [
-  "#e91e63", "#9c27b0", "#ff7043", "#26a69a", "#42a5f5",
-  "#ffb300", "#ec407a", "#26c6da", "#7e57c2", "#66bb6a",
-];
-function colorForMemberId(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return STAFF_COLORS[h % STAFF_COLORS.length];
 }
 
 /* ── page ────────────────────────────────────────────────────────── */
@@ -683,13 +663,6 @@ export default function TimesheetsPage() {
                 href={`/payroll/timesheets/staff/${encodeURIComponent(s.teamMemberId)}?start=${startISO}&end=${endISO}`}
                 className={styles.staffRowLink}
               >
-                <span
-                  className={styles.avatarColor}
-                  style={{ background: colorForMemberId(s.teamMemberId) }}
-                  aria-hidden="true"
-                >
-                  {initialsOf(s.name)}
-                </span>
                 <div className={styles.rowBody}>
                   <div className={styles.rowTitleLine}>
                     <p className={styles.rowTitle}>{s.name}</p>
