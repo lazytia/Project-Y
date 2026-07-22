@@ -326,8 +326,23 @@
   letter-spacing: -0.02em;
 }
 
-.shiftsPanel {
+.shiftsPanelDesktop {
+  display: none;
   min-width: 0;
+}
+
+.inlineShifts {
+  margin-top: 12px;
+}
+
+@media (min-width: 860px) {
+  .shiftsPanelDesktop {
+    display: block;
+  }
+
+  .inlineShifts {
+    display: none;
+  }
 }
 
 .shiftsHeading {

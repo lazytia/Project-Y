@@ -268,11 +268,6 @@ export default function StaffDetailPage() {
     setEditingField(null);
   }, [memberShifts]);
 
-  const memberName = nameOfMember(teamMemberId, teamMembers[teamMemberId]);
-  const selectedStaff = byStaff.find((s) => s.teamMemberId === teamMemberId);
-  const totalHours = selectedStaff?.hours ?? 0;
-  const totalGross = selectedStaff?.gross ?? 0;
-  const rates = memberRates(memberShifts);
   const dayCount = startISO && endISO ? eachDayISO(startISO, endISO).length : 0;
 
   function updateDraft(shiftId: string, patch: Partial<ShiftDraft>) {
@@ -347,6 +342,127 @@ export default function StaffDetailPage() {
       `/payroll/timesheets/staff/${encodeURIComponent(teamMemberId)}?start=${startISO}&end=${endISO}`,
     );
     void load();
+  }
+
+  function shiftsForStaff(staffId: string): ShiftFromApi[] {
+    return shifts
+      .filter((s) => s.teamMemberId === staffId && !dismissed.has(s.id))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt));
+  }
+
+  function renderShiftsBlock(staffShifts: ShiftFromApi[], className?: string) {
+    return (
+      <div className={className}>
+        <h2 className={styles.shiftsHeading}>Shifts ({staffShifts.length})</h2>
+        <ul className={styles.shiftList}>
+          {staffShifts.length === 0 && !busy && (
+            <li className={styles.empty}>No shifts recorded in this range.</li>
+          )}
+          {staffShifts.map((s) => {
+            const draft = drafts[s.id] ?? {
+              startHHMM: hhmmFromIso(s.startAt),
+              endHHMM: hhmmFromIso(s.endAt),
+            };
+            const editRec = edits[s.id];
+            const isEdited = !!editRec;
+            const isSaving = savingEditId === s.id;
+            const isDirty = dirty.has(s.id);
+            const editingStart = editingField?.shiftId === s.id && editingField.field === "start";
+            const editingEnd = editingField?.shiftId === s.id && editingField.field === "end";
+
+            const displayStart = replaceHHMM(s.startAt, draft.startHHMM || hhmmFromIso(s.startAt));
+            const displayEnd = s.endAt
+              ? replaceHHMM(s.endAt, draft.endHHMM || hhmmFromIso(s.endAt))
+              : null;
+            const start = fmtClock(displayStart);
+            const end = fmtClock(displayEnd);
+
+            return (
+              <li key={s.id} className={styles.shiftCard}>
+                <p className={styles.shiftDate}>{fmtDay(s.dateISO)}</p>
+                <div className={styles.timeRow}>
+                  {editingStart ? (
+                    <input
+                      type="time"
+                      className={styles.timeInput}
+                      value={draft.startHHMM}
+                      autoFocus
+                      disabled={isSaving}
+                      onChange={(e) => updateDraft(s.id, { startHHMM: e.target.value })}
+                      onBlur={() => setEditingField(null)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.timeChip}
+                      onClick={() => setEditingField({ shiftId: s.id, field: "start" })}
+                    >
+                      <span className={styles.timeMain}>{start.hhmm}</span>
+                      <span className={styles.timeAmpm}>{start.ampm}</span>
+                    </button>
+                  )}
+                  <span className={styles.timeSep}>—</span>
+                  {editingEnd ? (
+                    <input
+                      type="time"
+                      className={styles.timeInput}
+                      value={draft.endHHMM}
+                      autoFocus
+                      disabled={isSaving}
+                      onChange={(e) => updateDraft(s.id, { endHHMM: e.target.value })}
+                      onBlur={() => setEditingField(null)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.timeChip}
+                      onClick={() => setEditingField({ shiftId: s.id, field: "end" })}
+                    >
+                      <span className={styles.timeMain}>{end.hhmm}</span>
+                      <span className={styles.timeAmpm}>{end.ampm}</span>
+                    </button>
+                  )}
+                </div>
+                {isEdited && editRec ? (
+                  <p className={styles.editedNote}>
+                    <span className={styles.editedBadge}>EDITED</span>
+                    {" · was "}
+                    {(() => {
+                      const os = fmtClock(editRec.originalStartAt);
+                      const oe = fmtClock(editRec.originalEndAt);
+                      return `${os.hhmm} – ${oe.hhmm}`;
+                    })()}
+                  </p>
+                ) : (
+                  <p className={styles.storeNote}>Store time (Australia/Sydney) · 5-minute steps</p>
+                )}
+                <div className={styles.shiftFooter}>
+                  <span className={styles.shiftHours}>{fmtHoursLong(draftHours(s))}</span>
+                  <div className={styles.shiftActions}>
+                    <button
+                      type="button"
+                      className={styles.saveBtn}
+                      disabled={!isDirty || isSaving}
+                      onClick={() => void saveShift(s)}
+                    >
+                      {isSaving ? "…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.deleteBtn}
+                      aria-label="Remove shift"
+                      onClick={() => void removeShift(s)}
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
   }
 
   if (authLoading || loading) return <Splash />;
@@ -464,6 +580,7 @@ export default function StaffDetailPage() {
                     <p className={styles.detailGrossLabel}>Est. gross pay</p>
                     <p className={styles.detailGross}>{fmtMoney(staff.gross)}</p>
                   </div>
+                  {renderShiftsBlock(shiftsForStaff(staff.teamMemberId), styles.inlineShifts)}
                 </li>
               );
             }
@@ -491,115 +608,8 @@ export default function StaffDetailPage() {
           {byStaff.length === 0 && <li className={styles.empty}>No staff in this range.</li>}
         </ul>
 
-        <section className={styles.shiftsPanel}>
-          <h2 className={styles.shiftsHeading}>Shifts ({memberShifts.length})</h2>
-          <ul className={styles.shiftList}>
-            {memberShifts.length === 0 && !busy && (
-              <li className={styles.empty}>No shifts recorded in this range.</li>
-            )}
-            {memberShifts.map((s) => {
-              const draft = drafts[s.id] ?? {
-                startHHMM: hhmmFromIso(s.startAt),
-                endHHMM: hhmmFromIso(s.endAt),
-              };
-              const editRec = edits[s.id];
-              const isEdited = !!editRec;
-              const isSaving = savingEditId === s.id;
-              const isDirty = dirty.has(s.id);
-              const editingStart = editingField?.shiftId === s.id && editingField.field === "start";
-              const editingEnd = editingField?.shiftId === s.id && editingField.field === "end";
-
-              const displayStart = replaceHHMM(s.startAt, draft.startHHMM || hhmmFromIso(s.startAt));
-              const displayEnd = s.endAt
-                ? replaceHHMM(s.endAt, draft.endHHMM || hhmmFromIso(s.endAt))
-                : null;
-              const start = fmtClock(displayStart);
-              const end = fmtClock(displayEnd);
-
-              return (
-                <li key={s.id} className={styles.shiftCard}>
-                  <p className={styles.shiftDate}>{fmtDay(s.dateISO)}</p>
-                  <div className={styles.timeRow}>
-                    {editingStart ? (
-                      <input
-                        type="time"
-                        className={styles.timeInput}
-                        value={draft.startHHMM}
-                        autoFocus
-                        disabled={isSaving}
-                        onChange={(e) => updateDraft(s.id, { startHHMM: e.target.value })}
-                        onBlur={() => setEditingField(null)}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.timeChip}
-                        onClick={() => setEditingField({ shiftId: s.id, field: "start" })}
-                      >
-                        <span className={styles.timeMain}>{start.hhmm}</span>
-                        <span className={styles.timeAmpm}>{start.ampm}</span>
-                      </button>
-                    )}
-                    <span className={styles.timeSep}>—</span>
-                    {editingEnd ? (
-                      <input
-                        type="time"
-                        className={styles.timeInput}
-                        value={draft.endHHMM}
-                        autoFocus
-                        disabled={isSaving}
-                        onChange={(e) => updateDraft(s.id, { endHHMM: e.target.value })}
-                        onBlur={() => setEditingField(null)}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.timeChip}
-                        onClick={() => setEditingField({ shiftId: s.id, field: "end" })}
-                      >
-                        <span className={styles.timeMain}>{end.hhmm}</span>
-                        <span className={styles.timeAmpm}>{end.ampm}</span>
-                      </button>
-                    )}
-                  </div>
-                  {isEdited && editRec ? (
-                    <p className={styles.editedNote}>
-                      <span className={styles.editedBadge}>EDITED</span>
-                      {" · was "}
-                      {(() => {
-                        const os = fmtClock(editRec.originalStartAt);
-                        const oe = fmtClock(editRec.originalEndAt);
-                        return `${os.hhmm} – ${oe.hhmm}`;
-                      })()}
-                    </p>
-                  ) : (
-                    <p className={styles.storeNote}>Store time (Australia/Sydney) · 5-minute steps</p>
-                  )}
-                  <div className={styles.shiftFooter}>
-                    <span className={styles.shiftHours}>{fmtHoursLong(draftHours(s))}</span>
-                    <div className={styles.shiftActions}>
-                      <button
-                        type="button"
-                        className={styles.saveBtn}
-                        disabled={!isDirty || isSaving}
-                        onClick={() => void saveShift(s)}
-                      >
-                        {isSaving ? "…" : "Save"}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.deleteBtn}
-                        aria-label="Remove shift"
-                        onClick={() => void removeShift(s)}
-                      >
-                        <TrashIcon />
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+        <section className={styles.shiftsPanelDesktop}>
+          {renderShiftsBlock(memberShifts)}
         </section>
       </div>
 
