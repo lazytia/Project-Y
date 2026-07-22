@@ -27,9 +27,11 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   const { user, loading, staffCompletedStep } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sessionVerified, setSessionVerified] = useState<boolean | null>(
-    initialHasSession ? true : null,
-  );
+  const [sessionVerified, setSessionVerified] = useState<boolean | null>(() => {
+    if (initialHasSession) return true;
+    if (typeof document !== "undefined" && document.cookie.includes("uid=")) return true;
+    return null;
+  });
 
   useEffect(() => {
     if (isPublic) {
@@ -62,11 +64,15 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   }, [user, loading, showShellSkeleton, initialHasSession]);
 
   if (showShellSkeleton) {
-    return <AppShellSkeleton>{children}</AppShellSkeleton>;
+    return (
+      <>
+        <AppReadyMarker />
+        <AppShellSkeleton>{children}</AppShellSkeleton>
+      </>
+    );
   }
 
   if (loading) {
-    /* Boot splash (inline HTML) stays visible — no client Splash here. */
     return null;
   }
 
