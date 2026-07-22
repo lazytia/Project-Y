@@ -430,8 +430,7 @@ function OwnerDashboard() {
     return hasDashCache(dateKey);
   }
 
-  // Phase 1: today's sales (Firestore snapshot + Square). Phase 2: everything
-  // else in the background. Cached visits paint immediately.
+  // Phase 1: Firestore sales_daily only (fast). Square + the rest in background.
   useEffect(() => {
     if (!selectedDate) return;
     let cancelled = false;
@@ -441,13 +440,11 @@ function OwnerDashboard() {
     else setUiReady(false);
 
     (async () => {
-      await Promise.allSettled([
-        fetchSavedDaySales(selectedDate),
-        fetchStats(selectedDate),
-      ]);
+      await fetchSavedDaySales(selectedDate);
       if (!cancelled) setUiReady(true);
 
       void Promise.allSettled([
+        fetchStats(selectedDate),
         fetchReservations(selectedDate),
         fetchCatering(),
         fetchRosterStaff(selectedDate),

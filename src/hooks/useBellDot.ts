@@ -89,19 +89,24 @@ function nameOf(d: Record<string, unknown>, uid: string): string {
  * the red dot is gated by — items with occurredAt > bellSeenAt are "new".
  * Items always render in the modal so the manager can still act on them.
  */
-export function useBellInbox(): {
+export function useBellInbox(options?: { enabled?: boolean }): {
   items: BellItem[];
   bellSeenAt: Date | null;
   loading: boolean;
   reload: () => void;
 } {
+  const enabled = options?.enabled ?? true;
   const { user } = useAuth();
   const [items, setItems] = useState<BellItem[]>([]);
   const [bellSeenAt, setBellSeenAt] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     if (!user) {
       setItems([]);
       setBellSeenAt(null);
@@ -109,6 +114,7 @@ export function useBellInbox(): {
       return;
     }
     let cancelled = false;
+    setLoading(true);
     (async () => {
       try {
         // Always start by reading the signed-in user's own doc for the
@@ -227,7 +233,7 @@ export function useBellInbox(): {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, tick]);
+  }, [user, tick, enabled]);
 
   return {
     items,

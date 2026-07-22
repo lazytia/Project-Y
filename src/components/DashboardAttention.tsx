@@ -12,6 +12,7 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { runWhenIdle } from "@/lib/run-when-idle";
 import { isNoticeGivenActive, isReadyToTerminate, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import styles from "./DashboardAttention.module.css";
 
@@ -280,6 +281,7 @@ export default function DashboardAttention() {
   const [counts, setCounts] = useState<Partial<Record<AttentionKind, number>> | null>(null);
   const [noted, setNoted] = useState<NotedMap>({});
   const [todayKey, setTodayKey] = useState<string>("");
+  const [fetchEnabled, setFetchEnabled] = useState(false);
 
   useEffect(() => {
     setTodayKey(sydneyTodayKey());
@@ -287,7 +289,11 @@ export default function DashboardAttention() {
   }, []);
 
   useEffect(() => {
-    if (!todayKey) return;
+    return runWhenIdle(() => setFetchEnabled(true), 2500);
+  }, []);
+
+  useEffect(() => {
+    if (!todayKey || !fetchEnabled) return;
     let cancelled = false;
     (async () => {
       const sinceUtc = startOfSydneyToday();
@@ -314,7 +320,7 @@ export default function DashboardAttention() {
     return () => {
       cancelled = true;
     };
-  }, [todayKey]);
+  }, [todayKey, fetchEnabled]);
 
   const rows: AttentionRow[] = useMemo(() => {
     if (!counts) return [];

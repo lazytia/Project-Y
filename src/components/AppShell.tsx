@@ -9,6 +9,7 @@ import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 import { fetchSessionHint } from "@/lib/auth-session-client";
+import { runWhenIdle } from "@/lib/run-when-idle";
 import { useBellInbox, type BellItem } from "@/hooks/useBellDot";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -78,7 +79,13 @@ function Shell({
 }) {
   const router = useRouter();
   const { user } = useAuth();
-  const { items, bellSeenAt, reload } = useBellInbox();
+  const [bellFetchEnabled, setBellFetchEnabled] = useState(false);
+
+  useEffect(() => {
+    return runWhenIdle(() => setBellFetchEnabled(true), 2500);
+  }, []);
+
+  const { items, bellSeenAt, reload } = useBellInbox({ enabled: bellFetchEnabled });
   const [bellOpen, setBellOpen] = useState(false);
   const seenMs = bellSeenAt?.getTime() ?? 0;
   const showBellDot = items.some((it) => (it.occurredAt?.getTime() ?? 0) > seenMs);
@@ -98,6 +105,7 @@ function Shell({
   }, [bellOpen]);
 
   async function handleBellClick() {
+    if (!bellFetchEnabled) setBellFetchEnabled(true);
     setBellOpen(true);
     if (!user) return;
     try {
