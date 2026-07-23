@@ -22,6 +22,7 @@ const EN: Dict = {
   "nav.onboarding": "Onboarding",
   "nav.onboardingOverview": "Overview",
   "nav.staffHandbook": "Staff Handbook",
+  "nav.beerGuide": "Beer Guide",
   "nav.schedule": "Schedule",
   "nav.roster": "Roster",
   "nav.requestHoliday": "Request Holiday",
@@ -344,6 +345,12 @@ const EN: Dict = {
   "staff.handbook.subtitle": "Your signed copy of the YURICA Staff Handbook.",
   "staff.handbook.signedOn": "Signed on",
   "staff.handbook.notSigned": "No signature on file.",
+  "staff.beerGuide.subtitle": "Training videos for beer service and glassware.",
+  "staff.beerGuide.introduce": "Introduce",
+  "staff.beerGuide.forManagers": "For Managers",
+  "staff.beerGuide.training1": "Training 1",
+  "staff.beerGuide.training2": "Training 2",
+  "staff.beerGuide.cleaningGlasses": "Cleaning the Glasses",
 
   // My Documents
   "docs.title": "My Documents",
@@ -459,6 +466,7 @@ const JA: Dict = {
   "nav.onboarding": "オンボーディング",
   "nav.onboardingOverview": "概要",
   "nav.staffHandbook": "スタッフハンドブック",
+  "nav.beerGuide": "ビールガイド",
   "nav.schedule": "スケジュール",
   "nav.roster": "シフト表",
   "nav.requestHoliday": "休暇申請",
@@ -783,6 +791,12 @@ const JA: Dict = {
   "staff.handbook.subtitle": "署名済みのYURICAスタッフハンドブックです。",
   "staff.handbook.signedOn": "署名日",
   "staff.handbook.notSigned": "署名記録がありません。",
+  "staff.beerGuide.subtitle": "ビール提供とグラスの扱いに関する研修動画です。",
+  "staff.beerGuide.introduce": "イントロダクション",
+  "staff.beerGuide.forManagers": "マネージャー向け",
+  "staff.beerGuide.training1": "トレーニング 1",
+  "staff.beerGuide.training2": "トレーニング 2",
+  "staff.beerGuide.cleaningGlasses": "グラスの洗浄",
 
   // My Documents
   "docs.title": "マイドキュメント",

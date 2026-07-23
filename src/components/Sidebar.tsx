@@ -36,7 +36,7 @@ export default function Sidebar({ open, onClose }: Props) {
   };
 
   useEffect(() => {
-    if (pathname.startsWith("/onboarding") || pathname.startsWith("/staff/handbook")) {
+    if (pathname.startsWith("/onboarding") || pathname.startsWith("/staff/handbook") || pathname.startsWith("/staff/beer-guide")) {
       setOpenGroup(t("nav.onboarding"));
     } else if (pathname.startsWith("/staff/schedule")) {
       setOpenGroup(t("nav.schedule"));
@@ -102,6 +102,7 @@ export default function Sidebar({ open, onClose }: Props) {
         children: [
           { label: t("nav.onboardingOverview"), href: "/onboarding" },
           { label: t("nav.staffHandbook"), href: "/staff/handbook" },
+          { label: t("nav.beerGuide"), href: "/staff/beer-guide" },
         ],
       },
       {

@@ -107,6 +107,7 @@ export const STAFF_NAV: NavGroup[] = [
     children: [
       { label: "Overview", href: "/onboarding" },
       { label: "Staff Handbook", href: "/staff/handbook" },
+      { label: "Beer Guide", href: "/staff/beer-guide" },
     ],
   },
   {
