@@ -86,6 +86,30 @@ export default function GlobalError({
             The app hit an unexpected error. Try again or reload the page.
             {error?.digest ? ` (id: ${error.digest})` : ""}
           </p>
+          {/* Surface the actual error message so it's easy to diagnose
+              instead of the user having to open DevTools. Hidden if
+              empty. */}
+          {error?.message && (
+            <pre
+              style={{
+                margin: "0 0 20px",
+                padding: "10px 12px",
+                background: "#fafafa",
+                border: "1px solid #eee",
+                borderRadius: 8,
+                fontSize: 11,
+                color: "#666",
+                textAlign: "left",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                maxHeight: 160,
+                overflow: "auto",
+              }}
+            >
+              {error.message}
+            </pre>
+          )}
           <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
             <button
               type="button"
