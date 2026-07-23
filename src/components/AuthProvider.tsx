@@ -74,6 +74,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [staffCompletedStep, setStaffCompletedStep] = useState<number | null>(null);
+  // Gate onboarding redirects until Firestore has confirmed the profile —
+  // offline/cache snapshots briefly sent completed staff to the notifications
+  // prompt ("alarm screen") before the server doc arrived.
+  const [staffProfileConfirmed, setStaffProfileConfirmed] = useState(false);
   // `null` while we haven't looked yet, `true` once the staff member has
   // seen (and accepted) the enable-notifications prompt, `false` if they
   // still owe us that step. Owners and chefs skip this entirely.
@@ -93,9 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setStaffCompletedStep(null);
         } else if (isChef(u)) {
           setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
+          setStaffProfileConfirmed(true);
         } else {
-          const cached = readStaffStepCache(u.uid);
-          if (cached !== null) setStaffCompletedStep(cached);
+          setStaffCompletedStep(null);
+          setNotificationsPromptSeen(null);
+          setStaffProfileConfirmed(false);
         }
         return;
       }
@@ -104,6 +110,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // flashes the login form before redirecting home.
       if (authReady) {
         setStaffCompletedStep(null);
+        setNotificationsPromptSeen(null);
+        setStaffProfileConfirmed(false);
         clearStaffStepCache();
         void clearAuthSession();
       }
@@ -114,6 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       if (!auth.currentUser) {
         setStaffCompletedStep(null);
+        setNotificationsPromptSeen(null);
+        setStaffProfileConfirmed(false);
         clearStaffStepCache();
         void clearAuthSession();
       }
@@ -132,7 +142,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // which caused the routing effect below to bounce the user between
   // /onboarding and /onboarding/notifications forever.
   useEffect(() => {
-    if (loading || !user) return;
+    if (loading || !user) {
+      setStaffProfileConfirmed(false);
+      return;
+    }
     const username = emailToUsername(user.email ?? "").toLowerCase();
     const role = isOwner(user) ? "owner" : isChef(user) ? "chef" : "staff";
     const ref = doc(getDb(), "staff_onboarding", user.uid);
@@ -162,8 +175,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isChef(user)) {
       setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
       setNotificationsPromptSeen(true);
+      setStaffProfileConfirmed(true);
       return;
     }
+
+    let confirmFallback: ReturnType<typeof setTimeout> | undefined;
 
     const unsub = onSnapshot(
       ref,
@@ -173,6 +189,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         writeStaffStepCache(user.uid, completed);
         setStaffCompletedStep(completed);
         setNotificationsPromptSeen(data.notificationsPromptSeen === true);
+
+        if (!snap.metadata.fromCache) {
+          setStaffProfileConfirmed(true);
+          if (confirmFallback) clearTimeout(confirmFallback);
+        }
       },
       () => {
         const fallback = readStaffStepCache(user.uid) ?? 0;
@@ -180,9 +201,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Fail-open on the notification gate — better to skip the
         // prompt than to trap the user on it.
         setNotificationsPromptSeen(true);
+        setStaffProfileConfirmed(true);
       },
     );
-    return () => unsub();
+
+    confirmFallback = setTimeout(() => {
+      setStaffProfileConfirmed(true);
+    }, 4_000);
+
+    return () => {
+      if (confirmFallback) clearTimeout(confirmFallback);
+      unsub();
+    };
   }, [user, loading]);
 
   const userIsOwner = isOwner(user);
@@ -206,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // — otherwise we'd flash /staff before bouncing back to /onboarding.
     const userIsOwnerNow = isOwner(user);
     const userIsChefNow = isChef(user);
-    if (user && !userIsOwnerNow && !userIsChefNow && staffCompletedStep === null) return;
+    if (user && !userIsOwnerNow && !userIsChefNow && !staffProfileConfirmed) return;
 
     const inOnboarding = pathname.startsWith(ROUTES.staffOnboarding);
     // Staff mid-onboarding still need access to /staff/settings so they

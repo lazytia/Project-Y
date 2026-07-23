@@ -74,8 +74,9 @@ export default function NotificationsPromptPage() {
     }
   }
 
-  if (authLoading) return <Splash />;
-  if (!user) return <Splash label="Redirecting…" />;
+  if (authLoading || !user) return <Splash />;
+  if (staffCompletedStep === null) return <Splash />;
+  if (staffCompletedStep >= 7) return <Splash label="Redirecting…" />;
 
   return (
     <div className={styles.page}>
