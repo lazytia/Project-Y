@@ -1,7 +1,10 @@
 /** Fired when the styled app shell (not auth-loading splash) has mounted. */
 export const APP_READY_EVENT = "project-y-app-ready";
 
-/** Fired when dashboard content (skeleton or live data) has painted in main. */
+/** Fired when Firebase authStateReady has resolved (loading → false). */
+export const AUTH_READY_EVENT = "project-y-auth-ready";
+
+/** Fired when the live dashboard layout has painted (not the skeleton). */
 export const DASHBOARD_READY_EVENT = "project-y-dashboard-ready";
 
 let readySent = false;

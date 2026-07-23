@@ -6,8 +6,6 @@ import dynamic from "next/dynamic";
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
-import Splash from "@/components/Splash";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
 import DashboardReadyMarker from "@/components/DashboardReadyMarker";
 import ManagerDashboard from "@/components/ManagerDashboard";
 import {
@@ -197,20 +195,18 @@ function OwnerDashboard({
 }: {
   sessionDashboard?: DashboardKind | null;
 }) {
-  const { user } = useAuth();
-  const initialDate = typeof window !== "undefined" ? sydneyTodayKey() : "";
-  const initialCache = initialDate ? readDashCache(initialDate) : null;
-  const [todayKey, setTodayKey] = useState(initialDate);
-  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const { user, loading: authLoading } = useAuth();
+  const [todayKey, setTodayKey] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const initialCache = todayKey ? readDashCache(todayKey) : null;
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
-    if (initialDate) return;
     const key = sydneyTodayKey();
     setTodayKey(key);
     setSelectedDate(key);
-  }, [initialDate]);
+  }, []);
 
   const isToday = !!selectedDate && selectedDate === todayKey;
   const dailyTarget = selectedDate ? DAILY_TARGETS[dowOfDateKey(selectedDate)] ?? 0 : 0;
@@ -250,10 +246,6 @@ function OwnerDashboard({
   const [reviewDraft, setReviewDraft] = useState(() => initialCache?.reviewNote ?? "");
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  /** False until today's sales path finishes on a cache-miss visit. */
-  const [uiReady, setUiReady] = useState(() =>
-    initialDate ? hasDashCache(initialDate) : false,
-  );
 
   const fetchStats = useCallback(async (dateKey: string) => {
     try {
@@ -457,7 +449,6 @@ function OwnerDashboard({
         if (cancelled || !data?.cache) return;
         writeDashCache(data.dateKey, data.cache);
         hydrateFromCache(data.dateKey);
-        setUiReady(true);
       })
       .catch(() => {
         /* Phase 1 client fetch still runs */
@@ -473,12 +464,9 @@ function OwnerDashboard({
     let cancelled = false;
 
     const cached = hydrateFromCache(selectedDate);
-    if (cached) setUiReady(true);
-    else setUiReady(false);
 
     (async () => {
       await fetchSavedDaySales(selectedDate);
-      if (!cancelled) setUiReady(true);
 
       void Promise.allSettled([
         fetchStats(selectedDate),
@@ -605,18 +593,9 @@ function OwnerDashboard({
     }
   };
 
-  if (!selectedDate || !uiReady) {
-    return (
-      <>
-        <DashboardReadyMarker />
-        <DashboardSkeleton />
-      </>
-    );
-  }
-
   return (
     <>
-      <DashboardReadyMarker />
+      <DashboardReadyMarker when={!authLoading && !!selectedDate} />
     <div className={styles.page}>
       {/* HEADER */}
       <header className={styles.pageHeader}>

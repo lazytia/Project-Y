@@ -6,6 +6,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth, getDb } from "@/lib/firebase";
 import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
+import { AUTH_READY_EVENT } from "@/lib/app-ready";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
@@ -115,6 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setStaffCompletedStep(null);
         clearStaffStepCache();
         void clearAuthSession();
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(AUTH_READY_EVENT));
       }
     });
 

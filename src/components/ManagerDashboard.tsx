@@ -182,7 +182,7 @@ export default function ManagerDashboard({
   hideAttention = false,
   sessionDashboard = null,
 }: DashboardProps = {}) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [firstName, setFirstName] = useState<string>("");
   const [attention, setAttention] = useState<AttentionCounts>({
     holidayRequests: 0, availabilityChanges: 0, newOnboarding: 0, visaExpiring: 0,
@@ -378,7 +378,7 @@ export default function ManagerDashboard({
 
   return (
     <>
-      <DashboardReadyMarker />
+      <DashboardReadyMarker when={!authLoading} />
     <div className={styles.page}>
       <header className={styles.greeting}>
         <h1 className={styles.greetingTitle}>

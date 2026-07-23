@@ -52,7 +52,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   const awaitingStaffStep =
     !!user && !isOwner(user) && !isChef(user) && staffCompletedStep === null;
   const usePlaceholderChrome =
-    (!isPublic && loading && hasSessionGuess) || (!isPublic && awaitingStaffStep);
+    (!isPublic && !user && loading && hasSessionGuess) || (!isPublic && awaitingStaffStep);
 
   useEffect(() => {
     const el = document.getElementById("server-app-shell");
@@ -94,7 +94,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
     <>
       <AppReadyMarker />
       <AuthenticatedShell
-        interactive={!usePlaceholderChrome && !!user && !loading}
+        interactive={!!user && !awaitingStaffStep}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
       >

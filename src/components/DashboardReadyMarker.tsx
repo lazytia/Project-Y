@@ -3,14 +3,20 @@
 import { useEffect } from "react";
 import { markDashboardReady } from "@/lib/app-ready";
 
-/** Mount when dashboard skeleton or live dashboard paints — boot splash waits for this. */
-export default function DashboardReadyMarker() {
+type Props = {
+  /** Only signal readiness when the final dashboard layout is visible. */
+  when?: boolean;
+};
+
+export default function DashboardReadyMarker({ when = true }: Props) {
   useEffect(() => {
+    if (!when) return;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         markDashboardReady();
       });
     });
-  }, []);
+  }, [when]);
+
   return null;
 }
