@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Splash from "./Splash";
-import AppShellSkeleton from "./AppShellSkeleton";
 import AppReadyMarker from "./AppReadyMarker";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
@@ -15,6 +14,7 @@ import { useBellInbox, type BellItem } from "@/hooks/useBellDot";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import styles from "./AppShell.module.css";
+import skeletonStyles from "./AppShellSkeleton.module.css";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -27,11 +27,6 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   const { user, loading, staffCompletedStep } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // MUST NOT read document.cookie here — the useState initializer runs
-  // on the server too during SSR of client components, and returning a
-  // different value on client vs server tips React into a hydration
-  // mismatch and can throw a client-side exception on navigation. The
-  // effect below hydrates the cookie hint after mount.
   const [sessionVerified, setSessionVerified] = useState<boolean | null>(
     initialHasSession ? true : null,
   );
@@ -42,8 +37,6 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
       return;
     }
     if (initialHasSession) return;
-    // Prefer the cookie hint immediately (no network) — falls back to
-    // the /api/auth/session round-trip only if the cookie's missing.
     if (typeof document !== "undefined" && document.cookie.includes("uid=")) {
       setSessionVerified(true);
       return;
@@ -56,42 +49,24 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   }, [isPublic, pathname, initialHasSession]);
 
   const hasSessionGuess = initialHasSession || sessionVerified === true;
-  const showShellSkeleton = !isPublic && loading && hasSessionGuess;
+  const awaitingStaffStep =
+    !!user && !isOwner(user) && !isChef(user) && staffCompletedStep === null;
+  const usePlaceholderChrome =
+    (!isPublic && loading && hasSessionGuess) || (!isPublic && awaitingStaffStep);
 
   useEffect(() => {
     const el = document.getElementById("server-app-shell");
     if (!el) return;
     if (user && !loading) {
       el.setAttribute("hidden", "");
-    } else if (showShellSkeleton) {
+    } else if (usePlaceholderChrome) {
       el.setAttribute("hidden", "");
     } else if (initialHasSession && loading && !user) {
       el.removeAttribute("hidden");
     } else if (!loading && !user) {
       el.setAttribute("hidden", "");
     }
-  }, [user, loading, showShellSkeleton, initialHasSession]);
-
-  if (showShellSkeleton) {
-    return (
-      <>
-        <AppReadyMarker />
-        <AppShellSkeleton>{children}</AppShellSkeleton>
-      </>
-    );
-  }
-
-  if (loading) {
-    if (hasSessionGuess) {
-      return (
-        <>
-          <AppReadyMarker />
-          <AppShellSkeleton>{children}</AppShellSkeleton>
-        </>
-      );
-    }
-    return null;
-  }
+  }, [user, loading, usePlaceholderChrome, initialHasSession]);
 
   if (isPublic) {
     return (
@@ -102,7 +77,11 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
     );
   }
 
-  if (!user) {
+  if (loading && !hasSessionGuess) {
+    return null;
+  }
+
+  if (!loading && !user) {
     return (
       <>
         <AppReadyMarker />
@@ -110,28 +89,47 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
       </>
     );
   }
-  if (!isOwner(user) && !isChef(user) && staffCompletedStep === null) {
-    return (
-      <>
-        <AppReadyMarker />
-        <AppShellSkeleton>{children}</AppShellSkeleton>
-      </>
-    );
-  }
 
   return (
     <>
       <AppReadyMarker />
-      <Shell sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>{children}</Shell>
+      <AuthenticatedShell
+        interactive={!usePlaceholderChrome && !!user && !loading}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+      >
+        {children}
+      </AuthenticatedShell>
     </>
   );
 }
 
-function Shell({
+function PlaceholderChrome() {
+  return (
+    <>
+      <div className={skeletonStyles.mobileHeader} aria-hidden="true">
+        <div className={skeletonStyles.hamburgerPlaceholder} />
+        <span className={skeletonStyles.mobileBrand}>YURICA</span>
+        <div className={skeletonStyles.bellPlaceholder} />
+      </div>
+      <aside className={skeletonStyles.sidebarPlaceholder} aria-hidden="true">
+        <div className={skeletonStyles.sidebarBrand} />
+        <div className={skeletonStyles.sidebarItem} />
+        <div className={skeletonStyles.sidebarItem} />
+        <div className={skeletonStyles.sidebarItem} />
+        <div className={skeletonStyles.sidebarItem} />
+      </aside>
+    </>
+  );
+}
+
+function AuthenticatedShell({
+  interactive,
   sidebarOpen,
   setSidebarOpen,
   children,
 }: {
+  interactive: boolean;
   sidebarOpen: boolean;
   setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
   children: React.ReactNode;
@@ -141,10 +139,11 @@ function Shell({
   const [bellFetchEnabled, setBellFetchEnabled] = useState(false);
 
   useEffect(() => {
+    if (!interactive) return;
     return runWhenIdle(() => setBellFetchEnabled(true), 2500);
-  }, []);
+  }, [interactive]);
 
-  const { items, bellSeenAt, reload } = useBellInbox({ enabled: bellFetchEnabled });
+  const { items, bellSeenAt, reload } = useBellInbox({ enabled: bellFetchEnabled && interactive });
   const [bellOpen, setBellOpen] = useState(false);
   const seenMs = bellSeenAt?.getTime() ?? 0;
   const showBellDot = items.some((it) => (it.occurredAt?.getTime() ?? 0) > seenMs);
@@ -187,41 +186,47 @@ function Shell({
 
   return (
     <div className={styles.shell} data-app-shell="true">
-      <div className={styles.mobileHeader}>
-        <button
-          className={styles.hamburger}
-          onClick={() => setSidebarOpen((o) => !o)}
-          aria-label={sidebarOpen ? "Close menu" : "Open menu"}
-        >
-          <span className={styles.bar} />
-          <span className={styles.bar} />
-          <span className={styles.bar} />
-        </button>
-        <span className={styles.mobileBrand}>YURICA</span>
-        <button
-          type="button"
-          className={styles.bellBtn}
-          aria-label="Notifications"
-          onClick={handleBellClick}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-          {showBellDot && <span className={styles.bellDot} aria-hidden="true" />}
-        </button>
-      </div>
-      {sidebarOpen && (
-        <div
-          className={styles.backdrop}
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-        />
+      {interactive ? (
+        <>
+          <div className={styles.mobileHeader}>
+            <button
+              className={styles.hamburger}
+              onClick={() => setSidebarOpen((o) => !o)}
+              aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+            >
+              <span className={styles.bar} />
+              <span className={styles.bar} />
+              <span className={styles.bar} />
+            </button>
+            <span className={styles.mobileBrand}>YURICA</span>
+            <button
+              type="button"
+              className={styles.bellBtn}
+              aria-label="Notifications"
+              onClick={handleBellClick}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {showBellDot && <span className={styles.bellDot} aria-hidden="true" />}
+            </button>
+          </div>
+          {sidebarOpen && (
+            <div
+              className={styles.backdrop}
+              onClick={() => setSidebarOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+          <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        </>
+      ) : (
+        <PlaceholderChrome />
       )}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className={styles.main}>{children}</main>
 
-      {bellOpen && (
+      {interactive && bellOpen && (
         <div
           className={styles.bellBackdrop}
           onClick={(e) => { if (e.target === e.currentTarget) setBellOpen(false); }}

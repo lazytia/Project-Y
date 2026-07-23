@@ -19,6 +19,7 @@ import type { ManagerDashServerSnapshot } from "@/lib/manager-dash-server";
 import type { DashboardKind } from "@/lib/session-dashboard";
 import { isManagerDashboardKind } from "@/lib/session-dashboard";
 import { sydneyTodayKey } from "@/lib/sydney-date";
+import DashboardReadyMarker from "@/components/DashboardReadyMarker";
 import styles from "./ManagerDashboard.module.css";
 
 type AttentionCounts = {
@@ -376,6 +377,8 @@ export default function ManagerDashboard({
   }, [todaySales, dailyTarget]);
 
   return (
+    <>
+      <DashboardReadyMarker />
     <div className={styles.page}>
       <header className={styles.greeting}>
         <h1 className={styles.greetingTitle}>
@@ -580,5 +583,6 @@ export default function ManagerDashboard({
         </p>
       </div>
     </div>
+    </>
   );
 }

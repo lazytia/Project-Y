@@ -126,11 +126,6 @@ export default async function RootLayout({
             <span />
           </div>
         </div>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){function hideBoot(){var prep=document.getElementById("ssr-dash-preparing");var shell=document.getElementById("server-app-shell");if(!prep&&!shell)return;var b=document.getElementById("boot-splash");if(b)b.classList.add("bootSplashHidden");}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",hideBoot);else hideBoot();})();`,
-          }}
-        />
         <AuthProvider>
           <LanguageProvider>
             <AuthSessionKeeper />

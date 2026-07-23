@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
-import DismissSsrPreparing from "@/components/DismissSsrPreparing";
 import ManagerDashboard from "@/components/ManagerDashboard";
 import type { DashboardKind } from "@/lib/session-dashboard";
 
@@ -23,31 +22,14 @@ export default function ChefDashboardClient({
     if (!isChef(user)) router.replace(ROUTES.staffHome);
   }, [loading, user, router]);
 
-  if (loading) {
-    return (
-      <>
-        <DismissSsrPreparing />
-        <ManagerDashboard
-          hideAttention
-          roleLabel="Head Chef"
-          displayName="Chuck"
-          sessionDashboard={dash}
-        />
-      </>
-    );
-  }
-
-  if (!isChef(user)) return null;
+  if (!loading && !isChef(user)) return null;
 
   return (
-    <>
-      <DismissSsrPreparing />
-      <ManagerDashboard
-        hideAttention
-        roleLabel="Head Chef"
-        displayName="Chuck"
-        sessionDashboard="chef"
-      />
-    </>
+    <ManagerDashboard
+      hideAttention
+      roleLabel="Head Chef"
+      displayName="Chuck"
+      sessionDashboard={loading ? dash : "chef"}
+    />
   );
 }

@@ -8,7 +8,7 @@ import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
 import Splash from "@/components/Splash";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
-import DismissSsrPreparing from "@/components/DismissSsrPreparing";
+import DashboardReadyMarker from "@/components/DashboardReadyMarker";
 import ManagerDashboard from "@/components/ManagerDashboard";
 import {
   hasDashCache,
@@ -126,20 +126,10 @@ export default function DashboardPageClient({
 
   if (loading) {
     if (sessionDashboard === "owner") {
-      return (
-        <>
-          <DismissSsrPreparing />
-          <OwnerDashboard sessionDashboard={sessionDashboard} />
-        </>
-      );
+      return <OwnerDashboard sessionDashboard={sessionDashboard} />;
     }
     if (isManagerDashboardKind(sessionDashboard)) {
-      return (
-        <>
-          <DismissSsrPreparing />
-          <ManagerDashboard {...managerProps} />
-        </>
-      );
+      return <ManagerDashboard {...managerProps} />;
     }
     return null;
   }
@@ -151,24 +141,16 @@ export default function DashboardPageClient({
 
   if (userIsManager) {
     return (
-      <>
-        <DismissSsrPreparing />
-        <ManagerDashboard
-          hideAttention={userIsChef}
-          roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
-          displayName={userIsChef ? "Chuck" : undefined}
-          sessionDashboard={userIsChef ? "chef" : "manager"}
-        />
-      </>
+      <ManagerDashboard
+        hideAttention={userIsChef}
+        roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
+        displayName={userIsChef ? "Chuck" : undefined}
+        sessionDashboard={userIsChef ? "chef" : "manager"}
+      />
     );
   }
 
-  return (
-    <>
-      <DismissSsrPreparing />
-      <OwnerDashboard sessionDashboard="owner" />
-    </>
-  );
+  return <OwnerDashboard sessionDashboard="owner" />;
 }
 
 type Stats = {
@@ -624,10 +606,17 @@ function OwnerDashboard({
   };
 
   if (!selectedDate || !uiReady) {
-    return <DashboardSkeleton />;
+    return (
+      <>
+        <DashboardReadyMarker />
+        <DashboardSkeleton />
+      </>
+    );
   }
 
   return (
+    <>
+      <DashboardReadyMarker />
     <div className={styles.page}>
       {/* HEADER */}
       <header className={styles.pageHeader}>
@@ -900,5 +889,6 @@ function OwnerDashboard({
         )}
       </section>
     </div>
+    </>
   );
 }
