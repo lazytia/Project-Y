@@ -3,7 +3,7 @@
   "name": "Project Y",
   "short_name": "Project Y",
   "description": "Project Y operations app",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
