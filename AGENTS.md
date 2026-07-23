@@ -8,7 +8,8 @@ Cursor read this file before making changes.
 - Next.js 15 (App Router) + TypeScript + React 19
 - Firebase (Auth, Firestore, Storage) — client SDK
 - PWA via `public/manifest.json`
-- Deploy: Firebase App Hosting (`apphosting.yaml`)
+- Deploy: Firebase App Hosting (`apphosting.yaml`), backend **`project-y-asia`**
+  in Firebase project **`project-y-d04dc`** (`asia-southeast1`)
 
 ## Folder layout
 

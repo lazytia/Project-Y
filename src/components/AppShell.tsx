@@ -27,11 +27,14 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   const { user, loading, staffCompletedStep } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sessionVerified, setSessionVerified] = useState<boolean | null>(() => {
-    if (initialHasSession) return true;
-    if (typeof document !== "undefined" && document.cookie.includes("uid=")) return true;
-    return null;
-  });
+  // MUST NOT read document.cookie here — the useState initializer runs
+  // on the server too during SSR of client components, and returning a
+  // different value on client vs server tips React into a hydration
+  // mismatch and can throw a client-side exception on navigation. The
+  // effect below hydrates the cookie hint after mount.
+  const [sessionVerified, setSessionVerified] = useState<boolean | null>(
+    initialHasSession ? true : null,
+  );
 
   useEffect(() => {
     if (isPublic) {
@@ -39,6 +42,12 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
       return;
     }
     if (initialHasSession) return;
+    // Prefer the cookie hint immediately (no network) — falls back to
+    // the /api/auth/session round-trip only if the cookie's missing.
+    if (typeof document !== "undefined" && document.cookie.includes("uid=")) {
+      setSessionVerified(true);
+      return;
+    }
     let cancelled = false;
     void fetchSessionHint().then((hint) => {
       if (!cancelled) setSessionVerified(hint.authenticated);

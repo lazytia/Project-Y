@@ -56,5 +56,16 @@ worker for offline support can be added later via Serwist.
 
 ## Deploy (Firebase App Hosting)
 
-`apphosting.yaml` is included. Push to the GitHub repo connected to your
-App Hosting backend at the project `project-y-d04dc`.
+Firebase **project**: `project-y-d04dc`  
+App Hosting **backend** (primary): `project-y-asia` (`asia-southeast1`)
+
+Live URL: https://project-y-asia--project-y-d04dc.asia-southeast1.hosted.app
+
+`firebase.json` points `apphosting.backendId` at `project-y-asia`. Deploy with:
+
+```bash
+npx firebase-tools@latest deploy --only apphosting
+```
+
+Push to the GitHub repo (`lazytia/Project-Y`) also triggers a rollout when
+App Hosting is connected to the backend.
