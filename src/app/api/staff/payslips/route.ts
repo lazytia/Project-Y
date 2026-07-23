@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import {
   fetchAllWeekPayrollDetails,
+  employeeGrossPay,
   isEmptyPayrollDetail,
   type WeekPayrollDetail,
 } from "@/lib/payroll-sheet";
@@ -26,7 +27,7 @@ import { emailToUsername } from "@/lib/username";
  *     payDate: string,   // Wednesday of the following week
  *     periodStart: string,
  *     periodEnd: string,
- *     grossPay: number,  // totalIncSuper (net + tax + super + cash)
+ *     grossPay: number,  // taxable gross (sheet col I — before tax & super)
  *     tax: number,
  *     super: number,
  *     netPay: number,
@@ -218,7 +219,7 @@ export async function GET(req: NextRequest) {
       payDate,
       periodStart: week.weekStartISO,
       periodEnd: week.weekEndISO,
-      grossPay: match.totalIncSuper,
+      grossPay: employeeGrossPay(match),
       tax: match.tax,
       super: match.superAnn,
       netPay: match.netPay,

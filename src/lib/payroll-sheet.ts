@@ -35,6 +35,8 @@ export type WeeklyPayrollRow = {
 
 export type EmployeePayRow = {
   name: string;
+  /** Taxable gross wages (sheet column I — before tax & super). */
+  grossPay: number;
   netPay: number;
   tax: number;
   superAnn: number;
@@ -140,6 +142,7 @@ function weekStartMatches(header: RegExpExecArray, weekStartISO: string): boolea
 
 type MoneyCols = {
   employeeCol: number;
+  grossPayCol: number;
   netPayCol: number;
   taxCol: number;
   superCol: number;
@@ -167,6 +170,7 @@ function resolveMoneyCols(cols: unknown[]): MoneyCols {
 
   return {
     employeeCol: findCol(/^\s*employee\s*$/i, /^\s*staff\s*$/i, /^\s*name\s*$/i, /employee|staff|name/i),
+    grossPayCol: findCol(/^\s*gross\s*pay\s*$/i, /gross\s*pay/i, /gross\s*earnings/i),
     netPayCol: findCol(
       /^\s*net\s*pay\s*$/i,
       /net\s*(pay|wage|amount)/i,
@@ -177,6 +181,12 @@ function resolveMoneyCols(cols: unknown[]): MoneyCols {
     cashPayCol,
     totalIncCol: findCol(/total\s*inc\s*super/i, /total\s*payroll/i),
   };
+}
+
+/** Payslip "Gross Pay" — sheet column I, else net + tax + cash (excludes super). */
+export function employeeGrossPay(e: Pick<EmployeePayRow, "grossPay" | "netPay" | "tax" | "cashPay">): number {
+  if (e.grossPay > 0) return e.grossPay;
+  return Math.round((e.netPay + e.tax + e.cashPay) * 100) / 100;
 }
 
 function totalsFromMoneyRow(
@@ -331,6 +341,7 @@ export function parseWeekPayrollDetailFromRows(
     const moneyCols = resolveMoneyCols(cols);
     const {
       employeeCol,
+      grossPayCol,
       netPayCol,
       taxCol,
       superCol,
@@ -341,6 +352,7 @@ export function parseWeekPayrollDetailFromRows(
     if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
       console.log("[payroll-sheet] cols for", weekStartISO, {
         employeeCol,
+        grossPayCol,
         netPayCol,
         taxCol,
         superCol,
@@ -383,6 +395,13 @@ export function parseWeekPayrollDetailFromRows(
       const rawTotalInc = totalIncCol >= 0 ? parseMoney(r[totalIncCol]) ?? 0 : 0;
       const totalIncSuper =
         rawTotalInc > 0 ? rawTotalInc : netPay + tax + superAnn + cashPay;
+      const grossPayRaw = grossPayCol >= 0 ? parseMoney(r[grossPayCol]) ?? 0 : 0;
+      const grossPay = employeeGrossPay({
+        grossPay: grossPayRaw,
+        netPay,
+        tax,
+        cashPay,
+      });
 
       if (netPay === 0 && tax === 0 && superAnn === 0 && cashPay === 0 && totalIncSuper === 0) {
         continue;
@@ -390,6 +409,7 @@ export function parseWeekPayrollDetailFromRows(
 
       employees.push({
         name,
+        grossPay,
         netPay,
         tax,
         superAnn,
