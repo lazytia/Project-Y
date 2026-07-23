@@ -136,14 +136,27 @@ export default function ReservationsPage() {
   // in localStorage so the Clear state is per-device and survives page
   // reloads — clearing on one phone never affects what another phone
   // sees, since each device keeps its own dismissed list.
-  const [clearedActivity, setClearedActivity] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
+  //
+  // MUST NOT read localStorage in the useState initializer — it runs
+  // during SSR of this "use client" component too and returns an empty
+  // Set on the server but a populated one on the client. That mismatch
+  // is exactly what surfaces as "Application error: a client-side
+  // exception has occurred" when navigating to this page. Initialize
+  // empty on both sides; the effect below hydrates from localStorage
+  // after mount.
+  const [clearedActivity, setClearedActivity] = useState<Set<string>>(
+    () => new Set(),
+  );
+  useEffect(() => {
     try {
       const raw = localStorage.getItem("reservations-cleared-activity");
-      if (!raw) return new Set();
-      return new Set(JSON.parse(raw) as string[]);
-    } catch { return new Set(); }
-  });
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as string[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setClearedActivity(new Set(parsed));
+      }
+    } catch { /* corrupt or blocked storage — keep empty */ }
+  }, []);
   function clearActivity(key: string) {
     setClearedActivity((prev) => {
       const next = new Set(prev);
