@@ -101,7 +101,14 @@ export const MANAGER_NAV: NavGroup[] = [
 
 export const STAFF_NAV: NavGroup[] = [
   { icon: "🏠", label: "Home", href: "/staff" },
-  { icon: "📋", label: "Onboarding", href: "/onboarding" },
+  {
+    icon: "📋",
+    label: "Onboarding",
+    children: [
+      { label: "Overview", href: "/onboarding" },
+      { label: "Staff Handbook", href: "/staff/handbook" },
+    ],
+  },
   {
     icon: "📅",
     label: "Schedule",

@@ -12,6 +12,7 @@ export const ROUTES = {
   staffScheduleAvailability: "/staff/schedule/availability-change",
   staffPayslips: "/staff/payslips",
   staffDocuments: "/staff/documents",
+  staffHandbook: "/staff/handbook",
   reservations: "/operations/reservations",
 } as const;
 
@@ -27,6 +28,7 @@ export function isStaffAllowedPath(pathname: string): boolean {
   return (
     pathname.startsWith(ROUTES.staffOnboarding) ||
     pathname.startsWith(ROUTES.staffHome) ||
+    pathname.startsWith(ROUTES.staffHandbook) ||
     pathname.startsWith(ROUTES.chefHome) ||
     pathname.startsWith(ROUTES.reservations)
   );

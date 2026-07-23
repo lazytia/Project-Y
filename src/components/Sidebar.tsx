@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
@@ -12,6 +12,12 @@ import { MANAGER_NAV, OWNER_NAV, type NavGroup } from "@/lib/sidebar-nav";
 import styles from "./Sidebar.module.css";
 
 type Props = { open: boolean; onClose?: () => void };
+
+function isNavChildActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (href === "/onboarding" && pathname.startsWith("/onboarding")) return true;
+  return pathname.startsWith(`${href}/`);
+}
 
 export default function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
@@ -28,6 +34,14 @@ export default function Sidebar({ open, onClose }: Props) {
   const toggleGroup = (label: string) => {
     setOpenGroup((prev) => (prev === label ? null : label));
   };
+
+  useEffect(() => {
+    if (pathname.startsWith("/onboarding") || pathname.startsWith("/staff/handbook")) {
+      setOpenGroup(t("nav.onboarding"));
+    } else if (pathname.startsWith("/staff/schedule")) {
+      setOpenGroup(t("nav.schedule"));
+    }
+  }, [pathname, t]);
 
   // Managers (yurina) get a curated nav — narrower than the owner nav and
   // explicit so the structure isn't accidentally widened later.
@@ -82,7 +96,14 @@ export default function Sidebar({ open, onClose }: Props) {
   if (!userIsOwner && !userIsChef) {
     const staffNav: NavGroup[] = [
       { icon: "🏠", label: t("nav.home"), href: "/staff" },
-      { icon: "📋", label: t("nav.onboarding"), href: "/onboarding" },
+      {
+        icon: "📋",
+        label: t("nav.onboarding"),
+        children: [
+          { label: t("nav.onboardingOverview"), href: "/onboarding" },
+          { label: t("nav.staffHandbook"), href: "/staff/handbook" },
+        ],
+      },
       {
         icon: "📅",
         label: t("nav.schedule"),
@@ -133,7 +154,7 @@ export default function Sidebar({ open, onClose }: Props) {
                         <li key={item.href}>
                           <Link
                             href={item.href}
-                            className={`${styles.childLink} ${pathname === item.href ? styles.active : ""}`}
+                            className={`${styles.childLink} ${isNavChildActive(pathname, item.href) ? styles.active : ""}`}
                             onClick={onClose}
                           >
                             {item.label}

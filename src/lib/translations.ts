@@ -20,6 +20,8 @@ const EN: Dict = {
   // Sidebar / nav
   "nav.home": "Home",
   "nav.onboarding": "Onboarding",
+  "nav.onboardingOverview": "Overview",
+  "nav.staffHandbook": "Staff Handbook",
   "nav.schedule": "Schedule",
   "nav.roster": "Roster",
   "nav.requestHoliday": "Request Holiday",
@@ -339,6 +341,9 @@ const EN: Dict = {
   "staff.time.hAgo": "h ago",
   "staff.time.dAgo": "d ago",
   "staff.time.wAgo": "w ago",
+  "staff.handbook.subtitle": "Your signed copy of the YURICA Staff Handbook.",
+  "staff.handbook.signedOn": "Signed on",
+  "staff.handbook.notSigned": "No signature on file.",
 
   // My Documents
   "docs.title": "My Documents",
@@ -452,6 +457,8 @@ const JA: Dict = {
   // Sidebar / nav
   "nav.home": "ホーム",
   "nav.onboarding": "オンボーディング",
+  "nav.onboardingOverview": "概要",
+  "nav.staffHandbook": "スタッフハンドブック",
   "nav.schedule": "スケジュール",
   "nav.roster": "シフト表",
   "nav.requestHoliday": "休暇申請",
@@ -773,6 +780,9 @@ const JA: Dict = {
   "staff.time.hAgo": "時間前",
   "staff.time.dAgo": "日前",
   "staff.time.wAgo": "週間前",
+  "staff.handbook.subtitle": "署名済みのYURICAスタッフハンドブックです。",
+  "staff.handbook.signedOn": "署名日",
+  "staff.handbook.notSigned": "署名記録がありません。",
 
   // My Documents
   "docs.title": "マイドキュメント",

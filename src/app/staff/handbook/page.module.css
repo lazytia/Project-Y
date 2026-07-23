@@ -1,0 +1,27 @@
+.page {
+  max-width: 720px;
+  padding: var(--space-4) var(--space-5) var(--space-8);
+}
+
+.header {
+  margin-bottom: var(--space-5);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.subtitle {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.unsigned {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
