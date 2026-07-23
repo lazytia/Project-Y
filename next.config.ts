@@ -16,6 +16,15 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  async redirects() {
+    return [
+      {
+        source: "/manifest.json",
+        destination: "/manifest.webmanifest",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default withSerwist(nextConfig);
