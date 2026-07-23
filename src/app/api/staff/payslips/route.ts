@@ -65,15 +65,23 @@ function normaliseName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-/** True when every token of `candidate` appears in `sheetName` in any
- *  order — order-agnostic full-word matching so "Sakura Tanaka" hits
- *  both "Sakura Tanaka" and "Tanaka, Sakura" without matching partials
- *  like "Sakura T". */
+/** True when every token of one name appears in the other (either
+ *  direction). Bidirectional subset handles all four common shapes:
+ *  - Firestore has "Sakura Tanaka", sheet has "Sakura Tanaka" → match
+ *  - Firestore has "Sakura Tanaka", sheet has "Tanaka, Sakura" → match
+ *  - Firestore has "Sakura Tanaka", sheet has just "Sakura" → match
+ *    (staff commonly logged under given name only)
+ *  - Firestore has just "yurina" (login username fallback), sheet has
+ *    "Yurina Y" → match
+ *  Still rejects "Sakura Tanaka" vs "Sakura Ito" (partial overlap
+ *  without full containment on either side). */
 function nameMatches(candidate: string, sheetName: string): boolean {
   const sheetTokens = new Set(normaliseName(sheetName).split(" ").filter(Boolean));
-  const candTokens = normaliseName(candidate).split(" ").filter(Boolean);
-  if (candTokens.length === 0 || sheetTokens.size === 0) return false;
-  return candTokens.every((t) => sheetTokens.has(t));
+  const candTokens = new Set(normaliseName(candidate).split(" ").filter(Boolean));
+  if (candTokens.size === 0 || sheetTokens.size === 0) return false;
+  const allCandInSheet = [...candTokens].every((t) => sheetTokens.has(t));
+  const allSheetInCand = [...sheetTokens].every((t) => candTokens.has(t));
+  return allCandInSheet || allSheetInCand;
 }
 
 async function resolveEmployeeName(
@@ -141,33 +149,45 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Cache-first: read the last N weeks from Firestore. This is fast
-  // (single collection query, bounded rows) and matches the numbers
-  // the owner-facing /payroll/payroll page has already cached. Only
-  // fall back to a full Google Sheets scan if the cache is empty
-  // (fresh install, cache purged, etc.). The old logic did it the
-  // other way around — sheet first, cache fallback — which meant
-  // every page load paid the 2-5s sheet round-trip.
+  // Sheet-first for correctness: the Google Sheet is the source of
+  // truth for pay history. The Firestore cache written by
+  // /api/payroll/summary is optimised for the owner's payroll view
+  // and sometimes contains weeks where `employees[]` is empty (e.g.
+  // when the summary route filled from payroll_weekly totals without
+  // the per-staff breakdown). Reading cache-first meant Yurina and
+  // other owner/manager accounts saw an empty list even though the
+  // sheet had ~29 weeks of her payslips.
+  //
+  // The live sheet read is fast enough on the asia-southeast1
+  // backend, and the client-side sessionStorage cache in the
+  // /staff/payslips page keeps repeat page loads instant. Cache is
+  // now a fallback only for when the Sheets API is unreachable.
   let allWeeks: WeekPayrollDetail[] = [];
   try {
-    // Doc IDs are weekStartISO (YYYY-MM-DD) so ordering by __name__
-    // desc gives the newest weeks first — cheap and index-free.
-    const snap = await adminDb()
-      .collection("payroll_summary_cache")
-      .orderBy("__name__", "desc")
-      .limit(CACHE_WEEKS_LIMIT)
-      .get();
-    allWeeks = snap.docs
-      .map((d) => (d.data() as { detail?: WeekPayrollDetail }).detail ?? null)
-      .filter((d): d is WeekPayrollDetail => !!d && !isEmptyPayrollDetail(d));
+    allWeeks = await fetchAllWeekPayrollDetails();
   } catch (err) {
-    console.warn("[staff/payslips] cache read failed:", err);
+    console.warn("[staff/payslips] sheet fetch failed — falling back to cache:", err);
   }
   if (allWeeks.length === 0) {
     try {
-      allWeeks = await fetchAllWeekPayrollDetails();
+      // Doc IDs are weekStartISO (YYYY-MM-DD) so ordering by __name__
+      // desc gives the newest weeks first — cheap and index-free.
+      const snap = await adminDb()
+        .collection("payroll_summary_cache")
+        .orderBy("__name__", "desc")
+        .limit(CACHE_WEEKS_LIMIT)
+        .get();
+      allWeeks = snap.docs
+        .map((d) => (d.data() as { detail?: WeekPayrollDetail }).detail ?? null)
+        // Only keep cached weeks that actually have per-employee
+        // rows — otherwise nameMatches has nothing to match against
+        // and the caller sees an empty list.
+        .filter(
+          (d): d is WeekPayrollDetail =>
+            !!d && !isEmptyPayrollDetail(d) && Array.isArray(d.employees) && d.employees.length > 0,
+        );
     } catch (err) {
-      console.error("[staff/payslips] sheet fetch failed:", err);
+      console.error("[staff/payslips] cache fallback failed:", err);
     }
   }
   if (allWeeks.length === 0) {
