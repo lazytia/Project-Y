@@ -81,25 +81,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(getAuth(), (u) => {
+    const auth = getAuth();
+    let authReady = false;
+
+    const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setLoading(false);
-      if (!u) {
+      if (u) {
+        void refreshAuthSession(u);
+        if (isOwner(u)) {
+          setStaffCompletedStep(null);
+        } else if (isChef(u)) {
+          setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
+        } else {
+          const cached = readStaffStepCache(u.uid);
+          if (cached !== null) setStaffCompletedStep(cached);
+        }
+        return;
+      }
+      // Don't clear cookies / show login until Firebase has finished
+      // restoring persisted auth — otherwise PWA cold start briefly
+      // flashes the login form before redirecting home.
+      if (authReady) {
         setStaffCompletedStep(null);
         clearStaffStepCache();
         void clearAuthSession();
-        return;
-      }
-      void refreshAuthSession(u);
-      if (isOwner(u)) {
-        setStaffCompletedStep(null);
-      } else if (isChef(u)) {
-        setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
-      } else {
-        const cached = readStaffStepCache(u.uid);
-        if (cached !== null) setStaffCompletedStep(cached);
       }
     });
+
+    void auth.authStateReady().then(() => {
+      authReady = true;
+      setLoading(false);
+      if (!auth.currentUser) {
+        setStaffCompletedStep(null);
+        clearStaffStepCache();
+        void clearAuthSession();
+      }
+    });
+
     return () => unsub();
   }, []);
 
