@@ -219,7 +219,7 @@ export function useBellInbox(options?: { enabled?: boolean }): {
                 title: n.title ?? "Notification",
                 detail: n.detail ?? "",
                 ago: fmtRelative(at),
-                href: undefined,
+                href: n.id ? `/staff/notifications/${n.id}` : undefined,
                 occurredAt: at,
               };
             })

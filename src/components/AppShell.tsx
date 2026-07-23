@@ -49,6 +49,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   }, [isPublic, pathname, initialHasSession]);
 
   const hasSessionGuess = initialHasSession || sessionVerified === true;
+  const authSettled = !loading;
   const awaitingStaffStep =
     !!user && !isOwner(user) && !isChef(user) && staffCompletedStep === null;
   const usePlaceholderChrome =
@@ -92,7 +93,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
 
   return (
     <>
-      <AppReadyMarker />
+      {authSettled && <AppReadyMarker />}
       <AuthenticatedShell
         interactive={!!user && !awaitingStaffStep}
         sidebarOpen={sidebarOpen}
