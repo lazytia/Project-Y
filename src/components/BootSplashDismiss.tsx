@@ -7,7 +7,7 @@ import {
   AUTH_READY_EVENT,
   DASHBOARD_READY_EVENT,
 } from "@/lib/app-ready";
-import { hideBootSplash } from "@/lib/boot-splash";
+import { hasPageLoadingMarker, hideBootSplash } from "@/lib/boot-splash";
 
 const FALLBACK_MS = 8_000;
 const DASHBOARD_ROUTES = new Set(["/", "/chef"]);
@@ -20,18 +20,39 @@ export default function BootSplashDismiss() {
     let appReady = false;
     let authReady = false;
     let dashboardReady = false;
+    let raf = 0;
 
     const dashboardRoute = DASHBOARD_ROUTES.has(pathname);
 
     const hideOnce = () => {
       if (hidden) return;
-      if (!appReady) return;
-      if (dashboardRoute && !authReady) return;
-      if (dashboardRoute && !dashboardReady) return;
+
+      if (!appReady || !authReady) {
+        raf = requestAnimationFrame(hideOnce);
+        return;
+      }
+      if (dashboardRoute && !dashboardReady) {
+        raf = requestAnimationFrame(hideOnce);
+        return;
+      }
+      if (hasPageLoadingMarker()) {
+        raf = requestAnimationFrame(hideOnce);
+        return;
+      }
+
+      const shell = document.querySelector("[data-app-shell='true']");
+      const rect = shell?.getBoundingClientRect();
+      if (!rect || rect.width === 0) {
+        raf = requestAnimationFrame(hideOnce);
+        return;
+      }
+
       hidden = true;
       requestAnimationFrame(() => {
-        hideBootSplash();
-        document.getElementById("ssr-dash-preparing")?.remove();
+        requestAnimationFrame(() => {
+          hideBootSplash();
+          document.getElementById("ssr-dash-preparing")?.remove();
+        });
       });
     };
 
@@ -59,11 +80,14 @@ export default function BootSplashDismiss() {
       hideOnce();
     }, FALLBACK_MS);
 
+    hideOnce();
+
     return () => {
       window.removeEventListener(APP_READY_EVENT, onAppReady);
       window.removeEventListener(AUTH_READY_EVENT, onAuthReady);
       window.removeEventListener(DASHBOARD_READY_EVENT, onDashboardReady);
       window.clearTimeout(fallback);
+      cancelAnimationFrame(raf);
     };
   }, [pathname]);
 

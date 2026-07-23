@@ -7,6 +7,10 @@ export const AUTH_READY_EVENT = "project-y-auth-ready";
 /** Fired when the live dashboard layout has painted (not the skeleton). */
 export const DASHBOARD_READY_EVENT = "project-y-dashboard-ready";
 
+/** Splash / page-loading marker in the DOM — boot splash waits for this to clear. */
+export const PAGE_LOADING_ATTR = "data-page-loading";
+export const SPLASH_ATTR = "data-splash";
+
 let readySent = false;
 let dashboardReadySent = false;
 

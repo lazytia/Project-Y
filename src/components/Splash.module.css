@@ -8,7 +8,6 @@
   justify-content: center;
   gap: var(--space-4);
   z-index: 1000;
-  animation: fadeIn 0.25s ease-out;
 }
 
 .logo {
@@ -61,11 +60,6 @@
   font-size: var(--font-size-sm);
   color: var(--color-fg-subtle);
   margin-top: var(--space-1);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
 }
 
 @keyframes pulse {
