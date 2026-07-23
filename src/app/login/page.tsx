@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
@@ -9,14 +9,35 @@ import { ROUTES } from "@/lib/routes";
 import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
 import { refreshAuthSession } from "@/lib/auth-session-client";
+import { useAuth } from "@/components/AuthProvider";
+import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Cookie-hint check runs after mount (never in initial state — that
+  // would diverge between SSR and client render). If the browser has a
+  // recent session cookie, Firebase Auth almost certainly will resolve
+  // to a real user in a moment — keep the splash up instead of
+  // flashing the login form.
+  const [hasSessionCookieGuess, setHasSessionCookieGuess] = useState(false);
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.cookie.includes("uid=")) setHasSessionCookieGuess(true);
+  }, []);
+
+  // Owner reported the login form was flashing for a split second on
+  // cold app launch before AuthProvider resolved and redirected to
+  // Home. Hold the splash while Firebase Auth is still hydrating OR
+  // while a signed-in user is present (in that case AppShell's
+  // useEffect is about to push us off /login anyway).
+  const shouldHoldSplash =
+    authLoading || !!user || (hasSessionCookieGuess && !authLoading && !user);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +107,10 @@ export default function LoginPage() {
       setBusy(false);
     }
   };
+
+  if (shouldHoldSplash) {
+    return <Splash />;
+  }
 
   return (
     <div className={styles.card}>
