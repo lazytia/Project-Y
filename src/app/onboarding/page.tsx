@@ -6,7 +6,6 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
-import { isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import { useLang } from "@/components/LanguageProvider";
@@ -56,11 +55,6 @@ export default function OnboardingPage() {
   const { t } = useLang();
   const name = emailToUsername(user?.email ?? "");
   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
-
-  // Chefs skip onboarding entirely — bounce them out immediately.
-  useEffect(() => {
-    if (user && isChef(user)) router.replace(ROUTES.chefHome);
-  }, [user, router]);
 
   const [completedStep, setCompletedStep] = useState(0);
   // inProgressStep: step they were last WORKING on (including partial Save & Exit)

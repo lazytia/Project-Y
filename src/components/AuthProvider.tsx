@@ -290,8 +290,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Chefs skip onboarding entirely — bounce them out if they land there.
-    if (user && isChef(user) && inOnboarding) {
+    // Chefs skip onboarding wizard steps — overview + handbook/beer guide stay reachable.
+    if (
+      user &&
+      isChef(user) &&
+      pathname.startsWith(ROUTES.staffOnboarding) &&
+      pathname !== ROUTES.staffOnboarding
+    ) {
       router.replace(ROUTES.chefHome);
       return;
     }

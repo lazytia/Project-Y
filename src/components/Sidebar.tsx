@@ -216,7 +216,7 @@ export default function Sidebar({ open, onClose }: Props) {
                       <li key={item.href}>
                         <Link
                           href={item.href}
-                          className={`${styles.childLink} ${pathname === item.href ? styles.active : ""}`}
+                          className={`${styles.childLink} ${isNavChildActive(pathname, item.href) ? styles.active : ""}`}
                           onClick={onClose}
                         >
                           {item.label}

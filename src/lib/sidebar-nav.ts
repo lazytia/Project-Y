@@ -70,6 +70,15 @@ export const OWNER_NAV: NavGroup[] = [
 export const MANAGER_NAV: NavGroup[] = [
   { icon: "🏠", label: "Dashboard", href: "/" },
   {
+    icon: "📋",
+    label: "Onboarding",
+    children: [
+      { label: "Overview", href: "/onboarding" },
+      { label: "Staff Handbook", href: "/staff/handbook" },
+      { label: "Beer Guide", href: "/staff/beer-guide" },
+    ],
+  },
+  {
     icon: "👥",
     label: "People",
     children: [
