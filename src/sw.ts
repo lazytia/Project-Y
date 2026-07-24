@@ -41,11 +41,16 @@ const serwist = new Serwist({
           // Cache 0-status opaque responses too so cross-origin OK.
           new CacheableResponsePlugin({ statuses: [0, 200] }),
           new ExpirationPlugin({
+            // Owner asked for zero blank even when the app hasn't
+            // been opened in a while. Drop the time-based expiry
+            // entirely — the previous 7-day TTL was long enough for
+            // daily users but forced occasional users (e.g. staff
+            // who only check the app every couple of weeks) back
+            // through the cold-start blank. Cache is still bounded
+            // by maxEntries and stays fresh via SWR revalidation +
+            // the SerwistRegister controllerchange auto-reload on
+            // new deploys, so we don't get stuck on ancient HTML.
             maxEntries: 32,
-            // 7 days — long enough that repeat users get instant
-            // shell, short enough that a stale cache still refreshes
-            // eventually if nothing prompts a reload.
-            maxAgeSeconds: 60 * 60 * 24 * 7,
           }),
         ],
       }),
