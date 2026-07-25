@@ -146,11 +146,15 @@ const CATEGORY_CONFIG: Record<Category, CategoryConfig> = {
     subtitle: "Record an incident or workplace issue.",
     iconClass: "iconIncident",
     icon: iconIncident,
+    // Owner-requested field order: Title → Time → Witness → Details →
+    // Action Taken → Photo. Detail view iterates the saved fields
+    // object in insertion order, so this order also governs how the
+    // note reads back after save.
     fields: [
       { key: "title",       label: "Title",          hint: "Give this incident a short title.",              placeholder: "e.g. Spill incident in kitchen during dinner service", kind: "input", maxLength: 100 },
       { key: "time",        label: "Time (Approx.)", hint: "",                                                kind: "time" },
-      { key: "details",     label: "Details",        hint: "Describe what happened.",                          placeholder: "e.g. Customer complained about incorrect order and poor service." },
       { key: "witness",     label: "Witness",        hint: "Who witnessed the incident?",                      placeholder: "e.g. John Smith", kind: "input", optional: true, maxLength: 100 },
+      { key: "details",     label: "Details",        hint: "Describe what happened.",                          placeholder: "e.g. Customer complained about incorrect order and poor service." },
       { key: "actionTaken", label: "Action Taken",   hint: "Describe what action was taken.",                  placeholder: "e.g. Apologised to the customer, corrected the order, and reminded staff of service standards." },
       { key: "photo",       label: "Attach Photo",   hint: "",                                                kind: "photo", optional: true },
     ],
@@ -457,6 +461,38 @@ export default function AddHrNoteCategoryPage({
         </div>
       </section>
 
+      {/* Owner asked for Title to sit ABOVE the Date pill. Split the
+          category fields so index 0 (always "title") renders first,
+          then the Date section, then the remaining fields. */}
+      {cfg.fields.map((f, idx) => {
+        // Only render the very first field (Title) in this pre-Date pass.
+        if (idx !== 0) return null;
+        const kind = f.kind ?? "textarea";
+        const max = f.maxLength ?? (kind === "input" ? 100 : MAX_LEN);
+        return (
+          <section key={f.key}>
+            <h2 className={styles.sectionTitle}>
+              {f.label}
+              {f.optional && <span className={styles.optional}> (Optional)</span>}
+            </h2>
+            {f.hint && <p className={styles.sectionSub}>{f.hint}</p>}
+            {kind === "input" && (
+              <div className={styles.textareaWrap}>
+                <input
+                  type="text"
+                  className={styles.shortInput}
+                  placeholder={f.placeholder}
+                  value={fieldValues[idx]}
+                  onChange={(e) => setField(idx, e.target.value)}
+                  maxLength={max}
+                />
+                <span className={styles.counter}>{fieldValues[idx].length}/{max}</span>
+              </div>
+            )}
+          </section>
+        );
+      })}
+
       {/* Date */}
       <section>
         <h2 className={styles.sectionTitle}>Date</h2>
@@ -479,8 +515,9 @@ export default function AddHrNoteCategoryPage({
         </div>
       </section>
 
-      {/* Per-category fields */}
+      {/* Remaining per-category fields (Title already rendered above). */}
       {cfg.fields.map((f, idx) => {
+        if (idx === 0) return null;
         const kind = f.kind ?? "textarea";
         const max = f.maxLength ?? (kind === "input" ? 100 : MAX_LEN);
         return (

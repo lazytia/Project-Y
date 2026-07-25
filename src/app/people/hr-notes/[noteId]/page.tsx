@@ -211,6 +211,19 @@ function ChevronDown({ open }: { open: boolean }) {
   );
 }
 
+/** Sort saved field entries so "Title" always renders first, then the
+ *  rest in whatever order they were saved. Applies to both original
+ *  notes and follow-ups so old records also read Title-first without
+ *  needing to be re-saved. */
+function orderedFieldEntries(fields: Record<string, string> | undefined | null) {
+  const entries = Object.entries(fields ?? {});
+  return entries.sort(([a], [b]) => {
+    if (a === "Title") return -1;
+    if (b === "Title") return 1;
+    return 0;
+  });
+}
+
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   const isImage =
     value.startsWith("data:image/") || value.startsWith("https://") || value.startsWith("http://");
@@ -486,7 +499,7 @@ export default function HrNoteDetailPage({
           </button>
           {expanded.has("original") && (
             <div className={styles.noteEntryBody}>
-              {Object.entries(note.fields ?? {}).map(([label, value]) => (
+              {orderedFieldEntries(note.fields).map(([label, value]) => (
                 <ReadOnlyField key={label} label={label} value={value} />
               ))}
               <ReadOnlyChecks items={note.checkboxes ?? []} />
@@ -562,7 +575,7 @@ export default function HrNoteDetailPage({
                     </>
                   ) : (
                     <>
-                      {Object.entries(fu.fields).map(([label, value]) => (
+                      {orderedFieldEntries(fu.fields).map(([label, value]) => (
                         <ReadOnlyField key={label} label={label} value={value} />
                       ))}
                       <ReadOnlyChecks items={fu.checkboxes} />
@@ -583,19 +596,9 @@ export default function HrNoteDetailPage({
         </button>
       </section>
 
-      <div className={styles.infoBox}>
-        <span className={styles.infoIcon} aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
-        </span>
-        <p className={styles.infoText}>
-          To keep a clear record, notes cannot be deleted. If a note was added in error, please edit it to update the information.
-        </p>
-      </div>
-
+      {/* Owner asked for the Edit / Save Changes bar to sit ABOVE the
+          "notes cannot be deleted" info box — the action row is what
+          the manager reaches for, so it should be the closer target. */}
       <div className={styles.footerActions}>
         <button type="button" className={styles.editBtn} onClick={handleEdit}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -612,6 +615,19 @@ export default function HrNoteDetailPage({
         >
           {saving ? "Saving…" : "Save Changes"}
         </button>
+      </div>
+
+      <div className={styles.infoBox}>
+        <span className={styles.infoIcon} aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+        </span>
+        <p className={styles.infoText}>
+          To keep a clear record, notes cannot be deleted. If a note was added in error, please edit it to update the information.
+        </p>
       </div>
 
       <p className={styles.visibility}>This record is visible to managers only.</p>

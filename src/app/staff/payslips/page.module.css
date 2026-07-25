@@ -172,6 +172,33 @@
 .viewBtn:hover { opacity: 0.92; }
 
 /* ── Previous Payslips ── */
+/* Column headers above the Previous Payslips list — mirrors the flex
+   layout of .prevRow so the label sits directly over its number. Uses
+   the same left icon slot for spacing but leaves it empty. */
+.prevHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-fg-muted);
+  text-transform: none;
+}
+.prevHeaderDate {
+  /* 18px SVG + gap in .prevRow — pad by the same amount so the
+     header sits above the date column, not above the icon. */
+  padding-left: calc(18px + var(--space-3));
+  flex: 1;
+}
+.prevHeaderAmount {
+  /* Reserve room for the chevron on the row (20px + gap) so the
+     header sits directly over .prevAmount, not over the chevron. */
+  padding-right: calc(20px + var(--space-3));
+  white-space: nowrap;
+}
+
 .prevList {
   list-style: none;
   margin: 0;

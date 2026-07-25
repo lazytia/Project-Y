@@ -176,6 +176,12 @@ export default function PayslipsPage() {
           {previous.length > 0 && (
             <>
               <h2 className={styles.sectionTitle}>{t("pay.previous")}</h2>
+              {/* Column headers above the Previous Payslips list so the
+                  two numbers in each row are self-explanatory. */}
+              <div className={styles.prevHeader} aria-hidden="true">
+                <span className={styles.prevHeaderDate}>{t("pay.paymentDate")}</span>
+                <span className={styles.prevHeaderAmount}>{t("pay.netPay")}</span>
+              </div>
               <ul className={styles.prevList}>
                 {previous.map((p) => (
                   <li key={p.id}>
