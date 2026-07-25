@@ -1,0 +1,372 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 560px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 22px 1fr 22px;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.backBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-fg);
+  cursor: pointer;
+  padding: 0;
+}
+
+.pageTitle {
+  margin: 0;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.heroCard {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-warm-bg);
+  border-radius: var(--radius-lg);
+}
+
+.heroIconWrap {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--color-warm);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.heroVersionBadge {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-warm);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--color-warm-bg);
+}
+
+.heroBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.heroEyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-warm);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.heroMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.heroChangesReviewed {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.heroSub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--color-fg);
+  line-height: 1.5;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.sectionCount {
+  color: var(--color-fg-muted);
+  font-size: 14px;
+}
+
+.updatedList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.updatedRow {
+  display: grid;
+  grid-template-columns: 48px 1fr 20px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.updatedList li:last-child {
+  border-bottom: none;
+}
+
+.updatedNum {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.updatedBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.updatedTitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+}
+
+.updatedTitleBold {
+  font-weight: 700;
+}
+
+.updatedSummary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.updatedChev {
+  font-size: 20px;
+  color: var(--color-warm);
+  text-align: right;
+}
+
+.viewFullRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 14px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+.viewFullIcon {
+  color: var(--color-fg-muted);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.viewFullText {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.viewFullBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-warm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sectionTitleAck {
+  margin: var(--space-3) 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.ackCard {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ackHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.ackAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.ackName {
+  display: flex;
+  flex-direction: column;
+}
+
+.ackNameMain {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.ackNameRole {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+.ackDeclaration {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  font-size: 14px;
+  color: var(--color-fg);
+  line-height: 1.55;
+}
+
+.ackSignatureLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.required {
+  color: #dc2626;
+}
+
+.signHere {
+  padding: 12px 22px;
+  border: 1px dashed var(--color-border);
+  background: transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.signaturePreview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.signatureImg {
+  max-height: 60px;
+  flex: 1;
+}
+
+.signatureClear {
+  background: transparent;
+  border: none;
+  color: var(--color-warm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.signatureClear:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.submitBtn {
+  margin-top: var(--space-2);
+  padding: 14px;
+  background: var(--color-warm);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.recordNote {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}

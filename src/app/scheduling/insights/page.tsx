@@ -784,39 +784,10 @@ export default function InsightsPage() {
         </div>
       </section>
 
-      {/* Planned vs Actual */}
-      <section className={styles.card}>
-        <p className={styles.cardTitle}>PLANNED VS ACTUAL</p>
-        <div className={styles.pvaGrid}>
-          <div className={styles.pvaCol}>
-            <p className={styles.pvaLabel}>ROSTER COST (PLANNED)</p>
-            <p className={styles.pvaValue}>{fmtCurrency(rosterPlanned)}</p>
-            <p className={styles.pvaMeta}>{hasSales ? `${fmtPct((rosterPlanned / sales) * 100)} of sales` : "Estimated"}</p>
-          </div>
-          <span className={styles.pvaOp} aria-hidden="true">−</span>
-          <div className={styles.pvaCol}>
-            <p className={styles.pvaLabel}>
-              PAYROLL COST (ACTUAL)
-            </p>
-            <p className={`${styles.pvaValue} ${styles.pvaValueWarm}`}>{fmtCurrency(payrollCost)}</p>
-            <p className={styles.pvaMeta}>
-              {hasSales
-                ? `${fmtPct(payrollPct)} of sales`
-                : payrollIsActual ? "incl. super" : "Estimated"}
-            </p>
-          </div>
-          <span className={styles.pvaOp} aria-hidden="true">=</span>
-          <div className={styles.pvaCol}>
-            <p className={styles.pvaLabel}>VARIANCE</p>
-            <p className={`${styles.pvaValue} ${variance > 0 ? styles.pvaValuePositive : variance < 0 ? styles.pvaValueWarm : ""}`}>
-              {variance >= 0 ? "+" : "−"}{fmtCurrency(Math.abs(variance))}
-            </p>
-            <p className={styles.pvaMeta}>
-              {hasSales ? `${variance >= 0 ? "+" : ""}${fmtPct((variance / sales) * 100)} of sales` : "vs roster plan"}
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* Planned vs Actual card removed per owner request — the two
+          data points already appear on the Snapshot row above and the
+          derived variance was noisy for the roster-planned numbers
+          we can currently compute. */}
 
       {/* Labour trend */}
       <section>

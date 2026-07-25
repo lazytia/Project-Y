@@ -108,6 +108,48 @@ export const MANAGER_NAV: NavGroup[] = [
   },
 ];
 
+// Chef (Chuck) gets his own dedicated nav — spec approved by owner:
+// Dashboard, Team (New Staff Requests / Staff Handbook / Training Manual
+// / HR Notes / Notice Given / Cash Payments), Scheduling, Operations,
+// Payroll. Different enough from MANAGER_NAV that filtering via
+// chefHidden was getting awkward — keeping them separate is clearer.
+export const CHEF_NAV: NavGroup[] = [
+  { icon: "🏠", label: "Dashboard", href: "/" },
+  {
+    icon: "👥",
+    label: "Team",
+    children: [
+      { label: "New Staff Requests", href: "/people/onboarding" },
+      { label: "Staff Handbook", href: "/staff/handbook" },
+      { label: "Training Manual", href: "/staff/training-manual" },
+      { label: "HR Notes", href: "/people/hr-notes" },
+      { label: "Notice Given", href: "/people/notice-given" },
+      { label: "Cash Payments", href: "/people/cash-payments" },
+    ],
+  },
+  {
+    icon: "📅",
+    label: "Scheduling",
+    children: [
+      { label: "Roster", href: "/scheduling/roster" },
+      { label: "Roster Insights", href: "/scheduling/insights" },
+    ],
+  },
+  {
+    icon: "🍽",
+    label: "Operations",
+    children: [
+      { label: "Reservations", href: "/operations/reservations" },
+      { label: "Catering Orders", href: "/operations/catering-orders" },
+    ],
+  },
+  {
+    icon: "💰",
+    label: "Payroll",
+    children: [{ label: "Payslips", href: "/payslips" }],
+  },
+];
+
 export const STAFF_NAV: NavGroup[] = [
   { icon: "🏠", label: "Home", href: "/staff" },
   {
@@ -136,12 +178,7 @@ export const STAFF_NAV: NavGroup[] = [
 /** Nav tree for SSR shell paint based on the session role cookie. */
 export function navForSessionRole(role: string | null): NavGroup[] {
   if (role === "staff") return STAFF_NAV;
-  if (role === "chef") {
-    return MANAGER_NAV.map((group) => ({
-      ...group,
-      children: group.children?.filter((c) => !c.chefHidden),
-    })).filter((group) => group.href || (group.children && group.children.length > 0));
-  }
+  if (role === "chef") return CHEF_NAV;
   if (role === "owner") return OWNER_NAV;
   return OWNER_NAV;
 }

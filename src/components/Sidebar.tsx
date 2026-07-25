@@ -8,7 +8,7 @@ import { useLang } from "./LanguageProvider";
 import LanguageToggle from "./LanguageToggle";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
-import { MANAGER_NAV, OWNER_NAV, type NavGroup } from "@/lib/sidebar-nav";
+import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup } from "@/lib/sidebar-nav";
 import styles from "./Sidebar.module.css";
 
 type Props = { open: boolean; onClose?: () => void };
@@ -54,12 +54,9 @@ export default function Sidebar({ open, onClose }: Props) {
       (group) => group.href || (group.children && group.children.length > 0),
     );
 
-  const managerNav = userIsChef
-    ? MANAGER_NAV.map((group) => ({
-        ...group,
-        children: group.children?.filter((c) => !c.chefHidden),
-      })).filter((group) => group.href || (group.children && group.children.length > 0))
-    : MANAGER_NAV;
+  // Chef gets his own dedicated tree (CHEF_NAV); managers still use
+  // the manager tree. Owners use ownerNav computed above.
+  const managerNav: NavGroup[] = userIsChef ? CHEF_NAV : MANAGER_NAV;
 
   const visibleNav: NavGroup[] = userIsManager ? managerNav : ownerNav;
 

@@ -387,6 +387,32 @@ export default function ManagerDashboard({
         <p className={styles.greetingRole}>{roleLabel}</p>
       </header>
 
+      {/* Chef-only: Training Manual / Staff Handbook update banner.
+          Static v2.4 for now — full version tracking is a follow-up
+          (needs a training_manual_versions Firestore collection and
+          per-user ack tracking). "Review Now" jumps into the review
+          page where Chuck signs to acknowledge the changes. */}
+      {sessionDashboard === "chef" && (
+        <section className={styles.trainingBanner}>
+          <div className={styles.trainingIconWrap} aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="12" y1="12" x2="12" y2="18" />
+              <line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
+          </div>
+          <div className={styles.trainingBody}>
+            <p className={styles.trainingEyebrow}>ACTION REQUIRED</p>
+            <p className={styles.trainingTitle}>Training Manual Updated</p>
+            <p className={styles.trainingSub}>Please review and sign v2.4.</p>
+          </div>
+          <Link href="/staff/training-manual" className={styles.trainingCta}>
+            Review Now <span aria-hidden="true">→</span>
+          </Link>
+        </section>
+      )}
+
       {!hideAttention && (
         <section>
           <div className={styles.sectionHead}>
