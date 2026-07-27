@@ -143,7 +143,6 @@ export default function StaffDashboardPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [nextShift, setNextShift] = useState<NextShiftInfo | null>(null);
   const [shiftLoaded, setShiftLoaded] = useState(false);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const [today, setTodayDate] = useState<Date>(() => {
     const d = new Date(0);
@@ -198,15 +197,8 @@ export default function StaffDashboardPage() {
   }, [user, thisWeekISO, nextWeekISO, t]);
 
   useEffect(() => {
-    if (!user) {
-      setInitialLoadDone(false);
-      return;
-    }
-    let cancelled = false;
-    void loadData().finally(() => {
-      if (!cancelled) setInitialLoadDone(true);
-    });
-    return () => { cancelled = true; };
+    if (!user) return;
+    void loadData();
   }, [user, loadData]);
 
   // Re-fetch data when the app becomes visible (e.g. after tapping a push notification)
@@ -249,10 +241,6 @@ export default function StaffDashboardPage() {
 
   // Show only the top 2 on the dashboard card; the rest live in the modal.
   const preview = notifications.slice(0, 2);
-
-  if (!initialLoadDone) {
-    return <div data-page-loading="true" hidden aria-hidden="true" />;
-  }
 
   return (
     <div className={styles.page}>

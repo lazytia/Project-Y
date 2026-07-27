@@ -7,7 +7,8 @@ import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firest
 import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
 import DashboardReadyMarker from "@/components/DashboardReadyMarker";
-import ManagerDashboard from "@/components/ManagerDashboard";
+import { useAuth } from "@/components/AuthProvider";
+import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import {
   hasDashCache,
   readDashCache,
@@ -23,18 +24,6 @@ import {
   isoMondayOf,
   sydneyTodayKey,
 } from "@/lib/sydney-date";
-
-// Calendar picker is only mounted when the user actually taps the date pill.
-const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
-  ssr: false,
-});
-// Attention card sits above the TODAY tile — code-split so it doesn't
-// bloat the manager/chef dashboards (which don't render it).
-const DashboardAttention = dynamic(() => import("@/components/DashboardAttention"), {
-  ssr: false,
-});
-import { useAuth } from "@/components/AuthProvider";
-import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import {
   type Reservation,
   fetchReservationsForDate,
@@ -45,6 +34,18 @@ import {
   fetchCateringOrders,
   dCountdownLabel,
 } from "@/lib/catering-orders";
+
+const ManagerDashboard = dynamic(() => import("@/components/ManagerDashboard"));
+
+// Calendar picker is only mounted when the user actually taps the date pill.
+const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
+  ssr: false,
+});
+// Attention card sits above the TODAY tile — code-split so it doesn't
+// bloat the manager/chef dashboards (which don't render it).
+const DashboardAttention = dynamic(() => import("@/components/DashboardAttention"), {
+  ssr: false,
+});
 
 const WEEKLY_TARGET = 30_000;
 const PAYROLL_TARGET_PCT = 25;

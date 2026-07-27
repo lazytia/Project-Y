@@ -93,7 +93,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
 
   return (
     <>
-      {authSettled && <AppReadyMarker />}
+      {(authSettled || usePlaceholderChrome) && <AppReadyMarker />}
       <AuthenticatedShell
         interactive={!!user && !awaitingStaffStep}
         sidebarOpen={sidebarOpen}

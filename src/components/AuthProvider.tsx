@@ -99,9 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
           setStaffProfileConfirmed(true);
         } else {
-          setStaffCompletedStep(null);
-          setNotificationsPromptSeen(null);
-          setStaffProfileConfirmed(false);
+          const cached = readStaffStepCache(u.uid);
+          setStaffCompletedStep(cached);
+          if (cached !== null && cached >= TOTAL_ONBOARDING_STEPS) {
+            setStaffProfileConfirmed(true);
+            setNotificationsPromptSeen(true);
+          } else {
+            setNotificationsPromptSeen(null);
+            setStaffProfileConfirmed(false);
+          }
         }
         return;
       }
@@ -207,7 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     confirmFallback = setTimeout(() => {
       setStaffProfileConfirmed(true);
-    }, 4_000);
+    }, 1_500);
 
     return () => {
       if (confirmFallback) clearTimeout(confirmFallback);

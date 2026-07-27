@@ -1,0 +1,14 @@
+name: Warm App Hosting
+
+on:
+  schedule:
+    # Keep the App Hosting instance warm (minInstances: 0 cold starts).
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping production health endpoint
+        run: curl -fsS --max-time 30 "https://project.yurica.com.au/api/health"
