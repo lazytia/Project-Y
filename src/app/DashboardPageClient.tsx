@@ -482,14 +482,21 @@ function OwnerDashboard({
     })();
 
     return () => { cancelled = true; };
-  }, [selectedDate, prevMondayISO, weekMondayISO, fetchStats, fetchSavedDaySales, fetchReservations, fetchCatering, fetchRosterStaff, fetchPrevWeekSales, fetchWeekSales, fetchWeeklyPayroll, fetchReviewNote]);
+    // Intentionally exclude the fetch* callbacks — including them makes
+    // the effect re-fire (and re-fetch every endpoint) whenever the
+    // Firebase user object identity changes (token refresh) or memoised
+    // week keys recompute. HAR analysis showed the same API being hit
+    // 8–16× on a single dashboard visit before this fix.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid]);
 
   useEffect(() => {
     if (!selectedDate || !isToday) return;
     const id1 = setInterval(() => fetchStats(selectedDate), POLL_INTERVAL_MS);
     const id2 = setInterval(() => fetchReservations(selectedDate), POLL_INTERVAL_MS);
     return () => { clearInterval(id1); clearInterval(id2); };
-  }, [selectedDate, isToday, fetchStats, fetchReservations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, isToday]);
 
   const resCounts = useMemo(() => {
     if (reservations) {
