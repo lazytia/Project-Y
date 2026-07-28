@@ -8,7 +8,6 @@ import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
 import { refreshAuthSession } from "@/lib/auth-session-client";
 import {
-  hasClientSessionHint,
   setClientDashboardHint,
   setClientSessionHint,
 } from "@/lib/client-session-hint";
@@ -29,8 +28,7 @@ export default function LoginClient({ initialHasSession: _initialHasSession }: L
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const shouldHoldSplash =
-    authLoading || !!user || (hasClientSessionHint() && !authLoading && !user);
+  const shouldHoldSplash = authLoading || !!user || busy;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

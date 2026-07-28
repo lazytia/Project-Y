@@ -80,11 +80,7 @@ export function AuthProvider({
   initialHasSession?: boolean;
 }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(() => {
-    if (initialHasSession) return false;
-    if (typeof window !== "undefined" && hasClientSessionHint()) return false;
-    return true;
-  });
+  const [loading, setLoading] = useState(() => !initialHasSession);
   const [authRestored, setAuthRestored] = useState(false);
   const [staffCompletedStep, setStaffCompletedStep] = useState<number | null>(null);
   // Gate onboarding redirects until Firestore has confirmed the profile —
@@ -287,7 +283,11 @@ export function AuthProvider({
       if (loginRedirectStarted.current) return;
       loginRedirectStarted.current = true;
       void (async () => {
-        await refreshAuthSession(user);
+        try {
+          await refreshAuthSession(user);
+        } catch {
+          /* still navigate — dashboard renders from local hints */
+        }
         let dest = postLoginRoute(user);
         if (staffNeedsOnboarding) {
           dest =
@@ -305,7 +305,6 @@ export function AuthProvider({
       router.replace(ROUTES.login);
       return;
     }
-
     // Wait until we know the staff's completedStep before routing them around
     // — otherwise we'd flash /staff before bouncing back to /onboarding.
     const userIsOwnerNow = isOwner(user);

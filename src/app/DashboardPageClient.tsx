@@ -13,7 +13,7 @@ import {
   resolveDashboardKind,
 } from "@/lib/resolve-dashboard-kind";
 import { isManagerDashboardKind } from "@/lib/session-dashboard";
-import { hasClientSessionHint } from "@/lib/client-session-hint";
+import { hasClientSessionHint, readClientDashboardHint } from "@/lib/client-session-hint";
 import {
   hasDashCache,
   readDashCache,
@@ -117,34 +117,46 @@ export default function DashboardPageClient({
 }) {
   const { user, loading } = useAuth();
   const effectiveDashboard = resolveDashboardKind(sessionDashboard, user);
+  const dashHint = readClientDashboardHint();
+  const hintedDash =
+    dashHint === "owner" ||
+    dashHint === "manager" ||
+    dashHint === "chef" ||
+    dashHint === "staff"
+      ? dashHint
+      : null;
+  const dashKind = effectiveDashboard ?? hintedDash;
 
   const managerProps = {
-    hideAttention: effectiveDashboard === "chef",
-    roleLabel: effectiveDashboard === "chef" ? "Head Chef" : "Store Manager",
-    displayName: effectiveDashboard === "chef" ? "Chuck" : undefined,
-    sessionDashboard: effectiveDashboard,
+    hideAttention: dashKind === "chef",
+    roleLabel: dashKind === "chef" ? "Head Chef" : "Store Manager",
+    displayName: dashKind === "chef" ? "Chuck" : undefined,
+    sessionDashboard: isManagerDashboardKind(dashKind) ? dashKind : effectiveDashboard,
     initialCache: initialManagerCache,
   };
 
-  const showOwnerDash = effectiveDashboard === "owner";
-  const showManagerDash = isManagerDashboardKind(effectiveDashboard);
+  const showOwnerDash = dashKind === "owner";
+  const showManagerDash = isManagerDashboardKind(dashKind);
 
   if (loading || !user) {
     if (showOwnerDash) {
-      return <OwnerDashboard sessionDashboard={effectiveDashboard} />;
+      return <OwnerDashboard sessionDashboard={dashKind} />;
     }
-    if (showManagerDash) {
-      return <ManagerDashboard {...managerProps} />;
-    }
-    if (hasClientSessionHint()) {
+    if (showManagerDash || hasClientSessionHint()) {
       return (
         <ManagerDashboard
           {...managerProps}
-          sessionDashboard={effectiveDashboard ?? "manager"}
+          sessionDashboard={
+            isManagerDashboardKind(dashKind)
+              ? dashKind
+              : hintedDash === "chef"
+                ? "chef"
+                : "manager"
+          }
         />
       );
     }
-    return <div data-page-loading="true" aria-busy="true" />;
+    return <ManagerDashboard sessionDashboard="manager" initialCache={initialManagerCache} />;
   }
 
   const userIsChef = isChef(user);

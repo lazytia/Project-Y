@@ -30,12 +30,8 @@ export default function BootSplashDismiss() {
       }
     };
 
-    // Returning users: splash already hidden by inline/head scripts — hand off now.
-    if (
-      hidden ||
-      document.documentElement.classList.contains("y-has-session") ||
-      hasClientSessionHint()
-    ) {
+    // Returning users with SSR chrome: splash already hidden by inline scripts.
+    if (hidden || (document.documentElement.classList.contains("y-has-session") && ssrShellVisible())) {
       hidden = true;
       hideBootSplash();
       handoffFromSsr();
@@ -56,15 +52,13 @@ export default function BootSplashDismiss() {
         return;
       }
 
-      const sessionKnown = authReady || hasClientSessionHint();
+      const sessionKnown = authReady;
 
-      // Returning users: drop splash as soon as any chrome is visible — don't
-      // wait for Firebase authStateReady or the full JS bundle.
-      if (hasClientSessionHint() && chromeVisible) {
+      if (hasClientSessionHint() && chromeVisible && clientShellPainted()) {
         hidden = true;
         hideBootSplash();
-        if (clientShellPainted()) hideServerAppShell();
-        else handoffFromSsr();
+        hideServerAppShell();
+        fallbackEl?.setAttribute("hidden", "");
         return;
       }
 
