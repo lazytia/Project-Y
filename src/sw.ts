@@ -3,9 +3,20 @@ import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import {
   CacheableResponsePlugin,
   ExpirationPlugin,
-  NetworkFirst,
   Serwist,
+  StaleWhileRevalidate,
 } from "serwist";
+
+const HTML_SHELL_CACHE = "html-shell";
+
+// When a new SW takes over, nuke the html-shell cache so we don't hand
+// users an old HTML that references chunks the new deploy has replaced.
+// Combined with SWR + controllerchange reload in SerwistRegister, this
+// keeps cold navigations instant (cache hit) while guaranteeing that
+// no stale HTML survives across a rollout.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.delete(HTML_SHELL_CACHE));
+});
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -34,17 +45,14 @@ const serwist = new Serwist({
     // putting the navigation matcher ahead of defaultCache stops
     // defaultCache's NetworkFirst handler from grabbing it.
     {
-      // NetworkFirst for navigations: with `minInstances: 1` the server
-      // is always warm, so we can afford to try the network on every
-      // navigation and only fall back to cache when offline / slow.
-      // StaleWhileRevalidate previously handed users an old HTML that
-      // referenced JS chunks deleted by later deploys — the chunk 404s
-      // then trapped the app on the boot splash. NetworkFirst avoids
-      // that by always serving the freshest chunk manifest.
+      // SWR for navigations gives instant paint from cache (boot splash
+      // appears on the first frame) while the SW revalidates in the
+      // background. Stale-chunk risk is mitigated by the `activate`
+      // handler above (nukes html-shell on new SW takeover) plus the
+      // ChunkLoadError auto-reload in SerwistRegister.
       matcher: ({ request }) => request.mode === "navigate",
-      handler: new NetworkFirst({
-        cacheName: "html-shell",
-        networkTimeoutSeconds: 3,
+      handler: new StaleWhileRevalidate({
+        cacheName: HTML_SHELL_CACHE,
         plugins: [
           new CacheableResponsePlugin({ statuses: [0, 200] }),
           new ExpirationPlugin({ maxEntries: 32 }),
