@@ -466,20 +466,22 @@ function OwnerDashboard({
 
     const cached = hydrateFromCache(selectedDate);
 
-    (async () => {
-      await fetchSavedDaySales(selectedDate);
-
-      void Promise.allSettled([
-        fetchStats(selectedDate),
-        fetchReservations(selectedDate),
-        fetchCatering(),
-        fetchRosterStaff(selectedDate),
-        fetchPrevWeekSales(prevMondayISO, selectedDate),
-        fetchWeekSales(weekMondayISO, selectedDate),
-        fetchWeeklyPayroll(weekMondayISO, selectedDate),
-        fetchReviewNote(selectedDate),
-      ]);
-    })();
+    // Kick every fetch off in parallel. Previously fetchSavedDaySales
+    // was awaited FIRST, which blocked the Square-backed /today-stats
+    // (and every other API) behind Firestore's ~1s cold-start init.
+    // HAR analysis showed the first API firing at +1198ms with no
+    // parallelism — this change drops that to under 200ms.
+    void Promise.allSettled([
+      fetchSavedDaySales(selectedDate),
+      fetchStats(selectedDate),
+      fetchReservations(selectedDate),
+      fetchCatering(),
+      fetchRosterStaff(selectedDate),
+      fetchPrevWeekSales(prevMondayISO, selectedDate),
+      fetchWeekSales(weekMondayISO, selectedDate),
+      fetchWeeklyPayroll(weekMondayISO, selectedDate),
+      fetchReviewNote(selectedDate),
+    ]);
 
     return () => { cancelled = true; };
     // Intentionally exclude the fetch* callbacks — including them makes
