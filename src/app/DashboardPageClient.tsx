@@ -2,13 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
 import DashboardReadyMarker from "@/components/DashboardReadyMarker";
+import ManagerDashboard from "@/components/ManagerDashboard";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
+import {
+  resolveDashboardKind,
+  isManagerDashKind,
+} from "@/lib/resolve-dashboard-kind";
 import {
   hasDashCache,
   readDashCache,
@@ -17,7 +21,7 @@ import {
 } from "@/lib/owner-dash-cache";
 import type { OwnerDashServerSnapshot } from "@/lib/owner-dash-server";
 import type { DashboardKind } from "@/lib/session-dashboard";
-import { isManagerDashboardKind } from "@/lib/session-dashboard";
+import dynamic from "next/dynamic";
 import {
   addDaysISO,
   dowOfDateKey,
@@ -35,16 +39,9 @@ import {
   dCountdownLabel,
 } from "@/lib/catering-orders";
 
-const ManagerDashboard = dynamic(() => import("@/components/ManagerDashboard"), {
-  loading: () => <div id="manager-dash-loading" aria-hidden="true" />,
-});
-
-// Calendar picker is only mounted when the user actually taps the date pill.
 const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
   ssr: false,
 });
-// Attention card sits above the TODAY tile — code-split so it doesn't
-// bloat the manager/chef dashboards (which don't render it).
 const DashboardAttention = dynamic(() => import("@/components/DashboardAttention"), {
   ssr: false,
 });
@@ -117,31 +114,21 @@ export default function DashboardPageClient({
   sessionDashboard?: DashboardKind | null;
 }) {
   const { user, loading } = useAuth();
+  const effectiveDashboard = resolveDashboardKind(sessionDashboard, user);
 
   const managerProps = {
-    hideAttention: sessionDashboard === "chef",
-    roleLabel: sessionDashboard === "chef" ? "Head Chef" : "Store Manager",
-    displayName: sessionDashboard === "chef" ? "Chuck" : undefined,
-    sessionDashboard,
+    hideAttention: effectiveDashboard === "chef",
+    roleLabel: effectiveDashboard === "chef" ? "Head Chef" : "Store Manager",
+    displayName: effectiveDashboard === "chef" ? "Chuck" : undefined,
+    sessionDashboard: effectiveDashboard,
   };
 
-  const showOwnerDash = sessionDashboard === "owner";
-  const showManagerDash = isManagerDashboardKind(sessionDashboard);
+  const showOwnerDash = effectiveDashboard === "owner";
+  const showManagerDash = isManagerDashKind(sessionDashboard, user);
 
-  if (loading) {
+  if (loading || !user) {
     if (showOwnerDash) {
-      return <OwnerDashboard sessionDashboard={sessionDashboard} />;
-    }
-    if (showManagerDash) {
-      return <ManagerDashboard {...managerProps} />;
-    }
-    return null;
-  }
-
-  if (!user) {
-    // Session cookie / SSR knows the role before Firebase user hydrates.
-    if (showOwnerDash) {
-      return <OwnerDashboard sessionDashboard={sessionDashboard} />;
+      return <OwnerDashboard sessionDashboard={effectiveDashboard} />;
     }
     if (showManagerDash) {
       return <ManagerDashboard {...managerProps} />;

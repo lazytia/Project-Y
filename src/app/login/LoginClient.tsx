@@ -1,15 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
 import { usernameToEmail } from "@/lib/username";
-import { ROUTES, postLoginRoute } from "@/lib/routes";
 import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
 import { refreshAuthSession } from "@/lib/auth-session-client";
-import { hasClientSessionHint } from "@/lib/client-session-hint";
+import { hasClientSessionHint, setClientDashboardHint } from "@/lib/client-session-hint";
+import { dashboardKindFromEmail } from "@/lib/session-dashboard";
 import { useAuth } from "@/components/AuthProvider";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -20,7 +19,6 @@ type LoginClientProps = {
 };
 
 export default function LoginClient({ initialHasSession: _initialHasSession }: LoginClientProps) {
-  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -77,10 +75,8 @@ export default function LoginClient({ initialHasSession: _initialHasSession }: L
         registerFcmToken(cred.user.uid).catch(() => {});
       }
 
+      setClientDashboardHint(dashboardKindFromEmail(cred.user.email));
       await refreshAuthSession(cred.user);
-
-      router.replace(postLoginRoute(cred.user));
-      router.refresh();
     } catch {
       setError("Invalid username or password");
       setBusy(false);

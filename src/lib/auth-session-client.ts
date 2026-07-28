@@ -1,6 +1,8 @@
 "use client";
 
 import type { User } from "firebase/auth";
+import { dashboardKindFromEmail } from "@/lib/session-dashboard";
+import { setClientDashboardHint } from "@/lib/client-session-hint";
 
 /** Refresh the HTTP-only session cookie from the current Firebase user. */
 export async function refreshAuthSession(user: User): Promise<boolean> {
@@ -10,7 +12,11 @@ export async function refreshAuthSession(user: User): Promise<boolean> {
       method: "POST",
       headers: { Authorization: `Bearer ${idToken}` },
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const data = (await res.json()) as { dashboard?: string };
+    const dash = data.dashboard ?? dashboardKindFromEmail(user.email);
+    setClientDashboardHint(dash);
+    return true;
   } catch {
     return false;
   }

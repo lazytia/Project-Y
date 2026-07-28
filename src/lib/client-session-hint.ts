@@ -1,5 +1,6 @@
 /** localStorage flag — set after a successful sign-in, cleared on sign-out. */
 export const CLIENT_SESSION_HINT_KEY = "y.authed";
+export const CLIENT_DASH_HINT_KEY = "y.dash";
 
 export function setClientSessionHint(): void {
   try {
@@ -9,9 +10,27 @@ export function setClientSessionHint(): void {
   }
 }
 
+export function setClientDashboardHint(kind: string): void {
+  try {
+    localStorage.setItem(CLIENT_DASH_HINT_KEY, kind);
+  } catch {
+    /* private mode */
+  }
+}
+
+export function readClientDashboardHint(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(CLIENT_DASH_HINT_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function clearClientSessionHint(): void {
   try {
     localStorage.removeItem(CLIENT_SESSION_HINT_KEY);
+    localStorage.removeItem(CLIENT_DASH_HINT_KEY);
   } catch {
     /* private mode */
   }

@@ -63,6 +63,8 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
     (loading && initialHasSession);
   const awaitingStaffStep =
     !!user && !isOwner(user) && !isChef(user) && staffCompletedStep === null;
+  const shellInteractive =
+    (!!user && !awaitingStaffStep) || (hasSessionGuess && !isPublic);
   const usePlaceholderChrome =
     (!isPublic && !user && loading && hasSessionGuess) || (!isPublic && awaitingStaffStep);
 
@@ -96,7 +98,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
         <Splash label="Redirecting…" />
       ) : (
         <AuthenticatedShell
-          interactive={!!user && !awaitingStaffStep}
+          interactive={shellInteractive}
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
         >

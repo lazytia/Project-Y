@@ -5,10 +5,11 @@ import type { User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
 import { AUTH_READY_EVENT } from "@/lib/app-ready";
-import { clearClientSessionHint, hasClientSessionHint, setClientSessionHint } from "@/lib/client-session-hint";
+import { clearClientSessionHint, hasClientSessionHint, setClientSessionHint, setClientDashboardHint } from "@/lib/client-session-hint";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath, postLoginRoute } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
+import { dashboardKindFromEmail } from "@/lib/session-dashboard";
 import { emailToUsername } from "@/lib/username";
 
 const TOTAL_ONBOARDING_STEPS = 7;
@@ -127,6 +128,7 @@ export function AuthProvider({
         if (u) {
           void refreshAuthSession(u);
           setClientSessionHint();
+          setClientDashboardHint(dashboardKindFromEmail(u.email));
           setLoading(false);
           emitAuthReady();
           if (isOwner(u)) {
@@ -271,8 +273,24 @@ export function AuthProvider({
     staffCompletedStep < TOTAL_ONBOARDING_STEPS;
 
   useEffect(() => {
-    if (!authRestored) return;
     const isPublic = PUBLIC_ROUTES.has(pathname);
+
+    // Sign-in handoff — redirect immediately when Firebase user appears.
+    if (user && isPublic) {
+      if (staffNeedsOnboarding) {
+        if (notificationsPromptSeen === false) {
+          router.replace(ROUTES.staffNotificationsPrompt);
+        } else {
+          router.replace(ROUTES.staffOnboarding);
+        }
+      } else {
+        router.replace(postLoginRoute(user));
+        router.refresh();
+      }
+      return;
+    }
+
+    if (!authRestored) return;
     if (!user && !isPublic) {
       router.replace(ROUTES.login);
       return;
@@ -289,21 +307,6 @@ export function AuthProvider({
     // can toggle EN/JA while filling out the forms — treat it as an
     // allowed escape hatch alongside the onboarding routes themselves.
     const inSettings = pathname === "/staff/settings";
-
-    if (user && isPublic) {
-      // Just signed in. Staff who still owe us onboarding go straight to it,
-      // everyone else goes to their Home / Dashboard.
-      if (staffNeedsOnboarding) {
-        if (notificationsPromptSeen === false) {
-          router.replace(ROUTES.staffNotificationsPrompt);
-        } else {
-          router.replace(ROUTES.staffOnboarding);
-        }
-      } else {
-        router.replace(postLoginRoute(user));
-      }
-      return;
-    }
 
     // Chef landing on the staff app home — bounce to dashboard (sidebar Home is /).
     if (user && isChef(user) && pathname === ROUTES.staffHome) {
@@ -345,7 +348,7 @@ export function AuthProvider({
       pathname.startsWith(ROUTES.staffOnboarding) &&
       pathname !== ROUTES.staffOnboarding
     ) {
-      router.replace(ROUTES.chefHome);
+      router.replace(ROUTES.home);
       return;
     }
 
