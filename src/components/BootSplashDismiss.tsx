@@ -2,17 +2,14 @@
 
 import { useEffect } from "react";
 import { APP_READY_EVENT, AUTH_READY_EVENT } from "@/lib/app-ready";
-import { hasPageLoadingMarker, hideBootSplash } from "@/lib/boot-splash";
+import {
+  clientShellPainted,
+  hasPageLoadingMarker,
+  hideBootSplash,
+  hideServerAppShell,
+} from "@/lib/boot-splash";
 
-const FALLBACK_MS = 5_000;
-
-function shellPainted(): boolean {
-  const shell = document.querySelector("[data-app-shell='true']");
-  const rect = shell?.getBoundingClientRect();
-  if (rect && rect.width > 0) return true;
-  const ssr = document.getElementById("server-app-shell");
-  return !!ssr && !ssr.hasAttribute("hidden");
-}
+const FALLBACK_MS = 8_000;
 
 export default function BootSplashDismiss() {
   useEffect(() => {
@@ -32,7 +29,9 @@ export default function BootSplashDismiss() {
         raf = requestAnimationFrame(hideOnce);
         return;
       }
-      if (!shellPainted()) {
+      // Wait for the client React shell — not SSR chrome alone. Dismissing
+      // on #server-app-shell caused a ~2s blank gap before hydration.
+      if (!clientShellPainted()) {
         raf = requestAnimationFrame(hideOnce);
         return;
       }
@@ -41,6 +40,7 @@ export default function BootSplashDismiss() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           hideBootSplash();
+          hideServerAppShell();
           document.getElementById("ssr-dash-preparing")?.remove();
         });
       });

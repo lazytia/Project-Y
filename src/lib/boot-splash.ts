@@ -10,7 +10,18 @@ export function isBootSplashVisible(): boolean {
 export function hideBootSplash() {
   const el = document.getElementById(BOOT_SPLASH_ID);
   if (el) el.classList.add(BOOT_SPLASH_HIDDEN);
+}
+
+/** Hide SSR chrome once the client React shell has painted. */
+export function hideServerAppShell() {
   document.getElementById("server-app-shell")?.setAttribute("hidden", "");
+}
+
+export function clientShellPainted(): boolean {
+  if (typeof document === "undefined") return false;
+  const shell = document.querySelector("[data-app-shell='true']");
+  const rect = shell?.getBoundingClientRect();
+  return !!rect && rect.width > 0 && rect.height > 0;
 }
 
 export function hasPageLoadingMarker(): boolean {
@@ -18,30 +29,18 @@ export function hasPageLoadingMarker(): boolean {
   return !!document.querySelector("[data-page-loading='true'], [data-splash='true']");
 }
 
-function hasSsrChrome() {
-  return (
-    !!document.getElementById("ssr-dash-preparing") ||
-    !!document.getElementById("server-app-shell")
-  );
-}
-
-/**
- * Hide boot splash once SSR chrome or the client shell is painted.
- */
 export function hideBootSplashWhenSafe(maxAttempts = 30) {
-  if (hasSsrChrome()) {
+  if (clientShellPainted()) {
     hideBootSplash();
+    hideServerAppShell();
     return;
   }
 
   let attempts = 0;
   const tryHide = () => {
-    const shell = document.querySelector("[data-app-shell='true']");
-    const rect = shell?.getBoundingClientRect();
-    const shellPainted = !!rect && rect.width > 0 && rect.height > 0;
-
-    if (shellPainted || hasSsrChrome() || attempts >= maxAttempts) {
+    if (clientShellPainted() || attempts >= maxAttempts) {
       hideBootSplash();
+      if (clientShellPainted()) hideServerAppShell();
       return;
     }
 

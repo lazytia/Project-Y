@@ -79,7 +79,15 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   }
 
   if (loading && !hasSessionGuess) {
-    return null;
+    return (
+      <>
+        <AppReadyMarker />
+        <div className={styles.shell} data-app-shell="true">
+          <PlaceholderChrome />
+          <main className={styles.main} />
+        </div>
+      </>
+    );
   }
 
   if (!loading && !user) {
