@@ -357,6 +357,10 @@ export function AuthProvider({
   const signOut = async () => {
     clearStaffStepCache();
     clearClientSessionHint();
+    document.documentElement.classList.remove("y-has-session");
+    document.getElementById("static-chrome-fallback")?.setAttribute("hidden", "");
+    setUser(null);
+    setLoading(false);
     await clearAuthSession();
     const [{ signOut: fbSignOut }, { getAuth }] = await Promise.all([
       import("firebase/auth"),
@@ -364,6 +368,7 @@ export function AuthProvider({
     ]);
     await fbSignOut(getAuth());
     router.replace(ROUTES.login);
+    router.refresh();
   };
 
   return (

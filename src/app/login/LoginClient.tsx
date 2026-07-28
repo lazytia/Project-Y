@@ -9,6 +9,7 @@ import { ROUTES } from "@/lib/routes";
 import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
 import { refreshAuthSession } from "@/lib/auth-session-client";
+import { hasClientSessionHint } from "@/lib/client-session-hint";
 import { useAuth } from "@/components/AuthProvider";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -18,7 +19,7 @@ type LoginClientProps = {
   initialHasSession: boolean;
 };
 
-export default function LoginClient({ initialHasSession }: LoginClientProps) {
+export default function LoginClient({ initialHasSession: _initialHasSession }: LoginClientProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
@@ -27,7 +28,7 @@ export default function LoginClient({ initialHasSession }: LoginClientProps) {
   const [busy, setBusy] = useState(false);
 
   const shouldHoldSplash =
-    authLoading || !!user || (initialHasSession && !authLoading && !user);
+    authLoading || !!user || (hasClientSessionHint() && !authLoading && !user);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

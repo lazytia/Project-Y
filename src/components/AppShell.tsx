@@ -35,6 +35,12 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   });
 
   useEffect(() => {
+    if (!user && !hasClientSessionHint()) {
+      setSessionVerified(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (isPublic) {
       setSessionVerified(false);
       return;
@@ -51,7 +57,10 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
     return () => { cancelled = true; };
   }, [isPublic, pathname, initialHasSession]);
 
-  const hasSessionGuess = initialHasSession || sessionVerified === true;
+  const hasSessionGuess =
+    hasClientSessionHint() ||
+    sessionVerified === true ||
+    (loading && initialHasSession);
   const awaitingStaffStep =
     !!user && !isOwner(user) && !isChef(user) && staffCompletedStep === null;
   const usePlaceholderChrome =
