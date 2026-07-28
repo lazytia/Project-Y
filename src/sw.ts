@@ -3,8 +3,8 @@ import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import {
   CacheableResponsePlugin,
   ExpirationPlugin,
+  NetworkFirst,
   Serwist,
-  StaleWhileRevalidate,
 } from "serwist";
 
 declare global {
@@ -34,24 +34,20 @@ const serwist = new Serwist({
     // putting the navigation matcher ahead of defaultCache stops
     // defaultCache's NetworkFirst handler from grabbing it.
     {
+      // NetworkFirst for navigations: with `minInstances: 1` the server
+      // is always warm, so we can afford to try the network on every
+      // navigation and only fall back to cache when offline / slow.
+      // StaleWhileRevalidate previously handed users an old HTML that
+      // referenced JS chunks deleted by later deploys — the chunk 404s
+      // then trapped the app on the boot splash. NetworkFirst avoids
+      // that by always serving the freshest chunk manifest.
       matcher: ({ request }) => request.mode === "navigate",
-      handler: new StaleWhileRevalidate({
+      handler: new NetworkFirst({
         cacheName: "html-shell",
+        networkTimeoutSeconds: 3,
         plugins: [
-          // Cache 0-status opaque responses too so cross-origin OK.
           new CacheableResponsePlugin({ statuses: [0, 200] }),
-          new ExpirationPlugin({
-            // Owner asked for zero blank even when the app hasn't
-            // been opened in a while. Drop the time-based expiry
-            // entirely — the previous 7-day TTL was long enough for
-            // daily users but forced occasional users (e.g. staff
-            // who only check the app every couple of weeks) back
-            // through the cold-start blank. Cache is still bounded
-            // by maxEntries and stays fresh via SWR revalidation +
-            // the SerwistRegister controllerchange auto-reload on
-            // new deploys, so we don't get stuck on ancient HTML.
-            maxEntries: 32,
-          }),
+          new ExpirationPlugin({ maxEntries: 32 }),
         ],
       }),
     },
