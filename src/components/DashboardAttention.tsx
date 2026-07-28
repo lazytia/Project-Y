@@ -9,9 +9,11 @@ import {
   getDocs,
   orderBy,
   query,
+  setDoc,
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { useAuth } from "@/components/AuthProvider";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { isNoticeGivenActive, isReadyToTerminate, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import styles from "./DashboardAttention.module.css";
@@ -278,6 +280,7 @@ function CheckCircleIcon() {
 
 export default function DashboardAttention() {
   const router = useRouter();
+  const { user } = useAuth();
   const [counts, setCounts] = useState<Partial<Record<AttentionKind, number>> | null>(null);
   const [noted, setNoted] = useState<NotedMap>({});
   const [todayKey, setTodayKey] = useState<string>("");
@@ -287,6 +290,35 @@ export default function DashboardAttention() {
     setTodayKey(sydneyTodayKey());
     setNoted(readNoted());
   }, []);
+
+  // Hydrate noted map from Firestore so "Noted" persists across devices /
+  // browsers / PWA reinstalls — localStorage alone left the owner seeing
+  // the same items re-appear whenever they opened the dashboard from a
+  // different device.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "dashboard_attention_noted", user.uid));
+        if (cancelled || !snap.exists()) return;
+        const remote = (snap.data()?.noted ?? {}) as NotedMap;
+        setNoted((prev) => {
+          const merged: NotedMap = { ...prev };
+          for (const [k, v] of Object.entries(remote)) {
+            if (typeof v === "string") merged[k as AttentionKind] = v;
+          }
+          writeNoted(merged);
+          return merged;
+        });
+      } catch {
+        /* offline — fall back to localStorage */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     return runWhenIdle(() => setFetchEnabled(true), 2500);
@@ -387,10 +419,20 @@ export default function DashboardAttention() {
 
   if (!counts || rows.length === 0) return null;
 
+  function persistRemote(next: NotedMap) {
+    if (!user) return;
+    setDoc(
+      doc(getDb(), "dashboard_attention_noted", user.uid),
+      { noted: next, updatedAt: new Date() },
+      { merge: true },
+    ).catch(() => {/* best-effort */});
+  }
+
   function noteOne(kind: AttentionKind) {
     const next: NotedMap = { ...noted, [kind]: todayKey };
     setNoted(next);
     writeNoted(next);
+    persistRemote(next);
   }
 
   function noteAll() {
@@ -398,6 +440,7 @@ export default function DashboardAttention() {
     for (const r of rows) next[r.kind] = todayKey;
     setNoted(next);
     writeNoted(next);
+    persistRemote(next);
   }
 
   return (
