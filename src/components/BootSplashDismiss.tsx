@@ -52,7 +52,18 @@ export default function BootSplashDismiss() {
         return;
       }
 
+      const isBareLogin =
+        typeof window !== "undefined" &&
+        window.location.pathname === "/login" &&
+        !document.documentElement.classList.contains("y-has-session");
+
       const sessionKnown = authReady;
+
+      if (isBareLogin && appReady) {
+        hidden = true;
+        hideBootSplash();
+        return;
+      }
 
       if (hasClientSessionHint() && chromeVisible && clientShellPainted()) {
         hidden = true;

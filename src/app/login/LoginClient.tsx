@@ -21,14 +21,15 @@ type LoginClientProps = {
   initialHasSession: boolean;
 };
 
-export default function LoginClient({ initialHasSession: _initialHasSession }: LoginClientProps) {
+export default function LoginClient({ initialHasSession }: LoginClientProps) {
   const { user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const shouldHoldSplash = authLoading || !!user || busy;
+  // Only hold splash when we expect an existing session — not on a fresh login visit.
+  const shouldHoldSplash = !!user || busy || (authLoading && initialHasSession);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

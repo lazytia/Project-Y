@@ -99,6 +99,14 @@ export function AuthProvider({
     if (!user) loginRedirectStarted.current = false;
   }, [user]);
 
+  // Fresh /login visit with no server or client session hint — don't block the
+  // form (or boot splash dismiss) on Firebase authStateReady.
+  useEffect(() => {
+    if (pathname !== ROUTES.login) return;
+    if (initialHasSession || hasClientSessionHint()) return;
+    window.dispatchEvent(new Event(AUTH_READY_EVENT));
+  }, [pathname, initialHasSession]);
+
   useEffect(() => {
     let cancelled = false;
     let authReady = false;
@@ -170,6 +178,7 @@ export function AuthProvider({
         setNotificationsPromptSeen(null);
         setStaffProfileConfirmed(false);
         clearStaffStepCache();
+        clearClientSessionHint();
         void clearAuthSession();
       }
     })();
