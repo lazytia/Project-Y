@@ -196,8 +196,14 @@ export default function ManagerDashboard({
   useEffect(() => {
     setTodayKey(sydneyTodayKey());
     setGreeting(greetingForNow());
-    document.getElementById("ssr-manager-dash")?.remove();
   }, []);
+
+  useEffect(() => {
+    const el = document.getElementById("ssr-manager-dash");
+    if (!el || !todayKey) return;
+    const remove = () => el.remove();
+    requestAnimationFrame(() => requestAnimationFrame(remove));
+  }, [todayKey]);
 
   // All dashboard metrics start null so SSR and hydration produce the same
   // "—" placeholders. The sessionStorage cache is applied in the effect

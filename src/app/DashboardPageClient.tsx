@@ -35,7 +35,9 @@ import {
   dCountdownLabel,
 } from "@/lib/catering-orders";
 
-const ManagerDashboard = dynamic(() => import("@/components/ManagerDashboard"));
+const ManagerDashboard = dynamic(() => import("@/components/ManagerDashboard"), {
+  loading: () => <div id="manager-dash-loading" aria-hidden="true" />,
+});
 
 // Calendar picker is only mounted when the user actually taps the date pill.
 const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
@@ -123,17 +125,29 @@ export default function DashboardPageClient({
     sessionDashboard,
   };
 
+  const showOwnerDash = sessionDashboard === "owner";
+  const showManagerDash = isManagerDashboardKind(sessionDashboard);
+
   if (loading) {
-    if (sessionDashboard === "owner") {
+    if (showOwnerDash) {
       return <OwnerDashboard sessionDashboard={sessionDashboard} />;
     }
-    if (isManagerDashboardKind(sessionDashboard)) {
+    if (showManagerDash) {
       return <ManagerDashboard {...managerProps} />;
     }
     return null;
   }
 
-  if (!user) return null;
+  if (!user) {
+    // Session cookie / SSR knows the role before Firebase user hydrates.
+    if (showOwnerDash) {
+      return <OwnerDashboard sessionDashboard={sessionDashboard} />;
+    }
+    if (showManagerDash) {
+      return <ManagerDashboard {...managerProps} />;
+    }
+    return null;
+  }
 
   const userIsChef = isChef(user);
   const userIsManager = (isOwner(user) && !isStrictOwner(user)) || userIsChef;

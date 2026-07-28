@@ -1,3 +1,6 @@
+import type { User } from "firebase/auth";
+import { isChef, isOwner } from "./permissions";
+
 export const ROUTES = {
   home: "/",
   login: "/login",
@@ -18,6 +21,13 @@ export const ROUTES = {
 } as const;
 
 export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([ROUTES.login]);
+
+/** First screen after sign-in — must match AuthProvider routing. */
+export function postLoginRoute(user: User): string {
+  if (isOwner(user)) return ROUTES.home;
+  if (isChef(user)) return ROUTES.home;
+  return ROUTES.staffHome;
+}
 
 /**
  * Paths a non-owner (staff) user is allowed to visit. Anything outside this

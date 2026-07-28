@@ -8,6 +8,8 @@ import styles from "./Splash.module.css";
 type Props = {
   /** Optional sub-text under the wordmark. Defaults to nothing. */
   label?: string;
+  /** Show the Y splash even when SSR chrome is visible (e.g. post-login handoff). */
+  forceVisible?: boolean;
 };
 
 function subscribeBootSplash(onStoreChange: () => void) {
@@ -25,7 +27,7 @@ function chromeAlreadyVisible(): boolean {
   return ssrShellVisible() || fallbackVisible || hasClientSessionHint();
 }
 
-export default function Splash({ label }: Props) {
+export default function Splash({ label, forceVisible = false }: Props) {
   const bootVisible = useSyncExternalStore(
     subscribeBootSplash,
     isBootSplashVisible,
@@ -39,7 +41,7 @@ export default function Splash({ label }: Props) {
   }
 
   // SSR / static chrome is already visible — never cover it with a 2nd Y splash.
-  if (chromeAlreadyVisible()) {
+  if (!forceVisible && chromeAlreadyVisible()) {
     return <div data-page-loading="true" hidden aria-hidden="true" />;
   }
 

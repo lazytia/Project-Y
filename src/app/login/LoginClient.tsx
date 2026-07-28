@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
 import { usernameToEmail } from "@/lib/username";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, postLoginRoute } from "@/lib/routes";
 import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
 import { refreshAuthSession } from "@/lib/auth-session-client";
@@ -79,8 +79,8 @@ export default function LoginClient({ initialHasSession: _initialHasSession }: L
 
       await refreshAuthSession(cred.user);
 
-      const dest = isOwner(cred.user) ? ROUTES.home : ROUTES.staffHome;
-      router.push(dest);
+      router.replace(postLoginRoute(cred.user));
+      router.refresh();
     } catch {
       setError("Invalid username or password");
       setBusy(false);
@@ -88,7 +88,7 @@ export default function LoginClient({ initialHasSession: _initialHasSession }: L
   };
 
   if (shouldHoldSplash) {
-    return <Splash />;
+    return <Splash label={user || busy ? "Signing in…" : undefined} forceVisible={!!user || busy} />;
   }
 
   return (

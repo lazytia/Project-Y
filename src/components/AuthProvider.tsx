@@ -7,7 +7,7 @@ import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client"
 import { AUTH_READY_EVENT } from "@/lib/app-ready";
 import { clearClientSessionHint, hasClientSessionHint, setClientSessionHint } from "@/lib/client-session-hint";
 import { runWhenIdle } from "@/lib/run-when-idle";
-import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
+import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath, postLoginRoute } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 
@@ -299,13 +299,15 @@ export function AuthProvider({
         } else {
           router.replace(ROUTES.staffOnboarding);
         }
-      } else if (userIsOwnerNow) {
-        router.replace(ROUTES.home);
-      } else if (isChef(user)) {
-        router.replace(ROUTES.chefHome);
       } else {
-        router.replace(ROUTES.staffHome);
+        router.replace(postLoginRoute(user));
       }
+      return;
+    }
+
+    // Chef landing on the staff app home — bounce to dashboard (sidebar Home is /).
+    if (user && isChef(user) && pathname === ROUTES.staffHome) {
+      router.replace(ROUTES.home);
       return;
     }
 
