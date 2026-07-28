@@ -1,7 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { isBootSplashVisible } from "@/lib/boot-splash";
+import { isBootSplashVisible, ssrShellVisible } from "@/lib/boot-splash";
+import { hasClientSessionHint } from "@/lib/client-session-hint";
 import styles from "./Splash.module.css";
 
 type Props = {
@@ -17,6 +18,13 @@ function subscribeBootSplash(onStoreChange: () => void) {
   return () => observer.disconnect();
 }
 
+function chromeAlreadyVisible(): boolean {
+  if (typeof document === "undefined") return false;
+  const fallback = document.getElementById("static-chrome-fallback");
+  const fallbackVisible = !!fallback && !fallback.hasAttribute("hidden");
+  return ssrShellVisible() || fallbackVisible || hasClientSessionHint();
+}
+
 export default function Splash({ label }: Props) {
   const bootVisible = useSyncExternalStore(
     subscribeBootSplash,
@@ -27,6 +35,11 @@ export default function Splash({ label }: Props) {
   // Keep the HTML boot splash on screen — don't mount a second splash layer
   // that would flash when boot splash dismisses.
   if (bootVisible) {
+    return <div data-page-loading="true" hidden aria-hidden="true" />;
+  }
+
+  // SSR / static chrome is already visible — never cover it with a 2nd Y splash.
+  if (chromeAlreadyVisible()) {
     return <div data-page-loading="true" hidden aria-hidden="true" />;
   }
 

@@ -7,7 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { getAuth, getDb } from "@/lib/firebase";
 import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
 import { AUTH_READY_EVENT } from "@/lib/app-ready";
-import { clearClientSessionHint, setClientSessionHint } from "@/lib/client-session-hint";
+import { clearClientSessionHint, hasClientSessionHint, setClientSessionHint } from "@/lib/client-session-hint";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
@@ -72,7 +72,14 @@ const AuthContext = createContext<AuthContextValue>({
   staffNeedsOnboarding: false,
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+  initialHasSession = false,
+}: {
+  children: React.ReactNode;
+  /** From server uid cookie — skip waiting on authStateReady for splash / gates. */
+  initialHasSession?: boolean;
+}) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [staffCompletedStep, setStaffCompletedStep] = useState<number | null>(null);
@@ -97,6 +104,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authReadySent = true;
       window.dispatchEvent(new Event(AUTH_READY_EVENT));
     };
+
+    // Returning users: don't block splash on authStateReady (~3–4s cold start).
+    if (initialHasSession || hasClientSessionHint()) {
+      emitAuthReady();
+    }
 
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -149,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsub();
-  }, []);
+  }, [initialHasSession]);
 
   // On auth-state change: backfill role/username on the staff_onboarding doc
   // AND subscribe to it so completedStep + notificationsPromptSeen stay in

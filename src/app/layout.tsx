@@ -8,7 +8,7 @@ import BootSplashDismiss from "@/components/BootSplashDismiss";
 import SerwistRegister from "@/components/SerwistRegister";
 import ServerAppShell from "@/components/ServerAppShell";
 import { readServerSession } from "@/lib/dashboard-session";
-import { BOOT_SPLASH_EARLY_DISMISS_SCRIPT } from "@/lib/client-session-hint";
+import { BOOT_SPLASH_HEAD_HINT_SCRIPT, bootSplashEarlyDismissScript } from "@/lib/client-session-hint";
 import "./globals.css";
 
 const inter = Inter({
@@ -57,6 +57,7 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               html,body{margin:0;background:#fff}
+              html.y-has-session #boot-splash{display:none!important}
               .bootSplash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fff}
               .bootSplashHidden{display:none!important}
               .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
@@ -105,6 +106,13 @@ export default async function RootLayout({
         <link rel="apple-touch-startup-image" href="/splash/apple-splash-828-1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
         <link rel="apple-touch-startup-image" href="/splash/apple-splash-750-1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
         <link rel="apple-touch-startup-image" href="/splash/apple-splash-1536-2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: session.authenticated
+              ? `document.documentElement.classList.add("y-has-session");`
+              : BOOT_SPLASH_HEAD_HINT_SCRIPT,
+          }}
+        />
       </head>
       <body className="appBody">
         <div id="boot-splash" className="bootSplash" aria-hidden="true">
@@ -135,9 +143,11 @@ export default async function RootLayout({
           </div>
         </div>
         <script
-          dangerouslySetInnerHTML={{ __html: BOOT_SPLASH_EARLY_DISMISS_SCRIPT }}
+          dangerouslySetInnerHTML={{
+            __html: bootSplashEarlyDismissScript(session.authenticated),
+          }}
         />
-        <AuthProvider>
+        <AuthProvider initialHasSession={session.authenticated}>
           <LanguageProvider>
             <AuthSessionKeeper />
             <SerwistRegister />

@@ -28,9 +28,11 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   const { user, loading, staffCompletedStep } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sessionVerified, setSessionVerified] = useState<boolean | null>(
-    initialHasSession ? true : null,
-  );
+  const [sessionVerified, setSessionVerified] = useState<boolean | null>(() => {
+    if (initialHasSession) return true;
+    if (typeof window !== "undefined" && hasClientSessionHint()) return true;
+    return null;
+  });
 
   useEffect(() => {
     if (isPublic) {
@@ -81,7 +83,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   return (
     <>
       <AppReadyMarker />
-      {!loading && !user ? (
+      {!loading && !user && !hasSessionGuess ? (
         <Splash label="Redirecting…" />
       ) : (
         <AuthenticatedShell
