@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
@@ -97,6 +97,11 @@ export function AuthProvider({
   const [notificationsPromptSeen, setNotificationsPromptSeen] = useState<boolean | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const loginRedirectStarted = useRef(false);
+
+  useEffect(() => {
+    if (!user) loginRedirectStarted.current = false;
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,18 +280,23 @@ export function AuthProvider({
   useEffect(() => {
     const isPublic = PUBLIC_ROUTES.has(pathname);
 
-    // Sign-in handoff — redirect immediately when Firebase user appears.
+    // Sign-in handoff — wait for session cookies, then hard-navigate so iOS
+    // PWA gets SSR HTML with the correct dash cookie (client router.refresh
+    // often races the POST and leaves main empty).
     if (user && isPublic) {
-      if (staffNeedsOnboarding) {
-        if (notificationsPromptSeen === false) {
-          router.replace(ROUTES.staffNotificationsPrompt);
-        } else {
-          router.replace(ROUTES.staffOnboarding);
+      if (loginRedirectStarted.current) return;
+      loginRedirectStarted.current = true;
+      void (async () => {
+        await refreshAuthSession(user);
+        let dest = postLoginRoute(user);
+        if (staffNeedsOnboarding) {
+          dest =
+            notificationsPromptSeen === false
+              ? ROUTES.staffNotificationsPrompt
+              : ROUTES.staffOnboarding;
         }
-      } else {
-        router.replace(postLoginRoute(user));
-        router.refresh();
-      }
+        window.location.replace(dest);
+      })();
       return;
     }
 

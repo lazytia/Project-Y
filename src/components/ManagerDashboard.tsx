@@ -201,7 +201,11 @@ export default function ManagerDashboard({
   useEffect(() => {
     const el = document.getElementById("ssr-manager-dash");
     if (!el || !todayKey) return;
-    const remove = () => el.remove();
+    const remove = () => {
+      if (document.querySelector("[data-manager-dash-client='true']")) {
+        el.remove();
+      }
+    };
     requestAnimationFrame(() => requestAnimationFrame(remove));
   }, [todayKey]);
 
@@ -386,7 +390,7 @@ export default function ManagerDashboard({
   return (
     <>
       <DashboardReadyMarker when={!authLoading} />
-    <div className={styles.page}>
+    <div className={styles.page} data-manager-dash-client="true">
       <header className={styles.greeting}>
         <h1 className={styles.greetingTitle}>
           {greeting || "Hello"}, {firstName || "there"}

@@ -8,6 +8,7 @@ import { useLang } from "./LanguageProvider";
 import LanguageToggle from "./LanguageToggle";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
+import { readClientDashboardHint } from "@/lib/client-session-hint";
 import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup } from "@/lib/sidebar-nav";
 import styles from "./Sidebar.module.css";
 
@@ -23,10 +24,14 @@ export default function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
   const { user, signOut, staffNeedsOnboarding } = useAuth();
   const { t } = useLang();
+  const dashHint = readClientDashboardHint();
   const userIsOwner = isOwner(user);
   const userIsStrictOwner = isStrictOwner(user);
-  const userIsChef = isChef(user);
-  const userIsManager = (userIsOwner && !userIsStrictOwner) || userIsChef;
+  const userIsChef = isChef(user) || (!user && dashHint === "chef");
+  const userIsManager =
+    (userIsOwner && !userIsStrictOwner) ||
+    userIsChef ||
+    (!user && dashHint === "manager");
 
   // 기본값: 모두 닫힘. 한 번에 하나만 열림.
   const [openGroup, setOpenGroup] = useState<string | null>(null);

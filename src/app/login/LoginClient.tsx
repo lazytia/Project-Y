@@ -7,7 +7,11 @@ import { usernameToEmail } from "@/lib/username";
 import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
 import { refreshAuthSession } from "@/lib/auth-session-client";
-import { hasClientSessionHint, setClientDashboardHint } from "@/lib/client-session-hint";
+import {
+  hasClientSessionHint,
+  setClientDashboardHint,
+  setClientSessionHint,
+} from "@/lib/client-session-hint";
 import { dashboardKindFromEmail } from "@/lib/session-dashboard";
 import { useAuth } from "@/components/AuthProvider";
 import Splash from "@/components/Splash";
@@ -75,6 +79,7 @@ export default function LoginClient({ initialHasSession: _initialHasSession }: L
         registerFcmToken(cred.user.uid).catch(() => {});
       }
 
+      setClientSessionHint();
       setClientDashboardHint(dashboardKindFromEmail(cred.user.email));
       await refreshAuthSession(cred.user);
     } catch {

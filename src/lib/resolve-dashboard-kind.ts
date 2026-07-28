@@ -15,15 +15,19 @@ function dashFromHint(raw: string | null): DashboardKind | null {
   return null;
 }
 
-/** Server cookie → localStorage hint → Firebase user email. */
+/**
+ * Firebase user → localStorage hint (login handoff) → server cookie.
+ * Server props can lag behind session POST on iOS PWA client navigations,
+ * so the client hint must win until auth hydrates.
+ */
 export function resolveDashboardKind(
   sessionDashboard: DashboardKind | null | undefined,
   user: User | null | undefined,
 ): DashboardKind | null {
-  if (sessionDashboard) return sessionDashboard;
+  if (user) return dashboardKindFromEmail(user.email);
   const hinted = dashFromHint(readClientDashboardHint());
   if (hinted) return hinted;
-  if (user) return dashboardKindFromEmail(user.email);
+  if (sessionDashboard) return sessionDashboard;
   return null;
 }
 

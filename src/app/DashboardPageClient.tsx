@@ -11,8 +11,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import {
   resolveDashboardKind,
-  isManagerDashKind,
 } from "@/lib/resolve-dashboard-kind";
+import { isManagerDashboardKind } from "@/lib/session-dashboard";
+import { hasClientSessionHint } from "@/lib/client-session-hint";
 import {
   hasDashCache,
   readDashCache,
@@ -124,7 +125,7 @@ export default function DashboardPageClient({
   };
 
   const showOwnerDash = effectiveDashboard === "owner";
-  const showManagerDash = isManagerDashKind(sessionDashboard, user);
+  const showManagerDash = isManagerDashboardKind(effectiveDashboard);
 
   if (loading || !user) {
     if (showOwnerDash) {
@@ -133,7 +134,15 @@ export default function DashboardPageClient({
     if (showManagerDash) {
       return <ManagerDashboard {...managerProps} />;
     }
-    return null;
+    if (hasClientSessionHint()) {
+      return (
+        <ManagerDashboard
+          {...managerProps}
+          sessionDashboard={effectiveDashboard ?? "manager"}
+        />
+      );
+    }
+    return <div data-page-loading="true" aria-busy="true" />;
   }
 
   const userIsChef = isChef(user);
