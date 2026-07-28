@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { getAuth, getDb } from "@/lib/firebase";
 import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
 import { AUTH_READY_EVENT } from "@/lib/app-ready";
+import { runWhenIdle } from "@/lib/run-when-idle";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
@@ -88,11 +89,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const auth = getAuth();
     let authReady = false;
+    let authReadySent = false;
+
+    const emitAuthReady = () => {
+      if (authReadySent || typeof window === "undefined") return;
+      authReadySent = true;
+      window.dispatchEvent(new Event(AUTH_READY_EVENT));
+    };
 
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       if (u) {
         void refreshAuthSession(u);
+        setLoading(false);
+        emitAuthReady();
         if (isOwner(u)) {
           setStaffCompletedStep(null);
         } else if (isChef(u)) {
@@ -126,15 +136,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void auth.authStateReady().then(() => {
       authReady = true;
       setLoading(false);
+      emitAuthReady();
       if (!auth.currentUser) {
         setStaffCompletedStep(null);
         setNotificationsPromptSeen(null);
         setStaffProfileConfirmed(false);
         clearStaffStepCache();
         void clearAuthSession();
-      }
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event(AUTH_READY_EVENT));
       }
     });
 
@@ -186,38 +194,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     let confirmFallback: ReturnType<typeof setTimeout> | undefined;
+    let unsub: (() => void) | undefined;
 
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        const data = snap.data() ?? {};
-        const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
-        writeStaffStepCache(user.uid, completed);
-        setStaffCompletedStep(completed);
-        setNotificationsPromptSeen(data.notificationsPromptSeen === true);
+    const cancelIdle = runWhenIdle(() => {
+      unsub = onSnapshot(
+        ref,
+        (snap) => {
+          const data = snap.data() ?? {};
+          const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
+          writeStaffStepCache(user.uid, completed);
+          setStaffCompletedStep(completed);
+          setNotificationsPromptSeen(data.notificationsPromptSeen === true);
 
-        if (!snap.metadata.fromCache) {
+          if (!snap.metadata.fromCache) {
+            setStaffProfileConfirmed(true);
+            if (confirmFallback) clearTimeout(confirmFallback);
+          }
+        },
+        () => {
+          const fallback = readStaffStepCache(user.uid) ?? 0;
+          setStaffCompletedStep(fallback);
+          setNotificationsPromptSeen(true);
           setStaffProfileConfirmed(true);
-          if (confirmFallback) clearTimeout(confirmFallback);
-        }
-      },
-      () => {
-        const fallback = readStaffStepCache(user.uid) ?? 0;
-        setStaffCompletedStep(fallback);
-        // Fail-open on the notification gate — better to skip the
-        // prompt than to trap the user on it.
-        setNotificationsPromptSeen(true);
-        setStaffProfileConfirmed(true);
-      },
-    );
+        },
+      );
+    }, 0);
 
     confirmFallback = setTimeout(() => {
       setStaffProfileConfirmed(true);
-    }, 1_500);
+    }, 800);
 
     return () => {
+      cancelIdle();
       if (confirmFallback) clearTimeout(confirmFallback);
-      unsub();
+      unsub?.();
     };
   }, [user, loading]);
 

@@ -118,6 +118,13 @@ export default async function RootLayout({
             <AppShell initialHasSession={session.authenticated}>{children}</AppShell>
           </LanguageProvider>
         </AuthProvider>
+        {/* Logged-in SSR includes #server-app-shell — reveal it before JS
+            hydrates so cold starts don't sit on the boot splash for seconds. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var s=document.getElementById("server-app-shell");if(s){var b=document.getElementById("boot-splash");if(b)b.classList.add("bootSplashHidden");}})();`,
+          }}
+        />
       </body>
     </html>
   );

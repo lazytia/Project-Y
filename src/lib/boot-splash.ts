@@ -24,6 +24,17 @@ export function clientShellPainted(): boolean {
   return !!rect && rect.width > 0 && rect.height > 0;
 }
 
+export function ssrShellVisible(): boolean {
+  if (typeof document === "undefined") return false;
+  const ssr = document.getElementById("server-app-shell");
+  return !!ssr && !ssr.hasAttribute("hidden");
+}
+
+export function hasSessionCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.cookie.includes("uid=");
+}
+
 export function hasPageLoadingMarker(): boolean {
   if (typeof document === "undefined") return false;
   return !!document.querySelector("[data-page-loading='true'], [data-splash='true']");

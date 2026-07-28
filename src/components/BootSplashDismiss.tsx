@@ -5,8 +5,11 @@ import { APP_READY_EVENT, AUTH_READY_EVENT } from "@/lib/app-ready";
 import {
   clientShellPainted,
   hasPageLoadingMarker,
+  hasSessionCookie,
   hideBootSplash,
   hideServerAppShell,
+  isBootSplashVisible,
+  ssrShellVisible,
 } from "@/lib/boot-splash";
 
 const FALLBACK_MS = 8_000;
@@ -18,20 +21,38 @@ export default function BootSplashDismiss() {
     let authReady = false;
     let raf = 0;
 
+    const handoffFromSsr = () => {
+      if (clientShellPainted()) hideServerAppShell();
+      else raf = requestAnimationFrame(handoffFromSsr);
+    };
+
     const hideOnce = () => {
       if (hidden) return;
 
-      if (!appReady || !authReady) {
+      // Inline layout script already removed the splash for SSR sessions.
+      if (!isBootSplashVisible()) {
+        if (clientShellPainted()) {
+          hidden = true;
+          hideServerAppShell();
+        } else {
+          raf = requestAnimationFrame(hideOnce);
+        }
+        return;
+      }
+
+      const sessionKnown = authReady || hasSessionCookie();
+      if (!appReady || !sessionKnown) {
         raf = requestAnimationFrame(hideOnce);
         return;
       }
-      if (hasPageLoadingMarker()) {
+      if (hasPageLoadingMarker() && !ssrShellVisible()) {
         raf = requestAnimationFrame(hideOnce);
         return;
       }
-      // Wait for the client React shell — not SSR chrome alone. Dismissing
-      // on #server-app-shell caused a ~2s blank gap before hydration.
-      if (!clientShellPainted()) {
+
+      const clientReady = clientShellPainted();
+      const ssrReady = ssrShellVisible();
+      if (!clientReady && !ssrReady) {
         raf = requestAnimationFrame(hideOnce);
         return;
       }
@@ -40,8 +61,9 @@ export default function BootSplashDismiss() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           hideBootSplash();
-          hideServerAppShell();
           document.getElementById("ssr-dash-preparing")?.remove();
+          if (clientReady) hideServerAppShell();
+          else handoffFromSsr();
         });
       });
     };

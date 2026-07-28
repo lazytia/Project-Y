@@ -49,7 +49,6 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
   }, [isPublic, pathname, initialHasSession]);
 
   const hasSessionGuess = initialHasSession || sessionVerified === true;
-  const authSettled = !loading;
   const awaitingStaffStep =
     !!user && !isOwner(user) && !isChef(user) && staffCompletedStep === null;
   const usePlaceholderChrome =
@@ -78,37 +77,20 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
     );
   }
 
-  if (loading && !hasSessionGuess) {
-    return (
-      <>
-        <AppReadyMarker />
-        <div className={styles.shell} data-app-shell="true">
-          <PlaceholderChrome />
-          <main className={styles.main} />
-        </div>
-      </>
-    );
-  }
-
-  if (!loading && !user) {
-    return (
-      <>
-        <AppReadyMarker />
-        <Splash label="Redirecting…" />
-      </>
-    );
-  }
-
   return (
     <>
-      {(authSettled || usePlaceholderChrome) && <AppReadyMarker />}
-      <AuthenticatedShell
-        interactive={!!user && !awaitingStaffStep}
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-      >
-        {children}
-      </AuthenticatedShell>
+      <AppReadyMarker />
+      {!loading && !user ? (
+        <Splash label="Redirecting…" />
+      ) : (
+        <AuthenticatedShell
+          interactive={!!user && !awaitingStaffStep}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        >
+          {children}
+        </AuthenticatedShell>
+      )}
     </>
   );
 }
