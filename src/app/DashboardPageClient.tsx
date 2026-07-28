@@ -20,6 +20,7 @@ import {
   writeDashCache,
   type DashCache,
 } from "@/lib/owner-dash-cache";
+import type { ManagerDashCache } from "@/lib/manager-dash-cache";
 import type { OwnerDashServerSnapshot } from "@/lib/owner-dash-server";
 import type { DashboardKind } from "@/lib/session-dashboard";
 import dynamic from "next/dynamic";
@@ -108,11 +109,11 @@ function Progress({ value, max, pctRight, tone = "orange" }: { value: number; ma
 }
 
 export default function DashboardPageClient({
-  sessionRole = null,
   sessionDashboard = null,
+  initialManagerCache = null,
 }: {
-  sessionRole?: string | null;
   sessionDashboard?: DashboardKind | null;
+  initialManagerCache?: ManagerDashCache | null;
 }) {
   const { user, loading } = useAuth();
   const effectiveDashboard = resolveDashboardKind(sessionDashboard, user);
@@ -122,6 +123,7 @@ export default function DashboardPageClient({
     roleLabel: effectiveDashboard === "chef" ? "Head Chef" : "Store Manager",
     displayName: effectiveDashboard === "chef" ? "Chuck" : undefined,
     sessionDashboard: effectiveDashboard,
+    initialCache: initialManagerCache,
   };
 
   const showOwnerDash = effectiveDashboard === "owner";
@@ -155,6 +157,7 @@ export default function DashboardPageClient({
         roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
         displayName={userIsChef ? "Chuck" : undefined}
         sessionDashboard={userIsChef ? "chef" : "manager"}
+        initialCache={initialManagerCache}
       />
     );
   }

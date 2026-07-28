@@ -174,6 +174,8 @@ type DashboardProps = {
   displayName?: string;
   hideAttention?: boolean;
   sessionDashboard?: DashboardKind | null;
+  /** Server-fetched snapshot — same on SSR and client to avoid hydration mismatch. */
+  initialCache?: ManagerDashCache | null;
 };
 
 export default function ManagerDashboard({
@@ -181,48 +183,45 @@ export default function ManagerDashboard({
   displayName,
   hideAttention = false,
   sessionDashboard = null,
+  initialCache = null,
 }: DashboardProps = {}) {
   const { user, loading: authLoading } = useAuth();
-  const [firstName, setFirstName] = useState<string>("");
+  const bootApplied = initialCache ? applyManagerCache(initialCache) : null;
+
+  const [firstName, setFirstName] = useState(displayName ?? "");
   const [attention, setAttention] = useState<AttentionCounts>({
     holidayRequests: 0, availabilityChanges: 0, newOnboarding: 0, visaExpiring: 0,
   });
 
-  // Both start empty so SSR and hydration match. Filled in a client-only
-  // effect below — greetingForNow() reads local hours (UTC on the server,
-  // Sydney on the client) and would otherwise trigger React #418.
-  const [todayKey, setTodayKey] = useState("");
+  const [todayKey, setTodayKey] = useState(initialCache?.date ?? "");
   const [greeting, setGreeting] = useState("");
   useEffect(() => {
-    setTodayKey(sydneyTodayKey());
+    if (!todayKey) setTodayKey(sydneyTodayKey());
     setGreeting(greetingForNow());
-  }, []);
-
-  useEffect(() => {
-    const el = document.getElementById("ssr-manager-dash");
-    if (!el || !todayKey) return;
-    const remove = () => {
-      if (document.querySelector("[data-manager-dash-client='true']")) {
-        el.remove();
-      }
-    };
-    requestAnimationFrame(() => requestAnimationFrame(remove));
   }, [todayKey]);
 
-  // All dashboard metrics start null so SSR and hydration produce the same
-  // "—" placeholders. The sessionStorage cache is applied in the effect
-  // below, after hydration finishes — otherwise a cache hit would render
-  // real numbers on the client while the server rendered dashes and React
-  // would throw hydration error #418.
-  const [todaySales, setTodaySales] = useState<number | null>(null);
+  const [todaySales, setTodaySales] = useState<number | null>(
+    () => bootApplied?.todaySales ?? null,
+  );
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
-  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(null);
-  const [nextCatering, setNextCatering] = useState<{ deliveryDateISO: string } | null>(null);
-  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(null);
-  const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
-  const [hallStaff, setHallStaff] = useState<number | null>(null);
+  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(
+    () => bootApplied?.cachedResCounts ?? null,
+  );
+  const [nextCatering, setNextCatering] = useState<{ deliveryDateISO: string } | null>(
+    () => bootApplied?.nextCatering ?? null,
+  );
+  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(
+    () => bootApplied?.weekCateringCount ?? null,
+  );
+  const [kitchenStaff, setKitchenStaff] = useState<number | null>(
+    () => bootApplied?.kitchenStaff ?? null,
+  );
+  const [hallStaff, setHallStaff] = useState<number | null>(
+    () => bootApplied?.hallStaff ?? null,
+  );
 
   useEffect(() => {
+    if (initialCache) return;
     const date = sydneyTodayKey();
     const cached = readManagerDashCache(date);
     if (!cached) return;
@@ -233,7 +232,7 @@ export default function ManagerDashboard({
     setWeekCateringCount(applied.weekCateringCount);
     setKitchenStaff(applied.kitchenStaff);
     setHallStaff(applied.hallStaff);
-  }, []);
+  }, [initialCache]);
 
   useEffect(() => {
     if (!isManagerDashboardKind(sessionDashboard)) return;
@@ -390,7 +389,7 @@ export default function ManagerDashboard({
   return (
     <>
       <DashboardReadyMarker when={!authLoading} />
-    <div className={styles.page} data-manager-dash-client="true">
+    <div className={styles.page}>
       <header className={styles.greeting}>
         <h1 className={styles.greetingTitle}>
           {greeting || "Hello"}, {firstName || "there"}

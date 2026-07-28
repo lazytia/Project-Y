@@ -1,6 +1,6 @@
 import type { User } from "firebase/auth";
 import type { DashboardKind } from "@/lib/session-dashboard";
-import { dashboardKindFromEmail, isManagerDashboardKind } from "@/lib/session-dashboard";
+import { dashboardKindFromEmail } from "@/lib/session-dashboard";
 import { readClientDashboardHint } from "@/lib/client-session-hint";
 
 function dashFromHint(raw: string | null): DashboardKind | null {
@@ -29,11 +29,4 @@ export function resolveDashboardKind(
   if (hinted) return hinted;
   if (sessionDashboard) return sessionDashboard;
   return null;
-}
-
-export function isManagerDashKind(
-  sessionDashboard: DashboardKind | null | undefined,
-  user: User | null | undefined,
-): boolean {
-  return isManagerDashboardKind(resolveDashboardKind(sessionDashboard, user));
 }

@@ -1,10 +1,7 @@
-import { readServerSession } from "@/lib/dashboard-session";
-import ChefDashboardClient from "./ChefDashboardClient";
+import { redirect } from "next/navigation";
+import { ROUTES } from "@/lib/routes";
 
-export default async function ChefDashboardPage() {
-  const session = await readServerSession();
-
-  return (
-    <ChefDashboardClient sessionDashboard={session.dashboard ?? "chef"} />
-  );
+/** Legacy URL — chef dashboard lives at `/`. */
+export default function ChefDashboardPage() {
+  redirect(ROUTES.home);
 }
