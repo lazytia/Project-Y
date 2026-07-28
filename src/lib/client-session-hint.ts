@@ -55,5 +55,5 @@ export function bootSplashEarlyDismissScript(serverAuthenticated: boolean): stri
   if (!serverAuthenticated) {
     return `(function(){})();`;
   }
-  return `(function(){var b=document.getElementById("boot-splash");if(!b)return;b.classList.add("bootSplashHidden");document.documentElement.classList.add("y-has-session");var s=document.getElementById("server-app-shell");if(s)s.removeAttribute("hidden");})();`;
+  return `(function(){var b=document.getElementById("boot-splash");if(!b)return;b.classList.add("bootSplashHidden");document.documentElement.classList.add("y-has-session");var s=document.getElementById("server-app-shell");if(s)s.removeAttribute("hidden");for(var i=0,c=b.querySelectorAll("*");i<c.length;i++)c[i].style.animation="none";requestAnimationFrame(function(){b.remove();});})();`;
 }

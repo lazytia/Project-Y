@@ -14,7 +14,10 @@ type Props = {
 
 function subscribeBootSplash(onStoreChange: () => void) {
   const el = document.getElementById("boot-splash");
-  if (!el) return () => {};
+  if (!el) {
+    queueMicrotask(onStoreChange);
+    return () => {};
+  }
   const observer = new MutationObserver(onStoreChange);
   observer.observe(el, { attributes: true, attributeFilter: ["class"] });
   return () => observer.disconnect();

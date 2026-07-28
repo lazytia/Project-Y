@@ -7,9 +7,22 @@ export function isBootSplashVisible(): boolean {
   return !!el && !el.classList.contains(BOOT_SPLASH_HIDDEN);
 }
 
+/** Hide and remove the HTML boot splash — static node, safe to .remove(). */
 export function hideBootSplash() {
   const el = document.getElementById(BOOT_SPLASH_ID);
-  if (el) el.classList.add(BOOT_SPLASH_HIDDEN);
+  if (!el) return;
+
+  el.classList.add(BOOT_SPLASH_HIDDEN);
+  el.style.animation = "none";
+  for (const child of el.querySelectorAll("*")) {
+    (child as HTMLElement).style.animation = "none";
+  }
+
+  // iOS PWA keeps compositor layers from animated fixed overlays even when
+  // display:none — removing the node clears the ghost image.
+  requestAnimationFrame(() => {
+    document.getElementById(BOOT_SPLASH_ID)?.remove();
+  });
 }
 
 /** Hide SSR chrome once the client React shell has painted. */

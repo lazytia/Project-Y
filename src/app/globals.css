@@ -106,11 +106,16 @@ button {
   background: var(--color-bg);
 }
 
-/* Set by BootSplashDismiss once auth restore finishes. We hide instead of
-   removing the node so React can keep managing it — .remove() from an
-   effect blows up the reconciler on the next commit. */
+/* Hidden boot splash — kill animations before JS removes the node. */
 .bootSplashHidden {
   display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.bootSplashHidden,
+.bootSplashHidden * {
+  animation: none !important;
 }
 
 .bootSplashLogo {

@@ -17,6 +17,13 @@ const FALLBACK_MS = 2_000;
 export default function BootSplashDismiss() {
   useEffect(() => {
     let hidden = !isBootSplashVisible();
+
+    // CSS may hide the splash before JS runs — still remove the node for iOS.
+    if (document.documentElement.classList.contains("y-has-session")) {
+      hideBootSplash();
+      hidden = true;
+    }
+
     let appReady = false;
     let authReady = false;
     let raf = 0;
