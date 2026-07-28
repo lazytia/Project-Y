@@ -1,10 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
-import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
+import type { User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
-import { getAuth, getDb } from "@/lib/firebase";
 import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
 import { AUTH_READY_EVENT } from "@/lib/app-ready";
 import { clearClientSessionHint, hasClientSessionHint, setClientSessionHint } from "@/lib/client-session-hint";
@@ -81,7 +79,12 @@ export function AuthProvider({
   initialHasSession?: boolean;
 }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (initialHasSession) return false;
+    if (typeof window !== "undefined" && hasClientSessionHint()) return false;
+    return true;
+  });
+  const [authRestored, setAuthRestored] = useState(false);
   const [staffCompletedStep, setStaffCompletedStep] = useState<number | null>(null);
   // Gate onboarding redirects until Firestore has confirmed the profile —
   // offline/cache snapshots briefly sent completed staff to the notifications
@@ -95,9 +98,10 @@ export function AuthProvider({
   const pathname = usePathname();
 
   useEffect(() => {
-    const auth = getAuth();
+    let cancelled = false;
     let authReady = false;
     let authReadySent = false;
+    let unsub: (() => void) | undefined;
 
     const emitAuthReady = () => {
       if (authReadySent || typeof window === "undefined") return;
@@ -105,50 +109,57 @@ export function AuthProvider({
       window.dispatchEvent(new Event(AUTH_READY_EVENT));
     };
 
-    // Returning users: don't block splash on authStateReady (~3–4s cold start).
     if (initialHasSession || hasClientSessionHint()) {
       emitAuthReady();
     }
 
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (u) {
-        void refreshAuthSession(u);
-        setClientSessionHint();
-        setLoading(false);
-        emitAuthReady();
-        if (isOwner(u)) {
-          setStaffCompletedStep(null);
-        } else if (isChef(u)) {
-          setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
-          setStaffProfileConfirmed(true);
-        } else {
-          const cached = readStaffStepCache(u.uid);
-          setStaffCompletedStep(cached);
-          if (cached !== null && cached >= TOTAL_ONBOARDING_STEPS) {
-            setStaffProfileConfirmed(true);
-            setNotificationsPromptSeen(true);
-          } else {
-            setNotificationsPromptSeen(null);
-            setStaffProfileConfirmed(false);
-          }
-        }
-        return;
-      }
-      // Don't clear cookies / show login until Firebase has finished
-      // restoring persisted auth — otherwise PWA cold start briefly
-      // flashes the login form before redirecting home.
-      if (authReady) {
-        setStaffCompletedStep(null);
-        setNotificationsPromptSeen(null);
-        setStaffProfileConfirmed(false);
-        clearStaffStepCache();
-        void clearAuthSession();
-      }
-    });
+    void (async () => {
+      const [{ onAuthStateChanged, signOut: fbSignOut }, { getAuth }] = await Promise.all([
+        import("firebase/auth"),
+        import("@/lib/firebase"),
+      ]);
+      if (cancelled) return;
 
-    void auth.authStateReady().then(() => {
+      const auth = getAuth();
+
+      unsub = onAuthStateChanged(auth, (u) => {
+        setUser(u);
+        if (u) {
+          void refreshAuthSession(u);
+          setClientSessionHint();
+          setLoading(false);
+          emitAuthReady();
+          if (isOwner(u)) {
+            setStaffCompletedStep(null);
+          } else if (isChef(u)) {
+            setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
+            setStaffProfileConfirmed(true);
+          } else {
+            const cached = readStaffStepCache(u.uid);
+            setStaffCompletedStep(cached);
+            if (cached !== null && cached >= TOTAL_ONBOARDING_STEPS) {
+              setStaffProfileConfirmed(true);
+              setNotificationsPromptSeen(true);
+            } else {
+              setNotificationsPromptSeen(null);
+              setStaffProfileConfirmed(false);
+            }
+          }
+          return;
+        }
+        if (authReady) {
+          setStaffCompletedStep(null);
+          setNotificationsPromptSeen(null);
+          setStaffProfileConfirmed(false);
+          clearStaffStepCache();
+          void clearAuthSession();
+        }
+      });
+
+      await auth.authStateReady();
+      if (cancelled) return;
       authReady = true;
+      setAuthRestored(true);
       setLoading(false);
       emitAuthReady();
       if (!auth.currentUser) {
@@ -158,9 +169,12 @@ export function AuthProvider({
         clearStaffStepCache();
         void clearAuthSession();
       }
-    });
+    })();
 
-    return () => unsub();
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
   }, [initialHasSession]);
 
   // On auth-state change: backfill role/username on the staff_onboarding doc
@@ -176,62 +190,64 @@ export function AuthProvider({
     }
     const username = emailToUsername(user.email ?? "").toLowerCase();
     const role = isOwner(user) ? "owner" : isChef(user) ? "chef" : "staff";
-    const ref = doc(getDb(), "staff_onboarding", user.uid);
-
-    // Fire-and-forget: don't block rendering on the write.
-    // Chefs are marked onboarding-complete for now — they don't have a
-    // staff-style onboarding flow, and this keeps the Firestore doc
-    // consistent with the AttentionRequired / dashboard queries.
-    const chefOverride = isChef(user)
-      ? { completedStep: TOTAL_ONBOARDING_STEPS, status: "complete" as const }
-      : {};
-    setDoc(
-      ref,
-      {
-        uid: user.uid,
-        username,
-        email: user.email ?? null,
-        role,
-        ...chefOverride,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    ).catch(() => {/* best-effort */});
-
-    // Owners don't have an onboarding gate; chefs are short-circuited.
-    if (isOwner(user)) return;
-    if (isChef(user)) {
-      setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
-      setNotificationsPromptSeen(true);
-      setStaffProfileConfirmed(true);
-      return;
-    }
 
     let confirmFallback: ReturnType<typeof setTimeout> | undefined;
     let unsub: (() => void) | undefined;
 
     const cancelIdle = runWhenIdle(() => {
-      unsub = onSnapshot(
-        ref,
-        (snap) => {
-          const data = snap.data() ?? {};
-          const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
-          writeStaffStepCache(user.uid, completed);
-          setStaffCompletedStep(completed);
-          setNotificationsPromptSeen(data.notificationsPromptSeen === true);
+      void (async () => {
+        const [{ doc, onSnapshot, setDoc, serverTimestamp }, { getDb }] = await Promise.all([
+          import("firebase/firestore"),
+          import("@/lib/firebase"),
+        ]);
+        const ref = doc(getDb(), "staff_onboarding", user.uid);
 
-          if (!snap.metadata.fromCache) {
-            setStaffProfileConfirmed(true);
-            if (confirmFallback) clearTimeout(confirmFallback);
-          }
-        },
-        () => {
-          const fallback = readStaffStepCache(user.uid) ?? 0;
-          setStaffCompletedStep(fallback);
+        const chefOverride = isChef(user)
+          ? { completedStep: TOTAL_ONBOARDING_STEPS, status: "complete" as const }
+          : {};
+        setDoc(
+          ref,
+          {
+            uid: user.uid,
+            username,
+            email: user.email ?? null,
+            role,
+            ...chefOverride,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        ).catch(() => {/* best-effort */});
+
+        if (isOwner(user)) return;
+        if (isChef(user)) {
+          setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
           setNotificationsPromptSeen(true);
           setStaffProfileConfirmed(true);
-        },
-      );
+          return;
+        }
+
+        unsub = onSnapshot(
+          ref,
+          (snap) => {
+            const data = snap.data() ?? {};
+            const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
+            writeStaffStepCache(user.uid, completed);
+            setStaffCompletedStep(completed);
+            setNotificationsPromptSeen(data.notificationsPromptSeen === true);
+
+            if (!snap.metadata.fromCache) {
+              setStaffProfileConfirmed(true);
+              if (confirmFallback) clearTimeout(confirmFallback);
+            }
+          },
+          () => {
+            const fallback = readStaffStepCache(user.uid) ?? 0;
+            setStaffCompletedStep(fallback);
+            setNotificationsPromptSeen(true);
+            setStaffProfileConfirmed(true);
+          },
+        );
+      })();
     }, 0);
 
     confirmFallback = setTimeout(() => {
@@ -255,7 +271,7 @@ export function AuthProvider({
     staffCompletedStep < TOTAL_ONBOARDING_STEPS;
 
   useEffect(() => {
-    if (loading) return;
+    if (!authRestored) return;
     const isPublic = PUBLIC_ROUTES.has(pathname);
     if (!user && !isPublic) {
       router.replace(ROUTES.login);
@@ -336,12 +352,16 @@ export function AuthProvider({
     if (user && !userIsOwnerNow && !userIsChefNow && !isStaffAllowedPath(pathname)) {
       router.replace(ROUTES.staffHome);
     }
-  }, [user, loading, pathname, router, staffCompletedStep, staffNeedsOnboarding, notificationsPromptSeen]);
+  }, [user, authRestored, pathname, router, staffCompletedStep, staffNeedsOnboarding, notificationsPromptSeen, staffProfileConfirmed]);
 
   const signOut = async () => {
     clearStaffStepCache();
     clearClientSessionHint();
     await clearAuthSession();
+    const [{ signOut: fbSignOut }, { getAuth }] = await Promise.all([
+      import("firebase/auth"),
+      import("@/lib/firebase"),
+    ]);
     await fbSignOut(getAuth());
     router.replace(ROUTES.login);
   };

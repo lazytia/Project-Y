@@ -12,7 +12,7 @@ import {
 } from "@/lib/boot-splash";
 import { hasClientSessionHint } from "@/lib/client-session-hint";
 
-const FALLBACK_MS = 8_000;
+const FALLBACK_MS = 2_000;
 
 export default function BootSplashDismiss() {
   useEffect(() => {
@@ -29,6 +29,17 @@ export default function BootSplashDismiss() {
         raf = requestAnimationFrame(handoffFromSsr);
       }
     };
+
+    // Returning users: splash already hidden by inline/head scripts — hand off now.
+    if (
+      hidden ||
+      document.documentElement.classList.contains("y-has-session") ||
+      hasClientSessionHint()
+    ) {
+      hidden = true;
+      hideBootSplash();
+      handoffFromSsr();
+    }
 
     const hideOnce = () => {
       const fallbackEl = document.getElementById("static-chrome-fallback");

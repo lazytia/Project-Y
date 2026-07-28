@@ -1,15 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import dynamic from "next/dynamic";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
-import { LanguageProvider } from "@/components/LanguageProvider";
 import AppShell from "@/components/AppShell";
-import AuthSessionKeeper from "@/components/AuthSessionKeeper";
 import BootSplashDismiss from "@/components/BootSplashDismiss";
-import SerwistRegister from "@/components/SerwistRegister";
+import ClientRootExtras from "@/components/ClientRootExtras";
 import ServerAppShell from "@/components/ServerAppShell";
 import { readServerSession } from "@/lib/dashboard-session";
 import { BOOT_SPLASH_HEAD_HINT_SCRIPT, bootSplashEarlyDismissScript } from "@/lib/client-session-hint";
 import "./globals.css";
+
+const LanguageProvider = dynamic(
+  () => import("@/components/LanguageProvider").then((m) => ({ default: m.LanguageProvider })),
+);
 
 const inter = Inter({
   subsets: ["latin"],
@@ -149,8 +152,7 @@ export default async function RootLayout({
         />
         <AuthProvider initialHasSession={session.authenticated}>
           <LanguageProvider>
-            <AuthSessionKeeper />
-            <SerwistRegister />
+            <ClientRootExtras />
             <BootSplashDismiss />
             <AppShell initialHasSession={session.authenticated}>{children}</AppShell>
           </LanguageProvider>

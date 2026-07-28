@@ -196,6 +196,7 @@ export default function ManagerDashboard({
   useEffect(() => {
     setTodayKey(sydneyTodayKey());
     setGreeting(greetingForNow());
+    document.getElementById("ssr-manager-dash")?.remove();
   }, []);
 
   // All dashboard metrics start null so SSR and hydration produce the same
