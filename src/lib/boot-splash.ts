@@ -30,11 +30,6 @@ export function ssrShellVisible(): boolean {
   return !!ssr && !ssr.hasAttribute("hidden");
 }
 
-export function hasSessionCookie(): boolean {
-  if (typeof document === "undefined") return false;
-  return document.cookie.includes("uid=");
-}
-
 export function hasPageLoadingMarker(): boolean {
   if (typeof document === "undefined") return false;
   return !!document.querySelector("[data-page-loading='true'], [data-splash='true']");

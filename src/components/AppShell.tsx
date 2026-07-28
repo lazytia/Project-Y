@@ -9,6 +9,7 @@ import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 import { fetchSessionHint } from "@/lib/auth-session-client";
+import { hasClientSessionHint } from "@/lib/client-session-hint";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { useBellInbox, type BellItem } from "@/hooks/useBellDot";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
@@ -37,7 +38,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
       return;
     }
     if (initialHasSession) return;
-    if (typeof document !== "undefined" && document.cookie.includes("uid=")) {
+    if (hasClientSessionHint()) {
       setSessionVerified(true);
       return;
     }

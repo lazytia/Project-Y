@@ -5,54 +5,69 @@ import { APP_READY_EVENT, AUTH_READY_EVENT } from "@/lib/app-ready";
 import {
   clientShellPainted,
   hasPageLoadingMarker,
-  hasSessionCookie,
   hideBootSplash,
   hideServerAppShell,
   isBootSplashVisible,
   ssrShellVisible,
 } from "@/lib/boot-splash";
+import { hasClientSessionHint } from "@/lib/client-session-hint";
 
 const FALLBACK_MS = 8_000;
 
 export default function BootSplashDismiss() {
   useEffect(() => {
-    let hidden = false;
+    let hidden = !isBootSplashVisible();
     let appReady = false;
     let authReady = false;
     let raf = 0;
 
     const handoffFromSsr = () => {
-      if (clientShellPainted()) hideServerAppShell();
-      else raf = requestAnimationFrame(handoffFromSsr);
+      if (clientShellPainted()) {
+        hideServerAppShell();
+        document.getElementById("static-chrome-fallback")?.setAttribute("hidden", "");
+      } else {
+        raf = requestAnimationFrame(handoffFromSsr);
+      }
     };
 
     const hideOnce = () => {
-      if (hidden) return;
+      const fallbackEl = document.getElementById("static-chrome-fallback");
+      const fallbackVisible = !!fallbackEl && !fallbackEl.hasAttribute("hidden");
+      const chromeVisible = ssrShellVisible() || fallbackVisible;
 
-      // Inline layout script already removed the splash for SSR sessions.
-      if (!isBootSplashVisible()) {
+      if (hidden) {
         if (clientShellPainted()) {
-          hidden = true;
           hideServerAppShell();
-        } else {
-          raf = requestAnimationFrame(hideOnce);
+          fallbackEl?.setAttribute("hidden", "");
+        } else if (chromeVisible) {
+          handoffFromSsr();
         }
         return;
       }
 
-      const sessionKnown = authReady || hasSessionCookie();
+      const sessionKnown = authReady || hasClientSessionHint();
+
+      // Returning users: drop splash as soon as any chrome is visible — don't
+      // wait for Firebase authStateReady or the full JS bundle.
+      if (hasClientSessionHint() && chromeVisible) {
+        hidden = true;
+        hideBootSplash();
+        if (clientShellPainted()) hideServerAppShell();
+        else handoffFromSsr();
+        return;
+      }
+
       if (!appReady || !sessionKnown) {
         raf = requestAnimationFrame(hideOnce);
         return;
       }
-      if (hasPageLoadingMarker() && !ssrShellVisible()) {
+      if (hasPageLoadingMarker() && !chromeVisible) {
         raf = requestAnimationFrame(hideOnce);
         return;
       }
 
       const clientReady = clientShellPainted();
-      const ssrReady = ssrShellVisible();
-      if (!clientReady && !ssrReady) {
+      if (!clientReady && !chromeVisible) {
         raf = requestAnimationFrame(hideOnce);
         return;
       }
@@ -62,8 +77,12 @@ export default function BootSplashDismiss() {
         requestAnimationFrame(() => {
           hideBootSplash();
           document.getElementById("ssr-dash-preparing")?.remove();
-          if (clientReady) hideServerAppShell();
-          else handoffFromSsr();
+          if (clientReady) {
+            hideServerAppShell();
+            fallbackEl?.setAttribute("hidden", "");
+          } else {
+            handoffFromSsr();
+          }
         });
       });
     };
@@ -80,7 +99,7 @@ export default function BootSplashDismiss() {
     window.addEventListener(APP_READY_EVENT, onAppReady);
     window.addEventListener(AUTH_READY_EVENT, onAuthReady);
 
-    const fallback = window.setTimeout(() => {
+    const fallbackTimer = window.setTimeout(() => {
       appReady = true;
       authReady = true;
       hideOnce();
@@ -91,7 +110,7 @@ export default function BootSplashDismiss() {
     return () => {
       window.removeEventListener(APP_READY_EVENT, onAppReady);
       window.removeEventListener(AUTH_READY_EVENT, onAuthReady);
-      window.clearTimeout(fallback);
+      window.clearTimeout(fallbackTimer);
       cancelAnimationFrame(raf);
     };
   }, []);

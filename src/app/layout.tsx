@@ -8,6 +8,7 @@ import BootSplashDismiss from "@/components/BootSplashDismiss";
 import SerwistRegister from "@/components/SerwistRegister";
 import ServerAppShell from "@/components/ServerAppShell";
 import { readServerSession } from "@/lib/dashboard-session";
+import { BOOT_SPLASH_EARLY_DISMISS_SCRIPT } from "@/lib/client-session-hint";
 import "./globals.css";
 
 const inter = Inter({
@@ -69,6 +70,15 @@ export default async function RootLayout({
               @keyframes bootDotBounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
               #server-app-shell:not([hidden]){min-height:100vh;position:relative;background:#fff}
               #server-app-shell:not([hidden]) aside{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #ececec;box-sizing:border-box;padding:24px}
+              #static-chrome-fallback{min-height:100vh;background:#fff;position:relative}
+              #static-chrome-fallback[hidden]{display:none!important}
+              .staticChromeHeader{display:none;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;height:52px;padding:0 12px;background:#fff;border-bottom:1px solid #ececec;z-index:100;box-sizing:border-box}
+              .staticChromeBrand{flex:1;text-align:center;font-family:Arial,sans-serif;font-size:18px;font-weight:500;color:#111;letter-spacing:.35em;margin:0 12px}
+              .staticChromeIcon{width:36px;height:36px;border-radius:8px;background:#f5f5f5;flex-shrink:0}
+              .staticChromeSidebar{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #ececec;padding:24px;box-sizing:border-box}
+              .staticChromeSidebarBrand{font-family:Arial,sans-serif;font-size:20px;font-weight:700;color:#111;margin-bottom:24px}
+              .staticChromeSidebarItem{height:36px;border-radius:8px;background:#f5f5f5;margin-bottom:12px}
+              @media(max-width:767px){.staticChromeHeader{display:flex}.staticChromeSidebar{display:none}}
             `,
           }}
         />
@@ -109,22 +119,32 @@ export default async function RootLayout({
             <span />
           </div>
         </div>
+        <ServerAppShell session={session} />
+        <div id="static-chrome-fallback" hidden aria-hidden="true">
+          <div className="staticChromeHeader">
+            <div className="staticChromeIcon" />
+            <span className="staticChromeBrand">YURICA</span>
+            <div className="staticChromeIcon" />
+          </div>
+          <div className="staticChromeSidebar">
+            <div className="staticChromeSidebarBrand">YURICA</div>
+            <div className="staticChromeSidebarItem" />
+            <div className="staticChromeSidebarItem" />
+            <div className="staticChromeSidebarItem" />
+            <div className="staticChromeSidebarItem" />
+          </div>
+        </div>
+        <script
+          dangerouslySetInnerHTML={{ __html: BOOT_SPLASH_EARLY_DISMISS_SCRIPT }}
+        />
         <AuthProvider>
           <LanguageProvider>
             <AuthSessionKeeper />
             <SerwistRegister />
             <BootSplashDismiss />
-            <ServerAppShell session={session} />
             <AppShell initialHasSession={session.authenticated}>{children}</AppShell>
           </LanguageProvider>
         </AuthProvider>
-        {/* Logged-in SSR includes #server-app-shell — reveal it before JS
-            hydrates so cold starts don't sit on the boot splash for seconds. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var s=document.getElementById("server-app-shell");if(s){var b=document.getElementById("boot-splash");if(b)b.classList.add("bootSplashHidden");}})();`,
-          }}
-        />
       </body>
     </html>
   );

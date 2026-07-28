@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
 import { refreshAuthSession } from "@/lib/auth-session-client";
+import { setClientSessionHint } from "@/lib/client-session-hint";
 
 const SESSION_REFRESH_MS = 50 * 60 * 1000;
 
@@ -22,7 +23,10 @@ export default function AuthSessionKeeper() {
     };
 
     const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) void refreshAuthSession(user);
+      if (user) {
+        setClientSessionHint();
+        void refreshAuthSession(user);
+      }
     });
 
     const interval = window.setInterval(() => void syncSession(), SESSION_REFRESH_MS);

@@ -13,17 +13,20 @@ function setSessionCookies(
   role: string,
   dashboard: string,
 ) {
-  const base = { path: "/", maxAge: ONE_YEAR_SECONDS, sameSite: "lax" as const, secure, httpOnly: true };
-  res.cookies.set("uid", uid, base);
-  res.cookies.set("role", role, base);
-  res.cookies.set("dash", dashboard, base);
+  const httpOnly = { path: "/", maxAge: ONE_YEAR_SECONDS, sameSite: "lax" as const, secure, httpOnly: true };
+  res.cookies.set("uid", uid, httpOnly);
+  res.cookies.set("role", role, httpOnly);
+  res.cookies.set("dash", dashboard, httpOnly);
+  // Client-readable hint so boot splash can dismiss before Firebase hydrates.
+  res.cookies.set("y_sess", "1", { path: "/", maxAge: ONE_YEAR_SECONDS, sameSite: "lax", secure, httpOnly: false });
 }
 
 function clearSessionCookies(res: NextResponse, secure: boolean) {
-  const base = { path: "/", maxAge: 0, sameSite: "lax" as const, secure, httpOnly: true };
+  const httpOnly = { path: "/", maxAge: 0, sameSite: "lax" as const, secure, httpOnly: true };
   for (const name of ["uid", "role", "dash"]) {
-    res.cookies.set(name, "", base);
+    res.cookies.set(name, "", httpOnly);
   }
+  res.cookies.set("y_sess", "", { path: "/", maxAge: 0, sameSite: "lax", secure, httpOnly: false });
 }
 
 function roleFromEmail(email: string | null | undefined): string {

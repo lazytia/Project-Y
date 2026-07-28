@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { getAuth, getDb } from "@/lib/firebase";
 import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
 import { AUTH_READY_EVENT } from "@/lib/app-ready";
+import { clearClientSessionHint, setClientSessionHint } from "@/lib/client-session-hint";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
@@ -101,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       if (u) {
         void refreshAuthSession(u);
+        setClientSessionHint();
         setLoading(false);
         emitAuthReady();
         if (isOwner(u)) {
@@ -326,6 +328,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     clearStaffStepCache();
+    clearClientSessionHint();
     await clearAuthSession();
     await fbSignOut(getAuth());
     router.replace(ROUTES.login);
