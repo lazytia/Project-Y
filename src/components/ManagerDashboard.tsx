@@ -10,8 +10,6 @@ import { emailToUsername } from "@/lib/username";
 import { dCountdownLabel } from "@/lib/catering-orders";
 import { fetchReservationsForDate, type Reservation } from "@/lib/reservations";
 import {
-  hasManagerDashCache,
-  readManagerDashCache,
   writeManagerDashCache,
   type ManagerDashCache,
 } from "@/lib/manager-dash-cache";
@@ -88,20 +86,6 @@ function greetingForNow(): string {
 function firstNameFromUsername(username: string): string {
   if (!username) return "there";
   return username.charAt(0).toUpperCase() + username.slice(1);
-}
-
-function applyManagerCache(cache: ManagerDashCache) {
-  return {
-    todaySales: cache.todaySales,
-    cachedResCounts:
-      cache.totalPax !== null && cache.totalBookings !== null
-        ? { totalPax: cache.totalPax, totalBookings: cache.totalBookings }
-        : null,
-    nextCatering: cache.nextCatering,
-    weekCateringCount: cache.weekCateringCount,
-    kitchenStaff: cache.kitchenStaff,
-    hallStaff: cache.hallStaff,
-  };
 }
 
 async function authHeader(user: User | null | undefined): Promise<HeadersInit> {
@@ -186,7 +170,7 @@ export default function ManagerDashboard({
   initialCache = null,
 }: DashboardProps = {}) {
   const { user, loading: authLoading } = useAuth();
-  const bootApplied = initialCache ? applyManagerCache(initialCache) : null;
+  const [metricsReady, setMetricsReady] = useState(false);
 
   const [firstName, setFirstName] = useState(displayName ?? "");
   const [attention, setAttention] = useState<AttentionCounts>({
@@ -200,44 +184,17 @@ export default function ManagerDashboard({
     setGreeting(greetingForNow());
   }, [todayKey]);
 
-  const [todaySales, setTodaySales] = useState<number | null>(
-    () => bootApplied?.todaySales ?? null,
-  );
+  const [todaySales, setTodaySales] = useState<number | null>(null);
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
-  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(
-    () => bootApplied?.cachedResCounts ?? null,
-  );
-  const [nextCatering, setNextCatering] = useState<{ deliveryDateISO: string } | null>(
-    () => bootApplied?.nextCatering ?? null,
-  );
-  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(
-    () => bootApplied?.weekCateringCount ?? null,
-  );
-  const [kitchenStaff, setKitchenStaff] = useState<number | null>(
-    () => bootApplied?.kitchenStaff ?? null,
-  );
-  const [hallStaff, setHallStaff] = useState<number | null>(
-    () => bootApplied?.hallStaff ?? null,
-  );
-
-  useEffect(() => {
-    if (initialCache) return;
-    const date = sydneyTodayKey();
-    const cached = readManagerDashCache(date);
-    if (!cached) return;
-    const applied = applyManagerCache(cached);
-    setTodaySales(applied.todaySales);
-    if (applied.cachedResCounts) setCachedResCounts(applied.cachedResCounts);
-    setNextCatering(applied.nextCatering);
-    setWeekCateringCount(applied.weekCateringCount);
-    setKitchenStaff(applied.kitchenStaff);
-    setHallStaff(applied.hallStaff);
-  }, [initialCache]);
+  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(null);
+  const [nextCatering, setNextCatering] = useState<{ deliveryDateISO: string } | null>(null);
+  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(null);
+  const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
+  const [hallStaff, setHallStaff] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isManagerDashboardKind(sessionDashboard)) return;
     const date = todayKey || sydneyTodayKey();
-    if (hasManagerDashCache(date)) return;
     let cancelled = false;
     void fetch(
       `/api/dashboard/manager-snapshot?date=${encodeURIComponent(date)}`,
@@ -247,13 +204,6 @@ export default function ManagerDashboard({
       .then((data: ManagerDashServerSnapshot | null) => {
         if (cancelled || !data?.cache) return;
         writeManagerDashCache(data.cache);
-        const applied = applyManagerCache(data.cache);
-        setTodaySales(applied.todaySales);
-        if (applied.cachedResCounts) setCachedResCounts(applied.cachedResCounts);
-        setNextCatering(applied.nextCatering);
-        setWeekCateringCount(applied.weekCateringCount);
-        setKitchenStaff(applied.kitchenStaff);
-        setHallStaff(applied.hallStaff);
       })
       .catch(() => {
         /* live fetch below still runs */
@@ -353,27 +303,34 @@ export default function ManagerDashboard({
       kitchenStaff: kitchen,
       hallStaff: hall,
     });
+    setMetricsReady(true);
   }, [todayKey, user]);
 
   useEffect(() => {
-    if (!todayKey) return;
-    fetchLiveData();
+    if (!todayKey || !user) return;
+    setMetricsReady(false);
+    setTodaySales(null);
+    setReservations(null);
+    setCachedResCounts(null);
+    setNextCatering(null);
+    setWeekCateringCount(null);
+    setKitchenStaff(null);
+    setHallStaff(null);
+    void fetchLiveData();
     const id = setInterval(fetchLiveData, 60_000);
     return () => clearInterval(id);
-  }, [fetchLiveData, todayKey]);
+  }, [fetchLiveData, todayKey, user]);
 
   const resCounts = useMemo(() => {
-    if (reservations) {
-      const active = reservations.filter(
-        (r) => r.status !== "cancelled" && r.status !== "no-show",
-      );
-      return {
-        totalPax: active.reduce((s, r) => s + r.count, 0),
-        totalBookings: active.length,
-      };
-    }
-    return cachedResCounts;
-  }, [reservations, cachedResCounts]);
+    if (!metricsReady || !reservations) return null;
+    const active = reservations.filter(
+      (r) => r.status !== "cancelled" && r.status !== "no-show",
+    );
+    return {
+      totalPax: active.reduce((s, r) => s + r.count, 0),
+      totalBookings: active.length,
+    };
+  }, [reservations, metricsReady]);
 
   const attentionTotal =
     attention.holidayRequests + attention.availabilityChanges +
@@ -382,9 +339,9 @@ export default function ManagerDashboard({
   const team = (kitchenStaff ?? 0) + (hallStaff ?? 0);
 
   const salesPct = useMemo(() => {
-    if (todaySales === null || dailyTarget <= 0) return null;
+    if (!metricsReady || todaySales === null || dailyTarget <= 0) return null;
     return Math.min(100, Math.round((todaySales / dailyTarget) * 100));
-  }, [todaySales, dailyTarget]);
+  }, [todaySales, dailyTarget, metricsReady]);
 
   return (
     <>
@@ -519,14 +476,14 @@ export default function ManagerDashboard({
                   })}
                 </p>
               </>
-            ) : weekCateringCount === null ? (
+            ) : !metricsReady ? (
               <p className={styles.opsLabel}>—</p>
             ) : (
               <p className={styles.opsLabel}>No upcoming orders</p>
             )}
             <p className={styles.opsWeekLine}>
               This Week<br />
-              <strong>{weekCateringCount ?? "—"} Orders</strong>
+              <strong>{!metricsReady || weekCateringCount === null ? "—" : `${weekCateringCount} Orders`}</strong>
             </p>
             <Link href="/operations/catering-orders" className={styles.opsViewLink}>
               View <span aria-hidden="true">→</span>
@@ -542,7 +499,7 @@ export default function ManagerDashboard({
             <div className={styles.salesBlock}>
               <p className={styles.salesLabel}>Today Sales</p>
               <p className={styles.salesValue}>
-                {todaySales === null ? "—" : fmtCurrency(todaySales)}
+                {!metricsReady || todaySales === null ? "—" : fmtCurrency(todaySales)}
               </p>
             </div>
             <div className={styles.salesDivider} aria-hidden="true" />
@@ -577,7 +534,7 @@ export default function ManagerDashboard({
                 <line x1="6" y1="15" x2="18" y2="15" />
                 <line x1="7" y1="19" x2="17" y2="19" />
               </svg>
-              <p className={styles.teamValue}>{kitchenStaff ?? "—"}</p>
+              <p className={styles.teamValue}>{metricsReady && kitchenStaff !== null ? kitchenStaff : "—"}</p>
               <p className={styles.teamLabel}>Kitchen</p>
             </div>
             <div className={styles.teamDivider} />
@@ -588,7 +545,7 @@ export default function ManagerDashboard({
                 <path d="M19 21v-2a5 5 0 0 0-4-4.9" />
                 <path d="M10 12l2 2 2-2" />
               </svg>
-              <p className={styles.teamValue}>{hallStaff ?? "—"}</p>
+              <p className={styles.teamValue}>{metricsReady && hallStaff !== null ? hallStaff : "—"}</p>
               <p className={styles.teamLabel}>Hall</p>
             </div>
           </div>
@@ -599,7 +556,7 @@ export default function ManagerDashboard({
               <path d="M21 21v-2a4 4 0 0 0-3-3.87" />
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
-            <span>{team} Staff Scheduled</span>
+            <span>{metricsReady && kitchenStaff !== null && hallStaff !== null ? `${team} Staff Scheduled` : "— Staff Scheduled"}</span>
             <span className={styles.teamChev} aria-hidden="true">›</span>
           </Link>
         </div>
