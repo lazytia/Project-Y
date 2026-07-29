@@ -122,9 +122,17 @@ async function readPayrollSheetRows(): Promise<unknown[][]> {
   return (res.data.values ?? []) as unknown[][];
 }
 
+let payrollRowsCache: { at: number; rows: unknown[][] } | null = null;
+const PAYROLL_ROWS_TTL_MS = 5 * 60 * 1000;
+
 /** One sheet read — reuse across multiple week parses in a single request. */
 export async function fetchPayrollSheetRows(): Promise<unknown[][]> {
-  return readPayrollSheetRows();
+  if (payrollRowsCache && Date.now() - payrollRowsCache.at < PAYROLL_ROWS_TTL_MS) {
+    return payrollRowsCache.rows;
+  }
+  const rows = await readPayrollSheetRows();
+  payrollRowsCache = { at: Date.now(), rows };
+  return rows;
 }
 
 function weekStartMatches(header: RegExpExecArray, weekStartISO: string): boolean {

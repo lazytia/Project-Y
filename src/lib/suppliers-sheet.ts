@@ -322,15 +322,13 @@ export async function fetchSupplierMonths(
   monthISOs: string[],
 ): Promise<Map<string, MonthlySuppliers | null>> {
   const reader = await openTabReader();
-  const out = new Map<string, MonthlySuppliers | null>();
-  for (const monthISO of monthISOs) {
-    const match = reader.titles.find((t) => tabMatchesMonth(t, monthISO));
-    if (!match) {
-      out.set(monthISO, null);
-      continue;
-    }
-    const rows = await reader.rowsForTab(match);
-    out.set(monthISO, parseTabRows(rows, monthISO, match));
-  }
-  return out;
+  const pairs = await Promise.all(
+    monthISOs.map(async (monthISO) => {
+      const match = reader.titles.find((t) => tabMatchesMonth(t, monthISO));
+      if (!match) return [monthISO, null] as const;
+      const rows = await reader.rowsForTab(match);
+      return [monthISO, parseTabRows(rows, monthISO, match)] as const;
+    }),
+  );
+  return new Map(pairs);
 }

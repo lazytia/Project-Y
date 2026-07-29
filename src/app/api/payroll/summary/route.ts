@@ -70,26 +70,40 @@ async function readSummaryCache(
   weekStart: string,
   opts: { respectTtl: boolean },
 ): Promise<WeekPayrollDetail | null> {
-  try {
-    const snap = await adminDb().collection("payroll_summary_cache").doc(weekStart).get();
-    if (!snap.exists) return null;
-    const data = snap.data() as CachedDetail | undefined;
-    if (!data?.detail) return null;
-    const normalised = normaliseDetail(data.detail);
-    if (isEmptyPayrollDetail(normalised)) return null;
+  const [detail] = await readSummaryCaches([weekStart], opts);
+  return detail;
+}
 
-    if (opts.respectTtl) {
-      const today = todayKey();
-      const weekEnd = shiftDateKey(weekStart, 6, TIMEZONE);
-      const isPast = weekEnd < today;
-      const computedAt = data.computedAt?.toDate?.() ?? null;
-      const ttl = isPast ? PAST_TTL_MS : CURRENT_TTL_MS;
-      if (!computedAt || Date.now() - computedAt.getTime() >= ttl) return null;
-    }
-    return normalised;
+async function readSummaryCaches(
+  weekStarts: string[],
+  opts: { respectTtl: boolean },
+): Promise<(WeekPayrollDetail | null)[]> {
+  if (weekStarts.length === 0) return [];
+  try {
+    const db = adminDb();
+    const refs = weekStarts.map((ws) => db.collection("payroll_summary_cache").doc(ws));
+    const snaps = await db.getAll(...refs);
+    const today = todayKey();
+    return snaps.map((snap, i) => {
+      if (!snap.exists) return null;
+      const weekStart = weekStarts[i];
+      const data = snap.data() as CachedDetail | undefined;
+      if (!data?.detail) return null;
+      const normalised = normaliseDetail(data.detail);
+      if (isEmptyPayrollDetail(normalised)) return null;
+
+      if (opts.respectTtl) {
+        const weekEnd = shiftDateKey(weekStart, 6, TIMEZONE);
+        const isPast = weekEnd < today;
+        const computedAt = data.computedAt?.toDate?.() ?? null;
+        const ttl = isPast ? PAST_TTL_MS : CURRENT_TTL_MS;
+        if (!computedAt || Date.now() - computedAt.getTime() >= ttl) return null;
+      }
+      return normalised;
+    });
   } catch (err) {
     console.warn("[payroll/summary] cache read failed:", err);
-    return null;
+    return weekStarts.map(() => null);
   }
 }
 
@@ -196,57 +210,88 @@ async function loadDetailCached(
  *   2. sales_daily range query — nightly Firestore cache, recent
  *      months only. */
 async function loadWeekSales(weekStart: string): Promise<number> {
+  const [total] = await loadWeekSalesBatch([weekStart]);
+  return total;
+}
+
+async function loadWeekSalesBatch(weekStarts: string[]): Promise<number[]> {
+  if (weekStarts.length === 0) return [];
+  const out = new Array<number>(weekStarts.length).fill(0);
+
   try {
-    const cacheSnap = await adminDb()
-      .collection("sales_weekly_daily")
-      .doc(weekStart)
-      .get();
-    if (cacheSnap.exists) {
-      const data = cacheSnap.data() as { thisWeek?: { total?: number } };
+    const db = adminDb();
+    const refs = weekStarts.map((ws) => db.collection("sales_weekly_daily").doc(ws));
+    const snaps = await db.getAll(...refs);
+    snaps.forEach((snap, i) => {
+      if (!snap.exists) return;
+      const data = snap.data() as { thisWeek?: { total?: number } };
       const t = data.thisWeek?.total;
-      if (typeof t === "number" && t > 0) return Math.round(t * 100) / 100;
-    }
+      if (typeof t === "number" && t > 0) out[i] = Math.round(t * 100) / 100;
+    });
   } catch (err) {
-    console.warn("[payroll/summary] weekly-cache lookup failed:", err);
+    console.warn("[payroll/summary] weekly-cache batch lookup failed:", err);
   }
 
-  const startISO = weekStart;
-  const endISO = shiftDateKey(weekStart, 6, TIMEZONE);
+  const missingIdx = out
+    .map((v, i) => (v > 0 ? -1 : i))
+    .filter((i) => i >= 0);
+  if (missingIdx.length === 0) return out;
+
+  const startISO = weekStarts[Math.min(...missingIdx)];
+  const endISO = shiftDateKey(weekStarts[Math.max(...missingIdx)], 6, TIMEZONE);
   try {
     const snap = await adminDb()
       .collection("sales_daily")
       .where("dateISO", ">=", startISO)
       .where("dateISO", "<=", endISO)
       .get();
-    let total = 0;
+    const totals = new Map(weekStarts.map((ws) => [ws, 0]));
     snap.docs.forEach((d) => {
+      const dateISO = d.data().dateISO;
+      if (typeof dateISO !== "string") return;
+      const ws = isoMondayOfDateKey(dateISO);
+      if (!totals.has(ws)) return;
       const v = d.data().grossSales;
-      if (typeof v === "number") total += v;
+      if (typeof v === "number") totals.set(ws, (totals.get(ws) ?? 0) + v);
     });
-    if (total > 0) return Math.round(total * 100) / 100;
+    for (const i of missingIdx) {
+      const t = totals.get(weekStarts[i]) ?? 0;
+      if (t > 0) out[i] = Math.round(t * 100) / 100;
+    }
   } catch (err) {
-    console.warn("[payroll/summary] sales_daily lookup failed:", err);
+    console.warn("[payroll/summary] sales_daily batch lookup failed:", err);
   }
-  return 0;
+
+  return out;
 }
 
-/** Read cache first; warm from Square one week at a time on miss. */
+function isoMondayOfDateKey(dateISO: string): string {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dow = (dt.getUTCDay() + 6) % 7;
+  dt.setUTCDate(dt.getUTCDate() - dow);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Read cache first; warm from Square in parallel on miss. */
 async function loadWeekSalesResolved(weekStarts: string[]): Promise<number[]> {
-  const out = await Promise.all(weekStarts.map((ws) => loadWeekSales(ws)));
-  for (let i = 0; i < weekStarts.length; i += 1) {
-    if (out[i] > 0) continue;
-    try {
-      const warmed = await warmWeekSalesCache(weekStarts[i]);
-      if (warmed > 0) {
-        out[i] = warmed;
-        continue;
+  const out = await loadWeekSalesBatch(weekStarts);
+  await Promise.all(
+    weekStarts.map(async (ws, i) => {
+      if (out[i] > 0) return;
+      try {
+        const warmed = await warmWeekSalesCache(ws);
+        if (warmed > 0) {
+          out[i] = warmed;
+          return;
+        }
+        const retry = await loadWeekSales(ws);
+        if (retry > 0) out[i] = retry;
+      } catch (err) {
+        console.warn("[payroll/summary] warm weekly sales failed for", ws, err);
       }
-      const retry = await loadWeekSales(weekStarts[i]);
-      if (retry > 0) out[i] = retry;
-    } catch (err) {
-      console.warn("[payroll/summary] warm weekly sales failed for", weekStarts[i], err);
-    }
-  }
+    }),
+  );
   return out;
 }
 
@@ -258,22 +303,33 @@ export async function GET(req: NextRequest) {
 
   const prev1 = shiftDateKey(weekStart, -7, TIMEZONE);
   const prev2 = shiftDateKey(weekStart, -14, TIMEZONE);
+  const weekKeys = [weekStart, prev1, prev2];
+
+  const [cachedDetails, sales] = await Promise.all([
+    readSummaryCaches(weekKeys, { respectTtl: true }),
+    loadWeekSalesResolved(weekKeys),
+  ]);
+
+  const allPayrollCached = cachedDetails.every((d) => d !== null);
 
   let sheetRows: unknown[][] | null = null;
   let weeklyTotals: Record<string, WeeklyPayrollRow> = {};
-  try {
-    sheetRows = await fetchPayrollSheetRows();
-    weeklyTotals = parseWeeklyPayrollTotalsFromRows(sheetRows);
-  } catch (err) {
-    console.warn("[payroll/summary] sheet read failed:", err);
+  if (!allPayrollCached) {
+    try {
+      sheetRows = await fetchPayrollSheetRows();
+      weeklyTotals = parseWeeklyPayrollTotalsFromRows(sheetRows);
+    } catch (err) {
+      console.warn("[payroll/summary] sheet read failed:", err);
+    }
   }
 
-  const [currentDetail, prev1Detail, prev2Detail, sales] = await Promise.all([
-    loadDetailCached(weekStart, sheetRows, weeklyTotals),
-    loadDetailCached(prev1, sheetRows, weeklyTotals),
-    loadDetailCached(prev2, sheetRows, weeklyTotals),
-    loadWeekSalesResolved([weekStart, prev1, prev2]),
-  ]);
+  const [currentDetail, prev1Detail, prev2Detail] = await Promise.all(
+    weekKeys.map((ws, i) =>
+      cachedDetails[i]
+        ? Promise.resolve(cachedDetails[i])
+        : loadDetailCached(ws, sheetRows, weeklyTotals),
+    ),
+  );
 
   const [salesCurrent, salesPrev1, salesPrev2] = sales;
 

@@ -193,7 +193,7 @@ export default function PayrollOverviewPage() {
       setSummary(null);
     }
     setError(null);
-    setFetching(true);
+    setFetching(!cachedHasData);
     (async () => {
       try {
         const res = await fetch(`/api/payroll/summary?weekStart=${weekMondayISO}`);

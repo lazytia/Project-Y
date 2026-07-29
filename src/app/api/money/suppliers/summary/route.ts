@@ -60,76 +60,59 @@ function isEmptyMonth(m: MonthlySuppliers | null | undefined): boolean {
   return (m.total ?? 0) <= 0 && m.suppliers.length === 0;
 }
 
-async function loadMonth(
-  monthISO: string,
-  batch: Map<string, MonthlySuppliers | null> | null,
-): Promise<MonthlySuppliers | null> {
-  const isPast = monthISO < currentMonthKey();
-
-  if (batch?.has(monthISO)) {
-    const fromSheet = batch.get(monthISO) ?? null;
-    if (!isEmptyMonth(fromSheet)) {
-      adminDb()
-        .collection("suppliers_month_cache")
-        .doc(monthISO)
-        .set({ detail: fromSheet!, computedAt: Timestamp.now(), parseVersion: PARSE_VERSION }, { merge: true })
-        .catch((err) => console.warn("[suppliers/summary] cache write failed", err));
-      return fromSheet;
-    }
-  }
+async function loadMonthsBatch(monthKeys: string[]): Promise<(MonthlySuppliers | null)[]> {
+  if (monthKeys.length === 0) return [];
+  const now = Date.now();
+  const current = currentMonthKey();
+  const out: (MonthlySuppliers | null)[] = monthKeys.map(() => null);
 
   try {
-    const snap = await adminDb().collection("suppliers_month_cache").doc(monthISO).get();
-    if (snap.exists) {
+    const db = adminDb();
+    const refs = monthKeys.map((mk) => db.collection("suppliers_month_cache").doc(mk));
+    const snaps = await db.getAll(...refs);
+    snaps.forEach((snap, i) => {
+      if (!snap.exists) return;
+      const mk = monthKeys[i];
       const data = snap.data() as CachedMonth | undefined;
       const computedAt = data?.computedAt?.toDate?.() ?? null;
-      const ttl = isPast ? PAST_TTL_MS : CURRENT_TTL_MS;
+      const ttl = mk < current ? PAST_TTL_MS : CURRENT_TTL_MS;
       if (
         data?.detail &&
         data.parseVersion === PARSE_VERSION &&
         !isEmptyMonth(data.detail) &&
         computedAt &&
-        Date.now() - computedAt.getTime() < ttl
-      ) {
-        return data.detail;
-      }
-    }
-  } catch (err) {
-    console.warn("[suppliers/summary] cache read failed", monthISO, err);
-  }
-
-  if (batch?.has(monthISO)) {
-    return batch.get(monthISO) ?? null;
-  }
-
-  return null;
-}
-
-async function monthsCacheWarm(monthKeys: string[]): Promise<boolean> {
-  const now = Date.now();
-  const current = currentMonthKey();
-  try {
-    const snaps = await Promise.all(
-      monthKeys.map((mk) => adminDb().collection("suppliers_month_cache").doc(mk).get()),
-    );
-    return snaps.every((snap, i) => {
-      const mk = monthKeys[i];
-      if (!snap.exists) return false;
-      const data = snap.data() as CachedMonth | undefined;
-      const computedAt = data?.computedAt?.toDate?.() ?? null;
-      const ttl = mk < current ? PAST_TTL_MS : CURRENT_TTL_MS;
-      return (
-        !!data?.detail &&
-        data.parseVersion === PARSE_VERSION &&
-        !isEmptyMonth(data.detail) &&
-        !!computedAt &&
         now - computedAt.getTime() < ttl
-      );
+      ) {
+        out[i] = data.detail;
+      }
     });
   } catch (err) {
-    console.warn("[suppliers/summary] cache warm check failed", err);
-    return false;
+    console.warn("[suppliers/summary] cache batch read failed", err);
   }
+
+  if (out.every((m) => m !== null)) return out;
+
+  const batch = await fetchSupplierMonths(monthKeys).catch((err) => {
+    console.warn("[suppliers/summary] workbook fetch failed:", err);
+    return null;
+  });
+
+  return monthKeys.map((mk, i) => {
+    if (out[i]) return out[i];
+    const fromSheet = batch?.get(mk) ?? null;
+    if (!isEmptyMonth(fromSheet)) {
+      adminDb()
+        .collection("suppliers_month_cache")
+        .doc(mk)
+        .set(
+          { detail: fromSheet!, computedAt: Timestamp.now(), parseVersion: PARSE_VERSION },
+          { merge: true },
+        )
+        .catch((err) => console.warn("[suppliers/summary] cache write failed", err));
+      return fromSheet;
+    }
+    return null;
+  });
 }
 
 /** Load cached Square monthly totals keyed by YYYY-MM. */
@@ -217,16 +200,8 @@ export async function GET(req: NextRequest) {
     const monthKeys: string[] = [];
     for (let i = 5; i >= 0; i--) monthKeys.push(shiftMonth(month, -i));
 
-    const cacheWarm = await monthsCacheWarm(monthKeys);
-    const batch = cacheWarm
-      ? null
-      : await fetchSupplierMonths(monthKeys).catch((err) => {
-          console.warn("[suppliers/summary] workbook fetch failed:", err);
-          return null;
-        });
-
     const [monthData, salesData] = await Promise.all([
-      Promise.all(monthKeys.map((mk) => loadMonth(mk, batch))),
+      loadMonthsBatch(monthKeys),
       loadSalesByMonths(monthKeys),
     ]);
 
