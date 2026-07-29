@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
+import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
@@ -107,6 +108,7 @@ export default function DayDetailsPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [recentlySaved, setRecentlySaved] = useState<Set<string>>(new Set());
   const [extraShifts, setExtraShifts] = useState<ShiftFromApi[]>([]);
+  const [extraIds, setExtraIds] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState<{ teamMemberId: string; startHHMM: string; endHHMM: string }>({
     teamMemberId: "",
@@ -151,9 +153,12 @@ export default function DayDetailsPage() {
       // App-local backfilled shifts (not in Square Labor). We store them
       // shaped the same as Square rows so the render code doesn't care.
       try {
-        const snap = await getDocs(
-          query(collection(getDb(), "timesheet_extra_shifts"), where("dateISO", "==", dateISO)),
-        );
+        const [snap, dismissedIds] = await Promise.all([
+          getDocs(
+            query(collection(getDb(), "timesheet_extra_shifts"), where("dateISO", "==", dateISO)),
+          ),
+          loadDismissedShiftIdsForDay(dateISO),
+        ]);
         const extras: ShiftFromApi[] = snap.docs.map((d) => {
           const data = d.data() as Partial<ShiftFromApi>;
           return {
@@ -168,9 +173,13 @@ export default function DayDetailsPage() {
           };
         });
         setExtraShifts(extras);
+        setExtraIds(new Set(extras.map((row) => row.id)));
+        setDismissed(dismissedIds);
       } catch (err) {
         console.warn("[day-details] extra shifts fetch failed:", err);
         setExtraShifts([]);
+        setExtraIds(new Set());
+        setDismissed(new Set());
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Square unreachable.";
@@ -331,6 +340,26 @@ export default function DayDetailsPage() {
     }
   }
 
+  async function removeShift(shift: ShiftFromApi) {
+    if (!user) return;
+    if (extraIds.has(shift.id)) {
+      try {
+        await deleteDoc(doc(getDb(), "timesheet_extra_shifts", shift.id));
+        void load();
+      } catch (err) {
+        console.error("[timesheet_extra_shifts] delete failed:", err);
+        setEditError(err instanceof Error ? err.message : "Delete failed.");
+      }
+      return;
+    }
+    try {
+      await dismissSquareShift(shift, user.uid);
+      setDismissed((prev) => new Set(prev).add(shift.id));
+    } catch (err) {
+      console.error("[timesheet_dismissed] save failed:", err);
+      setEditError(err instanceof Error ? err.message : "Delete failed.");
+    }
+  }
 
   if (authLoading || loading) return <Splash />;
   if (!allowed) return <div className={styles.page}><p>Owner access only.</p></div>;
@@ -509,7 +538,7 @@ export default function DayDetailsPage() {
                   type="button"
                   className={styles.deleteBtn}
                   aria-label={`Remove ${name}'s shift`}
-                  onClick={() => setDismissed((prev) => new Set(prev).add(s.id))}
+                  onClick={() => void removeShift(s)}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6" />

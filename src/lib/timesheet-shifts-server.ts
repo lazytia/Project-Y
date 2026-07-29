@@ -146,6 +146,15 @@ function applyEdit(shift: TimesheetShift, edit: EditDoc | undefined): TimesheetS
   };
 }
 
+async function fetchDismissedShiftIds(startDate: string, endDate: string): Promise<Set<string>> {
+  const snap = await adminDb()
+    .collection("timesheet_dismissed")
+    .where("dateISO", ">=", startDate)
+    .where("dateISO", "<=", endDate)
+    .get();
+  return new Set(snap.docs.map((d) => d.id));
+}
+
 async function fetchExtraShifts(startDate: string, endDate: string): Promise<TimesheetShift[]> {
   const db = adminDb();
   const extrasSnap = await db
@@ -176,9 +185,10 @@ export async function fetchMergedTimesheetShifts(
   shifts: TimesheetShift[];
   teamMembers: Record<string, TimesheetTeamMember>;
 }> {
-  const [{ shifts: squareShifts, teamMembers }, extras] = await Promise.all([
+  const [{ shifts: squareShifts, teamMembers }, extras, dismissedIds] = await Promise.all([
     fetchSquareShifts(startDate, endDate),
     fetchExtraShifts(startDate, endDate),
+    fetchDismissedShiftIds(startDate, endDate),
   ]);
 
   const editsSnap = await adminDb()
@@ -189,7 +199,9 @@ export async function fetchMergedTimesheetShifts(
   const edits: Record<string, EditDoc> = {};
   for (const d of editsSnap.docs) edits[d.id] = d.data() as EditDoc;
 
-  const merged = [...squareShifts.map((s) => applyEdit(s, edits[s.id])), ...extras];
+  const merged = [...squareShifts.map((s) => applyEdit(s, edits[s.id])), ...extras].filter(
+    (s) => !dismissedIds.has(s.id),
+  );
   return { shifts: merged, teamMembers };
 }
 

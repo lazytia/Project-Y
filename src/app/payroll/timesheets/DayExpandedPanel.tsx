@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { collection, doc, getDocs, query, serverTimestamp, setDoc, where, deleteDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
 import styles from "./page.module.css";
 
 type ShiftFromApi = {
@@ -82,6 +83,7 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
   const [loading, setLoading] = useState(true);
   const [edits, setEdits] = useState<Record<string, EditDoc>>({});
   const [extras, setExtras] = useState<ShiftFromApi[]>([]);
+  const [extraIds, setExtraIds] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [editingField, setEditingField] = useState<{ shiftId: string; field: "start" | "end" } | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
@@ -91,9 +93,10 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
     setLoading(true);
     setEditError(null);
     try {
-      const [editsSnap, extrasSnap] = await Promise.all([
+      const [editsSnap, extrasSnap, dismissedIds] = await Promise.all([
         getDocs(query(collection(getDb(), "timesheet_edits"), where("dateISO", "==", dateISO))),
         getDocs(query(collection(getDb(), "timesheet_extra_shifts"), where("dateISO", "==", dateISO))),
+        loadDismissedShiftIdsForDay(dateISO),
       ]);
       const editMap: Record<string, EditDoc> = {};
       for (const d of editsSnap.docs) {
@@ -113,10 +116,14 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
       });
       setEdits(editMap);
       setExtras(extraRows);
+      setExtraIds(new Set(extraRows.map((row) => row.id)));
+      setDismissed(dismissedIds);
     } catch (err) {
       console.error("[timesheets] day panel load failed:", err);
       setEdits({});
       setExtras([]);
+      setExtraIds(new Set());
+      setDismissed(new Set());
     } finally {
       setLoading(false);
     }
@@ -178,6 +185,28 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
       setEditError(err instanceof Error ? err.message : "Save failed.");
     } finally {
       setSavingEditId(null);
+    }
+  }
+
+  async function removeShift(shift: ShiftFromApi) {
+    if (extraIds.has(shift.id)) {
+      try {
+        await deleteDoc(doc(getDb(), "timesheet_extra_shifts", shift.id));
+        void loadDayMeta();
+        onChanged?.();
+      } catch (err) {
+        console.error("[timesheet_extra_shifts] delete failed:", err);
+        setEditError(err instanceof Error ? err.message : "Delete failed.");
+      }
+      return;
+    }
+    try {
+      await dismissSquareShift(shift, userId);
+      setDismissed((prev) => new Set(prev).add(shift.id));
+      onChanged?.();
+    } catch (err) {
+      console.error("[timesheet_dismissed] save failed:", err);
+      setEditError(err instanceof Error ? err.message : "Delete failed.");
     }
   }
 
@@ -280,7 +309,7 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
               type="button"
               className={styles.deleteBtn}
               aria-label={`Remove ${name}'s shift from view`}
-              onClick={() => setDismissed((prev) => new Set(prev).add(s.id))}
+              onClick={() => void removeShift(s)}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6" />

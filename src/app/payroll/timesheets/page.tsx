@@ -393,7 +393,7 @@ export default function TimesheetsPage() {
 
     return {
       days,
-      byStaff: Object.values(staffAgg).sort((a, b) => b.hours - a.hours),
+      byStaff: Object.values(staffAgg).sort((a, b) => a.name.localeCompare(b.name, "en-AU")),
       totalHours,
       totalShifts,
       totalStaff: allTMs.size,

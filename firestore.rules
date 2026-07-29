@@ -145,6 +145,12 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // Square shifts the owner removed from the timesheet UI. Square Labor
+    // is unchanged; we filter these out when merging the feed.
+    match /timesheet_dismissed/{shiftId} {
+      allow read, write: if isOwner();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

@@ -17,6 +17,7 @@ import {
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
+import { dismissSquareShift } from "@/lib/timesheet-dismiss-client";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -260,7 +261,7 @@ export default function StaffDetailPage() {
       row.hours += s.hours;
       row.gross += s.hours * rate;
     }
-    return Object.values(agg).sort((a, b) => b.hours - a.hours);
+    return Object.values(agg).sort((a, b) => a.name.localeCompare(b.name, "en-AU"));
   }, [shifts, teamMembers, dismissed]);
 
   const memberShifts = useMemo(
@@ -337,6 +338,7 @@ export default function StaffDetailPage() {
   }
 
   async function removeShift(shift: ShiftFromApi) {
+    if (!user) return;
     if (extraIds.has(shift.id)) {
       try {
         await deleteDoc(doc(getDb(), "timesheet_extra_shifts", shift.id));
@@ -347,7 +349,14 @@ export default function StaffDetailPage() {
       }
       return;
     }
-    setDismissed((prev) => new Set(prev).add(shift.id));
+    try {
+      await dismissSquareShift(shift, user.uid);
+      setDismissed((prev) => new Set(prev).add(shift.id));
+      void load();
+    } catch (err) {
+      console.error("[timesheet_dismissed] save failed:", err);
+      setEditError(err instanceof Error ? err.message : "Delete failed.");
+    }
   }
 
   function applyRange() {

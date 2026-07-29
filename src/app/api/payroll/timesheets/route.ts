@@ -9,6 +9,7 @@ import { squareEnv } from "@/lib/square";
  *   1. Square Labor (read-only import — never written back to Square)
  *   2. Local overrides in Firestore `timesheet_edits`
  *   3. App backfills in Firestore `timesheet_extra_shifts`
+ *   4. Owner-dismissed Square shifts in `timesheet_dismissed`
  */
 export const dynamic = "force-dynamic";
 
