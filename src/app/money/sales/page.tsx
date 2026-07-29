@@ -19,10 +19,9 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
 
 /**
  * Owner Sales overview — pulls from:
- *   1. Firestore `sales_daily/{yyyy-mm-dd}` for weekly bars (9am–10pm
- *      business days, main restaurant location).
- *   2. /api/square/yearly-sales for monthly YTD bars (same method; Platter
- *      location excluded so totals match Square Sales Summary for one store).
+ *   1. /api/square/weekly-daily — Square Reporting API daily Gross sales
+ *      (net sales + taxes) for the selected week vs the prior week.
+ *   2. /api/square/yearly-sales — same Gross sales basis for monthly YTD bars.
  *   3. /api/square/sales-categories for category breakdown of the selected week.
  */
 
@@ -190,7 +189,7 @@ export default function SalesPage() {
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    const cacheKey = `y.sales.weekDaily.${weekMondayISO}`;
+    const cacheKey = `y.sales.weekDaily.v2.${weekMondayISO}`;
     type WeeklyCache = { thisWeek: number[]; lastWeek: number[] };
     const cached = readSession<WeeklyCache>(cacheKey);
     if (cached) {
@@ -234,8 +233,8 @@ export default function SalesPage() {
     let cancelled = false;
     const thisYear = Number(todayKey.slice(0, 4));
     const lastYear = thisYear - 1;
-    const thisKey = `y.sales.yearly.v2.${thisYear}`;
-    const lastKey = `y.sales.yearly.v2.${lastYear}`;
+    const thisKey = `y.sales.yearly.v5.${thisYear}`;
+    const lastKey = `y.sales.yearly.v5.${lastYear}`;
 
     // Hydrate from session first so the chart paints before the network
     // round-trip returns.

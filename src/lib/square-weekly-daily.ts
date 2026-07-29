@@ -1,42 +1,10 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
-import {
-  fetchOrders,
-  getSalesDayRange,
-  shiftDateKey,
-  squareClient,
-  squareEnv,
-  squareGrossSalesCents,
-} from "@/lib/square";
+import { fetchDailyGrossSalesFromReporting } from "@/lib/square-reporting";
+import { shiftDateKey, squareEnv } from "@/lib/square";
 
-const ORDER_STATES = ["OPEN", "COMPLETED"];
-
-type Refund = {
-  createdAt?: string;
-  amountMoney?: { amount?: bigint };
-};
-
-async function fetchRefunds(
-  locationId: string,
-  startAt: string,
-  endAt: string,
-): Promise<Refund[]> {
-  const refunds: Refund[] = [];
-  const iter = await squareClient.refunds.list({
-    locationId,
-    beginTime: startAt,
-    endTime: endAt,
-    limit: 100,
-    sortField: "CREATED_AT",
-  });
-  for await (const r of iter) refunds.push(r as Refund);
-  return refunds;
-}
-
-function localDateKey(iso: string, timezone: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-CA", { timeZone: timezone });
-}
+/** Bump when gross-sales formula or data source changes. */
+export const WEEKLY_DAILY_COMPUTE_VERSION = 2;
 
 export async function computeWeekPair(
   locationId: string,
@@ -47,38 +15,18 @@ export async function computeWeekPair(
   lastWeek: { daily: number[]; total: number };
 }> {
   const prevWeekStart = shiftDateKey(weekStart, -7, timezone);
-  const startWin = getSalesDayRange(timezone, prevWeekStart);
-  const endWin = getSalesDayRange(timezone, shiftDateKey(weekStart, 6, timezone));
+  const weekEnd = shiftDateKey(weekStart, 6, timezone);
 
-  const [orders, refunds] = await Promise.all([
-    fetchOrders(locationId, startWin.startAt, endWin.endAt, ORDER_STATES),
-    fetchRefunds(locationId, startWin.startAt, endWin.endAt),
-  ]);
-
-  const dayCents = new Map<string, number>();
-  for (const o of orders) {
-    if (o.state !== "COMPLETED") continue;
-    if (!o.createdAt) continue;
-    const dk = localDateKey(o.createdAt, timezone);
-    dayCents.set(dk, (dayCents.get(dk) ?? 0) + squareGrossSalesCents(o));
-  }
-  for (const r of refunds) {
-    if (!r.createdAt) continue;
-    const dk = localDateKey(r.createdAt, timezone);
-    const amt = Number(r.amountMoney?.amount ?? 0n);
-    if (!Number.isFinite(amt) || amt <= 0) continue;
-    dayCents.set(dk, (dayCents.get(dk) ?? 0) - amt);
-  }
+  const daily = await fetchDailyGrossSalesFromReporting(prevWeekStart, weekEnd, locationId);
 
   function seven(mondayKey: string) {
-    const daily: number[] = [];
+    const values: number[] = [];
     for (let i = 0; i < 7; i++) {
       const dk = shiftDateKey(mondayKey, i, timezone);
-      const cents = dayCents.get(dk) ?? 0;
-      daily.push(Math.round(cents) / 100);
+      values.push(daily.get(dk) ?? 0);
     }
-    const total = Math.round(daily.reduce((s, v) => s + v, 0) * 100) / 100;
-    return { daily, total };
+    const total = Math.round(values.reduce((s, v) => s + v, 0) * 100) / 100;
+    return { daily: values, total };
   }
 
   return {
@@ -104,6 +52,8 @@ export async function warmWeekSalesCache(weekStart: string): Promise<number> {
         weekStart,
         thisWeek: pair.thisWeek,
         lastWeek: pair.lastWeek,
+        computeVersion: WEEKLY_DAILY_COMPUTE_VERSION,
+        source: "square_reporting_gross_au",
         computedAt: Timestamp.now(),
       },
       { merge: true },

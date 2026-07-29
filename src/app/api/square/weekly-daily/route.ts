@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
-import { computeWeekPair } from "@/lib/square-weekly-daily";
+import { computeWeekPair, WEEKLY_DAILY_COMPUTE_VERSION } from "@/lib/square-weekly-daily";
 import { shiftDateKey, squareEnv } from "@/lib/square";
 
 /**
  * GET /api/square/weekly-daily?weekStart=YYYY-MM-DD
  *
  * Returns 7 daily Gross Sales totals (Mon–Sun) for the given week AND for
- * the immediately preceding week, matching Square Web's dashboard figures.
- * Powers the "This Week vs Last Week" chart on /money/sales so the numbers
- * come from Square rather than the potentially-stale Firestore cache.
+ * the immediately preceding week from Square Reporting API (Sales Summary
+ * Gross sales = net sales + taxes). Powers /money/sales weekly chart.
  */
 
 export const dynamic = "force-dynamic";
@@ -32,6 +31,7 @@ type CachedWeekPair = {
   thisWeek: { daily: number[]; total: number };
   lastWeek: { daily: number[]; total: number };
   computedAt?: Timestamp;
+  computeVersion?: number;
 };
 
 function todaySydneyKey(): string {
@@ -61,8 +61,9 @@ export async function GET(req: NextRequest) {
       const data = snap.data() as CachedWeekPair | undefined;
       const computedAt = data?.computedAt?.toDate?.() ?? null;
       const fresh =
-        isPastWeek ||
-        (computedAt && Date.now() - computedAt.getTime() < CURRENT_WEEK_TTL_MS);
+        data?.computeVersion === WEEKLY_DAILY_COMPUTE_VERSION &&
+        (isPastWeek ||
+          (computedAt && Date.now() - computedAt.getTime() < CURRENT_WEEK_TTL_MS));
       if (fresh && data?.thisWeek && data?.lastWeek) {
         return NextResponse.json(
           { weekStart, thisWeek: data.thisWeek, lastWeek: data.lastWeek, cached: true },
@@ -85,6 +86,8 @@ export async function GET(req: NextRequest) {
           weekStart,
           thisWeek: pair.thisWeek,
           lastWeek: pair.lastWeek,
+          computeVersion: WEEKLY_DAILY_COMPUTE_VERSION,
+          source: "square_reporting_gross_au",
           computedAt: Timestamp.now(),
         },
         { merge: true },
