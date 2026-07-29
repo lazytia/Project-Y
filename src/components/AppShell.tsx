@@ -84,15 +84,15 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
 
   if (isPublic) {
     return (
-      <>
+      <div data-app-shell-root="true">
         <AppReadyMarker />
         <div className={styles.public} data-app-shell="true">{children}</div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div data-app-shell-root="true">
       <AppReadyMarker />
       {!loading && !user && !hasSessionGuess ? (
         <Splash label="Redirecting…" />
@@ -105,7 +105,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
           {children}
         </AuthenticatedShell>
       )}
-    </>
+    </div>
   );
 }
 

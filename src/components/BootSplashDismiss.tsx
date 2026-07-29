@@ -99,7 +99,7 @@ export default function BootSplashDismiss() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           hideBootSplash();
-          document.getElementById("ssr-dash-preparing")?.remove();
+          document.getElementById("ssr-dash-preparing")?.setAttribute("hidden", "");
           if (clientReady) {
             hideServerAppShell();
             fallbackEl?.setAttribute("hidden", "");

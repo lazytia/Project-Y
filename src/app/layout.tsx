@@ -8,6 +8,7 @@ import ClientRootExtras from "@/components/ClientRootExtras";
 import ServerAppShell from "@/components/ServerAppShell";
 import { readServerSession } from "@/lib/dashboard-session";
 import { BOOT_SPLASH_HEAD_HINT_SCRIPT, bootSplashEarlyDismissScript } from "@/lib/client-session-hint";
+import { BOOT_SPLASH_MARKUP } from "@/lib/boot-splash";
 import "./globals.css";
 
 const LanguageProvider = dynamic(
@@ -62,8 +63,8 @@ export default async function RootLayout({
               html,body{margin:0;background:#fff}
               html.y-has-session #boot-splash{display:none!important;visibility:hidden!important}
               .bootSplash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fff;will-change:auto}
-              .bootSplashHidden{display:none!important;visibility:hidden!important;pointer-events:none!important}
-              .bootSplashHidden,.bootSplashHidden *{animation:none!important}
+              .bootSplashHidden{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important;height:0!important;width:0!important;overflow:hidden!important;position:absolute!important;inset:auto!important;z-index:-1!important}
+              .bootSplashHidden,.bootSplashHidden *{animation:none!important;transition:none!important}
               .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
               .bootSplashMark{color:#fff;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:40px;line-height:1}
               .bootSplashWordmark{font-family:Arial,sans-serif;font-size:16px;font-weight:600;color:#111;letter-spacing:.04em}
@@ -119,18 +120,10 @@ export default async function RootLayout({
         />
       </head>
       <body className="appBody">
-        <div id="boot-splash" className="bootSplash" aria-hidden="true">
-          <div className="bootSplashLogo">
-            <span className="bootSplashMark">Y</span>
-          </div>
-          <div className="bootSplashWordmark">Project Y</div>
-          <div className="bootSplashStatus">Loading…</div>
-          <div className="bootSplashDots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-        </div>
+        <div
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: BOOT_SPLASH_MARKUP }}
+        />
         <ServerAppShell session={session} />
         <div id="static-chrome-fallback" hidden aria-hidden="true">
           <div className="staticChromeHeader">
