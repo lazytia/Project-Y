@@ -18,15 +18,12 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
 });
 
 /**
- * Owner Sales overview — pulls from two data sources:
- *   1. Firestore `sales_daily/{yyyy-mm-dd}` for the weekly & yearly bar
- *      charts. Populated nightly by /api/insights/refresh, so it's fast
- *      and matches Square Web's "Gross Sales" column (verified in
- *      squareGrossSalesCents).
- *   2. /api/square/sales-categories for the donut + top-selling categories
- *      of the selected week. Uses the Square catalog to bucket line items
- *      by Category, aggregating grossSalesMoney (again the Web dashboard
- *      figure) rather than the post-discount total.
+ * Owner Sales overview — pulls from:
+ *   1. Firestore `sales_daily/{yyyy-mm-dd}` for weekly bars (9am–10pm
+ *      business days, main restaurant location).
+ *   2. /api/square/yearly-sales for monthly YTD bars (same method; Platter
+ *      location excluded so totals match Square Sales Summary for one store).
+ *   3. /api/square/sales-categories for category breakdown of the selected week.
  */
 
 const SYDNEY_TZ = "Australia/Sydney";
@@ -237,8 +234,8 @@ export default function SalesPage() {
     let cancelled = false;
     const thisYear = Number(todayKey.slice(0, 4));
     const lastYear = thisYear - 1;
-    const thisKey = `y.sales.yearly.${thisYear}`;
-    const lastKey = `y.sales.yearly.${lastYear}`;
+    const thisKey = `y.sales.yearly.v2.${thisYear}`;
+    const lastKey = `y.sales.yearly.v2.${lastYear}`;
 
     // Hydrate from session first so the chart paints before the network
     // round-trip returns.
