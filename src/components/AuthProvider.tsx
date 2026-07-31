@@ -80,7 +80,10 @@ export function AuthProvider({
   initialHasSession?: boolean;
 }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(() => !initialHasSession);
+  // Stay "loading" until authStateReady — initialHasSession only optimises
+  // shell paint, not permission gates. Setting loading=false early made
+  // owner-only pages redirect home while Firebase user was still null.
+  const [loading, setLoading] = useState(true);
   const [authRestored, setAuthRestored] = useState(false);
   const [staffCompletedStep, setStaffCompletedStep] = useState<number | null>(null);
   // Gate onboarding redirects until Firestore has confirmed the profile —

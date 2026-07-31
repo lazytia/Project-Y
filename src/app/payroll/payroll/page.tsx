@@ -6,6 +6,10 @@ import dynamic from "next/dynamic";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import {
+  isoLastCompletedPayWeek,
+  sydneyTodayKey,
+} from "@/lib/owner-money-prefetch";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -23,7 +27,6 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
  * "Payroll % of sales" gauge is meaningful.
  */
 
-const SYDNEY_TZ = "Australia/Sydney";
 
 type PayrollTotals = {
   netPay: number;
@@ -63,29 +66,12 @@ type SummaryPayload = {
 
 /* ── Date helpers ── */
 
-function sydneyTodayKey(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
-}
-
 /** Monday of the week containing `dateKey`. */
 function isoMondayOf(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   const dow = (dt.getUTCDay() + 6) % 7;
   dt.setUTCDate(dt.getUTCDate() - dow);
-  return dt.toISOString().slice(0, 10);
-}
-
-function isoLastCompletedPayWeek(): string {
-  // Yurica's Pay History sheet finalises a week after Sunday closes. So
-  // the most recently *paid* week has its Sunday last Sunday or earlier
-  // — i.e. two Mondays ago from today. Landing there means the page
-  // opens on real numbers instead of the current in-progress week that
-  // hasn't been paid yet.
-  const thisMonday = isoMondayOf(sydneyTodayKey());
-  const [y, m, d] = thisMonday.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() - 14);
   return dt.toISOString().slice(0, 10);
 }
 
@@ -155,8 +141,8 @@ export default function PayrollOverviewPage() {
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
 
-  const [weekMondayISO, setWeekMondayISO] = useState<string>("");
-  const [todayKey, setTodayKey] = useState<string>("");
+  const [weekMondayISO, setWeekMondayISO] = useState(isoLastCompletedPayWeek);
+  const [todayKey] = useState(sydneyTodayKey);
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -164,36 +150,24 @@ export default function PayrollOverviewPage() {
 
   useEffect(() => {
     if (authLoading) return;
+    if (!user) return;
     if (!allowed) router.replace(ROUTES.home);
-  }, [allowed, authLoading, router]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setTodayKey(sydneyTodayKey());
-    setWeekMondayISO(isoLastCompletedPayWeek());
-  }, []);
+  }, [allowed, authLoading, user, router]);
 
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    // Bump the version whenever the API's response shape or values
-    // change so stale sessionStorage entries don't shadow the fix.
     const cacheKey = `y.payroll.summary.v7.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
-    // Ignore stale entries that have payroll totals but no sales — they
-    // render "—%" on the gauge and a misleading ↓100% chip.
-    const cachedHasData =
-      cached &&
-      (cached.current?.totals?.totalIncSuper ?? 0) > 0 &&
-      (cached.sales?.current ?? 0) > 0 &&
-      cached.payrollPctSales != null;
-    if (cachedHasData) {
+    const cachedHasPayroll =
+      cached && (cached.current?.totals?.totalIncSuper ?? 0) > 0;
+    if (cachedHasPayroll) {
       setSummary(cached);
     } else {
       setSummary(null);
     }
     setError(null);
-    setFetching(!cachedHasData);
+    setFetching(!cachedHasPayroll);
     (async () => {
       try {
         const res = await fetch(`/api/payroll/summary?weekStart=${weekMondayISO}`);
@@ -239,7 +213,7 @@ export default function PayrollOverviewPage() {
       .slice(0, 5);
   }, [summary]);
 
-  if (authLoading || !allowed) return <Splash />;
+  if (authLoading || !user || !allowed) return <Splash />;
 
   const totals = summary?.current.totals;
   // The right-hand comparison card is labelled "2 Weeks Ago" so it must

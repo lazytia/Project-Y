@@ -134,8 +134,9 @@ export default function SalesPage() {
 
   useEffect(() => {
     if (authLoading) return;
+    if (!user) return;
     if (!allowed) router.replace(ROUTES.home);
-  }, [allowed, authLoading, router]);
+  }, [allowed, authLoading, user, router]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -367,7 +368,7 @@ export default function SalesPage() {
     [categories],
   );
 
-  if (authLoading || !allowed) return <Splash />;
+  if (authLoading || !user || !allowed) return <Splash />;
 
   const loading = daily === null;
 

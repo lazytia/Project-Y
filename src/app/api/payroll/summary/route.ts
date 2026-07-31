@@ -273,25 +273,15 @@ function isoMondayOfDateKey(dateISO: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
-/** Read cache first; warm from Square in parallel on miss. */
+/** Read cache first; warm missing weeks in the background (never block the response). */
 async function loadWeekSalesResolved(weekStarts: string[]): Promise<number[]> {
   const out = await loadWeekSalesBatch(weekStarts);
-  await Promise.all(
-    weekStarts.map(async (ws, i) => {
-      if (out[i] > 0) return;
-      try {
-        const warmed = await warmWeekSalesCache(ws);
-        if (warmed > 0) {
-          out[i] = warmed;
-          return;
-        }
-        const retry = await loadWeekSales(ws);
-        if (retry > 0) out[i] = retry;
-      } catch (err) {
-        console.warn("[payroll/summary] warm weekly sales failed for", ws, err);
-      }
-    }),
-  );
+  for (let i = 0; i < weekStarts.length; i++) {
+    if (out[i] > 0) continue;
+    void warmWeekSalesCache(weekStarts[i]).catch((err) => {
+      console.warn("[payroll/summary] background sales warm failed for", weekStarts[i], err);
+    });
+  }
   return out;
 }
 

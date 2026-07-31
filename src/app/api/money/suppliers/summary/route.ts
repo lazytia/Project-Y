@@ -66,33 +66,46 @@ async function loadMonthsBatch(monthKeys: string[]): Promise<(MonthlySuppliers |
   const current = currentMonthKey();
   const out: (MonthlySuppliers | null)[] = monthKeys.map(() => null);
 
-  try {
-    const db = adminDb();
-    const refs = monthKeys.map((mk) => db.collection("suppliers_month_cache").doc(mk));
-    const snaps = await db.getAll(...refs);
-    snaps.forEach((snap, i) => {
-      if (!snap.exists) return;
-      const mk = monthKeys[i];
-      const data = snap.data() as CachedMonth | undefined;
-      const computedAt = data?.computedAt?.toDate?.() ?? null;
-      const ttl = mk < current ? PAST_TTL_MS : CURRENT_TTL_MS;
-      if (
-        data?.detail &&
-        data.parseVersion === PARSE_VERSION &&
-        !isEmptyMonth(data.detail) &&
-        computedAt &&
-        now - computedAt.getTime() < ttl
-      ) {
-        out[i] = data.detail;
-      }
-    });
-  } catch (err) {
-    console.warn("[suppliers/summary] cache batch read failed", err);
+  const readCache = (respectTtl: boolean) => {
+    try {
+      const db = adminDb();
+      const refs = monthKeys.map((mk) => db.collection("suppliers_month_cache").doc(mk));
+      return db.getAll(...refs).then((snaps) => {
+        snaps.forEach((snap, i) => {
+          if (out[i] !== null) return;
+          if (!snap.exists) return;
+          const mk = monthKeys[i];
+          const data = snap.data() as CachedMonth | undefined;
+          const computedAt = data?.computedAt?.toDate?.() ?? null;
+          const ttl = mk < current ? PAST_TTL_MS : CURRENT_TTL_MS;
+          if (
+            data?.detail &&
+            data.parseVersion === PARSE_VERSION &&
+            !isEmptyMonth(data.detail) &&
+            computedAt &&
+            (!respectTtl || now - computedAt.getTime() < ttl)
+          ) {
+            out[i] = data.detail;
+          }
+        });
+      });
+    } catch (err) {
+      console.warn("[suppliers/summary] cache batch read failed", err);
+      return Promise.resolve();
+    }
+  };
+
+  await readCache(true);
+
+  const stillMissing = monthKeys.filter((_, i) => out[i] === null);
+  if (stillMissing.length > 0) {
+    await readCache(false);
   }
 
   if (out.every((m) => m !== null)) return out;
 
-  const batch = await fetchSupplierMonths(monthKeys).catch((err) => {
+  const missingKeys = monthKeys.filter((_, i) => out[i] === null);
+  const batch = await fetchSupplierMonths(missingKeys).catch((err) => {
     console.warn("[suppliers/summary] workbook fetch failed:", err);
     return null;
   });

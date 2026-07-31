@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { sydneyMonthKey } from "@/lib/owner-money-prefetch";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -19,7 +20,6 @@ const MonthPicker = dynamic(() => import("@/components/MonthPicker"), { ssr: fal
  * seeded yet, so the layout doesn't collapse.
  */
 
-const SYDNEY_TZ = "Australia/Sydney";
 
 type SupplierRow = { name: string; cost: number; pctOfTotal: number };
 type TrendPoint = { month: string; label: string; cost: number };
@@ -47,11 +47,6 @@ type SummaryPayload = {
 };
 
 /* ── Date helpers ── */
-
-function sydneyMonthKey(): string {
-  const d = new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
-  return d.slice(0, 7);
-}
 
 function monthLabel(monthISO: string): string {
   const [y, m] = monthISO.split("-").map(Number);
@@ -103,8 +98,8 @@ export default function SuppliersPage() {
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
 
-  const [monthISO, setMonthISO] = useState<string>("");
-  const [maxMonthISO, setMaxMonthISO] = useState<string>("");
+  const [monthISO, setMonthISO] = useState(sydneyMonthKey);
+  const [maxMonthISO] = useState(sydneyMonthKey);
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -112,15 +107,9 @@ export default function SuppliersPage() {
 
   useEffect(() => {
     if (authLoading) return;
+    if (!user) return;
     if (!allowed) router.replace(ROUTES.home);
-  }, [allowed, authLoading, router]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const current = sydneyMonthKey();
-    setMaxMonthISO(current);
-    setMonthISO(current);
-  }, []);
+  }, [allowed, authLoading, user, router]);
 
   useEffect(() => {
     if (!allowed || !monthISO) return;
@@ -171,7 +160,7 @@ export default function SuppliersPage() {
     ];
   }, [summary]);
 
-  if (authLoading || !allowed) return <Splash />;
+  if (authLoading || !user || !allowed) return <Splash />;
 
   const totalCost = summary?.currentTotal ?? 0;
   const costPctSales = summary?.costPctSales ?? null;
