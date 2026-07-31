@@ -19,16 +19,22 @@ import { isNoticeGivenActive, isReadyToTerminate, noticeLastWorkingDay } from "@
 import styles from "./DashboardAttention.module.css";
 
 /**
- * Owner Dashboard — top-of-screen attention card. Surfaces only *today's*
- * new items across six operational streams (catering, sold-out menu, new
- * onboarding requests, notice given, HR notes, cash payments) and lets the
- * owner "Noted" an individual row (or all of them). Noted state is per-
- * browser in localStorage keyed by today's date, so it resets naturally
- * overnight when the date rolls over.
+ * Owner Dashboard — top-of-screen attention card. Surfaces today's new
+ * items (catering, sold-out, HR notes, cash) and ongoing items (onboarding,
+ * notice given, ready to terminate). "Noted" hides a row until:
+ *   - today-scoped kinds: the next calendar day (fresh daily inbox), or
+ *   - ongoing kinds: the count rises above what was noted (new activity).
  */
 
 const SYDNEY_TZ = "Australia/Sydney";
 const STORAGE_KEY = "y.dashboardAttentionNoted";
+
+/** Counts that reflect open backlog, not just today's creations. */
+const PERSISTENT_KINDS = new Set<AttentionKind>([
+  "newEmployee",
+  "noticeGiven",
+  "readyToTerminate",
+]);
 
 type AttentionKind =
   | "catering"
@@ -48,7 +54,8 @@ type AttentionRow = {
   icon: React.ReactNode;
 };
 
-type NotedMap = Partial<Record<AttentionKind, string>>;
+type NotedEntry = { date: string; count: number };
+type NotedMap = Partial<Record<AttentionKind, NotedEntry>>;
 
 /* ── date helpers ── */
 
@@ -92,11 +99,45 @@ function tsDate(v: unknown): Date | null {
 
 /* ── noted state persistence ── */
 
+function normalizeNotedEntry(raw: unknown): NotedEntry | null {
+  if (typeof raw === "string") {
+    // Legacy: date-only — treat as noted through that day for daily items;
+    // persistent items use a high count so they stay dismissed until activity grows.
+    return { date: raw, count: Number.MAX_SAFE_INTEGER };
+  }
+  if (raw && typeof raw === "object") {
+    const o = raw as { date?: unknown; count?: unknown };
+    if (typeof o.date === "string" && typeof o.count === "number" && Number.isFinite(o.count)) {
+      return { date: o.date, count: o.count };
+    }
+  }
+  return null;
+}
+
+function normalizeNotedMap(raw: unknown): NotedMap {
+  if (!raw || typeof raw !== "object") return {};
+  const out: NotedMap = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const entry = normalizeNotedEntry(v);
+    if (entry) out[k as AttentionKind] = entry;
+  }
+  return out;
+}
+
+function isRowNoted(kind: AttentionKind, count: number, noted: NotedMap, todayKey: string): boolean {
+  const entry = noted[kind];
+  if (!entry) return false;
+  if (PERSISTENT_KINDS.has(kind)) {
+    return count <= entry.count;
+  }
+  return entry.date === todayKey;
+}
+
 function readNoted(): NotedMap {
   if (typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as NotedMap) : {};
+    return raw ? normalizeNotedMap(JSON.parse(raw)) : {};
   } catch {
     return {};
   }
@@ -302,11 +343,11 @@ export default function DashboardAttention() {
       try {
         const snap = await getDoc(doc(getDb(), "dashboard_attention_noted", user.uid));
         if (cancelled || !snap.exists()) return;
-        const remote = (snap.data()?.noted ?? {}) as NotedMap;
+        const remote = normalizeNotedMap(snap.data()?.noted);
         setNoted((prev) => {
           const merged: NotedMap = { ...prev };
           for (const [k, v] of Object.entries(remote)) {
-            if (typeof v === "string") merged[k as AttentionKind] = v;
+            merged[k as AttentionKind] = v;
           }
           writeNoted(merged);
           return merged;
@@ -414,7 +455,7 @@ export default function DashboardAttention() {
         icon: <DollarIcon />,
       },
     ];
-    return build.filter((r) => r.count > 0 && noted[r.kind] !== todayKey);
+    return build.filter((r) => r.count > 0 && !isRowNoted(r.kind, r.count, noted, todayKey));
   }, [counts, noted, todayKey]);
 
   if (!counts || rows.length === 0) return null;
@@ -428,8 +469,8 @@ export default function DashboardAttention() {
     ).catch(() => {/* best-effort */});
   }
 
-  function noteOne(kind: AttentionKind) {
-    const next: NotedMap = { ...noted, [kind]: todayKey };
+  function noteOne(kind: AttentionKind, count: number) {
+    const next: NotedMap = { ...noted, [kind]: { date: todayKey, count } };
     setNoted(next);
     writeNoted(next);
     persistRemote(next);
@@ -437,7 +478,7 @@ export default function DashboardAttention() {
 
   function noteAll() {
     const next: NotedMap = { ...noted };
-    for (const r of rows) next[r.kind] = todayKey;
+    for (const r of rows) next[r.kind] = { date: todayKey, count: r.count };
     setNoted(next);
     writeNoted(next);
     persistRemote(next);
@@ -476,7 +517,7 @@ export default function DashboardAttention() {
             <button
               type="button"
               className={styles.notedBtn}
-              onClick={() => noteOne(row.kind)}
+              onClick={() => noteOne(row.kind, row.count)}
             >
               Noted
             </button>
