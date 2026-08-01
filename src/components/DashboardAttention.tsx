@@ -9,6 +9,7 @@ import {
   getDocs,
   orderBy,
   query,
+  serverTimestamp,
   setDoc,
   type Timestamp,
 } from "firebase/firestore";
@@ -124,6 +125,31 @@ function normalizeNotedMap(raw: unknown): NotedMap {
   return out;
 }
 
+function mergeNotedEntry(
+  kind: AttentionKind,
+  a: NotedEntry | undefined,
+  b: NotedEntry | undefined,
+): NotedEntry | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  if (PERSISTENT_KINDS.has(kind)) {
+    // Higher count = dismissed more backlog — never downgrade on sync.
+    return a.count >= b.count ? a : b;
+  }
+  return a.date >= b.date ? a : b;
+}
+
+function mergeNotedMaps(a: NotedMap, b: NotedMap): NotedMap {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  const out: NotedMap = {};
+  for (const key of keys) {
+    const kind = key as AttentionKind;
+    const merged = mergeNotedEntry(kind, a[kind], b[kind]);
+    if (merged) out[kind] = merged;
+  }
+  return out;
+}
+
 function isRowNoted(kind: AttentionKind, count: number, noted: NotedMap, todayKey: string): boolean {
   const entry = noted[kind];
   if (!entry) return false;
@@ -133,19 +159,27 @@ function isRowNoted(kind: AttentionKind, count: number, noted: NotedMap, todayKe
   return entry.date === todayKey;
 }
 
-function readNoted(): NotedMap {
-  if (typeof window === "undefined") return {};
+function notedStorageKey(uid: string): string {
+  return `${STORAGE_KEY}.${uid}`;
+}
+
+function readNoted(uid: string): NotedMap {
+  if (typeof window === "undefined" || !uid) return {};
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? normalizeNotedMap(JSON.parse(raw)) : {};
+    const keyed = window.localStorage.getItem(notedStorageKey(uid));
+    if (keyed) return normalizeNotedMap(JSON.parse(keyed));
+    // One-time migration from the pre-uid local key.
+    const legacy = window.localStorage.getItem(STORAGE_KEY);
+    return legacy ? normalizeNotedMap(JSON.parse(legacy)) : {};
   } catch {
     return {};
   }
 }
 
-function writeNoted(next: NotedMap) {
+function writeNoted(uid: string, next: NotedMap) {
+  if (!uid) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.localStorage.setItem(notedStorageKey(uid), JSON.stringify(next));
   } catch {
     /* quota / private mode — ignore */
   }
@@ -324,13 +358,16 @@ export default function DashboardAttention() {
   const { user } = useAuth();
   const [counts, setCounts] = useState<Partial<Record<AttentionKind, number>> | null>(null);
   const [noted, setNoted] = useState<NotedMap>({});
-  const [todayKey, setTodayKey] = useState<string>("");
+  const [todayKey, setTodayKey] = useState(() => sydneyTodayKey());
   const [fetchEnabled, setFetchEnabled] = useState(false);
 
   useEffect(() => {
-    setTodayKey(sydneyTodayKey());
-    setNoted(readNoted());
-  }, []);
+    if (!user) {
+      setNoted({});
+      return;
+    }
+    setNoted(readNoted(user.uid));
+  }, [user]);
 
   // Hydrate noted map from Firestore so "Noted" persists across devices /
   // browsers / PWA reinstalls — localStorage alone left the owner seeing
@@ -342,16 +379,18 @@ export default function DashboardAttention() {
     (async () => {
       try {
         const snap = await getDoc(doc(getDb(), "dashboard_attention_noted", user.uid));
-        if (cancelled || !snap.exists()) return;
-        const remote = normalizeNotedMap(snap.data()?.noted);
-        setNoted((prev) => {
-          const merged: NotedMap = { ...prev };
-          for (const [k, v] of Object.entries(remote)) {
-            merged[k as AttentionKind] = v;
-          }
-          writeNoted(merged);
-          return merged;
-        });
+        if (cancelled) return;
+        const remote = normalizeNotedMap(snap.exists() ? snap.data()?.noted : undefined);
+        const merged = mergeNotedMaps(readNoted(user.uid), remote);
+        setNoted(merged);
+        writeNoted(user.uid, merged);
+        if (JSON.stringify(merged) !== JSON.stringify(remote)) {
+          setDoc(
+            doc(getDb(), "dashboard_attention_noted", user.uid),
+            { noted: merged, updatedAt: serverTimestamp() },
+            { merge: true },
+          ).catch(() => {/* best-effort */});
+        }
       } catch {
         /* offline — fall back to localStorage */
       }
@@ -464,23 +503,27 @@ export default function DashboardAttention() {
     if (!user) return;
     setDoc(
       doc(getDb(), "dashboard_attention_noted", user.uid),
-      { noted: next, updatedAt: new Date() },
+      { noted: next, updatedAt: serverTimestamp() },
       { merge: true },
     ).catch(() => {/* best-effort */});
   }
 
   function noteOne(kind: AttentionKind, count: number) {
-    const next: NotedMap = { ...noted, [kind]: { date: todayKey, count } };
+    if (!user) return;
+    const day = todayKey || sydneyTodayKey();
+    const next: NotedMap = { ...noted, [kind]: { date: day, count } };
     setNoted(next);
-    writeNoted(next);
+    writeNoted(user.uid, next);
     persistRemote(next);
   }
 
   function noteAll() {
+    if (!user) return;
+    const day = todayKey || sydneyTodayKey();
     const next: NotedMap = { ...noted };
-    for (const r of rows) next[r.kind] = { date: todayKey, count: r.count };
+    for (const r of rows) next[r.kind] = { date: day, count: r.count };
     setNoted(next);
-    writeNoted(next);
+    writeNoted(user.uid, next);
     persistRemote(next);
   }
 

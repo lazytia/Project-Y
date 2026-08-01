@@ -151,6 +151,12 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // Owner dashboard "Noted" dismissals — keyed by auth uid so Noted All
+    // survives app restarts, PWA reinstalls, and device switches.
+    match /dashboard_attention_noted/{uid} {
+      allow read, write: if isOwner() && request.auth.uid == uid;
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;
