@@ -10,7 +10,7 @@ import {
 /**
  * GET /api/menu/sold-out-categories
  *
- * Returns the four manageable sold-out categories. Reads a Firestore cache
+ * Returns the three manageable sold-out categories (Snapper, Trevally, Tuna).
  * first (~200 ms) so cold App Hosting instances don't walk the full Square
  * catalog on every page open; stale cache is served instantly while Square
  * refreshes in the background.

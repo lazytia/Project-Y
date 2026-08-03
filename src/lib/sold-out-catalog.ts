@@ -18,7 +18,6 @@ type CategoryConfig = {
 };
 
 const CONFIG: CategoryConfig[] = [
-  { id: "squid", displayName: "Cuttlefish", subName: "Ika", match: /\b(squid|ika)\b/i },
   { id: "snapper", displayName: "Snapper", match: /\bsnapper\b/i },
   { id: "trevally", displayName: "Trevally", match: /\btrevally\b/i },
   { id: "tuna", displayName: "Tuna", match: /\btuna\b/i },

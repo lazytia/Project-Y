@@ -6,7 +6,7 @@ import { setCategoryPresence } from "@/lib/sold-out-square";
 
 /**
  * POST /api/menu/set-sold-out
- * Body: { categoryId: "squid" | "snapper" | "trevally" | "tuna",
+ * Body: { categoryId: "snapper" | "trevally" | "tuna",
  *         soldOut: boolean }
  *
  * Owner-only — verified via the Firebase ID token in

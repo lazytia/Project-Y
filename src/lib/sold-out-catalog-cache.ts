@@ -6,7 +6,7 @@ import {
 } from "@/lib/sold-out-catalog";
 
 const CACHE_DOC = "catalog";
-export const SOLD_OUT_CATALOG_COMPUTE_VERSION = 1;
+export const SOLD_OUT_CATALOG_COMPUTE_VERSION = 2;
 
 /** After this age we return cached data instantly but refresh Square in the background. */
 export const FRESH_TTL_MS = 60 * 60 * 1000;

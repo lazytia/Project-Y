@@ -30,7 +30,6 @@ export type CategoryDef = {
 };
 
 export const SOLD_OUT_CATEGORIES: CategoryDef[] = [
-  { id: "squid", match: /\b(squid|ika)\b/i },
   { id: "snapper", match: /\bsnapper\b/i },
   { id: "trevally", match: /\btrevally\b/i },
   { id: "tuna", match: /\btuna\b/i },
