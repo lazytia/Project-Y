@@ -1,130 +1,50 @@
 import { NextResponse } from "next/server";
-import { squareClient } from "@/lib/square";
-import { SOLD_OUT_EXCLUDED_NAME } from "@/lib/sold-out-square";
-
-/** Avoid re-walking the full Square catalog on every page open. */
-const CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
-let catalogCache: { savedAt: number; body: { dailySoldOutCategories: unknown[] } } | null = null;
+import {
+  FRESH_TTL_MS,
+  readFirestoreSoldOutCatalog,
+  readMemorySoldOutCatalog,
+  refreshSoldOutCatalogFromSquare,
+  writeMemorySoldOutCatalog,
+} from "@/lib/sold-out-catalog-cache";
 
 /**
  * GET /api/menu/sold-out-categories
  *
- * Pulls the Square catalog and returns the four manageable sold-out
- * categories (Squid, Snapper, Trevally, Tuna). Each entry includes
- * its display name, sub name (where present), item count and the
- * affected item names so the Daily Sold Out page can render the
- * grouped list without hard-coding the menu.
+ * Returns the four manageable sold-out categories. Reads a Firestore cache
+ * first (~200 ms) so cold App Hosting instances don't walk the full Square
+ * catalog on every page open; stale cache is served instantly while Square
+ * refreshes in the background.
  */
 
-type CategoryConfig = {
-  id: string;
-  displayName: string;
-  subName?: string;
-  /** Lower-case keyword(s) we look for in the item / category name. */
-  match: RegExp;
-};
-
-const CONFIG: CategoryConfig[] = [
-  // Menu-wise the category is now called Cuttlefish, but the underlying
-  // Square catalog still names the items Squid / Ika — keep the match
-  // regex tied to the old keywords so item detection still works.
-  { id: "squid", displayName: "Cuttlefish", subName: "Ika", match: /\b(squid|ika)\b/i },
-  { id: "snapper", displayName: "Snapper", match: /\bsnapper\b/i },
-  { id: "trevally", displayName: "Trevally", match: /\btrevally\b/i },
-  { id: "tuna", displayName: "Tuna", match: /\btuna\b/i },
-];
-
-type CatalogObject = {
-  id?: string;
-  type?: string;
-  categoryData?: { name?: string };
-  itemData?: {
-    name?: string;
-    categories?: { id?: string }[];
-    categoryId?: string;
-  };
-};
+const CACHE_HEADERS = {
+  "cache-control": "private, max-age=300",
+} as const;
 
 export async function GET() {
   try {
-    if (catalogCache && Date.now() - catalogCache.savedAt < CATALOG_CACHE_TTL_MS) {
-      return NextResponse.json(catalogCache.body, {
-        headers: { "cache-control": "private, max-age=300" },
-      });
+    const mem = readMemorySoldOutCatalog();
+    if (mem) {
+      return NextResponse.json(mem, { headers: CACHE_HEADERS });
     }
 
-    // Pull every ITEM + CATEGORY from the catalog (Square paginates
-    // so we walk the cursor until the page iterator yields no more).
-    const all: CatalogObject[] = [];
-    const page = await squareClient.catalog.list({ types: "ITEM,CATEGORY" });
-    for await (const obj of page) {
-      all.push(obj as CatalogObject);
-    }
-
-    const categories = all.filter((o) => o.type === "CATEGORY");
-    const items = all.filter((o) => o.type === "ITEM");
-
-    const out = CONFIG.map((cfg) => {
-      // Find the matching Square category (so we can map by ID for items).
-      const cat = categories.find(
-        (c) => typeof c.categoryData?.name === "string" && cfg.match.test(c.categoryData!.name!),
-      );
-      const catId = cat?.id;
-
-      const affected = items
-        .filter((it) => {
-          const d = it.itemData;
-          if (!d) return false;
-          const itemName = d.name ?? "";
-          // Skip items that the Daily Sold Out toggle isn't allowed to manage
-          // (e.g. cooked tuna, katsu kushi).
-          if (SOLD_OUT_EXCLUDED_NAME.test(itemName)) return false;
-          if (catId) {
-            // Match by Square category ID first (most accurate).
-            if (d.categoryId === catId) return true;
-            if (Array.isArray(d.categories) && d.categories.some((c) => c.id === catId)) {
-              return true;
-            }
-          }
-          // Fallback: name keyword match — picks up "Ika (Squid) Sushi" etc.
-          return cfg.match.test(itemName);
-        })
-        .map((it) => it.itemData?.name ?? "")
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b));
-
-      // Square sometimes has the same dish twice with different casing
-      // (e.g. "Ika (Squid) Sushi" and "IKA (Squid) Sushi"). Both still get
-      // toggled sold-out, but show the user one row per dish.
-      const seen = new Set<string>();
-      const uniqueAffected: string[] = [];
-      for (const n of affected) {
-        const key = n.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        uniqueAffected.push(n);
+    const cached = await readFirestoreSoldOutCatalog();
+    if (cached) {
+      writeMemorySoldOutCatalog(cached.body);
+      if (cached.ageMs > FRESH_TTL_MS) {
+        void refreshSoldOutCatalogFromSquare().catch((err) => {
+          console.warn("[sold-out-categories] background refresh failed:", err);
+        });
       }
+      return NextResponse.json(cached.body, { headers: CACHE_HEADERS });
+    }
 
-      return {
-        categoryId: cfg.id,
-        displayName: cfg.displayName,
-        ...(cfg.subName ? { subName: cfg.subName } : {}),
-        itemCount: uniqueAffected.length,
-        resetRule: "Reset automatically at end of day",
-        affectedItems: uniqueAffected,
-      };
-    });
-
-    const body = { dailySoldOutCategories: out };
-    catalogCache = { savedAt: Date.now(), body };
-
-    return NextResponse.json(
-      body,
-      // 5-minute browser cache so the page doesn't hammer Square on every
-      // refresh; Square menu changes rarely.
-      { headers: { "cache-control": "private, max-age=300" } },
-    );
+    const body = await refreshSoldOutCatalogFromSquare();
+    return NextResponse.json(body, { headers: CACHE_HEADERS });
   } catch (err) {
+    const stale = await readFirestoreSoldOutCatalog();
+    if (stale) {
+      return NextResponse.json(stale.body, { headers: CACHE_HEADERS });
+    }
     const msg = err instanceof Error ? err.message : "Failed to load Square catalog.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

@@ -1,5 +1,5 @@
 const CACHE_KEY = "y.soldOutMenu";
-const MAX_AGE_MS = 5 * 60 * 1000;
+const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export type SoldOutMenuCategory = {
   id: string;
@@ -17,7 +17,7 @@ type CacheEntry = {
 export function readSoldOutMenuCache(): SoldOutMenuCategory[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY);
+    const raw = window.localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CacheEntry;
     if (!Array.isArray(parsed.categories)) return null;
@@ -32,7 +32,7 @@ export function writeSoldOutMenuCache(categories: SoldOutMenuCategory[]) {
   if (typeof window === "undefined") return;
   try {
     const entry: CacheEntry = { categories, savedAt: Date.now() };
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify(entry));
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
   } catch {
     /* quota / private mode */
   }

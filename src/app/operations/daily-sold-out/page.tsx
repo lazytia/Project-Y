@@ -97,12 +97,8 @@ function ChevronIcon() {
 }
 
 export default function DailySoldOutPage() {
-  const [today, setToday] = useState("");
+  const [today] = useState(sydneyTodayKey);
   const { user } = useAuth();
-
-  useEffect(() => {
-    setToday(sydneyTodayKey());
-  }, []);
 
   const [soldOutIds, setSoldOutIds] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
