@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, where, deleteDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
+import { sortShiftsByStaffThenStart } from "@/lib/timesheet-sort";
 import styles from "./page.module.css";
 
 type ShiftFromApi = {
@@ -146,11 +147,11 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
 
   const visibleShifts = useMemo(() => {
     const merged = [...entries, ...extras];
-    return merged
+    const filtered = merged
       .filter((s) => s.dateISO === dateISO && !dismissed.has(s.id))
-      .map(withEdit)
-      .sort((a, b) => a.startAt.localeCompare(b.startAt));
-  }, [entries, extras, dismissed, dateISO, edits]);
+      .map(withEdit);
+    return sortShiftsByStaffThenStart(filtered, teamMembers);
+  }, [entries, extras, dismissed, dateISO, edits, teamMembers]);
 
   async function saveTimeEdit(shift: ShiftFromApi, field: "start" | "end", newHHMM: string) {
     if (!/^\d{2}:\d{2}$/.test(newHHMM)) return;
@@ -179,7 +180,6 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
       );
       setEdits((prev) => ({ ...prev, [shift.id]: patch }));
       setEditingField(null);
-      onChanged?.();
     } catch (err) {
       console.error("[timesheet_edits] save failed:", err);
       setEditError(err instanceof Error ? err.message : "Save failed.");

@@ -21,6 +21,7 @@ import {
   type PayrollStaffRecord,
 } from "@/lib/payroll-attention";
 import { readTimesheetsCache, writeTimesheetsCache } from "@/lib/timesheets-cache";
+import { sortShiftsByStaffThenStart } from "@/lib/timesheet-sort";
 import { DayExpandedPanel } from "./DayExpandedPanel";
 import styles from "./page.module.css";
 
@@ -384,7 +385,7 @@ export default function TimesheetsPage() {
     for (const iso of Object.keys(byDate)) {
       const set = new Set(byDate[iso].entries.map((e) => e.teamMemberId));
       byDate[iso].staff = set.size;
-      byDate[iso].entries.sort((a, b) => a.startAt.localeCompare(b.startAt));
+      byDate[iso].entries = sortShiftsByStaffThenStart(byDate[iso].entries, teamMembers);
       days.push(byDate[iso]);
     }
     for (const uid of Object.keys(staffAgg)) {

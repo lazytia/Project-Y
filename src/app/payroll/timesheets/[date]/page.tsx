@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
+import { sortShiftsByStaffThenStart } from "@/lib/timesheet-sort";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
@@ -200,9 +201,7 @@ export default function DayDetailsPage() {
 
   const visibleShifts = useMemo(() => {
     const merged = [...shifts, ...extraShifts];
-    return merged
-      .filter((s) => s.dateISO === dateISO && !dismissed.has(s.id))
-      .sort((a, b) => a.startAt.localeCompare(b.startAt));
+    return merged.filter((s) => s.dateISO === dateISO && !dismissed.has(s.id));
   }, [shifts, extraShifts, dismissed, dateISO]);
 
   /** Effective (possibly-edited) shift used by the render code. */
@@ -222,7 +221,10 @@ export default function DayDetailsPage() {
     return { ...s, startAt, endAt, hours };
   }
 
-  const effectiveShifts = useMemo(() => visibleShifts.map(withEdit), [visibleShifts, edits]);
+  const effectiveShifts = useMemo(
+    () => sortShiftsByStaffThenStart(visibleShifts.map(withEdit), teamMembers),
+    [visibleShifts, edits, teamMembers],
+  );
   const totalHours = useMemo(
     () => effectiveShifts.reduce((sum, s) => sum + s.hours, 0),
     [effectiveShifts],
