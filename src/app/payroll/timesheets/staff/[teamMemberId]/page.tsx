@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -118,6 +118,15 @@ function hoursFromIso(startAt: string, endAt: string | null): number {
   const h = Math.round(((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100) / 100;
   return h > 0 ? h : 0;
 }
+function applyEditToShift(s: ShiftFromApi, edit: EditDoc | undefined): ShiftFromApi {
+  if (!edit?.startAt || !edit?.endAt) return s;
+  return {
+    ...s,
+    startAt: edit.startAt,
+    endAt: edit.endAt,
+    hours: hoursFromIso(edit.startAt, edit.endAt),
+  };
+}
 function memberRates(shifts: ShiftFromApi[]): { weekday: number | null; saturday: number | null } {
   let weekday: number | null = null;
   let saturday: number | null = null;
@@ -165,6 +174,7 @@ export default function StaffDetailPage() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, ShiftDraft>>({});
   const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const dirtyRef = useRef<Set<string>>(new Set());
   const [editingField, setEditingField] = useState<{ shiftId: string; field: "start" | "end" } | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -268,25 +278,31 @@ export default function StaffDetailPage() {
     () =>
       shifts
         .filter((s) => s.teamMemberId === teamMemberId && !dismissed.has(s.id))
+        .map((s) => applyEditToShift(s, edits[s.id]))
         .sort((a, b) => a.startAt.localeCompare(b.startAt)),
-    [shifts, teamMemberId, dismissed],
+    [shifts, teamMemberId, dismissed, edits],
   );
 
   useEffect(() => {
-    const next: Record<string, ShiftDraft> = {};
-    for (const s of memberShifts) {
-      next[s.id] = { startHHMM: hhmmFromIso(s.startAt), endHHMM: hhmmFromIso(s.endAt) };
-    }
-    setDrafts(next);
-    setDirty(new Set());
-    setEditingField(null);
+    setDrafts((prev) => {
+      const next: Record<string, ShiftDraft> = {};
+      for (const s of memberShifts) {
+        if (dirtyRef.current.has(s.id) && prev[s.id]) {
+          next[s.id] = prev[s.id];
+        } else {
+          next[s.id] = { startHHMM: hhmmFromIso(s.startAt), endHHMM: hhmmFromIso(s.endAt) };
+        }
+      }
+      return next;
+    });
   }, [memberShifts]);
 
   const dayCount = startISO && endISO ? eachDayISO(startISO, endISO).length : 0;
 
   function updateDraft(shiftId: string, patch: Partial<ShiftDraft>) {
     setDrafts((prev) => ({ ...prev, [shiftId]: { ...prev[shiftId], ...patch } }));
-    setDirty((prev) => new Set(prev).add(shiftId));
+    dirtyRef.current = new Set(dirtyRef.current).add(shiftId);
+    setDirty(dirtyRef.current);
   }
 
   function draftHours(shift: ShiftFromApi): number {
@@ -303,13 +319,14 @@ export default function StaffDetailPage() {
     if (!d || !/^\d{2}:\d{2}$/.test(d.startHHMM) || !/^\d{2}:\d{2}$/.test(d.endHHMM)) return;
 
     const existing = edits[shift.id];
-    const newStart = replaceHHMM(existing?.startAt ?? shift.startAt, d.startHHMM);
-    const newEnd = replaceHHMM(existing?.endAt ?? shift.endAt ?? shift.startAt, d.endHHMM);
+    const base = shifts.find((x) => x.id === shift.id) ?? shift;
+    const newStart = replaceHHMM(existing?.startAt ?? base.startAt, d.startHHMM);
+    const newEnd = replaceHHMM(existing?.endAt ?? base.endAt ?? base.startAt, d.endHHMM);
     const patch: EditDoc = {
       shiftId: shift.id,
       dateISO: shift.dateISO,
-      originalStartAt: existing?.originalStartAt ?? shift.startAt,
-      originalEndAt: existing?.originalEndAt ?? shift.endAt,
+      originalStartAt: existing?.originalStartAt ?? base.startAt,
+      originalEndAt: existing?.originalEndAt ?? base.endAt,
       startAt: newStart,
       endAt: newEnd,
     };
@@ -323,12 +340,25 @@ export default function StaffDetailPage() {
         { merge: true },
       );
       setEdits((prev) => ({ ...prev, [shift.id]: patch }));
+      setShifts((prev) =>
+        prev.map((s) =>
+          s.id === shift.id
+            ? {
+                ...s,
+                startAt: patch.startAt,
+                endAt: patch.endAt,
+                hours: hoursFromIso(patch.startAt, patch.endAt),
+              }
+            : s,
+        ),
+      );
       setDirty((prev) => {
         const next = new Set(prev);
         next.delete(shift.id);
+        dirtyRef.current = next;
         return next;
       });
-      void load();
+      setEditingField(null);
     } catch (err) {
       console.error("[timesheet_edits] save failed:", err);
       setEditError(err instanceof Error ? err.message : "Save failed.");
@@ -369,6 +399,7 @@ export default function StaffDetailPage() {
   function shiftsForStaff(staffId: string): ShiftFromApi[] {
     return shifts
       .filter((s) => s.teamMemberId === staffId && !dismissed.has(s.id))
+      .map((s) => applyEditToShift(s, edits[s.id]))
       .sort((a, b) => a.startAt.localeCompare(b.startAt));
   }
 
