@@ -22,15 +22,48 @@ const PERSONAL_EMAIL_DOMAINS = new Set([
 export type ResolvedCompany = {
   displayName: string;
   slug: string;
-  websiteUrl: string;
+  websiteUrl: string | null;
+  kind: "person" | "company";
   source: "company" | "email";
 };
 
+const PERSON_NAME_STOPWORDS =
+  /\b(and|&|the|services|architects|architecture|consulting|consultants|bank|group|hotel|restaurant|cafe|bar|studio|studios|design|designs|media|tech|technology|solutions|partners|holdings|enterprises|pty|ltd|limited|inc|corp|company|co)\b/i;
+
+/** Two to four name-like words (e.g. Rosie Karkash), not a company label. */
+export function looksLikePersonName(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed || COMPANY_SUFFIX_RE.test(trimmed) || PERSON_NAME_STOPWORDS.test(trimmed)) {
+    return false;
+  }
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length < 2 || words.length > 4) return false;
+  return words.every((word) => /^[A-Za-z][A-Za-z'-]*$/.test(word));
+}
+
+const COMPANY_SUFFIX_RE =
+  /\b(pty\.?\s*ltd\.?|pty\.?|ltd\.?|limited|inc\.?|incorporated|corp\.?|corporation|llc|plc|co\.?|company|group|holdings|enterprises|solutions)\b\.?/gi;
+
 function slugifyName(name: string): string {
   return name
+    .replace(COMPANY_SUFFIX_RE, " ")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "")
     .slice(0, 48);
+}
+
+/** Slugs to probe — strips Ltd/Pty etc. from the name when the raw slug misses. */
+export function companySlugCandidates(name: string, slug: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const candidate of [slugifyName(name), slug]) {
+    const safe = candidate.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (safe.length >= 2 && !seen.has(safe)) {
+      seen.add(safe);
+      out.push(safe);
+    }
+  }
+  return out;
 }
 
 function titleCaseSlug(slug: string): string {
@@ -83,10 +116,12 @@ export function resolveCompany(reservation: {
   if (companyField) {
     const slug = slugifyName(companyField);
     if (!slug) return null;
+    const isPerson = looksLikePersonName(companyField);
     return {
       displayName: companyField,
       slug,
-      websiteUrl: websiteForSlug(slug),
+      websiteUrl: isPerson ? null : websiteForSlug(slug),
+      kind: isPerson ? "person" : "company",
       source: "company",
     };
   }
@@ -102,6 +137,7 @@ export function resolveCompany(reservation: {
     displayName: titleCaseSlug(slug),
     slug,
     websiteUrl: websiteForSlug(slug, domain),
+    kind: "company",
     source: "email",
   };
 }
@@ -112,6 +148,8 @@ export function candidateWebsiteUrls(slug: string): string[] {
   return [
     `https://www.${safe}.com.au`,
     `https://${safe}.com.au`,
+    `https://www.${safe}.com/au`,
+    `https://${safe}.com/au`,
     `https://www.${safe}.com`,
     `https://${safe}.com`,
   ];
