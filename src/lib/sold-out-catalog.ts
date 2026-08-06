@@ -26,7 +26,6 @@ const CONFIG: CategoryConfig[] = [
   {
     id: "salmon-belly",
     displayName: "Salmon Belly",
-    subName: "Salmon Belly Sushi, Salmon Belly Aburi",
     match: /\bsalmon[\s-]*belly\b/i,
     fallbackItems: ["Salmon Belly Sushi", "Salmon Belly Aburi"],
   },

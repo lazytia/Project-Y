@@ -1,4 +1,4 @@
-const CACHE_KEY = "y.soldOutMenu.v3";
+const CACHE_KEY = "y.soldOutMenu.v4";
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export type SoldOutMenuCategory = {
