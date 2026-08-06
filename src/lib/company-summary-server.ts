@@ -3,7 +3,11 @@ import {
   companySlugCandidates,
 } from "@/lib/reservation-company";
 
-const FETCH_TIMEOUT_MS = 10_000;
+const SEARCH_TIMEOUT_MS = 2_500;
+const SITE_TIMEOUT_MS = 2_800;
+const SITE_HTML_CAP = 200_000;
+const CACHE_TTL_MS = 60 * 60 * 1000;
+const MISS_CACHE_TTL_MS = 30_000;
 
 const BROWSER_HEADERS = {
   "User-Agent":
@@ -11,6 +15,15 @@ const BROWSER_HEADERS = {
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "Accept-Language": "en-AU,en;q=0.9",
 } as const;
+
+type SearchHit = {
+  snippet: string;
+  url?: string;
+  title?: string;
+  source: "website" | "google" | "search";
+};
+
+const summaryCache = new Map<string, { at: number; value: CompanySummaryResult }>();
 
 function decodeHtmlEntities(text: string): string {
   return text
@@ -68,6 +81,12 @@ function detectTld(url: string | null): string | null {
   return null;
 }
 
+function isNoiseUrl(url: string): boolean {
+  return /linkedin\.com|wikipedia\.org|facebook\.com|instagram\.com|twitter\.com|^https?:\/\/(www\.)?x\.com/i.test(
+    url,
+  );
+}
+
 function extractMetaFromHtml(html: string): { title?: string; description?: string } {
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   let description: string | undefined;
@@ -88,21 +107,15 @@ function extractMetaFromHtml(html: string): { title?: string; description?: stri
   };
 }
 
-async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string } | null> {
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: BROWSER_HEADERS,
-    });
-    if (!res.ok) return null;
-    const type = (res.headers.get("content-type") ?? "").toLowerCase();
-    if (type && !type.includes("text/html") && !type.includes("application/xhtml")) return null;
-    const text = await res.text();
-    if (text.length < 200) return null;
-    return { html: text.slice(0, 120_000), finalUrl: normalizeWebsiteUrl(res.url) };
+    return await fetch(url, { ...init, signal: controller.signal });
   } catch {
     return null;
   } finally {
@@ -110,155 +123,168 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
   }
 }
 
-type SearchHit = { snippet: string; url?: string; title?: string };
+async function readHtmlUntilDescription(res: Response, maxBytes: number): Promise<string> {
+  const body = res.body;
+  if (!body) {
+    const text = await res.text();
+    return text.slice(0, maxBytes);
+  }
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let out = "";
+  try {
+    while (out.length < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      out += decoder.decode(value, { stream: true });
+      // Stop once description meta is fully available (content=… present on same tag).
+      if (
+        /<meta\b[^>]*(?:name|property)=["'](?:description|og:description)["'][^>]*\bcontent=["'][^"']+["']/i.test(
+          out,
+        ) ||
+        /<meta\b[^>]*\bcontent=["'][^"']+["'][^>]*(?:name|property)=["'](?:description|og:description)["']/i.test(
+          out,
+        )
+      ) {
+        break;
+      }
+    }
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      /* ignore */
+    }
+  }
+  return out.slice(0, maxBytes);
+}
+
+async function fetchSiteMeta(url: string): Promise<SearchHit | null> {
+  const res = await fetchWithTimeout(
+    url,
+    { redirect: "follow", headers: BROWSER_HEADERS },
+    SITE_TIMEOUT_MS,
+  );
+  if (!res?.ok) return null;
+  const type = (res.headers.get("content-type") ?? "").toLowerCase();
+  if (type && !type.includes("text/html") && !type.includes("application/xhtml")) return null;
+
+  const text = await readHtmlUntilDescription(res, SITE_HTML_CAP);
+  if (text.length < 200) return null;
+  const meta = extractMetaFromHtml(text);
+  if (!meta.description?.trim()) return null;
+
+  return {
+    snippet: meta.description.trim(),
+    url: normalizeWebsiteUrl(res.url),
+    title: meta.title,
+    source: "website",
+  };
+}
 
 async function fetchGoogleCustomSearch(query: string): Promise<SearchHit | null> {
   const apiKey = process.env.GOOGLE_CSE_API_KEY?.trim();
   const cx = process.env.GOOGLE_CSE_CX?.trim();
   if (!apiKey || !cx) return null;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const params = new URLSearchParams({
-      key: apiKey,
-      cx,
-      q: query,
-      num: "5",
-    });
-    const res = await fetch(`https://customsearch.googleapis.com/customsearch/v1?${params}`, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      items?: { link?: string; snippet?: string; title?: string }[];
-    };
-    const item = (data.items ?? []).find((row) => row.snippet?.trim());
-    if (!item?.snippet) return null;
-    return {
-      snippet: item.snippet.trim(),
-      url: item.link,
-      title: item.title?.trim(),
-    };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
+  const params = new URLSearchParams({ key: apiKey, cx, q: query, num: "3" });
+  const res = await fetchWithTimeout(
+    `https://customsearch.googleapis.com/customsearch/v1?${params}`,
+    { headers: { Accept: "application/json" } },
+    SEARCH_TIMEOUT_MS,
+  );
+  if (!res?.ok) return null;
 
-async function fetchDuckDuckGoSnippet(query: string): Promise<SearchHit | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch("https://html.duckduckgo.com/html/", {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        ...BROWSER_HEADERS,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: `q=${encodeURIComponent(query)}`,
-    });
-    if (!res.ok) return null;
-    const html = await res.text();
-    for (const match of html.matchAll(
-      /<a class="result__snippet" href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
-    )) {
-      const snippet = stripHtmlTags(match[2] ?? "");
-      if (snippet.length >= 24) {
-        return { snippet, url: match[1] };
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const data = (await res.json()) as {
+    items?: { link?: string; snippet?: string; title?: string }[];
+  };
+  const item = (data.items ?? []).find((row) => row.snippet?.trim());
+  if (!item?.snippet) return null;
+
+  return {
+    snippet: item.snippet.trim(),
+    url: item.link,
+    title: item.title?.trim(),
+    source: "google",
+  };
 }
 
 async function fetchBraveSearchSnippet(query: string): Promise<SearchHit | null> {
   const apiKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
   if (!apiKey) return null;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const params = new URLSearchParams({
-      q: query,
-      count: "5",
-      country: "AU",
-      search_lang: "en",
-    });
-    const res = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
-      signal: controller.signal,
+  const params = new URLSearchParams({
+    q: query,
+    count: "3",
+    country: "AU",
+    search_lang: "en",
+  });
+  const res = await fetchWithTimeout(
+    `https://api.search.brave.com/res/v1/web/search?${params}`,
+    {
       headers: {
         Accept: "application/json",
         "X-Subscription-Token": apiKey,
       },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      web?: { results?: { title?: string; url?: string; description?: string }[] };
-    };
-    const row = (data.web?.results ?? []).find((item) => item.description?.trim());
-    if (!row?.description) return null;
-    return {
-      title: row.title?.trim(),
-      url: row.url,
-      snippet: stripHtmlTags(row.description.trim()),
-    };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function isNoiseUrl(url: string): boolean {
-  return /linkedin\.com|wikipedia\.org|facebook\.com|instagram\.com|twitter\.com|^https?:\/\/(www\.)?x\.com/i.test(
-    url,
+    },
+    SEARCH_TIMEOUT_MS,
   );
+  if (!res?.ok) return null;
+
+  const data = (await res.json()) as {
+    web?: { results?: { title?: string; url?: string; description?: string }[] };
+  };
+  const row = (data.web?.results ?? []).find((item) => item.description?.trim());
+  if (!row?.description) return null;
+
+  return {
+    title: row.title?.trim(),
+    url: row.url,
+    snippet: stripHtmlTags(row.description.trim()),
+    source: "search",
+  };
 }
 
-async function searchCompanySnippet(companyName: string): Promise<SearchHit | null> {
-  const queries = [`${companyName} company Australia`, `${companyName} company`, companyName];
+/** First successful snippet wins. */
+async function firstHit(tasks: Promise<SearchHit | null>[]): Promise<SearchHit | null> {
+  if (!tasks.length) return null;
 
-  for (const query of queries) {
-    const google = await fetchGoogleCustomSearch(query);
-    if (google?.snippet) return google;
+  return new Promise((resolve) => {
+    let pending = tasks.length;
+    let settled = false;
 
-    const brave = await fetchBraveSearchSnippet(query);
-    if (brave?.snippet) return brave;
-
-    const ddg = await fetchDuckDuckGoSnippet(query);
-    if (ddg?.snippet) return ddg;
-  }
-
-  return null;
+    for (const task of tasks) {
+      void task.then(
+        (hit) => {
+          if (!settled && hit?.snippet) {
+            settled = true;
+            resolve(hit);
+            return;
+          }
+          pending -= 1;
+          if (!settled && pending === 0) resolve(null);
+        },
+        () => {
+          pending -= 1;
+          if (!settled && pending === 0) resolve(null);
+        },
+      );
+    }
+  });
 }
 
-async function tryOfficialWebsite(
-  companyName: string,
-  slug: string,
-): Promise<{ url: string; summary?: string; title?: string } | null> {
+function topWebsiteCandidates(companyName: string, slug: string): string[] {
   const urls = [
     ...new Set(companySlugCandidates(companyName, slug).flatMap((s) => candidateWebsiteUrls(s))),
   ];
-
-  for (const candidate of urls) {
-    const fetched = await fetchHtml(candidate);
-    if (!fetched) continue;
-    const meta = extractMetaFromHtml(fetched.html);
-    return {
-      url: fetched.finalUrl,
-      summary: meta.description,
-      title: meta.title,
-    };
-  }
-  return null;
+  // Prefer AU-facing hosts; race at most two.
+  const preferred = [
+    ...urls.filter((url) => /\/au\/?$/i.test(url)),
+    ...urls.filter((url) => /\.com\.au\/?$/i.test(url)),
+  ];
+  const deduped = [...new Set(preferred.length ? preferred : urls)];
+  return deduped.slice(0, 2);
 }
 
 export type CompanySummaryResult = {
@@ -278,49 +304,49 @@ export async function buildCompanySummary(
   name: string,
 ): Promise<CompanySummaryResult> {
   const companyName = name.trim() || slug;
+  const cacheKey = `${slug}|${companyName.toLowerCase()}`;
+  const cached = summaryCache.get(cacheKey);
+  if (cached) {
+    const ttl = cached.value.found ? CACHE_TTL_MS : MISS_CACHE_TTL_MS;
+    if (Date.now() - cached.at < ttl) return cached.value;
+  }
+
   const searchUrl = googleSearchUrl(`${companyName} company`);
+  const query = `${companyName} company`;
 
-  const site = await tryOfficialWebsite(companyName, slug);
-  if (site?.summary) {
-    return {
-      companyName,
-      slug,
-      websiteUrl: site.url,
-      title: site.title ?? null,
-      summary: simplifySummary(site.summary),
-      googleSearchUrl: searchUrl,
-      found: true,
-      tld: detectTld(site.url),
-      source: "website",
-    };
-  }
+  const hit = await firstHit([
+    fetchGoogleCustomSearch(query),
+    fetchBraveSearchSnippet(query),
+    ...topWebsiteCandidates(companyName, slug).map((url) => fetchSiteMeta(url)),
+  ]);
 
-  const hit = await searchCompanySnippet(companyName);
-  if (hit?.snippet) {
-    const websiteUrl =
-      hit.url && !isNoiseUrl(hit.url) ? normalizeWebsiteUrl(hit.url) : (site?.url ?? null);
-    return {
-      companyName,
-      slug,
-      websiteUrl,
-      title: hit.title ?? null,
-      summary: simplifySummary(hit.snippet),
-      googleSearchUrl: searchUrl,
-      found: true,
-      tld: detectTld(websiteUrl),
-      source: process.env.GOOGLE_CSE_API_KEY?.trim() ? "google" : "search",
-    };
-  }
+  const websiteUrl =
+    hit?.url && !isNoiseUrl(hit.url) ? normalizeWebsiteUrl(hit.url) : null;
 
-  return {
-    companyName,
-    slug,
-    websiteUrl: site?.url ?? null,
-    title: null,
-    summary: null,
-    googleSearchUrl: searchUrl,
-    found: false,
-    tld: detectTld(site?.url ?? null),
-    source: "none",
-  };
+  const result: CompanySummaryResult = hit?.snippet
+    ? {
+        companyName,
+        slug,
+        websiteUrl,
+        title: hit.title ?? null,
+        summary: simplifySummary(hit.snippet),
+        googleSearchUrl: searchUrl,
+        found: true,
+        tld: detectTld(websiteUrl),
+        source: hit.source,
+      }
+    : {
+        companyName,
+        slug,
+        websiteUrl: null,
+        title: null,
+        summary: null,
+        googleSearchUrl: searchUrl,
+        found: false,
+        tld: null,
+        source: "none",
+      };
+
+  summaryCache.set(cacheKey, { at: Date.now(), value: result });
+  return result;
 }

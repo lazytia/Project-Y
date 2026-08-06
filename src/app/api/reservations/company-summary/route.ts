@@ -28,5 +28,12 @@ export async function GET(req: NextRequest) {
   }
 
   const result = await buildCompanySummary(slug, name);
-  return NextResponse.json(result);
+  return NextResponse.json(result, {
+    headers: {
+      // Same company clicked again within the hour — reuse without re-searching.
+      "Cache-Control": result.found
+        ? "private, max-age=3600"
+        : "private, max-age=30",
+    },
+  });
 }
