@@ -75,6 +75,7 @@ export const MANAGER_NAV: NavGroup[] = [
     children: [
       { label: "New Staff Requests", href: "/people/onboarding" },
       { label: "Staff Handbook", href: "/staff/handbook" },
+      { label: "Beer Guide", href: "/staff/beer-guide" },
       { label: "Training Manual", href: "/staff/training-manual" },
       { label: "HR Notes", href: "/people/hr-notes" },
       { label: "Notice Given", href: "/people/notice-given" },
@@ -93,6 +94,7 @@ export const MANAGER_NAV: NavGroup[] = [
     icon: "🍽",
     label: "Operations",
     children: [
+      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering Orders", href: "/operations/catering-orders" },
     ],
@@ -105,8 +107,8 @@ export const MANAGER_NAV: NavGroup[] = [
 ];
 
 // Chef (Chuck) gets his own dedicated nav — spec approved by owner:
-// Dashboard, Team (New Staff Requests / Staff Handbook / Training Manual
-// / HR Notes / Notice Given / Cash Payments), Scheduling, Operations,
+// Dashboard, Team (New Staff Requests / Staff Handbook / Beer Guide
+// / Training Manual / HR Notes / Notice Given / Cash Payments), Scheduling, Operations,
 // Payroll. Different enough from MANAGER_NAV that filtering via
 // chefHidden was getting awkward — keeping them separate is clearer.
 export const CHEF_NAV: NavGroup[] = [
@@ -117,6 +119,7 @@ export const CHEF_NAV: NavGroup[] = [
     children: [
       { label: "New Staff Requests", href: "/people/onboarding" },
       { label: "Staff Handbook", href: "/staff/handbook" },
+      { label: "Beer Guide", href: "/staff/beer-guide" },
       { label: "Training Manual", href: "/staff/training-manual" },
       { label: "HR Notes", href: "/people/hr-notes" },
       { label: "Notice Given", href: "/people/notice-given" },
@@ -135,6 +138,7 @@ export const CHEF_NAV: NavGroup[] = [
     icon: "🍽",
     label: "Operations",
     children: [
+      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering Orders", href: "/operations/catering-orders" },
     ],
