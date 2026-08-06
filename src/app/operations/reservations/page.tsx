@@ -15,6 +15,7 @@ import {
   tsToDate,
   updateReservation,
 } from "@/lib/reservations";
+import { resolveCompany } from "@/lib/reservation-company";
 import styles from "./page.module.css";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -74,6 +75,14 @@ function PeopleIcon() {
 }
 function SeatIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="9" width="14" height="8" rx="2" /><path d="M5 17v2M19 17v2" /><path d="M7 9V5h10v4" /></svg>;
+}
+function BuildingIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="3" width="16" height="18" rx="1" />
+      <path d="M9 7h1M9 11h1M9 15h1M14 7h1M14 11h1M14 15h1" />
+    </svg>
+  );
 }
 function EditIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>;
@@ -515,7 +524,51 @@ function DetailModal({
   onMarkNoShow: () => void | Promise<void>;
   onCancel: () => void | Promise<void>;
 }) {
+  const { user } = useAuth();
+  const company = useMemo(() => resolveCompany(reservation), [reservation]);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [companySummary, setCompanySummary] = useState<{
+    companyName: string;
+    websiteUrl: string | null;
+    summary: string;
+    tld: string | null;
+  } | null>(null);
+
+  async function openCompanySummary() {
+    if (!company || !user) return;
+    setSummaryOpen(true);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setCompanySummary(null);
+    try {
+      const idToken = await user.getIdToken();
+      const qs = new URLSearchParams({
+        slug: company.slug,
+        name: company.displayName,
+      });
+      const res = await fetch(`/api/reservations/company-summary?${qs.toString()}`, {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+      setCompanySummary({
+        companyName: String(data.companyName ?? company.displayName),
+        websiteUrl: typeof data.websiteUrl === "string" ? data.websiteUrl : company.websiteUrl,
+        summary: String(data.summary ?? "No summary available."),
+        tld: typeof data.tld === "string" ? data.tld : null,
+      });
+    } catch (err) {
+      setSummaryError(err instanceof Error ? err.message : "Could not load company summary.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
   return (
+    <>
     <div className={styles.sheetBackdrop} onClick={onClose}>
       <div className={styles.sheet} onClick={(e) => e.stopPropagation()}>
         <button type="button" className={styles.sheetClose} onClick={onClose} aria-label="Close">×</button>
@@ -529,6 +582,15 @@ function DetailModal({
           <FactIcon icon={<CalIcon />} label="Date" value={fmtLongDate(reservation.date)} />
           <FactIcon icon={<ClockIcon />} label="Time" value={fmt12h(reservation.time)} />
           <FactIcon icon={<PeopleIcon />} label="Guests" value={`${reservation.count} Guests`} />
+          {company ? (
+            <div className={styles.factRowItem}>
+              <span className={styles.factIconWrap}><BuildingIcon /></span>
+              <span className={styles.factLabel}>Company</span>
+              <button type="button" className={styles.companyLink} onClick={() => void openCompanySummary()}>
+                {company.displayName}
+              </button>
+            </div>
+          ) : null}
           <FactIcon icon={<SeatIcon />} label="Seating" value={prettySeating(reservation.seating)} />
         </div>
 
@@ -553,6 +615,35 @@ function DetailModal({
         </div>
       </div>
     </div>
+
+    {summaryOpen && company && (
+      <div className={styles.summaryBackdrop} onClick={() => setSummaryOpen(false)}>
+        <div className={styles.summarySheet} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Company summary">
+          <button type="button" className={styles.sheetClose} onClick={() => setSummaryOpen(false)} aria-label="Close">×</button>
+          <h3 className={styles.summaryTitle}>{company.displayName}</h3>
+          {summaryLoading ? (
+            <p className={styles.summaryBody}>Loading company summary…</p>
+          ) : summaryError ? (
+            <p className={styles.summaryError}>{summaryError}</p>
+          ) : companySummary ? (
+            <>
+              {companySummary.websiteUrl ? (
+                <p className={styles.summaryWebsite}>
+                  <a href={companySummary.websiteUrl} target="_blank" rel="noopener noreferrer">
+                    {companySummary.websiteUrl.replace(/^https:\/\//, "")}
+                  </a>
+                  {companySummary.tld ? (
+                    <span className={styles.summaryTld}> · .{companySummary.tld}</span>
+                  ) : null}
+                </p>
+              ) : null}
+              <p className={styles.summaryBody}>{companySummary.summary}</p>
+            </>
+          ) : null}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
