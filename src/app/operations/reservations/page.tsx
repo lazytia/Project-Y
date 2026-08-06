@@ -539,6 +539,16 @@ function DetailModal({
 
   async function openCompanySummary() {
     if (!company || !user) return;
+
+    const fallbackGoogle = `https://www.google.com/search?q=${encodeURIComponent(`${company.displayName} company`)}`;
+    // Open under the user gesture — async window.open is blocked in the PWA.
+    let externalTab: Window | null = null;
+    try {
+      externalTab = window.open("about:blank", "_blank");
+    } catch {
+      externalTab = null;
+    }
+
     setSummaryOpen(true);
     setSummaryLoading(true);
     setSummaryError(null);
@@ -557,14 +567,40 @@ function DetailModal({
       if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
 
       const googleSearchUrl =
-        typeof data.googleSearchUrl === "string"
-          ? data.googleSearchUrl
-          : `https://www.google.com/search?q=${encodeURIComponent(`${company.displayName} company`)}`;
+        typeof data.googleSearchUrl === "string" ? data.googleSearchUrl : fallbackGoogle;
 
       if (!data.found || !data.summary) {
-        setSummaryOpen(false);
-        window.open(googleSearchUrl, "_blank", "noopener,noreferrer");
+        if (externalTab && !externalTab.closed) {
+          try {
+            externalTab.opener = null;
+            externalTab.location.replace(googleSearchUrl);
+            setSummaryOpen(false);
+            return;
+          } catch {
+            try {
+              externalTab.close();
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        // PWA / popup blocked — keep sheet with a tappable Google link.
+        setCompanySummary({
+          companyName: String(data.companyName ?? company.displayName),
+          websiteUrl: null,
+          summary: "No quick summary found. Search Google for details.",
+          tld: null,
+          googleSearchUrl,
+        });
         return;
+      }
+
+      if (externalTab && !externalTab.closed) {
+        try {
+          externalTab.close();
+        } catch {
+          /* ignore */
+        }
       }
 
       setCompanySummary({
@@ -575,6 +611,13 @@ function DetailModal({
         googleSearchUrl,
       });
     } catch (err) {
+      if (externalTab && !externalTab.closed) {
+        try {
+          externalTab.close();
+        } catch {
+          /* ignore */
+        }
+      }
       setSummaryError(err instanceof Error ? err.message : "Could not load company summary.");
     } finally {
       setSummaryLoading(false);
@@ -652,11 +695,14 @@ function DetailModal({
                 </p>
               ) : null}
               <p className={styles.summaryBody}>{companySummary.summary}</p>
-              <p className={styles.summaryWebsite}>
-                <a href={companySummary.googleSearchUrl} target="_blank" rel="noopener noreferrer">
-                  Open in Google
-                </a>
-              </p>
+              <a
+                className={styles.summaryGoogleBtn}
+                href={companySummary.googleSearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Search on Google
+              </a>
             </>
           ) : null}
         </div>

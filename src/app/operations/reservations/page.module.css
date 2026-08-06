@@ -3,7 +3,7 @@
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ?Ä?Ä Header ?Ä?Ä */
+/* ?ù?ù Header ?ù?ù */
 .header {
   display: flex;
   align-items: center;
@@ -50,7 +50,7 @@
   padding: 0;
 }
 
-/* ?Ä?Ä Hero ?Ä?Ä */
+/* ?ù?ù Hero ?ù?ù */
 .hero {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -76,7 +76,7 @@
   color: var(--color-warm);
 }
 
-/* ?Ä?Ä Service summary cards (Lunch / Dinner) ?Ä?Ä */
+/* ?ù?ù Service summary cards (Lunch / Dinner) ?ù?ù */
 .serviceCards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -183,7 +183,7 @@
   color: var(--color-fg);
 }
 
-/* ?Ä?Ä Activity strip (cancelled / new / updated) ?Ä?Ä */
+/* ?ù?ù Activity strip (cancelled / new / updated) ?ù?ù */
 .activityList {
   list-style: none;
   margin: 0 0 var(--space-3) 0;
@@ -278,7 +278,7 @@
 }
 .activityUpdated .activityIcon { color: var(--color-fg-muted); }
 
-/* ?Ä?Ä Cancel banner (legacy, kept for compat) ?Ä?Ä */
+/* ?ù?ù Cancel banner (legacy, kept for compat) ?ù?ù */
 .cancelBanner {
   display: flex;
   align-items: center;
@@ -331,7 +331,7 @@
   text-decoration: none;
 }
 
-/* ?Ä?Ä Search ?Ä?Ä */
+/* ?ù?ù Search ?ù?ù */
 .searchWrap {
   display: flex;
   align-items: center;
@@ -355,7 +355,7 @@
   color: var(--color-fg);
 }
 
-/* ?Ä?Ä Section ?Ä?Ä */
+/* ?ù?ù Section ?ù?ù */
 .section {
   margin-bottom: var(--space-4);
 }
@@ -494,7 +494,7 @@
   background: var(--color-surface);
 }
 
-/* ?Ä?Ä Add reservation button (sticky) ?Ä?Ä */
+/* ?ù?ù Add reservation button (sticky) ?ù?ù */
 .addBtn {
   position: fixed;
   left: 0;
@@ -530,7 +530,7 @@
   padding: var(--space-3);
 }
 
-/* ?Ä?Ä Detail Sheet (bottom modal) ?Ä?Ä */
+/* ?ù?ù Detail Sheet (bottom modal) ?ù?ù */
 .sheetBackdrop {
   position: fixed;
   inset: 0;
@@ -717,10 +717,26 @@
 }
 
 .summaryBody {
-  margin: 0;
+  margin: 0 0 var(--space-3) 0;
   font-size: 14px;
   line-height: 1.5;
   color: var(--color-fg);
+}
+
+.summaryGoogleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-warm);
+  color: var(--color-bg);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
 }
 
 .summaryError {
@@ -782,7 +798,7 @@
   margin-bottom: var(--space-3);
 }
 
-/* ?Ä?Ä Full-screen edit sheet (matches mockup) ?Ä?Ä */
+/* ?ù?ù Full-screen edit sheet (matches mockup) ?ù?ù */
 .fullSheet {
   position: fixed;
   inset: 0;
