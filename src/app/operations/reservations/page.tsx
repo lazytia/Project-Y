@@ -534,8 +534,7 @@ function DetailModal({
     websiteUrl: string | null;
     summary: string;
     tld: string | null;
-    kind: "person" | "company";
-    links: { label: string; url: string }[];
+    googleSearchUrl: string;
   } | null>(null);
 
   async function openCompanySummary() {
@@ -550,30 +549,30 @@ function DetailModal({
         slug: company.slug,
         name: company.displayName,
       });
-      if (reservation.email?.trim()) {
-        qs.set("email", reservation.email.trim());
-      }
       const res = await fetch(`/api/reservations/company-summary?${qs.toString()}`, {
         cache: "no-store",
         headers: { Authorization: `Bearer ${idToken}` },
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+
+      const googleSearchUrl =
+        typeof data.googleSearchUrl === "string"
+          ? data.googleSearchUrl
+          : `https://www.google.com/search?q=${encodeURIComponent(`${company.displayName} company`)}`;
+
+      if (!data.found || !data.summary) {
+        setSummaryOpen(false);
+        window.open(googleSearchUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
       setCompanySummary({
         companyName: String(data.companyName ?? company.displayName),
-        websiteUrl: typeof data.websiteUrl === "string" ? data.websiteUrl : company.websiteUrl,
-        summary: String(data.summary ?? "No summary available."),
+        websiteUrl: typeof data.websiteUrl === "string" ? data.websiteUrl : null,
+        summary: String(data.summary),
         tld: typeof data.tld === "string" ? data.tld : null,
-        kind: data.kind === "person" ? "person" : "company",
-        links: Array.isArray(data.links)
-          ? data.links.filter(
-              (row: unknown): row is { label: string; url: string } =>
-                !!row &&
-                typeof row === "object" &&
-                typeof (row as { label?: string }).label === "string" &&
-                typeof (row as { url?: string }).url === "string",
-            )
-          : [],
+        googleSearchUrl,
       });
     } catch (err) {
       setSummaryError(err instanceof Error ? err.message : "Could not load company summary.");
@@ -637,37 +636,27 @@ function DetailModal({
           <button type="button" className={styles.sheetClose} onClick={() => setSummaryOpen(false)} aria-label="Close">×</button>
           <h3 className={styles.summaryTitle}>{company.displayName}</h3>
           {summaryLoading ? (
-            <p className={styles.summaryBody}>Searching Google, Wikipedia &amp; social profiles…</p>
+            <p className={styles.summaryBody}>Searching Google…</p>
           ) : summaryError ? (
             <p className={styles.summaryError}>{summaryError}</p>
           ) : companySummary ? (
             <>
-              {companySummary.links.length > 0 ? (
-                <ul className={styles.summaryLinks}>
-                  {companySummary.links.map((link) => (
-                    <li key={`${link.label}-${link.url}`}>
-                      <a href={link.url} target="_blank" rel="noopener noreferrer">
-                        {link.label}
-                      </a>
-                      <span className={styles.summaryLinkUrl}>
-                        {link.url.replace(/^https:\/\//, "")}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : companySummary.websiteUrl ? (
+              {companySummary.websiteUrl ? (
                 <p className={styles.summaryWebsite}>
                   <a href={companySummary.websiteUrl} target="_blank" rel="noopener noreferrer">
                     {companySummary.websiteUrl.replace(/^https:\/\//, "")}
                   </a>
-                  {companySummary.tld === "linkedin" ? (
-                    <span className={styles.summaryTld}> · LinkedIn</span>
-                  ) : companySummary.tld ? (
+                  {companySummary.tld ? (
                     <span className={styles.summaryTld}> · .{companySummary.tld}</span>
                   ) : null}
                 </p>
               ) : null}
               <p className={styles.summaryBody}>{companySummary.summary}</p>
+              <p className={styles.summaryWebsite}>
+                <a href={companySummary.googleSearchUrl} target="_blank" rel="noopener noreferrer">
+                  Open in Google
+                </a>
+              </p>
             </>
           ) : null}
         </div>

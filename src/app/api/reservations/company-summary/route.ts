@@ -23,11 +23,10 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const slug = (url.searchParams.get("slug") ?? "").toLowerCase().trim();
   const name = (url.searchParams.get("name") ?? "").trim();
-  const email = (url.searchParams.get("email") ?? "").trim();
   if (!SLUG_RE.test(slug)) {
     return NextResponse.json({ error: "Invalid company slug." }, { status: 400 });
   }
 
-  const result = await buildCompanySummary(slug, name, email || undefined);
+  const result = await buildCompanySummary(slug, name);
   return NextResponse.json(result);
 }
