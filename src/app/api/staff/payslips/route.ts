@@ -20,11 +20,11 @@ import { emailToUsername } from "@/lib/username";
  * Response shape:
  * {
  *   employeeName: string | null,
- *   nextPayDateISO: string | null,   // Wednesday after the latest pay week
+ *   nextPayDateISO: string | null,   // Friday after the latest pay week
  *   payFrequency: "Paid weekly",
  *   payslips: [{
  *     id: string,        // "p-YYYY-MM-DD" using the pay week's Monday
- *     payDate: string,   // Wednesday of the following week
+ *     payDate: string,   // Friday of the following week
  *     periodStart: string,
  *     periodEnd: string,
  *     grossPay: number,  // taxable gross (sheet col I — before tax & super)
@@ -210,10 +210,9 @@ export async function GET(req: NextRequest) {
       return false;
     });
     if (!match) continue;
-    // Pay date = Wednesday of the week AFTER the pay week (weekEnd is
-    // Sunday, +3 days → Wednesday). Matches the payroll cutoff logic
-    // used by the onboarding overview.
-    const payDate = shiftDateKey(week.weekEndISO, 3, TIMEZONE);
+    // Pay date = Friday of the week AFTER the pay week (weekEnd is
+    // Sunday, +5 days → Friday). Matches weekly payday.
+    const payDate = shiftDateKey(week.weekEndISO, 5, TIMEZONE);
     payslips.push({
       id: `p-${week.weekStartISO}`,
       payDate,

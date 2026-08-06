@@ -11,14 +11,14 @@ import Splash from "@/components/Splash";
 import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
-/** Returns the Wednesday of the calendar week AFTER the given date. */
+/** Returns the Friday of the calendar week AFTER the given date. */
 function getPayrollCutoff(startDate: Date): Date {
   const d = new Date(startDate);
   const dow = d.getDay(); // 0=Sun … 6=Sat
   // Days from d until the next Monday
   const daysToNextMonday = dow === 0 ? 1 : 8 - dow;
-  // Wednesday of that next week = next Monday + 2 days
-  d.setDate(d.getDate() + daysToNextMonday + 2);
+  // Friday of that next week = next Monday + 4 days
+  d.setDate(d.getDate() + daysToNextMonday + 4);
   return d;
 }
 

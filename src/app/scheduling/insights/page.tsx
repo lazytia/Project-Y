@@ -896,7 +896,7 @@ export default function InsightsPage() {
             </svg>
           </span>
           <div className={styles.alertBody}>
-            <p className={styles.alertTitle}>Payroll % is over target this week.</p>
+            <p className={styles.alertTitle}>Payroll % was over target this week.</p>
             <p className={styles.alertSub}>Consider adjusting roster or reviewing shifts.</p>
           </div>
           <span className={styles.alertChev} aria-hidden="true">›</span>

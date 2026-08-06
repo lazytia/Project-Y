@@ -351,6 +351,9 @@ const EN: Dict = {
   "staff.beerGuide.training1": "Training 1",
   "staff.beerGuide.training2": "Training 2",
   "staff.beerGuide.cleaningGlasses": "Cleaning the Glasses",
+  "staff.beerGuide.cleanBeerTap1": "How to clean beer tap — Part 1",
+  "staff.beerGuide.cleanBeerTap2": "How to clean beer tap — Part 2",
+  "staff.beerGuide.cleanBeerTap3": "How to clean beer tap — Part 3",
 
   // My Documents
   "docs.title": "My Documents",
@@ -798,6 +801,9 @@ const JA: Dict = {
   "staff.beerGuide.training1": "トレーニング 1",
   "staff.beerGuide.training2": "トレーニング 2",
   "staff.beerGuide.cleaningGlasses": "グラスの洗浄",
+  "staff.beerGuide.cleanBeerTap1": "ビールタップの清掃 — パート 1",
+  "staff.beerGuide.cleanBeerTap2": "ビールタップの清掃 — パート 2",
+  "staff.beerGuide.cleanBeerTap3": "ビールタップの清掃 — パート 3",
 
   // My Documents
   "docs.title": "マイドキュメント",
