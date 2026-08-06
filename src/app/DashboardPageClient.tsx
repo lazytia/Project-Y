@@ -125,7 +125,7 @@ export default function DashboardPageClient({
   const dashKind = effectiveDashboard ?? hintedDash;
 
   const managerProps = {
-    hideAttention: dashKind === "chef",
+    hideAttention: false,
     roleLabel: dashKind === "chef" ? "Head Chef" : "Store Manager",
     displayName: dashKind === "chef" ? "Chuck" : undefined,
     sessionDashboard: isManagerDashboardKind(dashKind) ? dashKind : effectiveDashboard,
@@ -162,7 +162,7 @@ export default function DashboardPageClient({
   if (userIsManager) {
     return (
       <ManagerDashboard
-        hideAttention={userIsChef}
+        hideAttention={false}
         roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
         displayName={userIsChef ? "Chuck" : undefined}
         sessionDashboard={userIsChef ? "chef" : "manager"}

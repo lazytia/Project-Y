@@ -33,6 +33,7 @@ export const SOLD_OUT_CATEGORIES: CategoryDef[] = [
   { id: "snapper", match: /\bsnapper\b/i },
   { id: "trevally", match: /\btrevally\b/i },
   { id: "tuna", match: /\btuna\b/i },
+  { id: "salmon-belly", match: /\bsalmon\s+belly\b/i },
 ];
 
 /**

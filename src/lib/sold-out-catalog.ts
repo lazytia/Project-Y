@@ -21,6 +21,12 @@ const CONFIG: CategoryConfig[] = [
   { id: "snapper", displayName: "Snapper", match: /\bsnapper\b/i },
   { id: "trevally", displayName: "Trevally", match: /\btrevally\b/i },
   { id: "tuna", displayName: "Tuna", match: /\btuna\b/i },
+  {
+    id: "salmon-belly",
+    displayName: "Salmon Belly",
+    subName: "Salmon Belly Sushi, Salmon Belly Aburi",
+    match: /\bsalmon\s+belly\b/i,
+  },
 ];
 
 type CatalogObject = {

@@ -70,25 +70,17 @@ export const OWNER_NAV: NavGroup[] = [
 export const MANAGER_NAV: NavGroup[] = [
   { icon: "🏠", label: "Dashboard", href: "/" },
   {
-    icon: "📋",
-    label: "Onboarding",
-    children: [
-      { label: "Overview", href: "/onboarding" },
-      { label: "Staff Handbook", href: "/staff/handbook" },
-      { label: "Beer Guide", href: "/staff/beer-guide" },
-    ],
-  },
-  {
     icon: "👥",
-    label: "People",
+    label: "Team",
     children: [
-      { label: "New Staff Request", href: "/people/onboarding" },
-      { label: "Notice Given", href: "/people/notice-given" },
+      { label: "New Staff Requests", href: "/people/onboarding" },
+      { label: "Staff Handbook", href: "/staff/handbook" },
+      { label: "Training Manual", href: "/staff/training-manual" },
       { label: "HR Notes", href: "/people/hr-notes" },
+      { label: "Notice Given", href: "/people/notice-given" },
       { label: "Cash Payments", href: "/people/cash-payments" },
     ],
   },
-  { icon: "💰", label: "Payslips", href: "/payslips" },
   {
     icon: "📅",
     label: "Scheduling",
@@ -101,10 +93,14 @@ export const MANAGER_NAV: NavGroup[] = [
     icon: "🍽",
     label: "Operations",
     children: [
-      { label: "Daily Sold Out", href: "/operations/daily-sold-out", chefHidden: true },
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering Orders", href: "/operations/catering-orders" },
     ],
+  },
+  {
+    icon: "💰",
+    label: "Payroll",
+    children: [{ label: "Payslips", href: "/payslips" }],
   },
 ];
 
@@ -176,9 +172,13 @@ export const STAFF_NAV: NavGroup[] = [
 ];
 
 /** Nav tree for SSR shell paint based on the session role cookie. */
-export function navForSessionRole(role: string | null): NavGroup[] {
+export function navForSessionRole(
+  role: string | null,
+  dashboard: string | null = null,
+): NavGroup[] {
   if (role === "staff") return STAFF_NAV;
   if (role === "chef") return CHEF_NAV;
+  if (dashboard === "manager") return MANAGER_NAV;
   if (role === "owner") return OWNER_NAV;
   return OWNER_NAV;
 }

@@ -50,7 +50,7 @@ function ServerNavGroup({ group }: { group: NavGroup }) {
 export default function ServerAppShell({ session }: { session: ServerSession }) {
   if (!session.authenticated) return null;
 
-  const nav = navForSessionRole(session.role);
+  const nav = navForSessionRole(session.role, session.dashboard);
 
   return (
     <div id="server-app-shell" className={shellStyles.shell} aria-hidden="true">
