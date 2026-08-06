@@ -15,6 +15,8 @@ type CategoryConfig = {
   displayName: string;
   subName?: string;
   match: RegExp;
+  /** Shown (and used for Square sync) when catalog walk finds no items yet. */
+  fallbackItems?: string[];
 };
 
 const CONFIG: CategoryConfig[] = [
@@ -25,7 +27,8 @@ const CONFIG: CategoryConfig[] = [
     id: "salmon-belly",
     displayName: "Salmon Belly",
     subName: "Salmon Belly Sushi, Salmon Belly Aburi",
-    match: /\bsalmon\s+belly\b/i,
+    match: /\bsalmon[\s-]*belly\b/i,
+    fallbackItems: ["Salmon Belly Sushi", "Salmon Belly Aburi"],
   },
 ];
 
@@ -75,6 +78,10 @@ export function buildSoldOutCategories(all: CatalogObject[]): SoldOutCategoryPay
       if (seen.has(key)) continue;
       seen.add(key);
       uniqueAffected.push(n);
+    }
+
+    if (uniqueAffected.length === 0 && cfg.fallbackItems?.length) {
+      uniqueAffected.push(...cfg.fallbackItems);
     }
 
     return {
