@@ -732,12 +732,34 @@ function scorePersonSearchHit(name: string, hit: WebSearchHit): number {
   return score;
 }
 
+async function fetchWebSearchHitsMerged(query: string): Promise<WebSearchHit[]> {
+  const [google, braveApi, ddg] = await Promise.all([
+    fetchGoogleCustomSearchAll(query),
+    fetchBraveSearchApiAll(query),
+    fetchDuckDuckGoSearchAll(query),
+  ]);
+
+  const seen = new Set<string>();
+  const merged: WebSearchHit[] = [];
+
+  for (const batch of [google, braveApi, ddg]) {
+    for (const hit of batch) {
+      const key = (hit.url ?? hit.snippet.slice(0, 80)).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(hit);
+    }
+  }
+
+  if (!merged.length) {
+    merged.push(...(await fetchBraveSearchHtmlAll(query)));
+  }
+
+  return merged;
+}
+
 async function fetchWebSearchHits(query: string): Promise<WebSearchHit[]> {
-  const google = await fetchGoogleCustomSearchAll(query);
-  if (google.length) return google;
-  const brave = await fetchBraveSearchAll(query);
-  if (brave.length) return brave;
-  return fetchDuckDuckGoSearchAll(query);
+  return fetchWebSearchHitsMerged(query);
 }
 
 async function fetchPersonFromPublicTeamPages(name: string): Promise<WebSearchHit | null> {
@@ -935,12 +957,287 @@ async function fetchPersonProfileSummary(
 async function fetchWebSearchSummary(companyName: string): Promise<WebSearchHit | null> {
   const queries = [`${companyName} company Australia`, `${companyName} company`];
   for (const query of queries) {
-    const google = await fetchGoogleCustomSearch(query);
-    if (google?.snippet) return google;
-    const ddg = await fetchDuckDuckGoSearch(query);
-    if (ddg?.snippet) return ddg;
+    const hits = await fetchWebSearchHitsMerged(query);
+    if (hits[0]?.snippet) return hits[0];
   }
   return null;
+}
+
+const COMPANY_SUFFIX_RE =
+  /\b(pty\.?\s*ltd\.?|pty\.?|ltd\.?|limited|inc\.?|incorporated|corp\.?|corporation|llc|plc|co\.?|company|group|holdings|enterprises|solutions)\b\.?/gi;
+
+const NON_OFFICIAL_HOST_RE =
+  /linkedin|facebook|instagram|twitter|^x\.com$|youtube|wikipedia|duckduckgo|google|bing|brave|yahoo|reddit|tripadvisor|yelp|glassdoor|seek\.com/i;
+
+function companySearchTokens(name: string): string[] {
+  return name
+    .replace(COMPANY_SUFFIX_RE, " ")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => word.length > 2);
+}
+
+function companyNameMatchScore(companyName: string, hit: WebSearchHit): number {
+  const tokens = companySearchTokens(companyName);
+  if (!tokens.length) return 0;
+
+  const text = `${hit.title ?? ""} ${hit.snippet ?? ""} ${hit.url ?? ""}`.toLowerCase();
+  const matched = tokens.filter((token) => text.includes(token));
+  if (!matched.length) return 0;
+
+  let score = matched.length * 28;
+  if (matched.length === tokens.length) score += 35;
+
+  const url = (hit.url ?? "").toLowerCase();
+  if (/sydney|australia|\bnsw\b|melbourne|brisbane|perth|adelaide|canberra/i.test(text)) score += 22;
+  if (/linkedin\.com\/company\//i.test(url)) score += 30;
+  if (/facebook\.com/i.test(url)) score += 18;
+  if (/instagram\.com/i.test(url)) score += 18;
+  if (/wikipedia\.org\/wiki\//i.test(url)) score += 25;
+  if (isLikelyOfficialWebsite(url, companyName)) score += 32;
+  if (/\.com\.au(\/|$)/i.test(url)) score += 12;
+
+  return score;
+}
+
+function isLikelyOfficialWebsite(url: string, companyName: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (NON_OFFICIAL_HOST_RE.test(host)) return false;
+    const tokens = companySearchTokens(companyName);
+    const hostBase = host.replace(/^www\./, "").split(".")[0] ?? "";
+    return tokens.some(
+      (token) => host.includes(token) || hostBase.includes(token.slice(0, Math.min(token.length, 5))),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function wikipediaUrlFromTitle(title: string): string {
+  return `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+}
+
+async function fetchWikipediaSummary(
+  query: string,
+  companyName?: string,
+): Promise<{ extract: string; url: string } | null> {
+  const validate = (title: string, extract: string) =>
+    !companyName || wikiMatchesCompany(companyName, title, extract);
+
+  const direct = await fetchWikipediaExtract(query);
+  if (direct && validate(query, direct)) {
+    return { extract: direct, url: wikipediaUrlFromTitle(query) };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6_000);
+  try {
+    const params = new URLSearchParams({
+      action: "query",
+      list: "search",
+      srsearch: query,
+      format: "json",
+      origin: "*",
+      srlimit: "5",
+    });
+    const res = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      query?: { search?: { title?: string }[] };
+    };
+    for (const hit of data.query?.search ?? []) {
+      if (!hit.title) continue;
+      const extract = await fetchWikipediaExtract(hit.title);
+      if (extract && validate(hit.title, extract)) {
+        return { extract, url: wikipediaUrlFromTitle(hit.title) };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function wikiMatchesCompany(companyName: string, title: string, extract: string): boolean {
+  const tokens = companySearchTokens(companyName);
+  if (!tokens.length) return true;
+  const text = `${title} ${extract}`.toLowerCase();
+  const matched = tokens.filter((token) => text.includes(token));
+  return matched.length >= Math.min(2, tokens.length) || matched.length === tokens.length;
+}
+
+function extractCompanyLinks(
+  companyName: string,
+  hits: WebSearchHit[],
+  websiteUrl?: string | null,
+  wikipediaUrl?: string | null,
+): ProfileLink[] {
+  const links: ProfileLink[] = [];
+  const seen = new Set<string>();
+
+  const add = (label: string, url: string, minScore = 45) => {
+    const normalized = normalizeSocialUrl(url);
+    if (seen.has(normalized)) return;
+    if (label !== "Wikipedia" && label !== "Website") {
+      const score = companyNameMatchScore(companyName, { url: normalized, snippet: "", title: label });
+      if (score < minScore) return;
+    }
+    seen.add(normalized);
+    links.push({ label, url: normalized });
+  };
+
+  if (websiteUrl) add("Website", websiteUrl, 0);
+  if (wikipediaUrl) add("Wikipedia", wikipediaUrl, 0);
+
+  for (const hit of hits) {
+    const url = hit.url ?? "";
+    if (/linkedin\.com\/company\//i.test(url)) add("LinkedIn", url, 50);
+    else if (/facebook\.com/i.test(url) && !/\/posts\//i.test(url)) add("Facebook", url, 55);
+    else if (/instagram\.com\/[a-z0-9._-]+\/?$/i.test(url)) add("Instagram", url, 55);
+    else if (/wikipedia\.org\/wiki\//i.test(url)) add("Wikipedia", url, 0);
+    else if (isLikelyOfficialWebsite(url, companyName)) add("Website", url, 50);
+  }
+
+  const order = ["Website", "LinkedIn", "Facebook", "Instagram", "Wikipedia"];
+  links.sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
+  return links;
+}
+
+async function fetchCompanyFromAllChannels(
+  companyName: string,
+  slug: string,
+  email?: string,
+): Promise<CompanySummaryResult> {
+  const slugUrls = [
+    ...new Set(companySlugCandidates(companyName, slug).flatMap((s) => candidateWebsiteUrls(s))),
+  ];
+  const urls = [...slugUrls];
+
+  if (email) {
+    const at = email.lastIndexOf("@");
+    if (at >= 0) {
+      const domain = email.slice(at + 1).toLowerCase().trim();
+      if (domain && !PERSONAL_EMAIL_DOMAINS.has(domain)) {
+        urls.unshift(`https://www.${domain}`, `https://${domain}`);
+      }
+    }
+  }
+
+  let websiteUrl: string | null = null;
+  let title: string | undefined;
+  let description: string | undefined;
+  let source: CompanySummaryResult["source"] = "url-only";
+
+  for (const candidate of urls) {
+    const fetched = await fetchHtml(candidate);
+    if (!fetched) continue;
+    const meta = extractMetaFromHtml(fetched.html);
+    websiteUrl = fetched.finalUrl;
+    title = meta.title;
+    description = meta.description;
+    if (description || title) {
+      source = "website";
+      break;
+    }
+  }
+
+  if (!websiteUrl) {
+    for (const candidate of urls) {
+      const probed = await probeWebsite(candidate);
+      if (probed) {
+        websiteUrl = probed;
+        break;
+      }
+    }
+  }
+
+  const queries = [
+    `"${companyName}" company Australia`,
+    `"${companyName}" site:linkedin.com/company`,
+    `"${companyName}" site:facebook.com`,
+    `"${companyName}" site:instagram.com`,
+    `${companyName} official website Australia`,
+    `${companyName} wikipedia`,
+    `${companyName} LinkedIn Facebook Instagram`,
+  ];
+
+  const collected: WebSearchHit[] = [];
+  for (const query of queries) {
+    collected.push(...(await fetchWebSearchHitsMerged(query)));
+    if (collected.length >= 24) break;
+  }
+
+  const ranked = [...collected].sort(
+    (a, b) => companyNameMatchScore(companyName, b) - companyNameMatchScore(companyName, a),
+  );
+
+  let wikiSummary: { extract: string; url: string } | null = null;
+  for (const query of [companyName, `${companyName} company`, slug]) {
+    wikiSummary = await fetchWikipediaSummary(query, companyName);
+    if (wikiSummary) break;
+  }
+  if (!wikiSummary) {
+    wikiSummary = await fetchWikipediaSummary(`${companyName} company Australia`, companyName);
+  }
+
+  let summary = description ?? (title ? cleanTitle(title) : undefined);
+
+  if (!summary && wikiSummary?.extract) {
+    summary = wikiSummary.extract;
+    source = "wikipedia";
+  }
+
+  if (!summary) {
+    for (const hit of ranked) {
+      if (companyNameMatchScore(companyName, hit) >= 45 && (hit.snippet?.length ?? 0) >= 30) {
+        summary = hit.snippet;
+        source = process.env.GOOGLE_CSE_API_KEY?.trim() ? "google" : "search";
+        if (!websiteUrl && hit.url && isLikelyOfficialWebsite(hit.url, companyName)) {
+          websiteUrl = normalizeWebsiteUrl(hit.url);
+        }
+        break;
+      }
+    }
+  }
+
+  if (!summary && ranked[0]?.snippet) {
+    summary = ranked[0].snippet;
+    source = "search";
+    if (!websiteUrl && ranked[0].url && isLikelyOfficialWebsite(ranked[0].url, companyName)) {
+      websiteUrl = normalizeWebsiteUrl(ranked[0].url);
+    }
+  }
+
+  const links = extractCompanyLinks(companyName, ranked, websiteUrl, wikiSummary?.url ?? null);
+  const websiteLink = links.find((link) => link.label === "Website");
+  if (!websiteUrl && websiteLink) websiteUrl = websiteLink.url;
+
+  if (summary) {
+    summary = simplifySummary(summary);
+  } else if (websiteUrl) {
+    summary = `${companyName} — visit ${websiteUrl.replace(/^https:\/\//, "")} for company details.`;
+  } else {
+    summary = `Could not find a public website or summary for ${companyName}. Try searching manually.`;
+  }
+
+  return {
+    companyName,
+    slug,
+    websiteUrl,
+    title: title ?? null,
+    summary,
+    tld: detectTld(websiteUrl),
+    kind: "company",
+    links,
+    source,
+  };
 }
 
 async function fetchWikipediaSearchExtract(query: string): Promise<string | null> {
@@ -1028,92 +1325,5 @@ export async function buildCompanySummary(
     };
   }
 
-  const urls = [
-    ...new Set(companySlugCandidates(name, slug).flatMap((s) => candidateWebsiteUrls(s))),
-  ];
-
-  let websiteUrl: string | null = null;
-  let title: string | undefined;
-  let description: string | undefined;
-  let source: CompanySummaryResult["source"] = "url-only";
-
-  for (const candidate of urls) {
-    const fetched = await fetchHtml(candidate);
-    if (!fetched) continue;
-    const meta = extractMetaFromHtml(fetched.html);
-    websiteUrl = fetched.finalUrl;
-    title = meta.title;
-    description = meta.description;
-    if (description || title) {
-      source = "website";
-      break;
-    }
-  }
-
-  if (!websiteUrl) {
-    for (const candidate of urls) {
-      const probed = await probeWebsite(candidate);
-      if (probed) {
-        websiteUrl = probed;
-        break;
-      }
-    }
-  }
-
-  let summary =
-    description ??
-    (title ? cleanTitle(title) : undefined);
-
-  if (!summary) {
-    for (const query of [companyName, slug.toUpperCase(), slug]) {
-      const wiki = await fetchWikipediaExtract(query);
-      if (wiki) {
-        summary = wiki;
-        source = "wikipedia";
-        break;
-      }
-    }
-  }
-
-  if (!summary) {
-    const searchHit = await fetchWebSearchSummary(companyName);
-    if (searchHit?.snippet) {
-      summary = searchHit.snippet;
-      source = process.env.GOOGLE_CSE_API_KEY?.trim() ? "google" : "search";
-      if (!websiteUrl && searchHit.url?.startsWith("http")) {
-        websiteUrl = searchHit.url;
-      }
-    }
-  }
-
-  if (!summary) {
-    const wikiSearch = await fetchWikipediaSearchExtract(`${companyName} company`);
-    if (wikiSearch) {
-      summary = wikiSearch;
-      source = "wikipedia";
-    }
-  }
-
-  if (summary) {
-    summary = simplifySummary(summary);
-  }
-
-  if (!summary && websiteUrl) {
-    summary = `${companyName} — visit ${websiteUrl.replace(/^https:\/\//, "")} for company details.`;
-  } else if (!summary) {
-    summary = `Could not find a public website or summary for ${companyName}. Try searching manually.`;
-  }
-
-  const tld = detectTld(websiteUrl);
-
-  return {
-    companyName,
-    slug,
-    websiteUrl,
-    title: title ?? null,
-    summary,
-    tld,
-    kind: "company",
-    source,
-  };
+  return fetchCompanyFromAllChannels(companyName, slug, email);
 }

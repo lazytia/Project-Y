@@ -637,9 +637,7 @@ function DetailModal({
           <button type="button" className={styles.sheetClose} onClick={() => setSummaryOpen(false)} aria-label="Close">×</button>
           <h3 className={styles.summaryTitle}>{company.displayName}</h3>
           {summaryLoading ? (
-            <p className={styles.summaryBody}>
-              {company.kind === "person" ? "Searching web & social profiles…" : "Loading company summary…"}
-            </p>
+            <p className={styles.summaryBody}>Searching Google, Wikipedia &amp; social profiles…</p>
           ) : summaryError ? (
             <p className={styles.summaryError}>{summaryError}</p>
           ) : companySummary ? (
