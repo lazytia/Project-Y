@@ -32,6 +32,7 @@ export const OWNER_NAV: NavGroup[] = [
     children: [
       { label: "New Employees", href: "/people/onboarding" },
       { label: "Active Employees", href: "/people/active" },
+      { label: "Beer Guide", href: "/staff/beer-guide" },
       { label: "Notice Given", href: "/people/notice-given" },
       { label: "Terminated", href: "/people/terminated" },
       { label: "HR Notes", href: "/people/hr-notes" },
