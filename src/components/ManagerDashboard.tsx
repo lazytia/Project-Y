@@ -10,6 +10,7 @@ import { emailToUsername } from "@/lib/username";
 import { dCountdownLabel } from "@/lib/catering-orders";
 import { fetchReservationsForDate, type Reservation } from "@/lib/reservations";
 import {
+  readManagerDashCache,
   writeManagerDashCache,
   type ManagerDashCache,
 } from "@/lib/manager-dash-cache";
@@ -162,6 +163,35 @@ type DashboardProps = {
   initialCache?: ManagerDashCache | null;
 };
 
+function applyManagerFields(
+  cache: ManagerDashCache,
+  setters: {
+    setTodaySales: (v: number | null) => void;
+    setCachedResCounts: (v: { totalPax: number; totalBookings: number } | null) => void;
+    setNextCatering: (v: { deliveryDateISO: string } | null) => void;
+    setWeekCateringCount: (v: number | null) => void;
+    setKitchenStaff: (v: number | null) => void;
+    setHallStaff: (v: number | null) => void;
+  },
+): boolean {
+  const useful =
+    typeof cache.todaySales === "number" ||
+    typeof cache.totalPax === "number" ||
+    typeof cache.kitchenStaff === "number" ||
+    typeof cache.weekCateringCount === "number";
+  if (!useful) return false;
+
+  if (typeof cache.todaySales === "number") setters.setTodaySales(cache.todaySales);
+  if (typeof cache.totalPax === "number" && typeof cache.totalBookings === "number") {
+    setters.setCachedResCounts({ totalPax: cache.totalPax, totalBookings: cache.totalBookings });
+  }
+  if (cache.nextCatering) setters.setNextCatering(cache.nextCatering);
+  if (typeof cache.weekCateringCount === "number") setters.setWeekCateringCount(cache.weekCateringCount);
+  if (typeof cache.kitchenStaff === "number") setters.setKitchenStaff(cache.kitchenStaff);
+  if (typeof cache.hallStaff === "number") setters.setHallStaff(cache.hallStaff);
+  return true;
+}
+
 export default function ManagerDashboard({
   roleLabel = "Store Manager",
   displayName,
@@ -170,7 +200,14 @@ export default function ManagerDashboard({
   initialCache = null,
 }: DashboardProps = {}) {
   const { user, loading: authLoading } = useAuth();
-  const [metricsReady, setMetricsReady] = useState(false);
+  const seed = initialCache;
+  const [metricsReady, setMetricsReady] = useState(
+    () =>
+      !!seed &&
+      (typeof seed.todaySales === "number" ||
+        typeof seed.totalPax === "number" ||
+        typeof seed.kitchenStaff === "number"),
+  );
 
   const [firstName, setFirstName] = useState(displayName ?? "");
   const [attention, setAttention] = useState<AttentionCounts>({
@@ -184,26 +221,53 @@ export default function ManagerDashboard({
     setGreeting(greetingForNow());
   }, [todayKey]);
 
-  const [todaySales, setTodaySales] = useState<number | null>(null);
+  const [todaySales, setTodaySales] = useState<number | null>(seed?.todaySales ?? null);
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
-  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(null);
-  const [nextCatering, setNextCatering] = useState<{ deliveryDateISO: string } | null>(null);
-  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(null);
-  const [kitchenStaff, setKitchenStaff] = useState<number | null>(null);
-  const [hallStaff, setHallStaff] = useState<number | null>(null);
+  const [cachedResCounts, setCachedResCounts] = useState<{ totalPax: number; totalBookings: number } | null>(
+    typeof seed?.totalPax === "number" && typeof seed?.totalBookings === "number"
+      ? { totalPax: seed.totalPax, totalBookings: seed.totalBookings }
+      : null,
+  );
+  const [nextCatering, setNextCatering] = useState<{ deliveryDateISO: string } | null>(
+    seed?.nextCatering ?? null,
+  );
+  const [weekCateringCount, setWeekCateringCount] = useState<number | null>(
+    seed?.weekCateringCount ?? null,
+  );
+  const [kitchenStaff, setKitchenStaff] = useState<number | null>(seed?.kitchenStaff ?? null);
+  const [hallStaff, setHallStaff] = useState<number | null>(seed?.hallStaff ?? null);
 
   useEffect(() => {
-    if (!isManagerDashboardKind(sessionDashboard)) return;
     const date = todayKey || sydneyTodayKey();
+    const local = readManagerDashCache(date);
+    if (local) {
+      const ok = applyManagerFields(local, {
+        setTodaySales,
+        setCachedResCounts,
+        setNextCatering,
+        setWeekCateringCount,
+        setKitchenStaff,
+        setHallStaff,
+      });
+      if (ok) setMetricsReady(true);
+    }
+
+    if (!isManagerDashboardKind(sessionDashboard)) return;
     let cancelled = false;
-    void fetch(
-      `/api/dashboard/manager-snapshot?date=${encodeURIComponent(date)}`,
-      { cache: "no-store" },
-    )
+    void fetch(`/api/dashboard/manager-snapshot?date=${encodeURIComponent(date)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: ManagerDashServerSnapshot | null) => {
         if (cancelled || !data?.cache) return;
         writeManagerDashCache(data.cache);
+        const ok = applyManagerFields(data.cache, {
+          setTodaySales,
+          setCachedResCounts,
+          setNextCatering,
+          setWeekCateringCount,
+          setKitchenStaff,
+          setHallStaff,
+        });
+        if (ok) setMetricsReady(true);
       })
       .catch(() => {
         /* live fetch below still runs */
@@ -308,29 +372,24 @@ export default function ManagerDashboard({
 
   useEffect(() => {
     if (!todayKey || !user) return;
-    setMetricsReady(false);
-    setTodaySales(null);
-    setReservations(null);
-    setCachedResCounts(null);
-    setNextCatering(null);
-    setWeekCateringCount(null);
-    setKitchenStaff(null);
-    setHallStaff(null);
+    // Keep cached numbers on screen while live data refreshes.
     void fetchLiveData();
     const id = setInterval(fetchLiveData, 60_000);
     return () => clearInterval(id);
   }, [fetchLiveData, todayKey, user]);
 
   const resCounts = useMemo(() => {
-    if (!metricsReady || !reservations) return null;
-    const active = reservations.filter(
-      (r) => r.status !== "cancelled" && r.status !== "no-show",
-    );
-    return {
-      totalPax: active.reduce((s, r) => s + r.count, 0),
-      totalBookings: active.length,
-    };
-  }, [reservations, metricsReady]);
+    if (reservations) {
+      const active = reservations.filter(
+        (r) => r.status !== "cancelled" && r.status !== "no-show",
+      );
+      return {
+        totalPax: active.reduce((s, r) => s + r.count, 0),
+        totalBookings: active.length,
+      };
+    }
+    return cachedResCounts;
+  }, [reservations, cachedResCounts]);
 
   const attentionTotal =
     attention.holidayRequests + attention.availabilityChanges +
@@ -339,9 +398,9 @@ export default function ManagerDashboard({
   const team = (kitchenStaff ?? 0) + (hallStaff ?? 0);
 
   const salesPct = useMemo(() => {
-    if (!metricsReady || todaySales === null || dailyTarget <= 0) return null;
+    if (todaySales === null || dailyTarget <= 0) return null;
     return Math.min(100, Math.round((todaySales / dailyTarget) * 100));
-  }, [todaySales, dailyTarget, metricsReady]);
+  }, [todaySales, dailyTarget]);
 
   return (
     <>
@@ -476,14 +535,12 @@ export default function ManagerDashboard({
                   })}
                 </p>
               </>
-            ) : !metricsReady ? (
-              <p className={styles.opsLabel}>—</p>
             ) : (
-              <p className={styles.opsLabel}>No upcoming orders</p>
+              <p className={styles.opsLabel}>{metricsReady ? "No upcoming orders" : "—"}</p>
             )}
             <p className={styles.opsWeekLine}>
               This Week<br />
-              <strong>{!metricsReady || weekCateringCount === null ? "—" : `${weekCateringCount} Orders`}</strong>
+              <strong>{weekCateringCount === null ? "—" : `${weekCateringCount} Orders`}</strong>
             </p>
             <Link href="/operations/catering-orders" className={styles.opsViewLink}>
               View <span aria-hidden="true">→</span>
@@ -499,7 +556,7 @@ export default function ManagerDashboard({
             <div className={styles.salesBlock}>
               <p className={styles.salesLabel}>Today Sales</p>
               <p className={styles.salesValue}>
-                {!metricsReady || todaySales === null ? "—" : fmtCurrency(todaySales)}
+                {todaySales === null ? "—" : fmtCurrency(todaySales)}
               </p>
             </div>
             <div className={styles.salesDivider} aria-hidden="true" />
@@ -534,7 +591,7 @@ export default function ManagerDashboard({
                 <line x1="6" y1="15" x2="18" y2="15" />
                 <line x1="7" y1="19" x2="17" y2="19" />
               </svg>
-              <p className={styles.teamValue}>{metricsReady && kitchenStaff !== null ? kitchenStaff : "—"}</p>
+              <p className={styles.teamValue}>{kitchenStaff !== null ? kitchenStaff : "—"}</p>
               <p className={styles.teamLabel}>Kitchen</p>
             </div>
             <div className={styles.teamDivider} />
@@ -545,7 +602,7 @@ export default function ManagerDashboard({
                 <path d="M19 21v-2a5 5 0 0 0-4-4.9" />
                 <path d="M10 12l2 2 2-2" />
               </svg>
-              <p className={styles.teamValue}>{metricsReady && hallStaff !== null ? hallStaff : "—"}</p>
+              <p className={styles.teamValue}>{hallStaff !== null ? hallStaff : "—"}</p>
               <p className={styles.teamLabel}>Hall</p>
             </div>
           </div>
@@ -556,7 +613,7 @@ export default function ManagerDashboard({
               <path d="M21 21v-2a4 4 0 0 0-3-3.87" />
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
-            <span>{metricsReady && kitchenStaff !== null && hallStaff !== null ? `${team} Staff Scheduled` : "— Staff Scheduled"}</span>
+            <span>{kitchenStaff !== null && hallStaff !== null ? `${team} Staff Scheduled` : "— Staff Scheduled"}</span>
             <span className={styles.teamChev} aria-hidden="true">›</span>
           </Link>
         </div>

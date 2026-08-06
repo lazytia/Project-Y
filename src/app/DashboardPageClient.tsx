@@ -15,7 +15,9 @@ import {
 import { isManagerDashboardKind } from "@/lib/session-dashboard";
 import { hasClientSessionHint, readClientDashboardHint } from "@/lib/client-session-hint";
 import {
+  readDashCache,
   writeDashCache,
+  type DashCache,
 } from "@/lib/owner-dash-cache";
 import type { ManagerDashCache } from "@/lib/manager-dash-cache";
 import type { OwnerDashServerSnapshot } from "@/lib/owner-dash-server";
@@ -108,9 +110,11 @@ function Progress({ value, max, pctRight, tone = "orange" }: { value: number; ma
 export default function DashboardPageClient({
   sessionDashboard = null,
   initialManagerCache = null,
+  initialOwnerCache = null,
 }: {
   sessionDashboard?: DashboardKind | null;
   initialManagerCache?: ManagerDashCache | null;
+  initialOwnerCache?: DashCache | null;
 }) {
   const { user, loading } = useAuth();
   const effectiveDashboard = resolveDashboardKind(sessionDashboard, user);
@@ -137,7 +141,7 @@ export default function DashboardPageClient({
 
   if (loading || !user) {
     if (showOwnerDash) {
-      return <OwnerDashboard sessionDashboard={dashKind} />;
+      return <OwnerDashboard sessionDashboard={dashKind} initialCache={initialOwnerCache} />;
     }
     if (showManagerDash || hasClientSessionHint()) {
       return (
@@ -171,7 +175,7 @@ export default function DashboardPageClient({
     );
   }
 
-  return <OwnerDashboard sessionDashboard="owner" />;
+  return <OwnerDashboard sessionDashboard="owner" initialCache={initialOwnerCache} />;
 }
 
 type Stats = {
@@ -188,18 +192,44 @@ type Stats = {
   bestSellers: { name: string; sales: number; quantity: number }[];
 };
 
+function emptyStats(sales = 0): Stats {
+  return {
+    todaySales: sales,
+    transactions: 0,
+    transactionsChange: 0,
+    avgSpendPerTable: 0,
+    avgSpendChange: 0,
+    restaurantSales: 0,
+    platterSales: 0,
+    weeklyProgress: 0,
+    peakHour: null,
+    peakHourOrders: 0,
+    bestSellers: [],
+  };
+}
+
 function OwnerDashboard({
   sessionDashboard = null,
+  initialCache = null,
 }: {
   sessionDashboard?: DashboardKind | null;
+  initialCache?: DashCache | null;
 }) {
   const { user, loading: authLoading } = useAuth();
   const [todayKey, setTodayKey] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  /** Live fetch finished for the current selectedDate — gates numeric display. */
-  const [metricsReady, setMetricsReady] = useState(false);
+  /** True once we have something to show (cache or live). */
+  const [metricsReady, setMetricsReady] = useState(() => {
+    const sales =
+      typeof initialCache?.todaySales === "number"
+        ? initialCache.todaySales
+        : typeof initialCache?.savedDaySales === "number"
+          ? initialCache.savedDaySales
+          : null;
+    return sales !== null || typeof initialCache?.weekSalesDoc === "number";
+  });
 
   useEffect(() => {
     const key = sydneyTodayKey();
@@ -212,20 +242,133 @@ function OwnerDashboard({
   const weekMondayISO = selectedDate ? isoMondayOf(selectedDate) : "";
   const prevMondayISO = weekMondayISO ? addDaysISO(weekMondayISO, -7) : "";
 
-  const [stats, setStats] = useState<Stats | null>(null);
+  const seedSales =
+    typeof initialCache?.todaySales === "number"
+      ? initialCache.todaySales
+      : typeof initialCache?.savedDaySales === "number"
+        ? initialCache.savedDaySales
+        : null;
+
+  const [stats, setStats] = useState<Stats | null>(() =>
+    seedSales !== null
+      ? {
+          ...emptyStats(seedSales),
+          restaurantSales: initialCache?.restaurantSales ?? 0,
+          platterSales: initialCache?.platterSales ?? 0,
+          weeklyProgress: initialCache?.weeklyProgress ?? 0,
+          bestSellers: initialCache?.bestSellers ?? [],
+        }
+      : null,
+  );
   const [statsError, setStatsError] = useState(false);
   const [reservations, setReservations] = useState<Reservation[] | null>(null);
   const [cateringOrders, setCateringOrders] = useState<CateringOrder[] | null>(null);
-  const [lunchStaff, setLunchStaff] = useState<number | null>(null);
-  const [dinnerStaff, setDinnerStaff] = useState<number | null>(null);
-  const [prevWeekSales, setPrevWeekSales] = useState<number | null>(null);
-  const [weekSalesDoc, setWeekSalesDoc] = useState<number | null>(null);
-  const [weeklyPayroll, setWeeklyPayroll] = useState<number | null>(null);
-  const [reviewNote, setReviewNote] = useState("");
+  const [cachedPax, setCachedPax] = useState<{ lunchPax: number; dinnerPax: number } | null>(() =>
+    typeof initialCache?.lunchPax === "number" || typeof initialCache?.dinnerPax === "number"
+      ? { lunchPax: initialCache?.lunchPax ?? 0, dinnerPax: initialCache?.dinnerPax ?? 0 }
+      : null,
+  );
+  const [cachedCatering, setCachedCatering] = useState<{
+    nextCateringISO?: string;
+    weekCateringCount?: number;
+  } | null>(() =>
+    typeof initialCache?.nextCateringISO === "string" ||
+    typeof initialCache?.weekCateringCount === "number"
+      ? {
+          nextCateringISO: initialCache?.nextCateringISO,
+          weekCateringCount: initialCache?.weekCateringCount,
+        }
+      : null,
+  );
+  const [lunchStaff, setLunchStaff] = useState<number | null>(initialCache?.lunchStaff ?? null);
+  const [dinnerStaff, setDinnerStaff] = useState<number | null>(initialCache?.dinnerStaff ?? null);
+  const [prevWeekSales, setPrevWeekSales] = useState<number | null>(initialCache?.prevWeekSales ?? null);
+  const [weekSalesDoc, setWeekSalesDoc] = useState<number | null>(initialCache?.weekSalesDoc ?? null);
+  const [weeklyPayroll, setWeeklyPayroll] = useState<number | null>(initialCache?.weeklyPayroll ?? null);
+  const [reviewNote, setReviewNote] = useState(initialCache?.reviewNote ?? "");
   const [reviewEditing, setReviewEditing] = useState(false);
-  const [reviewDraft, setReviewDraft] = useState("");
+  const [reviewDraft, setReviewDraft] = useState(initialCache?.reviewNote ?? "");
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+
+  const applyOwnerCache = useCallback((cache: DashCache | null): boolean => {
+    if (!cache) return false;
+    const hasNumbers =
+      typeof cache.todaySales === "number" ||
+      typeof cache.savedDaySales === "number" ||
+      typeof cache.weeklyProgress === "number" ||
+      typeof cache.weekSalesDoc === "number" ||
+      typeof cache.lunchPax === "number" ||
+      typeof cache.lunchStaff === "number";
+    if (!hasNumbers) return false;
+
+    const sales =
+      typeof cache.todaySales === "number"
+        ? cache.todaySales
+        : typeof cache.savedDaySales === "number"
+          ? cache.savedDaySales
+          : null;
+    if (sales !== null) {
+      setStats((prev) => ({
+        ...(prev ?? emptyStats(sales)),
+        todaySales: sales,
+        restaurantSales: cache.restaurantSales ?? prev?.restaurantSales ?? 0,
+        platterSales: cache.platterSales ?? prev?.platterSales ?? 0,
+        weeklyProgress: cache.weeklyProgress ?? prev?.weeklyProgress ?? 0,
+        bestSellers: cache.bestSellers ?? prev?.bestSellers ?? [],
+      }));
+    }
+    if (typeof cache.lunchPax === "number" || typeof cache.dinnerPax === "number") {
+      setCachedPax({
+        lunchPax: cache.lunchPax ?? 0,
+        dinnerPax: cache.dinnerPax ?? 0,
+      });
+    }
+    if (typeof cache.lunchStaff === "number") setLunchStaff(cache.lunchStaff);
+    if (typeof cache.dinnerStaff === "number") setDinnerStaff(cache.dinnerStaff);
+    if (typeof cache.prevWeekSales === "number") setPrevWeekSales(cache.prevWeekSales);
+    if (typeof cache.weekSalesDoc === "number") setWeekSalesDoc(cache.weekSalesDoc);
+    if (typeof cache.weeklyPayroll === "number") setWeeklyPayroll(cache.weeklyPayroll);
+    if (typeof cache.reviewNote === "string") {
+      setReviewNote(cache.reviewNote);
+      setReviewDraft(cache.reviewNote);
+    }
+    if (
+      typeof cache.nextCateringISO === "string" ||
+      typeof cache.weekCateringCount === "number"
+    ) {
+      setCachedCatering({
+        nextCateringISO: cache.nextCateringISO,
+        weekCateringCount: cache.weekCateringCount,
+      });
+    }
+    setMetricsReady(true);
+    return true;
+  }, []);
+
+  const fetchSalesBrief = useCallback(async (dateKey: string) => {
+    try {
+      const res = await fetch(
+        `/api/square/today-sales-brief?date=${encodeURIComponent(dateKey)}`,
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as { todaySales?: number };
+      if (typeof data.todaySales !== "number") return;
+      setStats((prev) => ({
+        ...(prev ?? emptyStats(data.todaySales!)),
+        todaySales: data.todaySales!,
+      }));
+      setMetricsReady(true);
+      setStatsError(false);
+      setLastUpdated(new Date());
+      writeDashCache(dateKey, {
+        todaySales: data.todaySales,
+        savedDaySales: data.todaySales,
+      });
+    } catch {
+      /* full today-stats still runs */
+    }
+  }, []);
 
   const fetchStats = useCallback(async (dateKey: string) => {
     try {
@@ -235,6 +378,7 @@ function OwnerDashboard({
       setStats(data);
       setStatsError(false);
       setLastUpdated(new Date());
+      setMetricsReady(true);
       writeDashCache(dateKey, {
         todaySales: data.todaySales,
         restaurantSales: data.restaurantSales,
@@ -386,44 +530,52 @@ function OwnerDashboard({
     }
   }, []);
 
+  // Stale-while-revalidate: paint cache/snapshot immediately, refresh in background.
   useEffect(() => {
-    if (sessionDashboard !== "owner" || !selectedDate) return;
+    if (!selectedDate) return;
     let cancelled = false;
-    void fetch(
-      `/api/dashboard/owner-snapshot?date=${encodeURIComponent(selectedDate)}`,
-      { cache: "no-store" },
-    )
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: OwnerDashServerSnapshot | null) => {
-        if (cancelled || !data?.cache) return;
-        writeDashCache(data.dateKey, data.cache);
-      })
-      .catch(() => {
-        /* live fetch below still runs */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionDashboard, selectedDate]);
 
-  // Fetch live data once auth + date are ready — no cached numbers on screen.
-  useEffect(() => {
-    if (!selectedDate || !user) return;
-    let cancelled = false;
-    setMetricsReady(false);
-    setStats(null);
+    const hadCache =
+      applyOwnerCache(readDashCache(selectedDate)) ||
+      (!!initialCache && applyOwnerCache(initialCache));
+    if (!hadCache) {
+      setMetricsReady(false);
+      setStats(null);
+      setReservations(null);
+      setCateringOrders(null);
+      setCachedPax(null);
+      setCachedCatering(null);
+      setLunchStaff(null);
+      setDinnerStaff(null);
+      setPrevWeekSales(null);
+      setWeekSalesDoc(null);
+      setWeeklyPayroll(null);
+      setReviewNote("");
+      setReviewDraft("");
+    }
     setStatsError(false);
-    setReservations(null);
-    setCateringOrders(null);
-    setLunchStaff(null);
-    setDinnerStaff(null);
-    setPrevWeekSales(null);
-    setWeekSalesDoc(null);
-    setWeeklyPayroll(null);
-    setReviewNote("");
-    setReviewDraft("");
+
+    if (sessionDashboard === "owner") {
+      void fetch(`/api/dashboard/owner-snapshot?date=${encodeURIComponent(selectedDate)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: OwnerDashServerSnapshot | null) => {
+          if (cancelled || !data?.cache) return;
+          writeDashCache(data.dateKey, data.cache);
+          applyOwnerCache(data.cache);
+        })
+        .catch(() => {
+          /* live fetch below still runs */
+        });
+    }
+
+    if (!user) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
     void Promise.allSettled([
+      fetchSalesBrief(selectedDate),
       fetchStats(selectedDate),
       fetchReservations(selectedDate),
       fetchCatering(),
@@ -440,7 +592,7 @@ function OwnerDashboard({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid]);
+  }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid, sessionDashboard]);
 
   useEffect(() => {
     if (!selectedDate || !isToday) return;
@@ -451,33 +603,44 @@ function OwnerDashboard({
   }, [selectedDate, isToday]);
 
   const resCounts = useMemo(() => {
-    if (!metricsReady || !reservations) return null;
-    const active = reservations.filter((r) => r.status !== "cancelled" && r.status !== "no-show");
-    const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
-    const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
-    return {
-      lunchPax: lunch.reduce((s, r) => s + r.count, 0),
-      dinnerPax: dinner.reduce((s, r) => s + r.count, 0),
-    };
-  }, [reservations, metricsReady]);
+    if (reservations) {
+      const active = reservations.filter((r) => r.status !== "cancelled" && r.status !== "no-show");
+      const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
+      const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
+      return {
+        lunchPax: lunch.reduce((s, r) => s + r.count, 0),
+        dinnerPax: dinner.reduce((s, r) => s + r.count, 0),
+      };
+    }
+    return cachedPax;
+  }, [reservations, cachedPax]);
 
-  const nextCatering = useMemo(() => {
-    if (!metricsReady || !cateringOrders || !todayKey) return null;
-    const upcoming = cateringOrders
-      .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey)
-      .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
-    return upcoming[0] ?? null;
-  }, [cateringOrders, todayKey, metricsReady]);
+  const nextCatering = useMemo((): { deliveryDateISO: string } | null => {
+    if (cateringOrders && todayKey) {
+      const upcoming = cateringOrders
+        .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey)
+        .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
+      return upcoming[0] ? { deliveryDateISO: upcoming[0].deliveryDateISO } : null;
+    }
+    if (cachedCatering?.nextCateringISO) {
+      return { deliveryDateISO: cachedCatering.nextCateringISO };
+    }
+    return null;
+  }, [cateringOrders, todayKey, cachedCatering]);
 
   const weekCateringCount = useMemo(() => {
-    if (!metricsReady || !cateringOrders || !weekMondayISO) return null;
-    const end = addDaysISO(weekMondayISO, 6);
-    return cateringOrders.filter(
-      (o) => o.deliveryDateISO >= weekMondayISO && o.deliveryDateISO <= end && o.status !== "CANCELLED",
-    ).length;
-  }, [cateringOrders, weekMondayISO, metricsReady]);
+    if (cateringOrders && weekMondayISO) {
+      const end = addDaysISO(weekMondayISO, 6);
+      return cateringOrders.filter(
+        (o) => o.deliveryDateISO >= weekMondayISO && o.deliveryDateISO <= end && o.status !== "CANCELLED",
+      ).length;
+    }
+    return typeof cachedCatering?.weekCateringCount === "number"
+      ? cachedCatering.weekCateringCount
+      : null;
+  }, [cateringOrders, weekMondayISO, cachedCatering]);
 
-  const weeklySales = metricsReady ? (weekSalesDoc ?? stats?.weeklyProgress ?? null) : null;
+  const weeklySales = weekSalesDoc ?? stats?.weeklyProgress ?? null;
   const vsLastWeekPct = useMemo(() => {
     if (weeklySales === null || prevWeekSales === null || !prevWeekSales) return null;
     return ((weeklySales - prevWeekSales) / prevWeekSales) * 100;
@@ -490,7 +653,7 @@ function OwnerDashboard({
 
   const payrollOnTarget = payrollPct !== null && payrollPct <= PAYROLL_TARGET_PCT;
 
-  const bestSellers = metricsReady ? (stats?.bestSellers ?? []).slice(0, 3) : [];
+  const bestSellers = (stats?.bestSellers ?? []).slice(0, 3);
 
   const saveReview = async () => {
     if (reviewSaving) return;
@@ -592,8 +755,7 @@ function OwnerDashboard({
           <div className={styles.todayLeft}>
             <p className={styles.miniLabel}>TODAY SALES</p>
             {(() => {
-              const shown =
-                metricsReady && typeof stats?.todaySales === "number" ? stats.todaySales : null;
+              const shown = typeof stats?.todaySales === "number" ? stats.todaySales : null;
               return (
                 <>
                   <p className={`${styles.salesAmount} ${shown === null ? styles.loading : ""}`}>
@@ -617,7 +779,7 @@ function OwnerDashboard({
                   {resCounts?.lunchPax ?? "—"} <span className={styles.mealUnit}>PAX</span>
                 </p>
                 <p className={styles.mealSub}>
-                  <span aria-hidden="true">👥</span> {metricsReady && lunchStaff !== null ? lunchStaff : "—"} STAFF
+                  <span aria-hidden="true">👥</span> {lunchStaff !== null ? lunchStaff : "—"} STAFF
                 </p>
               </div>
             </div>
@@ -629,7 +791,7 @@ function OwnerDashboard({
                   {resCounts?.dinnerPax ?? "—"} <span className={styles.mealUnit}>PAX</span>
                 </p>
                 <p className={styles.mealSub}>
-                  <span aria-hidden="true">👥</span> {metricsReady && dinnerStaff !== null ? dinnerStaff : "—"} STAFF
+                  <span aria-hidden="true">👥</span> {dinnerStaff !== null ? dinnerStaff : "—"} STAFF
                 </p>
               </div>
             </div>
