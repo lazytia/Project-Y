@@ -9,8 +9,14 @@ const SITE_TIMEOUT_MS = 2_800;
 const SITE_HTML_CAP = 200_000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const MISS_CACHE_TTL_MS = 30_000;
-/** How many guessed website URLs to race when no search API key is set. */
-const WEBSITE_PROBE_LIMIT = 4;
+/**
+ * How many guessed website URLs to race when no search API key is set.
+ * These all fire in parallel and resolve via firstHit, so the wall-clock
+ * cost is one SITE_TIMEOUT_MS regardless of the count — capping it low only
+ * loses coverage. At 4 the bare ".com" variants fell off the end, which is
+ * where global brands like Rio Tinto and Canva actually live.
+ */
+const WEBSITE_PROBE_LIMIT = 8;
 
 const BROWSER_HEADERS = {
   "User-Agent":
@@ -90,18 +96,32 @@ function isNoiseUrl(url: string): boolean {
   );
 }
 
+/** Does this result's host actually belong to the company we searched for? */
+function domainMatchesSlug(url: string, slugs: string[]): boolean {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return false;
+  }
+  const label = host.split(".")[0] ?? "";
+  return slugs.some((candidate) => candidate.length >= 3 && label === candidate);
+}
+
 function extractMetaFromHtml(html: string): { title?: string; description?: string } {
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   let description: string | undefined;
 
+  // Pages often carry several description tags — a terse one for social
+  // cards and a fuller one for search engines. Taking the first match gave
+  // us summaries as useless as just "Atlassian", so prefer the longest.
   for (const tag of html.matchAll(/<meta\b[^>]*>/gi)) {
     const meta = tag[0];
     if (!/(?:name|property)=["'](?:description|og:description)["']/i.test(meta)) continue;
     const content = meta.match(/\bcontent=["']([^"']+)["']/i)?.[1];
-    if (content?.trim()) {
-      description = decodeHtmlEntities(content);
-      break;
-    }
+    if (!content?.trim()) continue;
+    const decoded = decodeHtmlEntities(content);
+    if (!description || decoded.length > description.length) description = decoded;
   }
 
   return {
@@ -141,17 +161,10 @@ async function readHtmlUntilDescription(res: Response, maxBytes: number): Promis
       const { done, value } = await reader.read();
       if (done) break;
       out += decoder.decode(value, { stream: true });
-      // Stop once description meta is fully available (content=… present on same tag).
-      if (
-        /<meta\b[^>]*(?:name|property)=["'](?:description|og:description)["'][^>]*\bcontent=["'][^"']+["']/i.test(
-          out,
-        ) ||
-        /<meta\b[^>]*\bcontent=["'][^"']+["'][^>]*(?:name|property)=["'](?:description|og:description)["']/i.test(
-          out,
-        )
-      ) {
-        break;
-      }
+      // Every meta tag lives in <head>, so stop there rather than at the
+      // first description match — otherwise we'd cut off before a later,
+      // fuller description tag that extractMetaFromHtml would prefer.
+      if (/<\/head\s*>/i.test(out)) break;
     }
   } finally {
     try {
@@ -249,32 +262,21 @@ async function fetchBraveSearchSnippet(query: string): Promise<SearchHit | null>
   };
 }
 
-/** First successful snippet wins. */
+/**
+ * Best successful snippet in *priority* order, not whichever returns first.
+ *
+ * Every task is already in flight before we start awaiting, so this still
+ * costs one timeout of wall-clock time overall — but it resolves
+ * deterministically. Racing on arrival order meant a company's Australian
+ * site lost to whichever mirror happened to be quicker, which is how
+ * "Deloitte" came back as the Korean landing page.
+ */
 async function firstHit(tasks: Promise<SearchHit | null>[]): Promise<SearchHit | null> {
-  if (!tasks.length) return null;
-
-  return new Promise((resolve) => {
-    let pending = tasks.length;
-    let settled = false;
-
-    for (const task of tasks) {
-      void task.then(
-        (hit) => {
-          if (!settled && hit?.snippet) {
-            settled = true;
-            resolve(hit);
-            return;
-          }
-          pending -= 1;
-          if (!settled && pending === 0) resolve(null);
-        },
-        () => {
-          pending -= 1;
-          if (!settled && pending === 0) resolve(null);
-        },
-      );
-    }
-  });
+  for (const task of tasks) {
+    const hit = await task.catch(() => null);
+    if (hit?.snippet) return hit;
+  }
+  return null;
 }
 
 function topWebsiteCandidates(companyName: string, slug: string): string[] {
@@ -316,26 +318,19 @@ export async function buildCompanySummary(
 
   const searchUrl = googleSearchUrl(`${companyName} company`);
   const query = `${companyName} company`;
+  const slugs = companySlugCandidates(companyName, slug);
 
-  // Guests sometimes type their own name into the Company field. Searching
-  // it would surface a same-named stranger's LinkedIn blurb, which we'd then
-  // render as if it described this guest. Never search a personal name —
-  // just hand back the Google link and let staff judge.
-  if (looksLikePersonName(companyName)) {
-    const personResult: CompanySummaryResult = {
-      companyName,
-      slug,
-      websiteUrl: null,
-      title: null,
-      summary: null,
-      googleSearchUrl: searchUrl,
-      found: false,
-      tld: null,
-      source: "none",
-    };
-    summaryCache.set(cacheKey, { at: Date.now(), value: personResult });
-    return personResult;
-  }
+  const miss: CompanySummaryResult = {
+    companyName,
+    slug,
+    websiteUrl: null,
+    title: null,
+    summary: null,
+    googleSearchUrl: searchUrl,
+    found: false,
+    tld: null,
+    source: "none",
+  };
 
   const hit = await firstHit([
     fetchGoogleCustomSearch(query),
@@ -343,32 +338,35 @@ export async function buildCompanySummary(
     ...topWebsiteCandidates(companyName, slug).map((url) => fetchSiteMeta(url)),
   ]);
 
-  const websiteUrl =
-    hit?.url && !isNoiseUrl(hit.url) ? normalizeWebsiteUrl(hit.url) : null;
+  // Social and directory pages are dropped outright: their blurb describes
+  // whoever happens to share the name, not the company on this booking.
+  if (!hit?.snippet || !hit.url || isNoiseUrl(hit.url)) {
+    summaryCache.set(cacheKey, { at: Date.now(), value: miss });
+    return miss;
+  }
 
-  const result: CompanySummaryResult = hit?.snippet
-    ? {
-        companyName,
-        slug,
-        websiteUrl,
-        title: hit.title ?? null,
-        summary: simplifySummary(hit.snippet),
-        googleSearchUrl: searchUrl,
-        found: true,
-        tld: detectTld(websiteUrl),
-        source: hit.source,
-      }
-    : {
-        companyName,
-        slug,
-        websiteUrl: null,
-        title: null,
-        summary: null,
-        googleSearchUrl: searchUrl,
-        found: false,
-        tld: null,
-        source: "none",
-      };
+  // Guests sometimes type their own name into the Company field. We still
+  // search it — "Rio Tinto" and "Rosie Karkash" are indistinguishable by
+  // shape — but for personal-looking names we only trust a result whose
+  // domain is actually that name. Otherwise a same-named stranger's page
+  // would render as if it described the guest.
+  if (looksLikePersonName(companyName) && !domainMatchesSlug(hit.url, slugs)) {
+    summaryCache.set(cacheKey, { at: Date.now(), value: miss });
+    return miss;
+  }
+
+  const websiteUrl = normalizeWebsiteUrl(hit.url);
+  const result: CompanySummaryResult = {
+    companyName,
+    slug,
+    websiteUrl,
+    title: hit.title ?? null,
+    summary: simplifySummary(hit.snippet),
+    googleSearchUrl: searchUrl,
+    found: true,
+    tld: detectTld(websiteUrl),
+    source: hit.source,
+  };
 
   summaryCache.set(cacheKey, { at: Date.now(), value: result });
   return result;

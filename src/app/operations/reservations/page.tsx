@@ -541,13 +541,6 @@ function DetailModal({
     if (!company || !user) return;
 
     const fallbackGoogle = `https://www.google.com/search?q=${encodeURIComponent(`${company.displayName} company`)}`;
-    // Open under the user gesture — async window.open is blocked in the PWA.
-    let externalTab: Window | null = null;
-    try {
-      externalTab = window.open("about:blank", "_blank");
-    } catch {
-      externalTab = null;
-    }
 
     setSummaryOpen(true);
     setSummaryLoading(true);
@@ -570,21 +563,9 @@ function DetailModal({
         typeof data.googleSearchUrl === "string" ? data.googleSearchUrl : fallbackGoogle;
 
       if (!data.found || !data.summary) {
-        if (externalTab && !externalTab.closed) {
-          try {
-            externalTab.opener = null;
-            externalTab.location.replace(googleSearchUrl);
-            setSummaryOpen(false);
-            return;
-          } catch {
-            try {
-              externalTab.close();
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-        // PWA / popup blocked — keep sheet with a tappable Google link.
+        // Staff asked for the summary in-app, so stay in the sheet rather
+        // than hijacking the tap into a Google tab. The link is right there
+        // if they want to dig further.
         setCompanySummary({
           companyName: String(data.companyName ?? company.displayName),
           websiteUrl: null,
@@ -595,14 +576,6 @@ function DetailModal({
         return;
       }
 
-      if (externalTab && !externalTab.closed) {
-        try {
-          externalTab.close();
-        } catch {
-          /* ignore */
-        }
-      }
-
       setCompanySummary({
         companyName: String(data.companyName ?? company.displayName),
         websiteUrl: typeof data.websiteUrl === "string" ? data.websiteUrl : null,
@@ -611,13 +584,6 @@ function DetailModal({
         googleSearchUrl,
       });
     } catch (err) {
-      if (externalTab && !externalTab.closed) {
-        try {
-          externalTab.close();
-        } catch {
-          /* ignore */
-        }
-      }
       setSummaryError(err instanceof Error ? err.message : "Could not load company summary.");
     } finally {
       setSummaryLoading(false);
@@ -640,20 +606,13 @@ function DetailModal({
           <FactIcon icon={<ClockIcon />} label="Time" value={fmt12h(reservation.time)} />
           <FactIcon icon={<PeopleIcon />} label="Guests" value={`${reservation.count} Guests`} />
           {company ? (
-            company.kind === "person" ? (
-              // Guest typed a personal name into Company — there's no company
-              // site to look up, so render plain text rather than baiting a
-              // tap that can only come back empty.
-              <FactIcon icon={<BuildingIcon />} label="Company" value={company.displayName} />
-            ) : (
-              <div className={styles.factRowItem}>
-                <span className={styles.factIconWrap}><BuildingIcon /></span>
-                <span className={styles.factLabel}>Company</span>
-                <button type="button" className={styles.companyLink} onClick={() => void openCompanySummary()}>
-                  {company.displayName}
-                </button>
-              </div>
-            )
+            <div className={styles.factRowItem}>
+              <span className={styles.factIconWrap}><BuildingIcon /></span>
+              <span className={styles.factLabel}>Company</span>
+              <button type="button" className={styles.companyLink} onClick={() => void openCompanySummary()}>
+                {company.displayName}
+              </button>
+            </div>
           ) : null}
           <FactIcon icon={<SeatIcon />} label="Seating" value={prettySeating(reservation.seating)} />
         </div>
