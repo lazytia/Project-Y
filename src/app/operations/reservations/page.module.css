@@ -3,7 +3,7 @@
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ?? Header ?? */
+/* ?ï¿½?ï¿½ Header ?ï¿½?ï¿½ */
 .header {
   display: flex;
   align-items: center;
@@ -50,7 +50,7 @@
   padding: 0;
 }
 
-/* ?? Hero ?? */
+/* ?ï¿½?ï¿½ Hero ?ï¿½?ï¿½ */
 .hero {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -76,7 +76,7 @@
   color: var(--color-warm);
 }
 
-/* ?? Service summary cards (Lunch / Dinner) ?? */
+/* ?ï¿½?ï¿½ Service summary cards (Lunch / Dinner) ?ï¿½?ï¿½ */
 .serviceCards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -183,7 +183,7 @@
   color: var(--color-fg);
 }
 
-/* ?? Activity strip (cancelled / new / updated) ?? */
+/* ?ï¿½?ï¿½ Activity strip (cancelled / new / updated) ?ï¿½?ï¿½ */
 .activityList {
   list-style: none;
   margin: 0 0 var(--space-3) 0;
@@ -278,7 +278,7 @@
 }
 .activityUpdated .activityIcon { color: var(--color-fg-muted); }
 
-/* ?? Cancel banner (legacy, kept for compat) ?? */
+/* ?ï¿½?ï¿½ Cancel banner (legacy, kept for compat) ?ï¿½?ï¿½ */
 .cancelBanner {
   display: flex;
   align-items: center;
@@ -331,7 +331,7 @@
   text-decoration: none;
 }
 
-/* ?? Search ?? */
+/* ?ï¿½?ï¿½ Search ?ï¿½?ï¿½ */
 .searchWrap {
   display: flex;
   align-items: center;
@@ -355,7 +355,7 @@
   color: var(--color-fg);
 }
 
-/* ?? Section ?? */
+/* ?ï¿½?ï¿½ Section ?ï¿½?ï¿½ */
 .section {
   margin-bottom: var(--space-4);
 }
@@ -494,7 +494,7 @@
   background: var(--color-surface);
 }
 
-/* ?? Add reservation button (sticky) ?? */
+/* ?ï¿½?ï¿½ Add reservation button (sticky) ?ï¿½?ï¿½ */
 .addBtn {
   position: fixed;
   left: 0;
@@ -530,7 +530,7 @@
   padding: var(--space-3);
 }
 
-/* ?? Detail Sheet (bottom modal) ?? */
+/* ?ï¿½?ï¿½ Detail Sheet (bottom modal) ?ï¿½?ï¿½ */
 .sheetBackdrop {
   position: fixed;
   inset: 0;
@@ -716,6 +716,19 @@
   font-weight: 600;
 }
 
+.summaryIndustry {
+  display: inline-block;
+  margin: 0 0 var(--space-2) 0;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2, rgba(127, 127, 127, 0.12));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
 .summaryBody {
   margin: 0 0 var(--space-3) 0;
   font-size: 14px;
@@ -798,7 +811,7 @@
   margin-bottom: var(--space-3);
 }
 
-/* ?? Full-screen edit sheet (matches mockup) ?? */
+/* ?ï¿½?ï¿½ Full-screen edit sheet (matches mockup) ?ï¿½?ï¿½ */
 .fullSheet {
   position: fixed;
   inset: 0;

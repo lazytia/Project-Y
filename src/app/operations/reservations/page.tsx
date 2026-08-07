@@ -533,6 +533,7 @@ function DetailModal({
     companyName: string;
     websiteUrl: string | null;
     summary: string;
+    industry: string | null;
     tld: string | null;
     googleSearchUrl: string;
   } | null>(null);
@@ -570,6 +571,7 @@ function DetailModal({
           companyName: String(data.companyName ?? company.displayName),
           websiteUrl: null,
           summary: "No quick summary found. Search Google for details.",
+          industry: null,
           tld: null,
           googleSearchUrl,
         });
@@ -580,6 +582,7 @@ function DetailModal({
         companyName: String(data.companyName ?? company.displayName),
         websiteUrl: typeof data.websiteUrl === "string" ? data.websiteUrl : null,
         summary: String(data.summary),
+        industry: typeof data.industry === "string" && data.industry ? data.industry : null,
         tld: typeof data.tld === "string" ? data.tld : null,
         googleSearchUrl,
       });
@@ -645,7 +648,7 @@ function DetailModal({
           <button type="button" className={styles.sheetClose} onClick={() => setSummaryOpen(false)} aria-label="Close">×</button>
           <h3 className={styles.summaryTitle}>{company.displayName}</h3>
           {summaryLoading ? (
-            <p className={styles.summaryBody}>Searching Google…</p>
+            <p className={styles.summaryBody}>Looking up this company…</p>
           ) : summaryError ? (
             <p className={styles.summaryError}>{summaryError}</p>
           ) : companySummary ? (
@@ -659,6 +662,9 @@ function DetailModal({
                     <span className={styles.summaryTld}> · .{companySummary.tld}</span>
                   ) : null}
                 </p>
+              ) : null}
+              {companySummary.industry ? (
+                <p className={styles.summaryIndustry}>{companySummary.industry}</p>
               ) : null}
               <p className={styles.summaryBody}>{companySummary.summary}</p>
               <a

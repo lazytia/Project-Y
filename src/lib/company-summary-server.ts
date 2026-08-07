@@ -1,10 +1,24 @@
+import { GoogleAuth } from "google-auth-library";
 import {
   candidateWebsiteUrls,
   companySlugCandidates,
   looksLikePersonName,
 } from "@/lib/reservation-company";
 
-const SEARCH_TIMEOUT_MS = 2_500;
+/**
+ * Gemini with Google Search grounding writes the summary staff actually see.
+ *
+ * Guessing a homepage from the company name only works when the domain *is*
+ * the name — it could never reach commbank.com.au from "Commonwealth Bank",
+ * and retailers like Bunnings block server-side fetches outright. A grounded
+ * model resolves the real company and describes it in a sentence or two,
+ * which is the whole point of the feature. It also reliably declines when the
+ * guest typed their own name, so we no longer guess at that from name shape.
+ */
+const VERTEX_LOCATION = "global";
+const VERTEX_MODEL = "gemini-2.5-flash";
+const VERTEX_TIMEOUT_MS = 9_000;
+
 const SITE_TIMEOUT_MS = 2_800;
 const SITE_HTML_CAP = 200_000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
@@ -29,7 +43,7 @@ type SearchHit = {
   snippet: string;
   url?: string;
   title?: string;
-  source: "website" | "google" | "search";
+  source: "website";
 };
 
 const summaryCache = new Map<string, { at: number; value: CompanySummaryResult }>();
@@ -199,67 +213,93 @@ async function fetchSiteMeta(url: string): Promise<SearchHit | null> {
   };
 }
 
-async function fetchGoogleCustomSearch(query: string): Promise<SearchHit | null> {
-  const apiKey = process.env.GOOGLE_CSE_API_KEY?.trim();
-  const cx = process.env.GOOGLE_CSE_CX?.trim();
-  if (!apiKey || !cx) return null;
+type CompanyBrief = {
+  isCompany: boolean;
+  summary: string;
+  industry: string;
+  website: string;
+};
 
-  const params = new URLSearchParams({ key: apiKey, cx, q: query, num: "3" });
-  const res = await fetchWithTimeout(
-    `https://customsearch.googleapis.com/customsearch/v1?${params}`,
-    { headers: { Accept: "application/json" } },
-    SEARCH_TIMEOUT_MS,
-  );
-  if (!res?.ok) return null;
-
-  const data = (await res.json()) as {
-    items?: { link?: string; snippet?: string; title?: string }[];
-  };
-  const item = (data.items ?? []).find((row) => row.snippet?.trim());
-  if (!item?.snippet) return null;
-
-  return {
-    snippet: item.snippet.trim(),
-    url: item.link,
-    title: item.title?.trim(),
-    source: "google",
-  };
+let googleAuth: GoogleAuth | null = null;
+function vertexAuth(): GoogleAuth {
+  googleAuth ??= new GoogleAuth({
+    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+  });
+  return googleAuth;
 }
 
-async function fetchBraveSearchSnippet(query: string): Promise<SearchHit | null> {
-  const apiKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
-  if (!apiKey) return null;
+function buildBriefPrompt(companyName: string): string {
+  return [
+    "You are briefing a restaurant host about a company on a guest's booking.",
+    `Company name on the booking: "${companyName}"`,
+    "",
+    "Reply with ONLY a JSON object:",
+    '{"isCompany":boolean,"summary":string,"industry":string,"website":string}',
+    "- isCompany: false if this is a person's name, or if you cannot verify a",
+    "  real company by this name. When false, leave the other fields empty.",
+    "- summary: at most two short sentences on what the company does. Plain text.",
+    "- industry: two or three words.",
+    "- website: official homepage URL, or empty string if unsure.",
+    "Prefer the Australian entity when one exists.",
+  ].join("\n");
+}
 
-  const params = new URLSearchParams({
-    q: query,
-    count: "3",
-    country: "AU",
-    search_lang: "en",
-  });
-  const res = await fetchWithTimeout(
-    `https://api.search.brave.com/res/v1/web/search?${params}`,
-    {
-      headers: {
-        Accept: "application/json",
-        "X-Subscription-Token": apiKey,
+/** Grounded company brief from Gemini. Returns null if Vertex is unreachable. */
+async function fetchCompanyBrief(companyName: string): Promise<CompanyBrief | null> {
+  try {
+    const auth = vertexAuth();
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT?.trim() || (await auth.getProjectId());
+    if (!projectId) return null;
+
+    const token = await auth.getAccessToken();
+    if (!token) return null;
+
+    const res = await fetchWithTimeout(
+      `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${VERTEX_LOCATION}/publishers/google/models/${VERTEX_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: buildBriefPrompt(companyName) }] }],
+          tools: [{ googleSearch: {} }],
+          generationConfig: {
+            temperature: 0.1,
+            // Reasoning tokens are billed as output and count against this
+            // budget. At 500 with thinking on, "TCS Australia" spent the
+            // allowance before finishing the JSON and came back truncated.
+            // A two-sentence blurb needs no deliberation, so switch thinking
+            // off — that cuts latency and roughly two thirds of the cost.
+            maxOutputTokens: 512,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
       },
-    },
-    SEARCH_TIMEOUT_MS,
-  );
-  if (!res?.ok) return null;
+      VERTEX_TIMEOUT_MS,
+    );
+    if (!res?.ok) return null;
 
-  const data = (await res.json()) as {
-    web?: { results?: { title?: string; url?: string; description?: string }[] };
-  };
-  const row = (data.web?.results ?? []).find((item) => item.description?.trim());
-  if (!row?.description) return null;
+    const data = (await res.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    };
+    const text = (data.candidates?.[0]?.content?.parts ?? [])
+      .map((part) => part.text ?? "")
+      .join("");
 
-  return {
-    title: row.title?.trim(),
-    url: row.url,
-    snippet: stripHtmlTags(row.description.trim()),
-    source: "search",
-  };
+    // Grounded replies sometimes arrive fenced or with a trailing note, so
+    // pull the object out rather than parsing the whole response.
+    const json = text.match(/\{[\s\S]*\}/)?.[0];
+    if (!json) return null;
+
+    const parsed = JSON.parse(json) as Partial<CompanyBrief>;
+    return {
+      isCompany: parsed.isCompany === true,
+      summary: typeof parsed.summary === "string" ? parsed.summary.trim() : "",
+      industry: typeof parsed.industry === "string" ? parsed.industry.trim() : "",
+      website: typeof parsed.website === "string" ? parsed.website.trim() : "",
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -298,10 +338,11 @@ export type CompanySummaryResult = {
   websiteUrl: string | null;
   title: string | null;
   summary: string | null;
+  industry: string | null;
   googleSearchUrl: string;
   found: boolean;
   tld: string | null;
-  source: "website" | "google" | "search" | "none";
+  source: "gemini" | "website" | "search" | "none";
 };
 
 export async function buildCompanySummary(
@@ -317,7 +358,6 @@ export async function buildCompanySummary(
   }
 
   const searchUrl = googleSearchUrl(`${companyName} company`);
-  const query = `${companyName} company`;
   const slugs = companySlugCandidates(companyName, slug);
 
   const miss: CompanySummaryResult = {
@@ -326,17 +366,46 @@ export async function buildCompanySummary(
     websiteUrl: null,
     title: null,
     summary: null,
+    industry: null,
     googleSearchUrl: searchUrl,
     found: false,
     tld: null,
     source: "none",
   };
 
-  const hit = await firstHit([
-    fetchGoogleCustomSearch(query),
-    fetchBraveSearchSnippet(query),
-    ...topWebsiteCandidates(companyName, slug).map((url) => fetchSiteMeta(url)),
-  ]);
+  const brief = await fetchCompanyBrief(companyName);
+  if (brief) {
+    // The model verified the name one way or the other, so trust it — this
+    // is also what keeps a guest's own name from being described as if it
+    // were their employer.
+    if (!brief.isCompany || !brief.summary) {
+      summaryCache.set(cacheKey, { at: Date.now(), value: miss });
+      return miss;
+    }
+
+    const site =
+      brief.website && !isNoiseUrl(brief.website) ? normalizeWebsiteUrl(brief.website) : null;
+    const result: CompanySummaryResult = {
+      companyName,
+      slug,
+      websiteUrl: site,
+      title: null,
+      summary: simplifySummary(brief.summary),
+      industry: brief.industry || null,
+      googleSearchUrl: searchUrl,
+      found: true,
+      tld: detectTld(site),
+      source: "gemini",
+    };
+    summaryCache.set(cacheKey, { at: Date.now(), value: result });
+    return result;
+  }
+
+  // Vertex unreachable — fall back to reading the company's own homepage so
+  // the feature degrades instead of going dark.
+  const hit = await firstHit(
+    topWebsiteCandidates(companyName, slug).map((url) => fetchSiteMeta(url)),
+  );
 
   // Social and directory pages are dropped outright: their blurb describes
   // whoever happens to share the name, not the company on this booking.
@@ -362,6 +431,7 @@ export async function buildCompanySummary(
     websiteUrl,
     title: hit.title ?? null,
     summary: simplifySummary(hit.snippet),
+    industry: null,
     googleSearchUrl: searchUrl,
     found: true,
     tld: detectTld(websiteUrl),
