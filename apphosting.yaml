@@ -29,6 +29,14 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  # Google Programmable Search — powers the company summary shown when staff
+  # tap a company name on a reservation. The API key is billable so it stays
+  # in Secret Manager; the search-engine id (cx) is a public identifier that
+  # Google itself embeds in client-side script tags, so it lives here inline.
+  - variable: GOOGLE_CSE_API_KEY
+    secret: GOOGLE_CSE_API_KEY
+  - variable: GOOGLE_CSE_CX
+    value: b6b23d99e257d49eb
   # Bearer token guarding the cron-style Square sales sync endpoint.
   - variable: SQUARE_SYNC_SHARED_TOKEN
     secret: SQUARE_SYNC_SHARED_TOKEN

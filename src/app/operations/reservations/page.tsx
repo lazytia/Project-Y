@@ -640,13 +640,20 @@ function DetailModal({
           <FactIcon icon={<ClockIcon />} label="Time" value={fmt12h(reservation.time)} />
           <FactIcon icon={<PeopleIcon />} label="Guests" value={`${reservation.count} Guests`} />
           {company ? (
-            <div className={styles.factRowItem}>
-              <span className={styles.factIconWrap}><BuildingIcon /></span>
-              <span className={styles.factLabel}>Company</span>
-              <button type="button" className={styles.companyLink} onClick={() => void openCompanySummary()}>
-                {company.displayName}
-              </button>
-            </div>
+            company.kind === "person" ? (
+              // Guest typed a personal name into Company — there's no company
+              // site to look up, so render plain text rather than baiting a
+              // tap that can only come back empty.
+              <FactIcon icon={<BuildingIcon />} label="Company" value={company.displayName} />
+            ) : (
+              <div className={styles.factRowItem}>
+                <span className={styles.factIconWrap}><BuildingIcon /></span>
+                <span className={styles.factLabel}>Company</span>
+                <button type="button" className={styles.companyLink} onClick={() => void openCompanySummary()}>
+                  {company.displayName}
+                </button>
+              </div>
+            )
           ) : null}
           <FactIcon icon={<SeatIcon />} label="Seating" value={prettySeating(reservation.seating)} />
         </div>

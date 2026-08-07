@@ -1,6 +1,7 @@
 import {
   candidateWebsiteUrls,
   companySlugCandidates,
+  looksLikePersonName,
 } from "@/lib/reservation-company";
 
 const SEARCH_TIMEOUT_MS = 2_500;
@@ -8,6 +9,8 @@ const SITE_TIMEOUT_MS = 2_800;
 const SITE_HTML_CAP = 200_000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const MISS_CACHE_TTL_MS = 30_000;
+/** How many guessed website URLs to race when no search API key is set. */
+const WEBSITE_PROBE_LIMIT = 4;
 
 const BROWSER_HEADERS = {
   "User-Agent":
@@ -275,16 +278,16 @@ async function firstHit(tasks: Promise<SearchHit | null>[]): Promise<SearchHit |
 }
 
 function topWebsiteCandidates(companyName: string, slug: string): string[] {
+  // candidateWebsiteUrls already returns the most-likely-first ordering for
+  // AU bookings: .com.au hosts, then global .com/au landing pages, then bare
+  // .com. An earlier re-sort here pushed the "/au" *path* variants ahead of
+  // the ".com.au" *domains* and then kept only two, so .com.au was never
+  // probed at all. These race in parallel via firstHit, so probing a few
+  // more candidates costs no extra wall-clock time.
   const urls = [
     ...new Set(companySlugCandidates(companyName, slug).flatMap((s) => candidateWebsiteUrls(s))),
   ];
-  // Prefer AU-facing hosts; race at most two.
-  const preferred = [
-    ...urls.filter((url) => /\/au\/?$/i.test(url)),
-    ...urls.filter((url) => /\.com\.au\/?$/i.test(url)),
-  ];
-  const deduped = [...new Set(preferred.length ? preferred : urls)];
-  return deduped.slice(0, 2);
+  return urls.slice(0, WEBSITE_PROBE_LIMIT);
 }
 
 export type CompanySummaryResult = {
@@ -313,6 +316,26 @@ export async function buildCompanySummary(
 
   const searchUrl = googleSearchUrl(`${companyName} company`);
   const query = `${companyName} company`;
+
+  // Guests sometimes type their own name into the Company field. Searching
+  // it would surface a same-named stranger's LinkedIn blurb, which we'd then
+  // render as if it described this guest. Never search a personal name —
+  // just hand back the Google link and let staff judge.
+  if (looksLikePersonName(companyName)) {
+    const personResult: CompanySummaryResult = {
+      companyName,
+      slug,
+      websiteUrl: null,
+      title: null,
+      summary: null,
+      googleSearchUrl: searchUrl,
+      found: false,
+      tld: null,
+      source: "none",
+    };
+    summaryCache.set(cacheKey, { at: Date.now(), value: personResult });
+    return personResult;
+  }
 
   const hit = await firstHit([
     fetchGoogleCustomSearch(query),
