@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -230,6 +230,13 @@ function OwnerDashboard({
    * bug. We now render "—" until the real number is in.
    */
   const [metricsReady, setMetricsReady] = useState(false);
+  /**
+   * Mirror of `metricsReady` readable from inside async callbacks. Used to
+   * drop a server snapshot that arrives after the live numbers are already
+   * on screen — applying it then would visibly rewrite them.
+   */
+  const metricsReadyRef = useRef(false);
+  metricsReadyRef.current = metricsReady;
 
   useEffect(() => {
     const key = sydneyTodayKey();
@@ -342,7 +349,9 @@ function OwnerDashboard({
         weekCateringCount: cache.weekCateringCount,
       });
     }
-    setMetricsReady(true);
+    // NOTE: deliberately does NOT flip metricsReady. Cached numbers are
+    // loaded into state so the live fetch has something to merge onto, but
+    // they stay hidden behind "—" until the live fetches settle.
     return true;
   }, []);
 
@@ -358,7 +367,6 @@ function OwnerDashboard({
         ...(prev ?? emptyStats(data.todaySales!)),
         todaySales: data.todaySales!,
       }));
-      setMetricsReady(true);
       setStatsError(false);
       setLastUpdated(new Date());
       writeDashCache(dateKey, {
@@ -378,7 +386,6 @@ function OwnerDashboard({
       setStats(data);
       setStatsError(false);
       setLastUpdated(new Date());
-      setMetricsReady(true);
       writeDashCache(dateKey, {
         todaySales: data.todaySales,
         restaurantSales: data.restaurantSales,
@@ -611,6 +618,9 @@ function OwnerDashboard({
       .then((data: OwnerDashServerSnapshot | null) => {
         if (cancelled || !data?.cache) return;
         writeDashCache(data.dateKey, data.cache);
+        // The live fetches already won the race — painting the snapshot now
+        // would swap a correct number for a slightly older one on screen.
+        if (metricsReadyRef.current) return;
         applyOwnerCache(data.cache);
       })
       .catch(() => {
