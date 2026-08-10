@@ -220,16 +220,16 @@ function OwnerDashboard({
   const [selectedDate, setSelectedDate] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  /** True once we have something to show (cache or live). */
-  const [metricsReady, setMetricsReady] = useState(() => {
-    const sales =
-      typeof initialCache?.todaySales === "number"
-        ? initialCache.todaySales
-        : typeof initialCache?.savedDaySales === "number"
-          ? initialCache.savedDaySales
-          : null;
-    return sales !== null || typeof initialCache?.weekSalesDoc === "number";
-  });
+  /**
+   * True once the LIVE fetches have settled — i.e. the numbers on screen
+   * are the real ones, not a cached guess.
+   *
+   * This deliberately starts false even when we have a cache. Showing the
+   * cached figure first meant the owner saw one number, then watched it
+   * change a second later once the live value landed, which read as a
+   * bug. We now render "—" until the real number is in.
+   */
+  const [metricsReady, setMetricsReady] = useState(false);
 
   useEffect(() => {
     const key = sydneyTodayKey();
@@ -537,11 +537,14 @@ function OwnerDashboard({
   useEffect(() => {
     if (!selectedDate) return;
 
+    // Always drop back to the "—" placeholder state for a new date; only
+    // the live fetch below is allowed to flip metricsReady back on.
+    setMetricsReady(false);
+
     const hadCache =
       applyOwnerCache(readDashCache(selectedDate)) ||
       (!!initialCache && applyOwnerCache(initialCache));
     if (!hadCache) {
-      setMetricsReady(false);
       setStats(null);
       setReservations(null);
       setCateringOrders(null);
@@ -564,6 +567,12 @@ function OwnerDashboard({
     if (!selectedDate || !user) return;
     let cancelled = false;
 
+    // Safety valve: if a fetch hangs we still reveal whatever we have
+    // (usually the cache) rather than leaving the owner staring at "—".
+    const reveal = setTimeout(() => {
+      if (!cancelled) setMetricsReady(true);
+    }, 8_000);
+
     void Promise.allSettled([
       fetchSalesBrief(selectedDate),
       fetchStats(selectedDate),
@@ -575,11 +584,13 @@ function OwnerDashboard({
       fetchWeeklyPayroll(weekMondayISO, selectedDate),
       fetchReviewNote(selectedDate),
     ]).then(() => {
+      clearTimeout(reveal);
       if (!cancelled) setMetricsReady(true);
     });
 
     return () => {
       cancelled = true;
+      clearTimeout(reveal);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid]);
@@ -669,9 +680,25 @@ function OwnerDashboard({
     return (weeklyPayroll / weeklySales) * 100;
   }, [weeklyPayroll, weeklySales]);
 
-  const payrollOnTarget = payrollPct !== null && payrollPct <= PAYROLL_TARGET_PCT;
+  // ── display gate ──────────────────────────────────────────────────
+  // Everything the cards render goes through here. Until metricsReady we
+  // hand back null so each card falls through to its "—" placeholder,
+  // rather than briefly showing a cached figure that the live fetch is
+  // about to overwrite with a different number.
+  const shownTodaySales =
+    metricsReady && typeof stats?.todaySales === "number" ? stats.todaySales : null;
+  const shownResCounts = metricsReady ? resCounts : null;
+  const shownLunchStaff = metricsReady ? lunchStaff : null;
+  const shownDinnerStaff = metricsReady ? dinnerStaff : null;
+  const shownWeeklySales = metricsReady ? weeklySales : null;
+  const shownVsLastWeekPct = metricsReady ? vsLastWeekPct : null;
+  const shownPayrollPct = metricsReady ? payrollPct : null;
+  const shownWeekCateringCount = metricsReady ? weekCateringCount : null;
+  const shownNextCatering = metricsReady ? nextCatering : null;
 
-  const bestSellers = (stats?.bestSellers ?? []).slice(0, 3);
+  const payrollOnTarget = shownPayrollPct !== null && shownPayrollPct <= PAYROLL_TARGET_PCT;
+
+  const bestSellers = metricsReady ? (stats?.bestSellers ?? []).slice(0, 3) : [];
 
   const saveReview = async () => {
     if (reviewSaving) return;
@@ -773,7 +800,7 @@ function OwnerDashboard({
           <div className={styles.todayLeft}>
             <p className={styles.miniLabel}>TODAY SALES</p>
             {(() => {
-              const shown = typeof stats?.todaySales === "number" ? stats.todaySales : null;
+              const shown = shownTodaySales;
               return (
                 <>
                   <p className={`${styles.salesAmount} ${shown === null ? styles.loading : ""}`}>
@@ -794,10 +821,10 @@ function OwnerDashboard({
               <div className={styles.mealCol}>
                 <p className={styles.mealTitle}>LUNCH</p>
                 <p className={styles.mealValue}>
-                  {resCounts?.lunchPax ?? "—"} <span className={styles.mealUnit}>PAX</span>
+                  {shownResCounts?.lunchPax ?? "—"} <span className={styles.mealUnit}>PAX</span>
                 </p>
                 <p className={styles.mealSub}>
-                  <span aria-hidden="true">👥</span> {lunchStaff !== null ? lunchStaff : "—"} STAFF
+                  <span aria-hidden="true">👥</span> {shownLunchStaff !== null ? shownLunchStaff : "—"} STAFF
                 </p>
               </div>
             </div>
@@ -806,10 +833,10 @@ function OwnerDashboard({
               <div className={styles.mealCol}>
                 <p className={styles.mealTitle}>DINNER</p>
                 <p className={styles.mealValue}>
-                  {resCounts?.dinnerPax ?? "—"} <span className={styles.mealUnit}>PAX</span>
+                  {shownResCounts?.dinnerPax ?? "—"} <span className={styles.mealUnit}>PAX</span>
                 </p>
                 <p className={styles.mealSub}>
-                  <span aria-hidden="true">👥</span> {dinnerStaff !== null ? dinnerStaff : "—"} STAFF
+                  <span aria-hidden="true">👥</span> {shownDinnerStaff !== null ? shownDinnerStaff : "—"} STAFF
                 </p>
               </div>
             </div>
@@ -833,15 +860,15 @@ function OwnerDashboard({
           <div className={styles.weekLeft}>
             <p className={styles.miniLabelOnDark}>WEEKLY SALES</p>
             <p className={styles.weekAmount}>
-              {weeklySales !== null ? fmtCurrency(weeklySales) : "—"}
+              {shownWeeklySales !== null ? fmtCurrency(shownWeeklySales) : "—"}
             </p>
             <p className={styles.targetSubOnDark}>Target {fmtCurrencyWhole(WEEKLY_TARGET)}</p>
-            <Progress value={weeklySales ?? 0} max={WEEKLY_TARGET} tone="onDark" />
+            <Progress value={shownWeeklySales ?? 0} max={WEEKLY_TARGET} tone="onDark" />
             <p className={styles.weekVs}>
               vs last week{" "}
-              {vsLastWeekPct !== null ? (
-                <span className={vsLastWeekPct >= 0 ? styles.deltaPos : styles.deltaNeg}>
-                  {vsLastWeekPct >= 0 ? "+" : ""}{vsLastWeekPct.toFixed(0)}% {vsLastWeekPct >= 0 ? "↑" : "↓"}
+              {shownVsLastWeekPct !== null ? (
+                <span className={shownVsLastWeekPct >= 0 ? styles.deltaPos : styles.deltaNeg}>
+                  {shownVsLastWeekPct >= 0 ? "+" : ""}{shownVsLastWeekPct.toFixed(0)}% {shownVsLastWeekPct >= 0 ? "↑" : "↓"}
                 </span>
               ) : "—"}
             </p>
@@ -850,10 +877,10 @@ function OwnerDashboard({
           <div className={styles.weekRight}>
             <p className={styles.miniLabelOnDark}>PAYROLL %</p>
             <p className={styles.payrollPct}>
-              {payrollPct !== null ? `${payrollPct.toFixed(1)}%` : "—"}
+              {shownPayrollPct !== null ? `${shownPayrollPct.toFixed(1)}%` : "—"}
             </p>
             <p className={styles.targetSubOnDark}>Target {PAYROLL_TARGET_PCT}%</p>
-            {payrollPct !== null && (
+            {shownPayrollPct !== null && (
               <span className={payrollOnTarget ? styles.badgeOnTarget : styles.badgeOverTarget}>
                 {payrollOnTarget ? "On target" : "Over Target"}
               </span>
@@ -876,7 +903,7 @@ function OwnerDashboard({
               </svg>
             </span>
             <p className={styles.cateringCount}>
-              {weekCateringCount ?? "—"} <span className={styles.cateringUnit}>Orders</span>
+              {shownWeekCateringCount ?? "—"} <span className={styles.cateringUnit}>Orders</span>
             </p>
           </div>
         </Link>
@@ -887,9 +914,9 @@ function OwnerDashboard({
               View <span aria-hidden="true">→</span>
             </span>
           </div>
-          {nextCatering ? (
+          {shownNextCatering ? (
             <>
-              <p className={styles.cateringCountdown}>{dCountdownLabel(nextCatering.deliveryDateISO)}</p>
+              <p className={styles.cateringCountdown}>{dCountdownLabel(shownNextCatering.deliveryDateISO)}</p>
               <p className={styles.cateringDate}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -897,7 +924,7 @@ function OwnerDashboard({
                   <line x1="8" y1="2" x2="8" y2="6" />
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
-                {new Date(nextCatering.deliveryDateISO + "T00:00:00").toLocaleDateString("en-AU", {
+                {new Date(shownNextCatering.deliveryDateISO + "T00:00:00").toLocaleDateString("en-AU", {
                   weekday: "short",
                   day: "numeric",
                   month: "short",
