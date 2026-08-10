@@ -530,10 +530,12 @@ function OwnerDashboard({
     }
   }, []);
 
-  // Stale-while-revalidate: paint cache/snapshot immediately, refresh in background.
+  // Paint whatever we already have for this date, and clear stale numbers
+  // from the previously selected date. Keyed on `selectedDate` alone —
+  // this must NOT re-run when Firebase Auth settles, or it would wipe the
+  // metrics the server snapshot just painted.
   useEffect(() => {
     if (!selectedDate) return;
-    let cancelled = false;
 
     const hadCache =
       applyOwnerCache(readDashCache(selectedDate)) ||
@@ -554,25 +556,13 @@ function OwnerDashboard({
       setReviewDraft("");
     }
     setStatsError(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
 
-    if (sessionDashboard === "owner") {
-      void fetch(`/api/dashboard/owner-snapshot?date=${encodeURIComponent(selectedDate)}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data: OwnerDashServerSnapshot | null) => {
-          if (cancelled || !data?.cache) return;
-          writeDashCache(data.dateKey, data.cache);
-          applyOwnerCache(data.cache);
-        })
-        .catch(() => {
-          /* live fetch below still runs */
-        });
-    }
-
-    if (!user) {
-      return () => {
-        cancelled = true;
-      };
-    }
+  // Live refresh. Needs the Firebase client SDK, so it waits for `user`.
+  useEffect(() => {
+    if (!selectedDate || !user) return;
+    let cancelled = false;
 
     void Promise.allSettled([
       fetchSalesBrief(selectedDate),
@@ -592,7 +582,35 @@ function OwnerDashboard({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid, sessionDashboard]);
+  }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid]);
+
+  // Server-session snapshot lives in its own effect on purpose. It is
+  // authenticated by the uid cookie, not by the Firebase client SDK, so
+  // it can (and should) fire before onAuthStateChanged settles. While it
+  // sat inside the effect above it ran TWICE on every dashboard open:
+  // once when selectedDate landed with user still null, then again when
+  // `user?.uid` flipped from undefined to the real uid and re-triggered
+  // that effect — repainting every metric with an identical response.
+  useEffect(() => {
+    if (!selectedDate || sessionDashboard !== "owner") return;
+    let cancelled = false;
+
+    void fetch(`/api/dashboard/owner-snapshot?date=${encodeURIComponent(selectedDate)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: OwnerDashServerSnapshot | null) => {
+        if (cancelled || !data?.cache) return;
+        writeDashCache(data.dateKey, data.cache);
+        applyOwnerCache(data.cache);
+      })
+      .catch(() => {
+        /* the live fetches still run */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, sessionDashboard]);
 
   useEffect(() => {
     if (!selectedDate || !isToday) return;
