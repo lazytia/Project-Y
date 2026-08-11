@@ -238,10 +238,39 @@ function OwnerDashboard({
   const metricsReadyRef = useRef(false);
   metricsReadyRef.current = metricsReady;
 
+  /** Bumped to force a fresh round of fetches without changing the date. */
+  const [refreshTick, setRefreshTick] = useState(0);
+
   useEffect(() => {
     const key = sydneyTodayKey();
     setTodayKey(key);
     setSelectedDate(key);
+  }, []);
+
+  const todayKeyRef = useRef("");
+  todayKeyRef.current = todayKey;
+  const selectedDateRef = useRef("");
+  selectedDateRef.current = selectedDate;
+
+  // Resuming the PWA does NOT remount this component — iOS keeps the page
+  // alive in the background, so coming back to the app leaves last session's
+  // numbers sitting on screen. Force a fresh round of fetches (and roll the
+  // date over if it is a new day) every time we become visible again.
+  useEffect(() => {
+    const onResume = () => {
+      if (document.visibilityState !== "visible") return;
+      const key = sydneyTodayKey();
+      const wasOnToday = selectedDateRef.current === todayKeyRef.current;
+      setTodayKey(key);
+      if (wasOnToday) setSelectedDate(key);
+      setRefreshTick((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("pageshow", onResume);
+    return () => {
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("pageshow", onResume);
+    };
   }, []);
 
   const isToday = !!selectedDate && selectedDate === todayKey;
@@ -574,6 +603,14 @@ function OwnerDashboard({
     if (!selectedDate || !user) return;
     let cancelled = false;
 
+    // Close the gate for THIS round of fetches.
+    //
+    // This is the case the earlier fix missed. metricsReady was only reset by
+    // the `selectedDate` effect, so on resume — same date, component never
+    // unmounted — it stayed true and last session's numbers rendered with no
+    // "—" phase at all, then silently changed once the refetch landed.
+    setMetricsReady(false);
+
     // Safety valve: if a fetch hangs we still reveal whatever we have
     // (usually the cache) rather than leaving the owner staring at "—".
     const reveal = setTimeout(() => {
@@ -600,7 +637,7 @@ function OwnerDashboard({
       clearTimeout(reveal);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid]);
+  }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid, refreshTick]);
 
   // Server-session snapshot lives in its own effect on purpose. It is
   // authenticated by the uid cookie, not by the Firebase client SDK, so
