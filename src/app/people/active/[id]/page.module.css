@@ -355,7 +355,7 @@
 
 .profileStats {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: var(--space-2);
 }
 
@@ -410,6 +410,148 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* ── Rate card ── */
+.rateCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.rateRow {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.rateIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rateInfo {
+  min-width: 0;
+}
+
+.rateLabel {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg);
+}
+
+.rateValue {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-warm);
+  letter-spacing: -0.01em;
+}
+
+.rateValueUnit {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+
+.rateEditBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-warm);
+  border-radius: 999px;
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-warm);
+  cursor: pointer;
+}
+
+.rateEditBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rateEditFields {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.rateEditActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rateInput {
+  width: 96px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg);
+}
+
+.rateSaveBtn,
+.rateCancelBtn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rateSaveBtn {
+  border: none;
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.rateCancelBtn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.rateSaveBtn:disabled,
+.rateCancelBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rateDivider {
+  height: 1px;
+  background: var(--color-border);
+}
+
+.rateFootnote {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
 }
 
 /* ── Phone / link row ── */

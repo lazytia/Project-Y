@@ -22,6 +22,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
+import { readStaffRates } from "@/lib/staff-rates";
 import { todayIso } from "@/lib/staff-display";
 import CalendarPicker from "@/components/CalendarPicker";
 import Splash from "@/components/Splash";
@@ -72,7 +73,8 @@ type Staff = {
   uid: string;
   name: string;
   positionLabel: string;
-  rate: number | null;
+  weekdayRate: number | null;
+  saturdayRate: number | null;
   startDate: Date | null;
   visaExpiry: Date | null;
   visaType: string;
@@ -100,6 +102,10 @@ type Staff = {
 };
 
 const VISA_WINDOW_DAYS = 30;
+
+/** Firestore field written for each half of the rate card. */
+const RATE_FIELDS = { weekday: "weekdayRate", saturday: "saturdayRate" } as const;
+type RateKind = keyof typeof RATE_FIELDS;
 
 const EMPLOYMENT_POSITIONS = ["Hall Staff", "Kitchen Staff", "Hall Manager", "Chef"] as const;
 const EMPLOYMENT_VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
@@ -296,6 +302,9 @@ export default function EmployeeDetailPage() {
   const [editEmploymentType, setEditEmploymentType] = useState("");
   const [editRate, setEditRate] = useState("");
   const [editReportsTo, setEditReportsTo] = useState("");
+  const [editingRateKind, setEditingRateKind] = useState<RateKind | null>(null);
+  const [rateDraft, setRateDraft] = useState("");
+  const [savingRate, setSavingRate] = useState(false);
   const [calRehireOpen, setCalRehireOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -338,12 +347,7 @@ export default function EmployeeDetailPage() {
         const reactivatedAt = tsToDate(raw.reactivatedAt);
         const isReactivated = !!rehireDate || !!reactivatedAt;
 
-        const rate =
-          typeof raw.afterTrainingRate === "number"
-            ? raw.afterTrainingRate
-            : typeof raw.trainingRate === "number"
-              ? raw.trainingRate
-              : null;
+        const rates = readStaffRates(raw);
 
         const policies = (raw.policies ?? {}) as Record<string, unknown>;
         const bank = (raw.bankSuper ?? {}) as BankSuper;
@@ -362,7 +366,8 @@ export default function EmployeeDetailPage() {
           uid: snap.id,
           name: fullNameOf(raw),
           positionLabel: positionLabelOf(raw),
-          rate,
+          weekdayRate: rates.weekday,
+          saturdayRate: rates.saturday,
           startDate: tsToDate(raw.startDate),
           visaExpiry: tsToDate(documents.visaExpiry ?? raw.visaExpiry ?? null),
           visaType: visaTypeOf(raw),
@@ -599,6 +604,41 @@ export default function EmployeeDetailPage() {
     }
   }
 
+  function startRateEdit(kind: RateKind) {
+    if (!staff) return;
+    const current = kind === "weekday" ? staff.weekdayRate : staff.saturdayRate;
+    setRateDraft(current != null ? String(current) : "");
+    setEditingRateKind(kind);
+  }
+
+  async function handleSaveRate(kind: RateKind) {
+    if (!staff || savingRate) return;
+    const parsed = parseFloat(rateDraft);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      alert("Please enter a valid hourly rate.");
+      return;
+    }
+    const value = Math.round(parsed * 100) / 100;
+    setSavingRate(true);
+    try {
+      await setDoc(
+        doc(getDb(), "staff_onboarding", staff.uid),
+        { [RATE_FIELDS[kind]]: value, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
+      setStaff({
+        ...staff,
+        ...(kind === "weekday" ? { weekdayRate: value } : { saturdayRate: value }),
+      });
+      setEditingRateKind(null);
+    } catch (err) {
+      console.error("[rate] save failed:", err);
+      alert("Failed to save the rate. Please try again.");
+    } finally {
+      setSavingRate(false);
+    }
+  }
+
   function startEmploymentEdit() {
     if (!staff) return;
     setEditRehireDate(staff.rehireDate || todayIso());
@@ -622,7 +662,7 @@ export default function EmployeeDetailPage() {
         ? staff.employmentType
         : EMPLOYMENT_TYPES[0],
     );
-    setEditRate(staff.rate != null ? String(staff.rate) : "");
+    setEditRate(staff.weekdayRate != null ? String(staff.weekdayRate) : "");
     setEditReportsTo(staff.reportsTo || "");
     setEmploymentEditing(true);
   }
@@ -644,6 +684,9 @@ export default function EmployeeDetailPage() {
           visaType: editVisaType,
           workLocation: editWorkLocation,
           employmentType: editEmploymentType,
+          // Same field the RATE card writes — otherwise editing here would
+          // leave the timesheets still paying the old rate.
+          weekdayRate: parsedRate,
           afterTrainingRate: parsedRate,
           trainingRate: parsedRate,
           reportsTo: editReportsTo.trim(),
@@ -658,7 +701,7 @@ export default function EmployeeDetailPage() {
         visaType: editVisaType,
         workLocation: editWorkLocation,
         employmentType: editEmploymentType,
-        rate: parsedRate,
+        weekdayRate: parsedRate,
         reportsTo: editReportsTo.trim(),
       });
       setEmploymentEditing(false);
@@ -718,6 +761,42 @@ export default function EmployeeDetailPage() {
     ? fmtDateWithDay(prevTerm.terminatedAt)
     : "—";
 
+  // Drives the pay shown on /payroll/timesheets for this employee.
+  const rateCard = (
+    <>
+      <p className={styles.sectionLabel}>RATE</p>
+      <section className={styles.rateCard}>
+        <RateRow
+          label="Weekdays (Sun – Fri)"
+          value={staff.weekdayRate}
+          editing={editingRateKind === "weekday"}
+          draft={rateDraft}
+          saving={savingRate}
+          onDraft={setRateDraft}
+          onEdit={() => startRateEdit("weekday")}
+          onSave={() => void handleSaveRate("weekday")}
+          onCancel={() => setEditingRateKind(null)}
+        />
+        <div className={styles.rateDivider} aria-hidden="true" />
+        <RateRow
+          label="Saturday"
+          value={staff.saturdayRate}
+          editing={editingRateKind === "saturday"}
+          draft={rateDraft}
+          saving={savingRate}
+          onDraft={setRateDraft}
+          onEdit={() => startRateEdit("saturday")}
+          onSave={() => void handleSaveRate("saturday")}
+          onCancel={() => setEditingRateKind(null)}
+        />
+        <p className={styles.rateFootnote}>
+          <InfoCircleIcon />
+          Rates are applied before penalties and allowances.
+        </p>
+      </section>
+    </>
+  );
+
   return (
     <div className={styles.page}>
       <TopBar
@@ -747,6 +826,8 @@ export default function EmployeeDetailPage() {
               </div>
             </div>
           </section>
+
+          {rateCard}
 
           {staff.phone && (
             <button
@@ -869,7 +950,11 @@ export default function EmployeeDetailPage() {
                 <EmploymentRow label="Employment Type" value={displayOrDash(staff.employmentType)} />
                 <EmploymentRow
                   label="Rate"
-                  value={typeof staff.rate === "number" ? `$${staff.rate.toFixed(2)} /hr` : "—"}
+                  value={
+                    typeof staff.weekdayRate === "number"
+                      ? `$${staff.weekdayRate.toFixed(2)} /hr`
+                      : "—"
+                  }
                 />
                 <EmploymentRow
                   label="Reports To"
@@ -993,7 +1078,6 @@ export default function EmployeeDetailPage() {
 
         <div className={styles.profileDivider} aria-hidden="true" />
         <div className={styles.profileStats}>
-          <StatCell label="Rate" value={typeof staff.rate === "number" ? `$${staff.rate}/hr` : "—"} accent />
           <StatCell label="Start Date" value={fmtDate(staff.startDate)} />
           <StatCell label="Visa Type" value={staff.visaType} />
           <StatCell
@@ -1005,6 +1089,8 @@ export default function EmployeeDetailPage() {
           />
         </div>
       </section>
+
+      {rateCard}
 
       {/* Phone row */}
       {staff.phone && (
@@ -1479,6 +1565,86 @@ function EmploymentEditRow({
     <div className={`${styles.employmentEditRow} ${last ? styles.employmentRowLast : ""}`}>
       <span className={styles.employmentLabel}>{label}</span>
       <div className={styles.employmentEditControl}>{children}</div>
+    </div>
+  );
+}
+
+function RateRow({
+  label,
+  value,
+  editing,
+  draft,
+  saving,
+  onDraft,
+  onEdit,
+  onSave,
+  onCancel,
+}: {
+  label: string;
+  value: number | null;
+  editing: boolean;
+  draft: string;
+  saving: boolean;
+  onDraft: (v: string) => void;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className={styles.rateRow}>
+      <span className={styles.rateIcon} aria-hidden="true">
+        <CalendarMiniIcon />
+      </span>
+      <div className={styles.rateInfo}>
+        <p className={styles.rateLabel}>{label}</p>
+        {editing ? (
+          <div className={styles.rateEditFields}>
+            <span className={styles.rateValueUnit}>$</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              className={styles.rateInput}
+              value={draft}
+              onChange={(e) => onDraft(e.target.value)}
+              min="0"
+              step="0.01"
+              aria-label={`${label} hourly rate`}
+              autoFocus
+            />
+            <span className={styles.rateValueUnit}>/hr</span>
+          </div>
+        ) : (
+          <p className={styles.rateValue}>
+            {value != null ? `$${value.toFixed(2)}` : "—"}
+            <span className={styles.rateValueUnit}>/hr</span>
+          </p>
+        )}
+      </div>
+      {editing ? (
+        <div className={styles.rateEditActions}>
+          <button
+            type="button"
+            className={styles.rateSaveBtn}
+            onClick={onSave}
+            disabled={saving}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            className={styles.rateCancelBtn}
+            onClick={onCancel}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button type="button" className={styles.rateEditBtn} onClick={onEdit}>
+          <EditIcon />
+          Edit
+        </button>
+      )}
     </div>
   );
 }

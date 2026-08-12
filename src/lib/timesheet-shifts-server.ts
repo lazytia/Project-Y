@@ -4,6 +4,7 @@
  */
 import { squareClient, squareEnv } from "@/lib/square";
 import { adminDb } from "@/lib/firebase-admin";
+import { rateForDateISO, readStaffRates, type StaffRates } from "@/lib/staff-rates";
 
 export type TimesheetShift = {
   id: string;
@@ -178,6 +179,37 @@ async function fetchExtraShifts(startDate: string, endDate: string): Promise<Tim
   });
 }
 
+/** teamMemberId → rates, for every employee linked to a Square team member. */
+async function fetchStaffRates(): Promise<Record<string, StaffRates>> {
+  const out: Record<string, StaffRates> = {};
+  try {
+    const snap = await adminDb().collection("staff_onboarding").get();
+    for (const d of snap.docs) {
+      const raw = d.data() as Record<string, unknown>;
+      const teamMemberId =
+        typeof raw.squareTeamMemberId === "string" ? raw.squareTeamMemberId.trim() : "";
+      if (teamMemberId) out[teamMemberId] = readStaffRates(raw);
+    }
+  } catch (err) {
+    console.warn("[timesheet-shifts] staff rates lookup failed:", err);
+  }
+  return out;
+}
+
+/**
+ * The wage Square reports is whatever was on the team member when the shift
+ * was clocked, and it cannot vary by day. Prefer the rate the owner set on
+ * the employee's profile, and only fall back to Square when none is set.
+ */
+function applyConfiguredRate(
+  shift: TimesheetShift,
+  rates: StaffRates | undefined,
+): TimesheetShift {
+  const rate = rateForDateISO(rates, shift.dateISO);
+  if (rate == null) return shift;
+  return { ...shift, hourlyRateCents: Math.round(rate * 100) };
+}
+
 export async function fetchMergedTimesheetShifts(
   startDate: string,
   endDate: string,
@@ -185,11 +217,13 @@ export async function fetchMergedTimesheetShifts(
   shifts: TimesheetShift[];
   teamMembers: Record<string, TimesheetTeamMember>;
 }> {
-  const [{ shifts: squareShifts, teamMembers }, extras, dismissedIds] = await Promise.all([
-    fetchSquareShifts(startDate, endDate),
-    fetchExtraShifts(startDate, endDate),
-    fetchDismissedShiftIds(startDate, endDate),
-  ]);
+  const [{ shifts: squareShifts, teamMembers }, extras, dismissedIds, staffRates] =
+    await Promise.all([
+      fetchSquareShifts(startDate, endDate),
+      fetchExtraShifts(startDate, endDate),
+      fetchDismissedShiftIds(startDate, endDate),
+      fetchStaffRates(),
+    ]);
 
   const editsSnap = await adminDb()
     .collection("timesheet_edits")
@@ -199,9 +233,9 @@ export async function fetchMergedTimesheetShifts(
   const edits: Record<string, EditDoc> = {};
   for (const d of editsSnap.docs) edits[d.id] = d.data() as EditDoc;
 
-  const merged = [...squareShifts.map((s) => applyEdit(s, edits[s.id])), ...extras].filter(
-    (s) => !dismissedIds.has(s.id),
-  );
+  const merged = [...squareShifts.map((s) => applyEdit(s, edits[s.id])), ...extras]
+    .filter((s) => !dismissedIds.has(s.id))
+    .map((s) => applyConfiguredRate(s, staffRates[s.teamMemberId]));
   return { shifts: merged, teamMembers };
 }
 
