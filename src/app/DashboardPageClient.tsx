@@ -207,6 +207,32 @@ function emptyStats(sales = 0): Stats {
   };
 }
 
+/**
+ * Cards reveal independently. A single dashboard-wide flag meant the slowest
+ * request decided when EVERY number appeared, so a 1s sales figure sat behind
+ * "—" until an unrelated 8s request gave up.
+ *
+ * Each group covers exactly the fetches that feed one card, so a card still
+ * never paints a cached number that its own live fetch is about to rewrite.
+ */
+type MetricGroup = "sales" | "reservations" | "staff" | "week" | "catering";
+type MetricsReady = Record<MetricGroup, boolean>;
+
+const METRICS_PENDING: MetricsReady = {
+  sales: false,
+  reservations: false,
+  staff: false,
+  week: false,
+  catering: false,
+};
+const METRICS_ALL_READY: MetricsReady = {
+  sales: true,
+  reservations: true,
+  staff: true,
+  week: true,
+  catering: true,
+};
+
 function OwnerDashboard({
   sessionDashboard = null,
   initialCache = null,
@@ -220,22 +246,26 @@ function OwnerDashboard({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   /**
-   * True once the LIVE fetches have settled — i.e. the numbers on screen
-   * are the real ones, not a cached guess.
+   * Which cards have their LIVE numbers in — i.e. what is on screen is real,
+   * not a cached guess.
    *
-   * This deliberately starts false even when we have a cache. Showing the
-   * cached figure first meant the owner saw one number, then watched it
-   * change a second later once the live value landed, which read as a
-   * bug. We now render "—" until the real number is in.
+   * Every group deliberately starts false even when we have a cache. Showing
+   * the cached figure first meant the owner saw one number, then watched it
+   * change a second later once the live value landed, which read as a bug.
+   * We render "—" until the real number is in.
    */
-  const [metricsReady, setMetricsReady] = useState(false);
+  const [metricsReady, setMetricsReady] = useState<MetricsReady>(METRICS_PENDING);
   /**
    * Mirror of `metricsReady` readable from inside async callbacks. Used to
-   * drop a server snapshot that arrives after the live numbers are already
-   * on screen — applying it then would visibly rewrite them.
+   * drop the parts of a server snapshot that arrive after those live numbers
+   * are already on screen — applying them then would visibly rewrite them.
    */
-  const metricsReadyRef = useRef(false);
+  const metricsReadyRef = useRef(METRICS_PENDING);
   metricsReadyRef.current = metricsReady;
+
+  const markMetricReady = useCallback((group: MetricGroup) => {
+    setMetricsReady((prev) => (prev[group] ? prev : { ...prev, [group]: true }));
+  }, []);
 
   /** Bumped to force a fresh round of fetches without changing the date. */
   const [refreshTick, setRefreshTick] = useState(0);
@@ -329,7 +359,12 @@ function OwnerDashboard({
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
-  const applyOwnerCache = useCallback((cache: DashCache | null): boolean => {
+  /** `skip` holds the groups whose live numbers already won the race; writing
+   *  cached values over those would swap a correct figure for an older one. */
+  const applyOwnerCache = useCallback((
+    cache: DashCache | null,
+    skip: MetricsReady = METRICS_PENDING,
+  ): boolean => {
     if (!cache) return false;
     const hasNumbers =
       typeof cache.todaySales === "number" ||
@@ -346,7 +381,7 @@ function OwnerDashboard({
         : typeof cache.savedDaySales === "number"
           ? cache.savedDaySales
           : null;
-    if (sales !== null) {
+    if (sales !== null && !skip.sales) {
       setStats((prev) => ({
         ...(prev ?? emptyStats(sales)),
         todaySales: sales,
@@ -356,22 +391,28 @@ function OwnerDashboard({
         bestSellers: cache.bestSellers ?? prev?.bestSellers ?? [],
       }));
     }
-    if (typeof cache.lunchPax === "number" || typeof cache.dinnerPax === "number") {
+    if (
+      !skip.reservations &&
+      (typeof cache.lunchPax === "number" || typeof cache.dinnerPax === "number")
+    ) {
       setCachedPax({
         lunchPax: cache.lunchPax ?? 0,
         dinnerPax: cache.dinnerPax ?? 0,
       });
     }
-    if (typeof cache.lunchStaff === "number") setLunchStaff(cache.lunchStaff);
-    if (typeof cache.dinnerStaff === "number") setDinnerStaff(cache.dinnerStaff);
-    if (typeof cache.weekSalesDoc === "number") setWeekSalesDoc(cache.weekSalesDoc);
+    if (!skip.staff) {
+      if (typeof cache.lunchStaff === "number") setLunchStaff(cache.lunchStaff);
+      if (typeof cache.dinnerStaff === "number") setDinnerStaff(cache.dinnerStaff);
+    }
+    if (!skip.week && typeof cache.weekSalesDoc === "number") setWeekSalesDoc(cache.weekSalesDoc);
     if (typeof cache.reviewNote === "string") {
       setReviewNote(cache.reviewNote);
       setReviewDraft(cache.reviewNote);
     }
     if (
-      typeof cache.nextCateringISO === "string" ||
-      typeof cache.weekCateringCount === "number"
+      !skip.catering &&
+      (typeof cache.nextCateringISO === "string" ||
+        typeof cache.weekCateringCount === "number")
     ) {
       setCachedCatering({
         nextCateringISO: cache.nextCateringISO,
@@ -565,7 +606,7 @@ function OwnerDashboard({
 
     // Always drop back to the "—" placeholder state for a new date; only
     // the live fetch below is allowed to flip metricsReady back on.
-    setMetricsReady(false);
+    setMetricsReady(METRICS_PENDING);
 
     const hadCache =
       applyOwnerCache(readDashCache(selectedDate)) ||
@@ -587,37 +628,51 @@ function OwnerDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
+  // Each group opens its own card as soon as the fetches behind that card
+  // land, so one slow request no longer holds the whole dashboard at "—".
+  const runMetricGroup = useCallback(
+    (name: MetricGroup, isCancelled: () => boolean, work: Promise<unknown>[]) =>
+      Promise.allSettled(work).then(() => {
+        if (!isCancelled()) markMetricReady(name);
+      }),
+    [markMetricReady],
+  );
+
   // Live refresh. Needs the Firebase client SDK, so it waits for `user`.
   useEffect(() => {
     if (!selectedDate || !user) return;
     let cancelled = false;
+    const isCancelled = () => cancelled;
 
-    // Close the gate for THIS round of fetches.
+    // Close the gates for THIS round of fetches.
     //
     // This is the case the earlier fix missed. metricsReady was only reset by
     // the `selectedDate` effect, so on resume — same date, component never
     // unmounted — it stayed true and last session's numbers rendered with no
     // "—" phase at all, then silently changed once the refetch landed.
-    setMetricsReady(false);
+    setMetricsReady(METRICS_PENDING);
 
     // Safety valve: if a fetch hangs we still reveal whatever we have
     // (usually the cache) rather than leaving the owner staring at "—".
     const reveal = setTimeout(() => {
-      if (!cancelled) setMetricsReady(true);
+      if (!cancelled) setMetricsReady(METRICS_ALL_READY);
     }, 8_000);
 
     void Promise.allSettled([
-      fetchSalesBrief(selectedDate),
-      fetchStats(selectedDate),
-      fetchReservations(selectedDate),
-      fetchCatering(),
-      fetchRosterStaff(selectedDate),
-      fetchWeekDaily(weekMondayISO),
-      fetchWeekSales(weekMondayISO, selectedDate),
+      runMetricGroup("sales", isCancelled, [
+        fetchSalesBrief(selectedDate),
+        fetchStats(selectedDate),
+      ]),
+      runMetricGroup("reservations", isCancelled, [fetchReservations(selectedDate)]),
+      runMetricGroup("catering", isCancelled, [fetchCatering()]),
+      runMetricGroup("staff", isCancelled, [fetchRosterStaff(selectedDate)]),
+      runMetricGroup("week", isCancelled, [
+        fetchWeekDaily(weekMondayISO),
+        fetchWeekSales(weekMondayISO, selectedDate),
+      ]),
       fetchReviewNote(selectedDate),
     ]).then(() => {
       clearTimeout(reveal);
-      if (!cancelled) setMetricsReady(true);
     });
 
     return () => {
@@ -643,10 +698,9 @@ function OwnerDashboard({
       .then((data: OwnerDashServerSnapshot | null) => {
         if (cancelled || !data?.cache) return;
         writeDashCache(data.dateKey, data.cache);
-        // The live fetches already won the race — painting the snapshot now
-        // would swap a correct number for a slightly older one on screen.
-        if (metricsReadyRef.current) return;
-        applyOwnerCache(data.cache);
+        // Skip the cards whose live fetches already won the race — painting
+        // the snapshot there would swap a correct number for an older one.
+        applyOwnerCache(data.cache, metricsReadyRef.current);
       })
       .catch(() => {
         /* the live fetches still run */
@@ -734,18 +788,18 @@ function OwnerDashboard({
   // rather than briefly showing a cached figure that the live fetch is
   // about to overwrite with a different number.
   const shownTodaySales =
-    metricsReady && typeof stats?.todaySales === "number" ? stats.todaySales : null;
-  const shownResCounts = metricsReady ? resCounts : null;
-  const shownLunchStaff = metricsReady ? lunchStaff : null;
-  const shownDinnerStaff = metricsReady ? dinnerStaff : null;
-  const shownWeeklySales = metricsReady ? weeklySales : null;
-  const shownLastWeekToDate = metricsReady ? lastWeekToDate : null;
-  const shownLastWeekDelta = metricsReady ? lastWeekDelta : null;
-  const shownLastWeekDeltaPct = metricsReady ? lastWeekDeltaPct : null;
-  const shownWeekCateringCount = metricsReady ? weekCateringCount : null;
-  const shownNextCatering = metricsReady ? nextCatering : null;
+    metricsReady.sales && typeof stats?.todaySales === "number" ? stats.todaySales : null;
+  const shownResCounts = metricsReady.reservations ? resCounts : null;
+  const shownLunchStaff = metricsReady.staff ? lunchStaff : null;
+  const shownDinnerStaff = metricsReady.staff ? dinnerStaff : null;
+  const shownWeeklySales = metricsReady.week ? weeklySales : null;
+  const shownLastWeekToDate = metricsReady.week ? lastWeekToDate : null;
+  const shownLastWeekDelta = metricsReady.week ? lastWeekDelta : null;
+  const shownLastWeekDeltaPct = metricsReady.week ? lastWeekDeltaPct : null;
+  const shownWeekCateringCount = metricsReady.catering ? weekCateringCount : null;
+  const shownNextCatering = metricsReady.catering ? nextCatering : null;
 
-  const bestSellers = metricsReady ? (stats?.bestSellers ?? []).slice(0, 3) : [];
+  const bestSellers = metricsReady.sales ? (stats?.bestSellers ?? []).slice(0, 3) : [];
 
   const saveReview = async () => {
     if (reviewSaving) return;
@@ -889,8 +943,8 @@ function OwnerDashboard({
             </div>
           </div>
         </div>
-        {statsError && metricsReady && <p className={styles.errorBadge}>Square 연결 오류</p>}
-        {lastUpdated && !statsError && metricsReady && (
+        {statsError && metricsReady.sales && <p className={styles.errorBadge}>Square 연결 오류</p>}
+        {lastUpdated && !statsError && metricsReady.sales && (
           <p className={styles.updatedTiny}>
             Updated {lastUpdated.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
           </p>
@@ -1042,7 +1096,7 @@ function OwnerDashboard({
           <p className={styles.sectionLabel}>BEST SELLER TODAY</p>
         </div>
         {bestSellers.length === 0 ? (
-          <p className={styles.mutedSmall}>{!metricsReady ? "Loading…" : stats ? "No data yet" : "No data yet"}</p>
+          <p className={styles.mutedSmall}>{!metricsReady.sales ? "Loading…" : "No data yet"}</p>
         ) : (
           <ul className={styles.bestList}>
             {bestSellers.map((item, i) => (
