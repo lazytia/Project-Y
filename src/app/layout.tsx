@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import dynamic from "next/dynamic";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { AuthProvider } from "@/components/AuthProvider";
 import AppShell from "@/components/AppShell";
 import BootSplashDismiss from "@/components/BootSplashDismiss";
@@ -15,9 +15,9 @@ const LanguageProvider = dynamic(
   () => import("@/components/LanguageProvider").then((m) => ({ default: m.LanguageProvider })),
 );
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
+const inter = localFont({
+  src: "./fonts/inter-latin-var.woff2",
+  weight: "100 900",
   variable: "--font-inter",
   display: "swap",
 });
