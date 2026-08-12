@@ -9,7 +9,10 @@ import LanguageToggle from "./LanguageToggle";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import { readClientDashboardHint } from "@/lib/client-session-hint";
-import { prefetchOwnerMoneySummaries } from "@/lib/owner-money-prefetch";
+import {
+  prefetchOwnerInventorySummaries,
+  prefetchOwnerMoneySummaries,
+} from "@/lib/owner-money-prefetch";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import styles from "./Sidebar.module.css";
@@ -78,9 +81,9 @@ export default function Sidebar({ open, onClose }: Props) {
 
   const toggleGroup = (label: string) => {
     setOpenGroup((prev) => (prev === label ? null : label));
-    if (label === "Money" && userIsStrictOwner) {
-      runWhenIdle(() => prefetchOwnerMoneySummaries(), 0);
-    }
+    if (!userIsStrictOwner) return;
+    if (label === "Money") runWhenIdle(() => prefetchOwnerMoneySummaries(), 0);
+    else if (label === "Inventory") runWhenIdle(() => prefetchOwnerInventorySummaries(), 0);
   };
 
   useEffect(() => {

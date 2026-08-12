@@ -27,18 +27,29 @@ export function isoLastCompletedPayWeek(): string {
   return dt.toISOString().slice(0, 10);
 }
 
-let prefetchedAt = 0;
 const PREFETCH_COOLDOWN_MS = 60_000;
 
-/** Warm payroll + suppliers API caches when the owner opens the Money nav. */
+let moneyPrefetchedAt = 0;
+let inventoryPrefetchedAt = 0;
+
+/** Warm the payroll API cache when the owner opens the Money nav. */
 export function prefetchOwnerMoneySummaries(): void {
   if (typeof window === "undefined") return;
   const now = Date.now();
-  if (now - prefetchedAt < PREFETCH_COOLDOWN_MS) return;
-  prefetchedAt = now;
+  if (now - moneyPrefetchedAt < PREFETCH_COOLDOWN_MS) return;
+  moneyPrefetchedAt = now;
+
+  const weekStart = isoLastCompletedPayWeek();
+  void fetch(`/api/payroll/summary?weekStart=${weekStart}`).catch(() => {});
+}
+
+/** Suppliers sits under Inventory, so its cache warms from that group. */
+export function prefetchOwnerInventorySummaries(): void {
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  if (now - inventoryPrefetchedAt < PREFETCH_COOLDOWN_MS) return;
+  inventoryPrefetchedAt = now;
 
   const month = sydneyMonthKey();
-  const weekStart = isoLastCompletedPayWeek();
   void fetch(`/api/money/suppliers/summary?month=${month}`).catch(() => {});
-  void fetch(`/api/payroll/summary?weekStart=${weekStart}`).catch(() => {});
 }

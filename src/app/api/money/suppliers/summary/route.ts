@@ -6,7 +6,7 @@ import { fetchSupplierMonths, type MonthlySuppliers } from "@/lib/suppliers-shee
 /**
  * GET /api/money/suppliers/summary?month=YYYY-MM
  *
- * Powers /money/suppliers. Pulls the current month + 5 prior months of
+ * Powers /inventory/suppliers. Pulls the current month + 5 prior months of
  * supplier costs from the shared Google Sheet, joins on matching Sydney
  * monthly Gross Sales from Firestore (sales_daily with sales_yearly
  * fallback), and computes % of sales / vs-previous-month deltas. Each month's sheet parse is cached
