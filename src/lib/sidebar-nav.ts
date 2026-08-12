@@ -76,7 +76,10 @@ export const OWNER_NAV: NavGroup[] = [
   {
     icon: "📦",
     label: "Inventory",
-    children: [{ label: "Stock Levels", href: "/inventory/inventory" }],
+    children: [
+      { label: "Stock Levels", href: "/inventory/inventory" },
+      { label: "Suppliers", href: "/inventory/suppliers" },
+    ],
   },
   {
     icon: "⚙️",
