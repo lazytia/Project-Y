@@ -64,8 +64,11 @@ export const OWNER_NAV: NavGroup[] = [
     label: "HR Records",
     children: [
       { label: "HR Notes", href: "/people/hr-notes" },
-      // Beer Guide lives inside the Training Guide page, not beside it.
-      { label: "Training Guide", href: "/staff/training-manual" },
+      {
+        label: "Training Guide",
+        href: "/staff/training-manual",
+        children: [{ label: "Beer Guide", href: "/staff/beer-guide" }],
+      },
       { label: "Employee Handbook", href: "/staff/handbook" },
       { label: "Employment Contract", href: "/hr-records/employment-contract" },
     ],
