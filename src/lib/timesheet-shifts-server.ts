@@ -35,7 +35,13 @@ function displayName(tm: TimesheetTeamMember | undefined, id: string): string {
 async function fetchSquareShifts(
   startDate: string,
   endDate: string,
-): Promise<{ shifts: TimesheetShift[]; teamMembers: Record<string, TimesheetTeamMember> }> {
+): Promise<{
+  shifts: TimesheetShift[];
+  teamMembers: Record<string, TimesheetTeamMember>;
+  /** Square `reference_id` — the 4-digit clock-in code. Stays server-side:
+   *  `teamMembers` is serialised to the browser, this is a staff passcode. */
+  staffIdByTeamMember: Record<string, string>;
+}> {
   const { locationId } = squareEnv;
   if (!locationId) throw new Error("SQUARE_LOCATION_ID not set");
 
@@ -73,6 +79,7 @@ async function fetchSquareShifts(
   } while (cursor);
 
   const teamMembers: Record<string, TimesheetTeamMember> = {};
+  const staffIdByTeamMember: Record<string, string> = {};
   try {
     let tCursor: string | undefined;
     do {
@@ -86,6 +93,7 @@ async function fetchSquareShifts(
           id?: string;
           givenName?: string;
           familyName?: string;
+          referenceId?: string;
           status?: string;
         }>;
         cursor?: string;
@@ -93,6 +101,8 @@ async function fetchSquareShifts(
       for (const m of page.teamMembers ?? []) {
         if (!m.id || (m.status && m.status !== "ACTIVE")) continue;
         teamMembers[m.id] = { firstName: m.givenName, lastName: m.familyName };
+        const staffId = (m.referenceId ?? "").trim();
+        if (staffId) staffIdByTeamMember[m.id] = staffId;
       }
       tCursor = page.cursor;
     } while (tCursor);
@@ -129,7 +139,7 @@ async function fetchSquareShifts(
     })
     .filter((s) => s.dateISO >= startDate && s.dateISO <= endDate);
 
-  return { shifts, teamMembers };
+  return { shifts, teamMembers, staffIdByTeamMember };
 }
 
 type EditDoc = { startAt?: string; endAt?: string; dateISO?: string };
@@ -179,19 +189,53 @@ async function fetchExtraShifts(startDate: string, endDate: string): Promise<Tim
   });
 }
 
-/** teamMemberId → rates, for every employee linked to a Square team member. */
-async function fetchStaffRates(): Promise<Record<string, StaffRates>> {
-  const out: Record<string, StaffRates> = {};
+type StaffRateIndex = {
+  byTeamMemberId: Record<string, StaffRates>;
+  byStaffId: Record<string, StaffRates>;
+};
+
+/**
+ * Rates are owned by the app, but shifts arrive keyed by Square team member,
+ * so each employee has to be recognisable from their shift. `squareTeamMemberId`
+ * is the explicit link; most employees only ever get a 4-digit clock-in code,
+ * so that is indexed too and matched against Square's `reference_id`.
+ */
+async function fetchStaffRates(): Promise<StaffRateIndex> {
+  const byTeamMemberId: Record<string, StaffRates> = {};
+  const byStaffId: Record<string, StaffRates> = {};
+  const sharedStaffIds = new Set<string>();
   try {
     const snap = await adminDb().collection("staff_onboarding").get();
     for (const d of snap.docs) {
       const raw = d.data() as Record<string, unknown>;
+      const rates = readStaffRates(raw);
       const teamMemberId =
         typeof raw.squareTeamMemberId === "string" ? raw.squareTeamMemberId.trim() : "";
-      if (teamMemberId) out[teamMemberId] = readStaffRates(raw);
+      if (teamMemberId) byTeamMemberId[teamMemberId] = rates;
+
+      const staffId = typeof raw.squareStaffId === "string" ? raw.squareStaffId.trim() : "";
+      if (!staffId) continue;
+      if (staffId in byStaffId) sharedStaffIds.add(staffId);
+      byStaffId[staffId] = rates;
     }
   } catch (err) {
     console.warn("[timesheet-shifts] staff rates lookup failed:", err);
+  }
+  // Two employees on one code means a shift can't be attributed to either.
+  // Paying the wrong rate is worse than falling back to the Square wage.
+  for (const staffId of sharedStaffIds) delete byStaffId[staffId];
+  return { byTeamMemberId, byStaffId };
+}
+
+function resolveRatesByTeamMember(
+  staffIdByTeamMember: Record<string, string>,
+  index: StaffRateIndex,
+): Record<string, StaffRates> {
+  const out: Record<string, StaffRates> = { ...index.byTeamMemberId };
+  for (const [teamMemberId, staffId] of Object.entries(staffIdByTeamMember)) {
+    if (out[teamMemberId]) continue;
+    const rates = index.byStaffId[staffId];
+    if (rates) out[teamMemberId] = rates;
   }
   return out;
 }
@@ -217,13 +261,18 @@ export async function fetchMergedTimesheetShifts(
   shifts: TimesheetShift[];
   teamMembers: Record<string, TimesheetTeamMember>;
 }> {
-  const [{ shifts: squareShifts, teamMembers }, extras, dismissedIds, staffRates] =
-    await Promise.all([
-      fetchSquareShifts(startDate, endDate),
-      fetchExtraShifts(startDate, endDate),
-      fetchDismissedShiftIds(startDate, endDate),
-      fetchStaffRates(),
-    ]);
+  const [
+    { shifts: squareShifts, teamMembers, staffIdByTeamMember },
+    extras,
+    dismissedIds,
+    rateIndex,
+  ] = await Promise.all([
+    fetchSquareShifts(startDate, endDate),
+    fetchExtraShifts(startDate, endDate),
+    fetchDismissedShiftIds(startDate, endDate),
+    fetchStaffRates(),
+  ]);
+  const staffRates = resolveRatesByTeamMember(staffIdByTeamMember, rateIndex);
 
   const editsSnap = await adminDb()
     .collection("timesheet_edits")
