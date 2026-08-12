@@ -16,6 +16,7 @@ import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import { isActiveEmployee } from "@/lib/staff-active";
+import { readStaffRates } from "@/lib/staff-rates";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -60,8 +61,6 @@ type StoredStaff = {
   position?: string;
   status?: string;
   dateOfBirth?: string;
-  trainingRate?: number;
-  afterTrainingRate?: number;
   accountCreated?: boolean;
   addedToScheduling?: boolean;
   documents?: { visaExpiry?: Timestamp | string | null };
@@ -210,12 +209,7 @@ export default function ActiveEmployeesPage() {
             if (!isTeamMember(raw)) return null;
             if (!isActiveEmployee(raw)) return null;
             const { kind, label } = positionOf(raw);
-            const rate =
-              typeof raw.afterTrainingRate === "number"
-                ? raw.afterTrainingRate
-                : typeof raw.trainingRate === "number"
-                  ? raw.trainingRate
-                  : null;
+            const rate = readStaffRates(raw as Record<string, unknown>).weekday;
             return {
               uid: d.id,
               name: fullNameOf(raw),
