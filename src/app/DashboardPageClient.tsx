@@ -48,7 +48,6 @@ const DashboardAttention = dynamic(() => import("@/components/DashboardAttention
 });
 
 const WEEKLY_TARGET = 30_000;
-const PAYROLL_TARGET_PCT = 25;
 
 /** Weekly-sales-derived daily targets (0=Sun … 6=Sat). Sunday is closed. */
 const DAILY_TARGETS: Record<number, number> = {
@@ -276,7 +275,6 @@ function OwnerDashboard({
   const isToday = !!selectedDate && selectedDate === todayKey;
   const dailyTarget = selectedDate ? DAILY_TARGETS[dowOfDateKey(selectedDate)] ?? 0 : 0;
   const weekMondayISO = selectedDate ? isoMondayOf(selectedDate) : "";
-  const prevMondayISO = weekMondayISO ? addDaysISO(weekMondayISO, -7) : "";
 
   const seedSales =
     typeof initialCache?.todaySales === "number"
@@ -318,9 +316,13 @@ function OwnerDashboard({
   );
   const [lunchStaff, setLunchStaff] = useState<number | null>(initialCache?.lunchStaff ?? null);
   const [dinnerStaff, setDinnerStaff] = useState<number | null>(initialCache?.dinnerStaff ?? null);
-  const [prevWeekSales, setPrevWeekSales] = useState<number | null>(initialCache?.prevWeekSales ?? null);
   const [weekSalesDoc, setWeekSalesDoc] = useState<number | null>(initialCache?.weekSalesDoc ?? null);
-  const [weeklyPayroll, setWeeklyPayroll] = useState<number | null>(initialCache?.weeklyPayroll ?? null);
+  /**
+   * Mon–Sun gross sales for the selected week and the one before it, straight
+   * from Square. Both halves of the THIS WEEK card are summed from this single
+   * source so the "vs last week" delta is always internally consistent.
+   */
+  const [weekDaily, setWeekDaily] = useState<{ thisWeek: number[]; lastWeek: number[] } | null>(null);
   const [reviewNote, setReviewNote] = useState(initialCache?.reviewNote ?? "");
   const [reviewEditing, setReviewEditing] = useState(false);
   const [reviewDraft, setReviewDraft] = useState(initialCache?.reviewNote ?? "");
@@ -362,9 +364,7 @@ function OwnerDashboard({
     }
     if (typeof cache.lunchStaff === "number") setLunchStaff(cache.lunchStaff);
     if (typeof cache.dinnerStaff === "number") setDinnerStaff(cache.dinnerStaff);
-    if (typeof cache.prevWeekSales === "number") setPrevWeekSales(cache.prevWeekSales);
     if (typeof cache.weekSalesDoc === "number") setWeekSalesDoc(cache.weekSalesDoc);
-    if (typeof cache.weeklyPayroll === "number") setWeeklyPayroll(cache.weeklyPayroll);
     if (typeof cache.reviewNote === "string") {
       setReviewNote(cache.reviewNote);
       setReviewDraft(cache.reviewNote);
@@ -510,16 +510,23 @@ function OwnerDashboard({
     }
   }, []);
 
-  const fetchPrevWeekSales = useCallback(async (prevMonday: string, dateKey: string) => {
-    if (!prevMonday) return;
+  const fetchWeekDaily = useCallback(async (monday: string) => {
+    if (!monday) return;
     try {
-      const snap = await getDoc(doc(getDb(), "sales_weekly", prevMonday));
-      const data = snap.exists() ? snap.data() as { grossSales?: number } : null;
-      const v = typeof data?.grossSales === "number" ? data.grossSales : null;
-      setPrevWeekSales(v);
-      if (v !== null) writeDashCache(dateKey, { prevWeekSales: v });
+      const res = await fetch(
+        `/api/square/weekly-daily?weekStart=${encodeURIComponent(monday)}`,
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        thisWeek?: { daily?: number[] };
+        lastWeek?: { daily?: number[] };
+      };
+      const thisWeek = data.thisWeek?.daily;
+      const lastWeek = data.lastWeek?.daily;
+      if (!Array.isArray(thisWeek) || !Array.isArray(lastWeek)) return;
+      setWeekDaily({ thisWeek, lastWeek });
     } catch {
-      /* keep previous */
+      /* the card falls back to the sales_weekly running total */
     }
   }, []);
 
@@ -531,23 +538,6 @@ function OwnerDashboard({
       const v = typeof data?.grossSales === "number" ? data.grossSales : null;
       setWeekSalesDoc(v);
       if (v !== null) writeDashCache(dateKey, { weekSalesDoc: v });
-    } catch {
-      /* keep previous */
-    }
-  }, []);
-
-  const fetchWeeklyPayroll = useCallback(async (monday: string, dateKey: string) => {
-    if (!monday) return;
-    try {
-      const snap = await getDoc(doc(getDb(), "payroll_weekly", monday));
-      const data = snap.exists() ? snap.data() as { totalIncSuper?: number; gross?: number; super?: number } : null;
-      if (!data) { setWeeklyPayroll(null); return; }
-      const total = typeof data.totalIncSuper === "number"
-        ? data.totalIncSuper
-        : (data.gross ?? 0) + (data.super ?? 0);
-      const v = total || null;
-      setWeeklyPayroll(v);
-      if (v !== null) writeDashCache(dateKey, { weeklyPayroll: v });
     } catch {
       /* keep previous */
     }
@@ -588,9 +578,8 @@ function OwnerDashboard({
       setCachedCatering(null);
       setLunchStaff(null);
       setDinnerStaff(null);
-      setPrevWeekSales(null);
       setWeekSalesDoc(null);
-      setWeeklyPayroll(null);
+      setWeekDaily(null);
       setReviewNote("");
       setReviewDraft("");
     }
@@ -623,9 +612,8 @@ function OwnerDashboard({
       fetchReservations(selectedDate),
       fetchCatering(),
       fetchRosterStaff(selectedDate),
-      fetchPrevWeekSales(prevMondayISO, selectedDate),
+      fetchWeekDaily(weekMondayISO),
       fetchWeekSales(weekMondayISO, selectedDate),
-      fetchWeeklyPayroll(weekMondayISO, selectedDate),
       fetchReviewNote(selectedDate),
     ]).then(() => {
       clearTimeout(reveal);
@@ -637,7 +625,7 @@ function OwnerDashboard({
       clearTimeout(reveal);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, prevMondayISO, weekMondayISO, user?.uid, refreshTick]);
+  }, [selectedDate, weekMondayISO, user?.uid, refreshTick]);
 
   // Server-session snapshot lives in its own effect on purpose. It is
   // authenticated by the uid cookie, not by the Firebase client SDK, so
@@ -716,16 +704,29 @@ function OwnerDashboard({
       : null;
   }, [cateringOrders, weekMondayISO, cachedCatering]);
 
-  const weeklySales = weekSalesDoc ?? stats?.weeklyProgress ?? null;
-  const vsLastWeekPct = useMemo(() => {
-    if (weeklySales === null || prevWeekSales === null || !prevWeekSales) return null;
-    return ((weeklySales - prevWeekSales) / prevWeekSales) * 100;
-  }, [weeklySales, prevWeekSales]);
+  /** 0 = Monday … 6 = Sunday. How far into the week the selected date sits. */
+  const weekDayOffset = useMemo(() => {
+    if (!selectedDate || !weekMondayISO) return 0;
+    const ms = Date.parse(`${selectedDate}T00:00:00Z`) - Date.parse(`${weekMondayISO}T00:00:00Z`);
+    return Math.min(6, Math.max(0, Math.round(ms / 86_400_000)));
+  }, [selectedDate, weekMondayISO]);
 
-  const payrollPct = useMemo(() => {
-    if (weeklyPayroll === null || weeklySales === null || !weeklySales) return null;
-    return (weeklyPayroll / weeklySales) * 100;
-  }, [weeklyPayroll, weeklySales]);
+  /** Mon → selected day inclusive. Comparing full weeks against a part-week
+   *  is what made the old "vs last week" figure meaningless. */
+  const sumToSelectedDay = useCallback(
+    (daily: number[] | undefined) =>
+      daily ? daily.slice(0, weekDayOffset + 1).reduce((sum, n) => sum + (n || 0), 0) : null,
+    [weekDayOffset],
+  );
+
+  const weeklySales =
+    sumToSelectedDay(weekDaily?.thisWeek) ?? weekSalesDoc ?? stats?.weeklyProgress ?? null;
+  const lastWeekToDate = sumToSelectedDay(weekDaily?.lastWeek);
+
+  const lastWeekDelta =
+    weeklySales !== null && lastWeekToDate !== null ? weeklySales - lastWeekToDate : null;
+  const lastWeekDeltaPct =
+    lastWeekDelta !== null && lastWeekToDate ? (lastWeekDelta / lastWeekToDate) * 100 : null;
 
   // ── display gate ──────────────────────────────────────────────────
   // Everything the cards render goes through here. Until metricsReady we
@@ -738,12 +739,11 @@ function OwnerDashboard({
   const shownLunchStaff = metricsReady ? lunchStaff : null;
   const shownDinnerStaff = metricsReady ? dinnerStaff : null;
   const shownWeeklySales = metricsReady ? weeklySales : null;
-  const shownVsLastWeekPct = metricsReady ? vsLastWeekPct : null;
-  const shownPayrollPct = metricsReady ? payrollPct : null;
+  const shownLastWeekToDate = metricsReady ? lastWeekToDate : null;
+  const shownLastWeekDelta = metricsReady ? lastWeekDelta : null;
+  const shownLastWeekDeltaPct = metricsReady ? lastWeekDeltaPct : null;
   const shownWeekCateringCount = metricsReady ? weekCateringCount : null;
   const shownNextCatering = metricsReady ? nextCatering : null;
-
-  const payrollOnTarget = shownPayrollPct !== null && shownPayrollPct <= PAYROLL_TARGET_PCT;
 
   const bestSellers = metricsReady ? (stats?.bestSellers ?? []).slice(0, 3) : [];
 
@@ -905,33 +905,28 @@ function OwnerDashboard({
         </div>
         <div className={styles.weekBody}>
           <div className={styles.weekLeft}>
-            <p className={styles.miniLabelOnDark}>WEEKLY SALES</p>
+            <p className={styles.miniLabelOnDark}>WEEK TO DATE SALES</p>
             <p className={styles.weekAmount}>
               {shownWeeklySales !== null ? fmtCurrency(shownWeeklySales) : "—"}
             </p>
-            <p className={styles.targetSubOnDark}>Target {fmtCurrencyWhole(WEEKLY_TARGET)}</p>
-            <Progress value={shownWeeklySales ?? 0} max={WEEKLY_TARGET} tone="onDark" />
-            <p className={styles.weekVs}>
-              vs last week{" "}
-              {shownVsLastWeekPct !== null ? (
-                <span className={shownVsLastWeekPct >= 0 ? styles.deltaPos : styles.deltaNeg}>
-                  {shownVsLastWeekPct >= 0 ? "+" : ""}{shownVsLastWeekPct.toFixed(0)}% {shownVsLastWeekPct >= 0 ? "↑" : "↓"}
-                </span>
-              ) : "—"}
-            </p>
+            <p className={styles.targetSubOnDark}>Weekly Target {fmtCurrencyWhole(WEEKLY_TARGET)}</p>
+            <Progress value={shownWeeklySales ?? 0} max={WEEKLY_TARGET} pctRight tone="onDark" />
           </div>
           <div className={styles.weekDivider} aria-hidden="true" />
           <div className={styles.weekRight}>
-            <p className={styles.miniLabelOnDark}>PAYROLL %</p>
-            <p className={styles.payrollPct}>
-              {shownPayrollPct !== null ? `${shownPayrollPct.toFixed(1)}%` : "—"}
+            <p className={styles.miniLabelOnDark}>LAST WEEK UP TO TODAY</p>
+            <p className={styles.weekAmount}>
+              {shownLastWeekToDate !== null ? fmtCurrency(shownLastWeekToDate) : "—"}
             </p>
-            <p className={styles.targetSubOnDark}>Target {PAYROLL_TARGET_PCT}%</p>
-            {shownPayrollPct !== null && (
-              <span className={payrollOnTarget ? styles.badgeOnTarget : styles.badgeOverTarget}>
-                {payrollOnTarget ? "On target" : "Over Target"}
-              </span>
+            {shownLastWeekDelta !== null && shownLastWeekDeltaPct !== null && (
+              <p
+                className={`${styles.weekDelta} ${shownLastWeekDelta >= 0 ? styles.deltaPos : styles.deltaNeg}`}
+              >
+                {shownLastWeekDelta >= 0 ? "↑" : "↓"} {fmtCurrency(Math.abs(shownLastWeekDelta))} (
+                {Math.abs(shownLastWeekDeltaPct).toFixed(1)}%)
+              </p>
             )}
+            <p className={styles.targetSubOnDark}>vs last week up to today</p>
           </div>
         </div>
       </section>

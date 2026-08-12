@@ -14,9 +14,7 @@ export type DashCache = Partial<{
   dinnerPax: number;
   lunchStaff: number;
   dinnerStaff: number;
-  prevWeekSales: number;
   weekSalesDoc: number;
-  weeklyPayroll: number;
   reviewNote: string;
   nextCateringISO: string;
   weekCateringCount: number;

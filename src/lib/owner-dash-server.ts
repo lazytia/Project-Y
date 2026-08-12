@@ -1,6 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { fetchSystemYuricaTodayCounts } from "@/lib/system-yurica";
-import { addDaysISO, isoMondayOf, sydneyTodayKey } from "@/lib/sydney-date";
+import { isoMondayOf, sydneyTodayKey } from "@/lib/sydney-date";
 import type { DashCache } from "@/lib/owner-dash-cache";
 
 export type OwnerDashServerSnapshot = {
@@ -14,22 +14,11 @@ export async function prefetchOwnerDash(
   options?: { includeTodayCounts?: boolean },
 ): Promise<OwnerDashServerSnapshot> {
   const weekMonday = isoMondayOf(dateKey);
-  const prevMonday = addDaysISO(weekMonday, -7);
   const db = adminDb();
 
-  const [
-    dailySnap,
-    weekSnap,
-    prevWeekSnap,
-    payrollSnap,
-    reviewSnap,
-    rosterSnap,
-    todayCounts,
-  ] = await Promise.all([
+  const [dailySnap, weekSnap, reviewSnap, rosterSnap, todayCounts] = await Promise.all([
     db.collection("sales_daily").doc(dateKey).get(),
     db.collection("sales_weekly").doc(weekMonday).get(),
-    db.collection("sales_weekly").doc(prevMonday).get(),
-    db.collection("payroll_weekly").doc(weekMonday).get(),
     db.collection("sales_reviews").doc(dateKey).get(),
     db.collection("rosters_published").doc(weekMonday).get(),
     options?.includeTodayCounts
@@ -48,20 +37,6 @@ export async function prefetchOwnerDash(
   const week = weekSnap.exists ? weekSnap.data() : null;
   if (typeof week?.totalSales === "number") cache.weekSalesDoc = week.totalSales;
   else if (typeof week?.grossSales === "number") cache.weekSalesDoc = week.grossSales;
-
-  const prevWeek = prevWeekSnap.exists ? prevWeekSnap.data() : null;
-  if (typeof prevWeek?.totalSales === "number") cache.prevWeekSales = prevWeek.totalSales;
-  else if (typeof prevWeek?.grossSales === "number") cache.prevWeekSales = prevWeek.grossSales;
-
-  const payroll = payrollSnap.exists ? payrollSnap.data() : null;
-  if (payroll) {
-    const total =
-      typeof payroll.totalIncSuper === "number"
-        ? payroll.totalIncSuper
-        : (typeof payroll.gross === "number" ? payroll.gross : 0) +
-          (typeof payroll.super === "number" ? payroll.super : 0);
-    if (total) cache.weeklyPayroll = total;
-  }
 
   const review = reviewSnap.exists ? reviewSnap.data() : null;
   if (typeof review?.text === "string") cache.reviewNote = review.text;
