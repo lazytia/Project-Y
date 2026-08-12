@@ -1,8 +1,26 @@
 import Link from "next/link";
 import type { ServerSession } from "@/lib/dashboard-session";
-import { navForSessionRole, type NavGroup } from "@/lib/sidebar-nav";
+import { navForSessionRole, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import shellStyles from "./AppShell.module.css";
 import sidebarStyles from "./Sidebar.module.css";
+
+function ServerNavChildList({ items, nested = false }: { items: NavItem[]; nested?: boolean }) {
+  return (
+    <ul className={nested ? sidebarStyles.grandChildren : sidebarStyles.children}>
+      {items.map((item) => (
+        <li key={item.href}>
+          <Link
+            href={item.href}
+            className={`${sidebarStyles.childLink} ${nested ? sidebarStyles.grandChildLink : ""}`}
+          >
+            {item.label}
+          </Link>
+          {item.children && <ServerNavChildList items={item.children} nested />}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function ServerNavGroup({ group }: { group: NavGroup }) {
   if (group.href) {
@@ -24,15 +42,7 @@ function ServerNavGroup({ group }: { group: NavGroup }) {
       </div>
       {group.children && (
         <div className={`${sidebarStyles.collapseWrap} ${sidebarStyles.collapseOpen}`}>
-          <ul className={sidebarStyles.children}>
-            {group.children.map((item) => (
-              <li key={item.href}>
-                <Link href={item.href} className={sidebarStyles.childLink}>
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <ServerNavChildList items={group.children} />
         </div>
       )}
     </div>

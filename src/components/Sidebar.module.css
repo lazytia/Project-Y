@@ -179,6 +179,23 @@
   padding-bottom: var(--space-1);
 }
 
+/* ── 손자 메뉴 (Money › Other Operating Costs › Utilities) ── */
+.grandChildren {
+  list-style: none;
+  margin: 2px 0 var(--space-1) var(--space-3);
+  padding: 0 0 0 var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--color-border);
+}
+
+.grandChildLink {
+  font-size: var(--font-size-xs);
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
 .childLink {
   display: block;
   padding: var(--space-2) var(--space-3);

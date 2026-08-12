@@ -3,6 +3,8 @@ export type NavItem = {
   href: string;
   ownerOnly?: boolean;
   chefHidden?: boolean;
+  /** Indented sub-list under this item. The parent stays a link. */
+  children?: NavItem[];
 };
 
 export type NavGroup = {
@@ -23,7 +25,24 @@ export const OWNER_NAV: NavGroup[] = [
       { label: "Catering", href: "/operations/catering-orders" },
       { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
       { label: "Roster", href: "/scheduling/roster" },
-      { label: "Timesheets", href: "/payroll/timesheets" },
+      { label: "Cash Payments", href: "/people/cash-payments" },
+    ],
+  },
+  {
+    icon: "💰",
+    label: "Money",
+    children: [
+      { label: "Sales Overview", href: "/money/sales" },
+      { label: "Payroll", href: "/payroll/payroll" },
+      { label: "Purchasing Cost", href: "/money/purchasing-cost" },
+      {
+        label: "Other Operating Costs",
+        href: "/money/operating-costs",
+        children: [
+          { label: "Utilities", href: "/money/utilities" },
+          { label: "Maintenance", href: "/money/maintenance" },
+        ],
+      },
     ],
   },
   {
@@ -32,31 +51,25 @@ export const OWNER_NAV: NavGroup[] = [
     children: [
       { label: "New Employees", href: "/people/onboarding" },
       { label: "Active Employees", href: "/people/active" },
-      { label: "Beer Guide", href: "/staff/beer-guide" },
       { label: "Notice Given", href: "/people/notice-given" },
       { label: "Terminated", href: "/people/terminated" },
+    ],
+  },
+  {
+    icon: "📋",
+    label: "HR Records",
+    children: [
       { label: "HR Notes", href: "/people/hr-notes" },
-      { label: "Cash Payments", href: "/people/cash-payments" },
+      // Beer Guide lives inside the Training Guide page, not beside it.
+      { label: "Training Guide", href: "/staff/training-manual" },
+      { label: "Employee Handbook", href: "/staff/handbook" },
+      { label: "Employment Contract", href: "/hr-records/employment-contract" },
     ],
   },
   {
     icon: "📦",
     label: "Inventory",
-    children: [
-      { label: "Stock Levels", href: "/inventory/inventory" },
-      { label: "Suppliers", href: "/inventory/suppliers" },
-    ],
-  },
-  {
-    icon: "💵",
-    label: "Money",
-    children: [
-      { label: "Sales", href: "/money/sales" },
-      { label: "Payroll", href: "/payroll/payroll" },
-      { label: "Suppliers", href: "/money/suppliers" },
-      { label: "Utilities", href: "/money/utilities" },
-      { label: "Maintenance", href: "/money/maintenance" },
-    ],
+    children: [{ label: "Stock Levels", href: "/inventory/inventory" }],
   },
   {
     icon: "⚙️",

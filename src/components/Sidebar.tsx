@@ -11,7 +11,7 @@ import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import { readClientDashboardHint } from "@/lib/client-session-hint";
 import { prefetchOwnerMoneySummaries } from "@/lib/owner-money-prefetch";
 import { runWhenIdle } from "@/lib/run-when-idle";
-import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup } from "@/lib/sidebar-nav";
+import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import styles from "./Sidebar.module.css";
 
 type Props = { open: boolean; onClose?: () => void };
@@ -20,6 +20,44 @@ function isNavChildActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   if (href === "/onboarding" && pathname.startsWith("/onboarding")) return true;
   return pathname.startsWith(`${href}/`);
+}
+
+function NavChildList({
+  items,
+  pathname,
+  onNavigate,
+  nested = false,
+}: {
+  items: NavItem[];
+  pathname: string;
+  onNavigate?: () => void;
+  nested?: boolean;
+}) {
+  return (
+    <ul className={nested ? styles.grandChildren : styles.children}>
+      {items.map((item) => (
+        <li key={item.href}>
+          <Link
+            href={item.href}
+            className={`${styles.childLink} ${nested ? styles.grandChildLink : ""} ${
+              isNavChildActive(pathname, item.href) ? styles.active : ""
+            }`}
+            onClick={onNavigate}
+          >
+            {item.label}
+          </Link>
+          {item.children && (
+            <NavChildList
+              items={item.children}
+              pathname={pathname}
+              onNavigate={onNavigate}
+              nested
+            />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export default function Sidebar({ open, onClose }: Props) {
@@ -157,19 +195,11 @@ export default function Sidebar({ open, onClose }: Props) {
                 )}
                 {group.children && (
                   <div className={`${styles.collapseWrap} ${isExpanded ? styles.collapseOpen : ""}`}>
-                    <ul className={styles.children}>
-                      {group.children.map((item) => (
-                        <li key={item.href}>
-                          <Link
-                            href={item.href}
-                            className={`${styles.childLink} ${isNavChildActive(pathname, item.href) ? styles.active : ""}`}
-                            onClick={onClose}
-                          >
-                            {item.label}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
+                    <NavChildList
+                      items={group.children}
+                      pathname={pathname}
+                      onNavigate={onClose}
+                    />
                   </div>
                 )}
               </div>
@@ -218,19 +248,11 @@ export default function Sidebar({ open, onClose }: Props) {
               )}
               {group.children && (
                 <div className={`${styles.collapseWrap} ${isExpanded ? styles.collapseOpen : ""}`}>
-                  <ul className={styles.children}>
-                    {group.children.map((item) => (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          className={`${styles.childLink} ${isNavChildActive(pathname, item.href) ? styles.active : ""}`}
-                          onClick={onClose}
-                        >
-                          {item.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                  <NavChildList
+                    items={group.children}
+                    pathname={pathname}
+                    onNavigate={onClose}
+                  />
                 </div>
               )}
             </div>
