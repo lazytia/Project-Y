@@ -12,7 +12,6 @@
  */
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import SignaturePad from "@/components/SignaturePad";
@@ -147,24 +146,6 @@ export default function TrainingManualPage() {
           View Full Manual →
         </button>
       </div>
-
-      <div className={styles.sectionHead}>
-        <h2 className={styles.sectionTitle}>Guides</h2>
-      </div>
-      <ul className={styles.updatedList}>
-        <li>
-          <Link href="/staff/beer-guide" className={`${styles.updatedRow} ${styles.guideLink}`}>
-            <span className={styles.guideIcon} aria-hidden="true">🍺</span>
-            <div className={styles.updatedBody}>
-              <p className={styles.updatedTitle}>
-                <span className={styles.updatedTitleBold}>Beer Guide</span>
-              </p>
-              <p className={styles.updatedSummary}>Pouring and tap maintenance videos.</p>
-            </div>
-            <span className={styles.updatedChev} aria-hidden="true">›</span>
-          </Link>
-        </li>
-      </ul>
 
       <h2 className={styles.sectionTitleAck}>Acknowledgement</h2>
       <section className={styles.ackCard}>
