@@ -1,7 +1,11 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { shiftDateKey } from "@/lib/square";
-import { warmWeekSalesCache, weekCacheIsSettled } from "@/lib/square-weekly-daily";
+import {
+  warmWeekSalesCache,
+  weekCacheIsSettled,
+  WEEKLY_DAILY_COMPUTE_VERSION,
+} from "@/lib/square-weekly-daily";
 
 /**
  * Sydney-week Gross Sales lookup shared by the payroll and supplier-cost
@@ -40,7 +44,14 @@ export async function loadWeekSalesBatch(weekStarts: string[]): Promise<number[]
     const snaps = await db.getAll(...refs);
     snaps.forEach((snap, i) => {
       if (!snap.exists) return;
-      const data = snap.data() as { thisWeek?: { total?: number }; computedAt?: Timestamp };
+      const data = snap.data() as {
+        thisWeek?: { total?: number };
+        computedAt?: Timestamp;
+        computeVersion?: number;
+      };
+      // A doc written by an older gross-sales formula would otherwise keep
+      // feeding this page a figure /money/sales has already recomputed.
+      if (data.computeVersion !== WEEKLY_DAILY_COMPUTE_VERSION) return;
       const weekStart = weekStarts[i];
       const weekIsOver = shiftDateKey(weekStart, 6, TIMEZONE) < today;
       if (
