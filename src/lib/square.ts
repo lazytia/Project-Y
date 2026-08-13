@@ -133,6 +133,20 @@ export function squareGrossSalesCents(order: SquareOrder): number {
 export const SALES_DAY_START_HOUR = 9;
 export const SALES_DAY_END_HOUR = 22;
 
+/** Service split: anything rung up before 3:00 PM local counts as lunch. */
+export const SERVICE_SPLIT_HOUR = 15;
+
+/** Hour of day (0–23) an instant falls on in the given timezone. */
+export function localHourIn(instant: string, timezone: string): number {
+  return new Date(
+    new Date(instant).toLocaleString("en-US", { timeZone: timezone }),
+  ).getHours();
+}
+
+export function isLunchInstant(instant: string, timezone: string): boolean {
+  return localHourIn(instant, timezone) < SERVICE_SPLIT_HOUR;
+}
+
 /**
  * UTC range covering Square's "Sales Report day (9:00 am–10:00 pm AET)"
  * for the given calendar date in `timezone`. If `dateKey` is omitted,
@@ -157,7 +171,22 @@ export async function sumRefundCents(
   beginTime: string,
   endTime: string,
 ): Promise<number> {
-  let total = 0;
+  const { lunch, dinner } = await sumRefundCentsByService(locationId, beginTime, endTime, "UTC");
+  return lunch + dinner;
+}
+
+/**
+ * Same window as `sumRefundCents`, split at `SERVICE_SPLIT_HOUR` so a refund
+ * lands on the service it belongs to. Lunch + dinner always equals the total.
+ */
+export async function sumRefundCentsByService(
+  locationId: string,
+  beginTime: string,
+  endTime: string,
+  timezone: string,
+): Promise<{ lunch: number; dinner: number }> {
+  let lunch = 0;
+  let dinner = 0;
   const iter = await squareClient.refunds.list({
     beginTime,
     endTime,
@@ -166,9 +195,11 @@ export async function sumRefundCents(
     sortField: "CREATED_AT",
   });
   for await (const refund of iter) {
-    total += Number(refund.amountMoney?.amount ?? 0n);
+    const cents = Number(refund.amountMoney?.amount ?? 0n);
+    if (refund.createdAt && isLunchInstant(refund.createdAt, timezone)) lunch += cents;
+    else dinner += cents;
   }
-  return total;
+  return { lunch, dinner };
 }
 
 /**

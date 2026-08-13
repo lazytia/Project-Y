@@ -16,11 +16,10 @@ export async function prefetchOwnerDash(
   const weekMonday = isoMondayOf(dateKey);
   const db = adminDb();
 
-  const [dailySnap, weekSnap, reviewSnap, rosterSnap, todayCounts] = await Promise.all([
+  const [dailySnap, weekSnap, reviewSnap, todayCounts] = await Promise.all([
     db.collection("sales_daily").doc(dateKey).get(),
     db.collection("sales_weekly").doc(weekMonday).get(),
     db.collection("sales_reviews").doc(dateKey).get(),
-    db.collection("rosters_published").doc(weekMonday).get(),
     options?.includeTodayCounts
       ? fetchSystemYuricaTodayCounts(dateKey).catch(() => null)
       : Promise.resolve(null),
@@ -41,26 +40,9 @@ export async function prefetchOwnerDash(
   const review = reviewSnap.exists ? reviewSnap.data() : null;
   if (typeof review?.text === "string") cache.reviewNote = review.text;
 
-  if (rosterSnap.exists) {
-    const assignments = rosterSnap.data()?.assignments as
-      | Record<string, Record<string, Record<string, string>>>
-      | undefined;
-    const dayAssign = assignments?.[dateKey] ?? {};
-    const lunch = new Set<string>();
-    const dinner = new Set<string>();
-    for (const [meal, uids] of Object.entries(dayAssign)) {
-      const set = meal.toLowerCase().includes("dinner") ? dinner : lunch;
-      for (const uid of Object.keys(uids)) set.add(uid);
-    }
-    cache.lunchStaff = lunch.size;
-    cache.dinnerStaff = dinner.size;
-  }
-
   if (todayCounts) {
     cache.lunchPax = todayCounts.lunchPax;
     cache.dinnerPax = todayCounts.dinnerPax;
-    if (cache.lunchStaff == null) cache.lunchStaff = todayCounts.lunchStaff;
-    if (cache.dinnerStaff == null) cache.dinnerStaff = todayCounts.dinnerStaff;
   }
 
   return { dateKey, cache };

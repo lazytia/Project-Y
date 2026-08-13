@@ -179,6 +179,9 @@ export default function DashboardPageClient({
 
 type Stats = {
   todaySales: number;
+  /** Same money as todaySales, cut at 3:00 PM. Null until Square answers. */
+  lunchSales: number | null;
+  dinnerSales: number | null;
   transactions: number;
   transactionsChange: number;
   avgSpendPerTable: number;
@@ -194,6 +197,8 @@ type Stats = {
 function emptyStats(sales = 0): Stats {
   return {
     todaySales: sales,
+    lunchSales: null,
+    dinnerSales: null,
     transactions: 0,
     transactionsChange: 0,
     avgSpendPerTable: 0,
@@ -215,20 +220,18 @@ function emptyStats(sales = 0): Stats {
  * Each group covers exactly the fetches that feed one card, so a card still
  * never paints a cached number that its own live fetch is about to rewrite.
  */
-type MetricGroup = "sales" | "reservations" | "staff" | "week" | "catering";
+type MetricGroup = "sales" | "reservations" | "week" | "catering";
 type MetricsReady = Record<MetricGroup, boolean>;
 
 const METRICS_PENDING: MetricsReady = {
   sales: false,
   reservations: false,
-  staff: false,
   week: false,
   catering: false,
 };
 const METRICS_ALL_READY: MetricsReady = {
   sales: true,
   reservations: true,
-  staff: true,
   week: true,
   catering: true,
 };
@@ -317,6 +320,8 @@ function OwnerDashboard({
     seedSales !== null
       ? {
           ...emptyStats(seedSales),
+          lunchSales: initialCache?.lunchSales ?? null,
+          dinnerSales: initialCache?.dinnerSales ?? null,
           restaurantSales: initialCache?.restaurantSales ?? 0,
           platterSales: initialCache?.platterSales ?? 0,
           weeklyProgress: initialCache?.weeklyProgress ?? 0,
@@ -344,8 +349,6 @@ function OwnerDashboard({
         }
       : null,
   );
-  const [lunchStaff, setLunchStaff] = useState<number | null>(initialCache?.lunchStaff ?? null);
-  const [dinnerStaff, setDinnerStaff] = useState<number | null>(initialCache?.dinnerStaff ?? null);
   const [weekSalesDoc, setWeekSalesDoc] = useState<number | null>(initialCache?.weekSalesDoc ?? null);
   /**
    * Mon–Sun gross sales for the selected week and the one before it, straight
@@ -371,8 +374,7 @@ function OwnerDashboard({
       typeof cache.savedDaySales === "number" ||
       typeof cache.weeklyProgress === "number" ||
       typeof cache.weekSalesDoc === "number" ||
-      typeof cache.lunchPax === "number" ||
-      typeof cache.lunchStaff === "number";
+      typeof cache.lunchPax === "number";
     if (!hasNumbers) return false;
 
     const sales =
@@ -385,6 +387,8 @@ function OwnerDashboard({
       setStats((prev) => ({
         ...(prev ?? emptyStats(sales)),
         todaySales: sales,
+        lunchSales: cache.lunchSales ?? prev?.lunchSales ?? null,
+        dinnerSales: cache.dinnerSales ?? prev?.dinnerSales ?? null,
         restaurantSales: cache.restaurantSales ?? prev?.restaurantSales ?? 0,
         platterSales: cache.platterSales ?? prev?.platterSales ?? 0,
         weeklyProgress: cache.weeklyProgress ?? prev?.weeklyProgress ?? 0,
@@ -399,10 +403,6 @@ function OwnerDashboard({
         lunchPax: cache.lunchPax ?? 0,
         dinnerPax: cache.dinnerPax ?? 0,
       });
-    }
-    if (!skip.staff) {
-      if (typeof cache.lunchStaff === "number") setLunchStaff(cache.lunchStaff);
-      if (typeof cache.dinnerStaff === "number") setDinnerStaff(cache.dinnerStaff);
     }
     if (!skip.week && typeof cache.weekSalesDoc === "number") setWeekSalesDoc(cache.weekSalesDoc);
     if (typeof cache.reviewNote === "string") {
@@ -458,6 +458,8 @@ function OwnerDashboard({
       setLastUpdated(new Date());
       writeDashCache(dateKey, {
         todaySales: data.todaySales,
+        lunchSales: data.lunchSales ?? undefined,
+        dinnerSales: data.dinnerSales ?? undefined,
         restaurantSales: data.restaurantSales,
         platterSales: data.platterSales,
         weeklyProgress: data.weeklyProgress,
@@ -523,33 +525,6 @@ function OwnerDashboard({
       console.error("[catering] fetch error:", err);
     }
   }, [user, weekMondayISO, todayKey, selectedDate]);
-
-  const fetchRosterStaff = useCallback(async (dateKey: string) => {
-    try {
-      const weekKey = isoMondayOf(dateKey);
-      const rSnap = await getDoc(doc(getDb(), "rosters_published", weekKey));
-      if (!rSnap.exists()) {
-        setLunchStaff(0);
-        setDinnerStaff(0);
-        writeDashCache(dateKey, { lunchStaff: 0, dinnerStaff: 0 });
-        return;
-      }
-      const rData = rSnap.data() as { assignments?: Record<string, Record<string, Record<string, string>>> };
-      const dayAssign = rData.assignments?.[dateKey] ?? {};
-      const lunch = new Set<string>();
-      const dinner = new Set<string>();
-      for (const [meal, uids] of Object.entries(dayAssign)) {
-        const key = meal.toLowerCase();
-        const set = key.includes("dinner") ? dinner : lunch;
-        for (const uid of Object.keys(uids)) set.add(uid);
-      }
-      setLunchStaff(lunch.size);
-      setDinnerStaff(dinner.size);
-      writeDashCache(dateKey, { lunchStaff: lunch.size, dinnerStaff: dinner.size });
-    } catch (err) {
-      console.error("[roster] fetch error:", err);
-    }
-  }, []);
 
   const fetchWeekDaily = useCallback(async (monday: string) => {
     if (!monday) return;
@@ -617,8 +592,6 @@ function OwnerDashboard({
       setCateringOrders(null);
       setCachedPax(null);
       setCachedCatering(null);
-      setLunchStaff(null);
-      setDinnerStaff(null);
       setWeekSalesDoc(null);
       setWeekDaily(null);
       setReviewNote("");
@@ -665,7 +638,6 @@ function OwnerDashboard({
       ]),
       runMetricGroup("reservations", isCancelled, [fetchReservations(selectedDate)]),
       runMetricGroup("catering", isCancelled, [fetchCatering()]),
-      runMetricGroup("staff", isCancelled, [fetchRosterStaff(selectedDate)]),
       runMetricGroup("week", isCancelled, [
         fetchWeekDaily(weekMondayISO),
         fetchWeekSales(weekMondayISO, selectedDate),
@@ -789,9 +761,11 @@ function OwnerDashboard({
   // about to overwrite with a different number.
   const shownTodaySales =
     metricsReady.sales && typeof stats?.todaySales === "number" ? stats.todaySales : null;
+  const shownLunchSales =
+    metricsReady.sales && typeof stats?.lunchSales === "number" ? stats.lunchSales : null;
+  const shownDinnerSales =
+    metricsReady.sales && typeof stats?.dinnerSales === "number" ? stats.dinnerSales : null;
   const shownResCounts = metricsReady.reservations ? resCounts : null;
-  const shownLunchStaff = metricsReady.staff ? lunchStaff : null;
-  const shownDinnerStaff = metricsReady.staff ? dinnerStaff : null;
   const shownWeeklySales = metricsReady.week ? weeklySales : null;
   const shownLastWeekToDate = metricsReady.week ? lastWeekToDate : null;
   const shownLastWeekDelta = metricsReady.week ? lastWeekDelta : null;
@@ -894,12 +868,14 @@ function OwnerDashboard({
       {/* TODAY */}
       <section className={styles.todayCard}>
         <div className={styles.todayHeader}>
-          <span className={styles.sectionLabel}>TODAY</span>
+          <span className={styles.sectionLabel}>
+            TODAY {selectedDate && <>&bull; {formatHeaderDate(selectedDate).toUpperCase()}</>}
+          </span>
           <Link href="/operations/reservations" className={styles.viewLink}>View</Link>
         </div>
         <div className={styles.todayBody}>
           <div className={styles.todayLeft}>
-            <p className={styles.miniLabel}>TODAY SALES</p>
+            <p className={styles.miniLabel}>TOTAL SALES</p>
             {(() => {
               const shown = shownTodaySales;
               return (
@@ -918,26 +894,26 @@ function OwnerDashboard({
           <div className={styles.todayDivider} aria-hidden="true" />
           <div className={styles.todayRight}>
             <div className={styles.mealRow}>
-              <span className={styles.mealIcon}>☀️</span>
+              <span className={styles.mealIcon} aria-hidden="true">☀️</span>
               <div className={styles.mealCol}>
-                <p className={styles.mealTitle}>LUNCH</p>
+                <p className={styles.mealTitle}>LUNCH SALES</p>
                 <p className={styles.mealValue}>
-                  {shownResCounts?.lunchPax ?? "—"} <span className={styles.mealUnit}>PAX</span>
+                  {shownLunchSales !== null ? fmtCurrency(shownLunchSales) : "—"}
                 </p>
                 <p className={styles.mealSub}>
-                  <span aria-hidden="true">👥</span> {shownLunchStaff !== null ? shownLunchStaff : "—"} STAFF
+                  <span aria-hidden="true">👤</span> {shownResCounts?.lunchPax ?? "—"} PAX
                 </p>
               </div>
             </div>
-            <div className={styles.mealRow}>
-              <span className={styles.mealIcon}>🌙</span>
+            <div className={`${styles.mealRow} ${styles.mealRowDivided}`}>
+              <span className={styles.mealIcon} aria-hidden="true">🌙</span>
               <div className={styles.mealCol}>
-                <p className={styles.mealTitle}>DINNER</p>
+                <p className={styles.mealTitle}>DINNER SALES</p>
                 <p className={styles.mealValue}>
-                  {shownResCounts?.dinnerPax ?? "—"} <span className={styles.mealUnit}>PAX</span>
+                  {shownDinnerSales !== null ? fmtCurrency(shownDinnerSales) : "—"}
                 </p>
                 <p className={styles.mealSub}>
-                  <span aria-hidden="true">👥</span> {shownDinnerStaff !== null ? shownDinnerStaff : "—"} STAFF
+                  <span aria-hidden="true">👥</span> {shownResCounts?.dinnerPax ?? "—"} PAX
                 </p>
               </div>
             </div>

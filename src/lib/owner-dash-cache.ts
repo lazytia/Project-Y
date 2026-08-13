@@ -5,6 +5,8 @@
 
 export type DashCache = Partial<{
   todaySales: number;
+  lunchSales: number;
+  dinnerSales: number;
   restaurantSales: number;
   platterSales: number;
   weeklyProgress: number;
@@ -12,8 +14,6 @@ export type DashCache = Partial<{
   savedDaySales: number;
   lunchPax: number;
   dinnerPax: number;
-  lunchStaff: number;
-  dinnerStaff: number;
   weekSalesDoc: number;
   reviewNote: string;
   nextCateringISO: string;

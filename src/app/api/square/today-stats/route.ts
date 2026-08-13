@@ -4,7 +4,10 @@ import {
   getSalesDayRange,
   getWeekToDateRange,
   fetchOrders,
+  isLunchInstant,
+  localHourIn,
   sumRefundCents,
+  sumRefundCentsByService,
   squareEnv,
   netAmountCents,
   squareGrossSalesCents,
@@ -44,10 +47,19 @@ function shiftKey(dateKey: string, dayOffset: number): string {
 /** Returns true if the order's createdAt falls within the 9am–10pm sales window in the given timezone. */
 function inSalesWindow(order: SquareOrder, timezone: string): boolean {
   if (!order.createdAt) return false;
-  const h = new Date(
-    new Date(order.createdAt).toLocaleString("en-US", { timeZone: timezone }),
-  ).getHours();
+  const h = localHourIn(order.createdAt, timezone);
   return h >= SALES_DAY_START_HOUR && h < SALES_DAY_END_HOUR;
+}
+
+/** Split windowed orders at 3:00 PM. Every windowed order has a createdAt,
+ *  so the two buckets always add back up to the day's total. */
+function splitByService(orders: SquareOrder[], timezone: string) {
+  const lunch: SquareOrder[] = [];
+  const dinner: SquareOrder[] = [];
+  for (const o of orders) {
+    (isLunchInstant(o.createdAt!, timezone) ? lunch : dinner).push(o);
+  }
+  return { lunch, dinner };
 }
 
 export async function GET(req: NextRequest) {
@@ -86,8 +98,8 @@ export async function GET(req: NextRequest) {
       platterTodayOrders,
       weekRestaurantOrders,
       weekPlatterOrders,
-      restaurantRefundsCents,
-      platterRefundsCents,
+      restaurantRefunds,
+      platterRefunds,
       weekRestaurantRefunds,
       weekPlatterRefunds,
     ] = await Promise.all([
@@ -101,10 +113,20 @@ export async function GET(req: NextRequest) {
       platterLocationId
         ? fetchOrders(platterLocationId, week.startAt, week.endAt, ["COMPLETED"])
         : Promise.resolve([]),
-      sumRefundCents(locationId, todaySalesWindow.startAt, todaySalesWindow.endAt),
+      sumRefundCentsByService(
+        locationId,
+        todaySalesWindow.startAt,
+        todaySalesWindow.endAt,
+        timezone,
+      ),
       platterLocationId
-        ? sumRefundCents(platterLocationId, todaySalesWindow.startAt, todaySalesWindow.endAt)
-        : Promise.resolve(0),
+        ? sumRefundCentsByService(
+            platterLocationId,
+            todaySalesWindow.startAt,
+            todaySalesWindow.endAt,
+            timezone,
+          )
+        : Promise.resolve({ lunch: 0, dinner: 0 }),
       sumRefundCents(locationId, week.startAt, week.endAt),
       platterLocationId
         ? sumRefundCents(platterLocationId, week.startAt, week.endAt)
@@ -127,9 +149,21 @@ export async function GET(req: NextRequest) {
     const yestTransactions = yesterdayOrders.length;
 
     // Sales (gross, 9am–10pm, refunds removed)
-    const restaurantSales = sumDollars(todayOrdersWindow, squareGrossSalesCents) - restaurantRefundsCents / 100;
-    const platterSales    = sumDollars(platterOrdersWindow, squareGrossSalesCents) - platterRefundsCents / 100;
+    const restaurantSales = sumDollars(todayOrdersWindow, squareGrossSalesCents)
+      - (restaurantRefunds.lunch + restaurantRefunds.dinner) / 100;
+    const platterSales    = sumDollars(platterOrdersWindow, squareGrossSalesCents)
+      - (platterRefunds.lunch + platterRefunds.dinner) / 100;
     const todaySales      = restaurantSales + platterSales;
+
+    // Same money, cut at 3:00 PM — lunchSales + dinnerSales === todaySales.
+    const restaurantByService = splitByService(todayOrdersWindow, timezone);
+    const platterByService    = splitByService(platterOrdersWindow, timezone);
+    const serviceSales = (meal: "lunch" | "dinner") =>
+      sumDollars(restaurantByService[meal], squareGrossSalesCents)
+      + sumDollars(platterByService[meal], squareGrossSalesCents)
+      - (restaurantRefunds[meal] + platterRefunds[meal]) / 100;
+    const lunchSales  = serviceSales("lunch");
+    const dinnerSales = serviceSales("dinner");
 
     // Avg net spend
     const restaurantNet = sumDollars(todayOrders, netAmountCents);
@@ -177,6 +211,8 @@ export async function GET(req: NextRequest) {
       date: selectedDate,
       isToday,
       todaySales,
+      lunchSales,
+      dinnerSales,
       restaurantSales,
       platterSales,
       weeklyProgress,
