@@ -76,6 +76,7 @@ export default async function RootLayout({
               @keyframes bootDotBounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
               #server-app-shell:not([hidden]){min-height:100vh;position:relative;background:#fff}
               #server-app-shell:not([hidden]) aside{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #ececec;box-sizing:border-box;padding:24px}
+              #server-app-shell [data-nav-collapsed]{display:none}
               #static-chrome-fallback{min-height:100vh;background:#fff;position:relative}
               #static-chrome-fallback[hidden]{display:none!important}
               .staticChromeHeader{display:none;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;height:52px;padding:0 12px;background:#fff;border-bottom:1px solid #ececec;z-index:100;box-sizing:border-box}

@@ -34,14 +34,24 @@ function ServerNavGroup({ group }: { group: NavGroup }) {
     );
   }
 
+  // Collapsed, shaped exactly like the client Sidebar's first render — its
+  // `openGroup` starts null, so every collapsible group is shut. This shell is
+  // swapped out the moment AppShell mounts, so painting the groups expanded
+  // made a tall menu flash and then snap shut on every refresh, which reads
+  // as the app briefly showing a different menu.
   return (
     <div className={sidebarStyles.group}>
-      <div className={sidebarStyles.groupHeader}>
+      <button type="button" className={sidebarStyles.groupHeader}>
         <span className={sidebarStyles.icon}>{group.icon}</span>
         <span className={sidebarStyles.groupLabel}>{group.label}</span>
-      </div>
+        <span className={sidebarStyles.chevron}>›</span>
+      </button>
+      {/* data-nav-collapsed is what the inline critical CSS in layout.tsx
+          hooks onto: it cannot target this hashed CSS-module class, and until
+          Sidebar.module.css lands the children would otherwise render as a
+          plain expanded list. */}
       {group.children && (
-        <div className={`${sidebarStyles.collapseWrap} ${sidebarStyles.collapseOpen}`}>
+        <div className={sidebarStyles.collapseWrap} data-nav-collapsed="">
           <ServerNavChildList items={group.children} />
         </div>
       )}
