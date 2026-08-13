@@ -9,7 +9,7 @@ import {
   type WeeklyPayrollRow,
   type WeekPayrollDetail,
 } from "@/lib/payroll-sheet";
-import { warmWeekSalesCache } from "@/lib/square-weekly-daily";
+import { warmWeekSalesCache, weekCacheIsSettled } from "@/lib/square-weekly-daily";
 import { shiftDateKey } from "@/lib/square";
 
 /**
@@ -218,13 +218,23 @@ async function loadWeekSalesBatch(weekStarts: string[]): Promise<number[]> {
   if (weekStarts.length === 0) return [];
   const out = new Array<number>(weekStarts.length).fill(0);
 
+  const today = todayKey();
+
   try {
     const db = adminDb();
     const refs = weekStarts.map((ws) => db.collection("sales_weekly_daily").doc(ws));
     const snaps = await db.getAll(...refs);
     snaps.forEach((snap, i) => {
       if (!snap.exists) return;
-      const data = snap.data() as { thisWeek?: { total?: number } };
+      const data = snap.data() as { thisWeek?: { total?: number }; computedAt?: Timestamp };
+      const weekStart = weekStarts[i];
+      const weekIsOver = shiftDateKey(weekStart, 6, TIMEZONE) < today;
+      if (
+        weekIsOver &&
+        !weekCacheIsSettled(weekStart, data.computedAt?.toDate?.() ?? null, TIMEZONE)
+      ) {
+        return;
+      }
       const t = data.thisWeek?.total;
       if (typeof t === "number" && t > 0) out[i] = Math.round(t * 100) / 100;
     });
@@ -237,8 +247,11 @@ async function loadWeekSalesBatch(weekStarts: string[]): Promise<number[]> {
     .filter((i) => i >= 0);
   if (missingIdx.length === 0) return out;
 
-  const startISO = weekStarts[Math.min(...missingIdx)];
-  const endISO = shiftDateKey(weekStarts[Math.max(...missingIdx)], 6, TIMEZONE);
+  // Callers pass weeks newest-first, so the range has to come from the dates
+  // themselves rather than their position in the array.
+  const missingWeeks = missingIdx.map((i) => weekStarts[i]).sort();
+  const startISO = missingWeeks[0];
+  const endISO = shiftDateKey(missingWeeks[missingWeeks.length - 1], 6, TIMEZONE);
   try {
     const snap = await adminDb()
       .collection("sales_daily")

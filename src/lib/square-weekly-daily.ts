@@ -1,10 +1,34 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { fetchDailyGrossSalesFromReporting } from "@/lib/square-reporting";
-import { shiftDateKey, squareEnv } from "@/lib/square";
+import {
+  fetchOrders,
+  getDateRange,
+  shiftDateKey,
+  squareEnv,
+  squareGrossSalesCents,
+} from "@/lib/square";
 
 /** Bump when gross-sales formula or data source changes. */
 export const WEEKLY_DAILY_COMPUTE_VERSION = 2;
+
+/**
+ * True when a cached week can be trusted as the week's settled total.
+ *
+ * Finished weeks are cached forever, so a document written mid-week — holding
+ * zeros for the days that had not happened yet — would otherwise stay frozen
+ * at a partial figure. Only a snapshot taken after the last day of the week
+ * counts as complete.
+ */
+export function weekCacheIsSettled(
+  weekStart: string,
+  computedAt: Date | null | undefined,
+  timezone: string,
+): boolean {
+  if (!computedAt) return false;
+  const weekEnd = shiftDateKey(weekStart, 6, timezone);
+  return computedAt.toLocaleDateString("en-CA", { timeZone: timezone }) > weekEnd;
+}
 
 export async function computeWeekPair(
   locationId: string,
@@ -33,6 +57,25 @@ export async function computeWeekPair(
     thisWeek: seven(weekStart),
     lastWeek: seven(prevWeekStart),
   };
+}
+
+/**
+ * Gross value of tickets opened on `dateKey` that are still unpaid.
+ *
+ * Square's Sales reports only recognise an order once it is paid, so a full
+ * dining room sitting on open tabs leaves the week-to-date figure flat. These
+ * orders are counted here and drop out of the OPEN state the moment they are
+ * paid, at which point Reporting picks them up — so nothing is counted twice.
+ */
+export async function fetchOpenOrderGross(
+  locationId: string,
+  timezone: string,
+  dateKey: string,
+): Promise<number> {
+  const { startAt, endAt } = getDateRange(timezone, 0, dateKey);
+  const orders = await fetchOrders(locationId, startAt, endAt, ["OPEN"]);
+  const cents = orders.reduce((sum, o) => sum + squareGrossSalesCents(o), 0);
+  return Math.round(cents) / 100;
 }
 
 /** Pull Gross Sales for a week from Square and write sales_weekly_daily. */
