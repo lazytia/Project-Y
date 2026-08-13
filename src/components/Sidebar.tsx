@@ -9,6 +9,7 @@ import LanguageToggle from "./LanguageToggle";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import { readClientDashboardHint } from "@/lib/client-session-hint";
+import type { DashboardKind } from "@/lib/session-dashboard";
 import {
   prefetchOwnerInventorySummaries,
   prefetchOwnerMoneySummaries,
@@ -17,7 +18,12 @@ import { runWhenIdle } from "@/lib/run-when-idle";
 import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import styles from "./Sidebar.module.css";
 
-type Props = { open: boolean; onClose?: () => void };
+type Props = {
+  open: boolean;
+  onClose?: () => void;
+  /** Role from the session cookie, so the pre-auth render picks the right tree. */
+  initialDashboard?: DashboardKind | null;
+};
 
 function isNavChildActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
@@ -63,18 +69,20 @@ function NavChildList({
   );
 }
 
-export default function Sidebar({ open, onClose }: Props) {
+export default function Sidebar({ open, onClose, initialDashboard = null }: Props) {
   const pathname = usePathname();
   const { user, signOut, staffNeedsOnboarding } = useAuth();
   const { t } = useLang();
-  const dashHint = readClientDashboardHint();
-  const userIsOwner = isOwner(user);
-  const userIsStrictOwner = isStrictOwner(user);
-  const userIsChef = isChef(user) || (!user && dashHint === "chef");
-  const userIsManager =
-    (userIsOwner && !userIsStrictOwner) ||
-    userIsChef ||
-    (!user && dashHint === "manager");
+  // Firebase Auth hydrates a second or two after paint, and until it does
+  // every isOwner/isChef check reads false — which sent owners and chefs
+  // through the staff branch below, so the wrong menu rendered and then
+  // swapped. The session cookie already knows the role during SSR; the
+  // localStorage hint is the fallback when it isn't threaded through.
+  const dashHint = user ? null : initialDashboard ?? readClientDashboardHint();
+  const userIsOwner = isOwner(user) || dashHint === "owner" || dashHint === "manager";
+  const userIsStrictOwner = isStrictOwner(user) || dashHint === "owner";
+  const userIsChef = isChef(user) || dashHint === "chef";
+  const userIsManager = (userIsOwner && !userIsStrictOwner) || userIsChef;
 
   // 기본값: 모두 닫힘. 한 번에 하나만 열림.
   const [openGroup, setOpenGroup] = useState<string | null>(null);

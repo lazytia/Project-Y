@@ -7,6 +7,7 @@ import Splash from "./Splash";
 import AppReadyMarker from "./AppReadyMarker";
 import { useAuth } from "./AuthProvider";
 import { PUBLIC_ROUTES } from "@/lib/routes";
+import type { DashboardKind } from "@/lib/session-dashboard";
 import { isOwner, isChef } from "@/lib/permissions";
 import { fetchSessionHint } from "@/lib/auth-session-client";
 import { hasClientSessionHint } from "@/lib/client-session-hint";
@@ -21,9 +22,15 @@ type AppShellProps = {
   children: React.ReactNode;
   /** Set from the server uid cookie — enables optimistic shell before /api/auth/session. */
   initialHasSession?: boolean;
+  /** Role from the session cookie, so Sidebar can pick its tree before auth hydrates. */
+  initialDashboard?: DashboardKind | null;
 };
 
-export default function AppShell({ children, initialHasSession = false }: AppShellProps) {
+export default function AppShell({
+  children,
+  initialHasSession = false,
+  initialDashboard = null,
+}: AppShellProps) {
   const pathname = usePathname();
   const { user, loading, staffCompletedStep } = useAuth();
   const isPublic = PUBLIC_ROUTES.has(pathname);
@@ -101,6 +108,7 @@ export default function AppShell({ children, initialHasSession = false }: AppShe
           interactive={shellInteractive}
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
+          initialDashboard={initialDashboard}
         >
           {children}
         </AuthenticatedShell>
@@ -132,11 +140,13 @@ function AuthenticatedShell({
   interactive,
   sidebarOpen,
   setSidebarOpen,
+  initialDashboard,
   children,
 }: {
   interactive: boolean;
   sidebarOpen: boolean;
   setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  initialDashboard: DashboardKind | null;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -224,7 +234,11 @@ function AuthenticatedShell({
               aria-hidden="true"
             />
           )}
-          <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          <Sidebar
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            initialDashboard={initialDashboard}
+          />
         </>
       ) : (
         <PlaceholderChrome />
