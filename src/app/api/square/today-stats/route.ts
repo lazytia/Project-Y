@@ -63,7 +63,7 @@ function splitByService(orders: SquareOrder[], timezone: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const { locationId, platterLocationId, timezone, accessToken } = squareEnv;
+  const { locationId, timezone, accessToken } = squareEnv;
 
   if (!locationId || !accessToken) {
     return NextResponse.json({ error: "Square not configured" }, { status: 500 });
@@ -91,77 +91,47 @@ export async function GET(req: NextRequest) {
 
     const RESTAURANT_STATES = ["OPEN", "COMPLETED"];
 
-    // 9 parallel Square API calls (down from ~29)
     const [
       todayOrders,
       yesterdayOrders,
-      platterTodayOrders,
       weekRestaurantOrders,
-      weekPlatterOrders,
       restaurantRefunds,
-      platterRefunds,
       weekRestaurantRefunds,
-      weekPlatterRefunds,
     ] = await Promise.all([
       fetchOrders(locationId, today.startAt, today.endAt, RESTAURANT_STATES),
       fetchOrders(locationId, yesterday.startAt, yesterday.endAt, RESTAURANT_STATES),
-      platterLocationId
-        ? fetchOrders(platterLocationId, today.startAt, today.endAt, ["COMPLETED"])
-        : Promise.resolve([]),
       // Single weekly window — filter 9am–10pm in memory
       fetchOrders(locationId, week.startAt, week.endAt, RESTAURANT_STATES),
-      platterLocationId
-        ? fetchOrders(platterLocationId, week.startAt, week.endAt, ["COMPLETED"])
-        : Promise.resolve([]),
       sumRefundCentsByService(
         locationId,
         todaySalesWindow.startAt,
         todaySalesWindow.endAt,
         timezone,
       ),
-      platterLocationId
-        ? sumRefundCentsByService(
-            platterLocationId,
-            todaySalesWindow.startAt,
-            todaySalesWindow.endAt,
-            timezone,
-          )
-        : Promise.resolve({ lunch: 0, dinner: 0 }),
       sumRefundCents(locationId, week.startAt, week.endAt),
-      platterLocationId
-        ? sumRefundCents(platterLocationId, week.startAt, week.endAt)
-        : Promise.resolve(0),
     ]);
 
     // Derive today's 9am–10pm orders from the full-day fetch (no extra API call)
-    const todayOrdersWindow   = todayOrders.filter(o => inSalesWindow(o, timezone));
-    const platterOrdersWindow = platterTodayOrders.filter(o => inSalesWindow(o, timezone));
+    const todayOrdersWindow = todayOrders.filter(o => inSalesWindow(o, timezone));
 
     // Weekly progress: filter to 9am–10pm per day in memory, subtract weekly refunds
     const weeklyRestaurantInWindow = weekRestaurantOrders.filter(o => inSalesWindow(o, timezone));
-    const weeklyPlatterInWindow    = weekPlatterOrders.filter(o => inSalesWindow(o, timezone));
     const weeklyProgress =
-      sumDollars(weeklyRestaurantInWindow, squareGrossSalesCents) - weekRestaurantRefunds / 100 +
-      sumDollars(weeklyPlatterInWindow, squareGrossSalesCents)    - weekPlatterRefunds / 100;
+      sumDollars(weeklyRestaurantInWindow, squareGrossSalesCents) - weekRestaurantRefunds / 100;
 
     // Transactions = restaurant order count (OPEN+COMPLETED, all-day)
     const transactions     = todayOrders.length;
     const yestTransactions = yesterdayOrders.length;
 
     // Sales (gross, 9am–10pm, refunds removed)
-    const restaurantSales = sumDollars(todayOrdersWindow, squareGrossSalesCents)
+    const todaySales = sumDollars(todayOrdersWindow, squareGrossSalesCents)
       - (restaurantRefunds.lunch + restaurantRefunds.dinner) / 100;
-    const platterSales    = sumDollars(platterOrdersWindow, squareGrossSalesCents)
-      - (platterRefunds.lunch + platterRefunds.dinner) / 100;
-    const todaySales      = restaurantSales + platterSales;
 
     // Same money, cut at 3:00 PM — lunchSales + dinnerSales === todaySales.
     const restaurantByService = splitByService(todayOrdersWindow, timezone);
-    const platterByService    = splitByService(platterOrdersWindow, timezone);
     const serviceSales = (meal: "lunch" | "dinner") =>
       sumDollars(restaurantByService[meal], squareGrossSalesCents)
-      + sumDollars(platterByService[meal], squareGrossSalesCents)
-      - (restaurantRefunds[meal] + platterRefunds[meal]) / 100;
+      - restaurantRefunds[meal] / 100;
     const lunchSales  = serviceSales("lunch");
     const dinnerSales = serviceSales("dinner");
 
@@ -213,8 +183,6 @@ export async function GET(req: NextRequest) {
       todaySales,
       lunchSales,
       dinnerSales,
-      restaurantSales,
-      platterSales,
       weeklyProgress,
       transactions,
       transactionsChange: transactions - yestTransactions,

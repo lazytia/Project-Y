@@ -31,7 +31,7 @@ function dateRange(startKey: string, endKey: string): string[] {
 }
 
 export async function GET(req: NextRequest) {
-  const { locationId, platterLocationId, timezone, accessToken } = squareEnv;
+  const { locationId, timezone, accessToken } = squareEnv;
   if (!locationId || !accessToken) {
     return NextResponse.json({ error: "Square not configured" }, { status: 500 });
   }
@@ -54,29 +54,21 @@ export async function GET(req: NextRequest) {
       days.map(async (dk) => {
         const w = getSalesDayRange(timezone, dk);
         const STATES = ["OPEN", "COMPLETED"];
-        const [restOrders, platterOrders, restRefunds, platRefunds] = await Promise.all([
+        const [restOrders, restRefunds] = await Promise.all([
           fetchOrders(locationId, w.startAt, w.endAt, STATES),
-          platterLocationId
-            ? fetchOrders(platterLocationId, w.startAt, w.endAt, ["COMPLETED"])
-            : Promise.resolve([]),
           sumRefundCents(locationId, w.startAt, w.endAt),
-          platterLocationId
-            ? sumRefundCents(platterLocationId, w.startAt, w.endAt)
-            : Promise.resolve(0),
         ]);
-        return { restOrders, platterOrders, restRefunds, platRefunds };
+        return { restOrders, restRefunds };
       }),
     );
 
     // Aggregate
     let restaurantSales = 0;
-    let platterSales    = 0;
     let transactions    = 0;
     const itemMap: Record<string, { sales: number; quantity: number }> = {};
 
-    for (const { restOrders, platterOrders, restRefunds, platRefunds } of dayFetches) {
+    for (const { restOrders, restRefunds } of dayFetches) {
       restaurantSales += sumDollars(restOrders, squareGrossSalesCents) - restRefunds / 100;
-      platterSales    += sumDollars(platterOrders, squareGrossSalesCents) - platRefunds / 100;
       transactions    += restOrders.length;
 
       for (const order of restOrders.filter(o => o.state === "COMPLETED")) {
@@ -92,7 +84,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const todaySales = restaurantSales + platterSales;
+    const todaySales = restaurantSales;
     const avgSpendPerTable = transactions > 0
       ? Math.round((sumDollars(
           dayFetches.flatMap(d => d.restOrders), netAmountCents,
@@ -110,7 +102,6 @@ export async function GET(req: NextRequest) {
       days: days.length,
       todaySales,
       restaurantSales,
-      platterSales,
       transactions,
       avgSpendPerTable,
       bestSellers,

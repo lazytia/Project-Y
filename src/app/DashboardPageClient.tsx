@@ -186,8 +186,6 @@ type Stats = {
   transactionsChange: number;
   avgSpendPerTable: number;
   avgSpendChange: number;
-  restaurantSales: number;
-  platterSales: number;
   weeklyProgress: number;
   peakHour: string | null;
   peakHourOrders: number;
@@ -203,8 +201,6 @@ function emptyStats(sales = 0): Stats {
     transactionsChange: 0,
     avgSpendPerTable: 0,
     avgSpendChange: 0,
-    restaurantSales: 0,
-    platterSales: 0,
     weeklyProgress: 0,
     peakHour: null,
     peakHourOrders: 0,
@@ -322,8 +318,6 @@ function OwnerDashboard({
           ...emptyStats(seedSales),
           lunchSales: initialCache?.lunchSales ?? null,
           dinnerSales: initialCache?.dinnerSales ?? null,
-          restaurantSales: initialCache?.restaurantSales ?? 0,
-          platterSales: initialCache?.platterSales ?? 0,
           weeklyProgress: initialCache?.weeklyProgress ?? 0,
           bestSellers: initialCache?.bestSellers ?? [],
         }
@@ -389,8 +383,6 @@ function OwnerDashboard({
         todaySales: sales,
         lunchSales: cache.lunchSales ?? prev?.lunchSales ?? null,
         dinnerSales: cache.dinnerSales ?? prev?.dinnerSales ?? null,
-        restaurantSales: cache.restaurantSales ?? prev?.restaurantSales ?? 0,
-        platterSales: cache.platterSales ?? prev?.platterSales ?? 0,
         weeklyProgress: cache.weeklyProgress ?? prev?.weeklyProgress ?? 0,
         bestSellers: cache.bestSellers ?? prev?.bestSellers ?? [],
       }));
@@ -460,8 +452,6 @@ function OwnerDashboard({
         todaySales: data.todaySales,
         lunchSales: data.lunchSales ?? undefined,
         dinnerSales: data.dinnerSales ?? undefined,
-        restaurantSales: data.restaurantSales,
-        platterSales: data.platterSales,
         weeklyProgress: data.weeklyProgress,
         bestSellers: data.bestSellers,
       });

@@ -78,19 +78,6 @@ type SquareOrder = NonNullable<
 >[number];
 
 /**
- * Gross sales amount in cents — items × qty, before discount/tax/tip/svc.
- * Derived: total_money + discount - tax - tip - service_charge.
- */
-export function grossAmountCents(order: SquareOrder): number {
-  const total = Number(order.totalMoney?.amount ?? 0n);
-  const discount = Number(order.totalDiscountMoney?.amount ?? 0n);
-  const tax = Number(order.totalTaxMoney?.amount ?? 0n);
-  const tip = Number(order.totalTipMoney?.amount ?? 0n);
-  const svc = Number(order.totalServiceChargeMoney?.amount ?? 0n);
-  return total + discount - tax - tip - svc;
-}
-
-/**
  * Net sales amount in cents — items minus discounts, before tax/tip/svc.
  * Matches Square dashboard "Net Sales" (used for "Avg Net Sale").
  */

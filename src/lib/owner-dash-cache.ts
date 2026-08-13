@@ -7,8 +7,6 @@ export type DashCache = Partial<{
   todaySales: number;
   lunchSales: number;
   dinnerSales: number;
-  restaurantSales: number;
-  platterSales: number;
   weeklyProgress: number;
   bestSellers: { name: string; sales: number; quantity: number }[];
   savedDaySales: number;
