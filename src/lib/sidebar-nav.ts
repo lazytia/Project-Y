@@ -24,7 +24,11 @@ export const OWNER_NAV: NavGroup[] = [
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering", href: "/operations/catering-orders" },
       { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
-      { label: "Roster", href: "/scheduling/roster" },
+      {
+        label: "Roster",
+        href: "/scheduling/roster",
+        children: [{ label: "Timesheets", href: "/payroll/timesheets" }],
+      },
       { label: "Cash Payments", href: "/people/cash-payments" },
     ],
   },
@@ -33,12 +37,8 @@ export const OWNER_NAV: NavGroup[] = [
     label: "Money",
     children: [
       { label: "Sales Overview", href: "/money/sales" },
-      {
-        label: "Payroll",
-        href: "/payroll/payroll",
-        children: [{ label: "Timesheets", href: "/payroll/timesheets" }],
-      },
-      { label: "Purchasing Cost", href: "/money/purchasing-cost" },
+      { label: "Payroll", href: "/payroll/payroll" },
+      { label: "Supplier Cost", href: "/money/purchasing-cost" },
       {
         label: "Other Operating Costs",
         href: "/money/operating-costs",

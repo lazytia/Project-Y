@@ -268,27 +268,36 @@ export default function PayrollOverviewPage() {
         />
       )}
 
-      {/* ── Payroll % of sales ── */}
-      <section className={styles.pctCard}>
-        <div>
-          <p className={styles.pctLabel}>
-            PAYROLL % OF SALES <InfoIcon />
+      {/* ── Headline cost + ratio ── */}
+      <div className={styles.heroGrid}>
+        <section className={styles.heroCard}>
+          <div className={styles.heroHead}>
+            <p className={styles.heroLabel}>TOTAL PAYROLL COST</p>
+            <span className={styles.heroBadge} aria-hidden="true"><WalletIcon /></span>
+          </div>
+          <p className={styles.heroValue}>
+            {totals ? fmtCurrency(totals.totalIncSuper) : "—"}
           </p>
-          <p className={styles.pctBig}>
-            {summary?.payrollPctSales !== null && summary?.payrollPctSales !== undefined
-              ? summary.payrollPctSales.toFixed(1)
-              : "—"}
-            <span className={styles.pctBigUnit}>%</span>
-          </p>
-          {payrollPctChip !== null && (
-            <span className={styles.pctChip}>
-              {payrollPctChip >= 0 ? "↑" : "↓"} {Math.abs(payrollPctChip).toFixed(1)}%{" "}
-              <span className={styles.pctChipSub}>vs prev 2 weeks</span>
-            </span>
-          )}
-        </div>
-        <GaugeChart pct={summary?.payrollPctSales ?? null} />
-      </section>
+          <HeroDelta pct={chips?.totalIncSuper ?? null} />
+        </section>
+
+        <section className={styles.heroCard}>
+          <div className={styles.heroHead}>
+            <p className={styles.heroLabel}>PAYROLL % OF SALES</p>
+            <InfoIcon />
+          </div>
+          <div className={styles.heroPctRow}>
+            <p className={styles.heroValue}>
+              {summary?.payrollPctSales !== null && summary?.payrollPctSales !== undefined
+                ? summary.payrollPctSales.toFixed(1)
+                : "—"}
+              <span className={styles.heroUnit}>%</span>
+            </p>
+            <GaugeChart pct={summary?.payrollPctSales ?? null} />
+          </div>
+          <HeroDelta pct={payrollPctChip} />
+        </section>
+      </div>
 
       {error && <p className={styles.errorMsg}>{error}</p>}
 
@@ -334,26 +343,6 @@ export default function PayrollOverviewPage() {
           />
         </div>
 
-        <div className={styles.totalRow}>
-          <span className={styles.totalIcon} aria-hidden="true"><WalletIcon /></span>
-          <span className={styles.totalLabel}>Total Payroll Cost</span>
-          <span className={styles.totalValue}>
-            {totals ? fmtCurrency(totals.totalIncSuper) : "—"}
-          </span>
-          {chips?.totalIncSuper !== null && chips?.totalIncSuper !== undefined && (
-            <span className={styles.totalDeltaGroup}>
-              <span
-                className={
-                  chips.totalIncSuper >= 0 ? styles.totalDeltaUp : styles.totalDeltaDown
-                }
-              >
-                {chips.totalIncSuper >= 0 ? "↑" : "↓"}{" "}
-                {Math.abs(chips.totalIncSuper).toFixed(1)}%
-              </span>
-              <span className={styles.totalDeltaSub}>vs prev 2 weeks avg</span>
-            </span>
-          )}
-        </div>
       </section>
 
       {/* ── Weekly comparison ── */}
@@ -391,15 +380,13 @@ export default function PayrollOverviewPage() {
             <thead>
               <tr>
                 <th className={styles.thLeft}>Employee</th>
-                <th className={styles.thRight}>Net Pay</th>
-                <th className={styles.thRight}>Superannuation</th>
-                <th className={styles.thRight}>Cash Pay</th>
+                <th className={styles.thRight}>Total Pay</th>
               </tr>
             </thead>
             <tbody>
               {topPaid.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className={styles.tableEmpty}>
+                  <td colSpan={2} className={styles.tableEmpty}>
                     {fetching ? "Loading…" : "No pay records for this week yet."}
                   </td>
                 </tr>
@@ -412,9 +399,7 @@ export default function PayrollOverviewPage() {
                         <span className={styles.empName}>{emp.name}</span>
                       </span>
                     </td>
-                    <td className={styles.tdRight}>{fmtCurrency(emp.netPay)}</td>
-                    <td className={styles.tdRight}>{fmtCurrency(emp.superAnn)}</td>
-                    <td className={styles.tdRight}>{fmtCurrency(emp.cashPay)}</td>
+                    <td className={styles.tdRight}>{fmtCurrency(emp.totalIncSuper)}</td>
                   </tr>
                 ))
               )}
@@ -427,6 +412,23 @@ export default function PayrollOverviewPage() {
 }
 
 /* ── Sub-components ── */
+
+/** Rising payroll is the bad direction, so up reads warm and down reads positive. */
+function HeroDelta({ pct }: { pct: number | null }) {
+  return (
+    <div className={styles.heroFoot}>
+      <div className={styles.heroDivider} />
+      {pct !== null ? (
+        <p className={pct >= 0 ? styles.heroDeltaUp : styles.heroDeltaDown}>
+          {pct >= 0 ? "↑" : "↓"} {Math.abs(pct).toFixed(1)}%
+        </p>
+      ) : (
+        <p className={styles.heroDeltaMuted}>—</p>
+      )}
+      <p className={styles.heroDeltaSub}>vs 2 weeks ago</p>
+    </div>
+  );
+}
 
 function SummaryTile({
   icon,
@@ -529,7 +531,14 @@ function GaugeChart({ pct }: { pct: number | null }) {
   return (
     <div className={styles.gauge}>
       <svg viewBox="0 0 120 120" className={styles.gaugeSvg} aria-hidden="true">
-        <circle cx={60} cy={60} r={radius} fill="none" stroke="#fce6d3" strokeWidth={stroke} />
+        <circle
+          cx={60}
+          cy={60}
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.15)"
+          strokeWidth={stroke}
+        />
         {pct !== null && (
           <circle
             cx={60}
