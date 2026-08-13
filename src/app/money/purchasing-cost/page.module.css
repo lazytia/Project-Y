@@ -1,0 +1,517 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 720px;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Header ── */
+.pageHeader {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.backBtn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-fg);
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.backBtn:hover {
+  background: var(--color-surface);
+}
+
+.headerTitles {
+  min-width: 0;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--page-title-size);
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+}
+
+.pageSubtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.datePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.datePillLabel {
+  white-space: nowrap;
+}
+
+.datePillChevron {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Hero cards ── */
+.heroGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.heroCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-fg);
+}
+
+.heroHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: #fff;
+}
+
+.heroLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.heroBadge {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Two cards share a phone width, so the figure scales with the viewport
+   rather than overflowing its card. */
+.heroValue {
+  margin: 0;
+  font-size: clamp(19px, 5.8vw, 32px);
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  min-width: 0;
+}
+
+.heroUnit {
+  font-size: 18px;
+  font-weight: 800;
+  margin-left: 2px;
+}
+
+/* The gauge repeats the number, so it may shrink away before the value does. */
+.heroPctRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.heroFoot {
+  margin-top: auto;
+}
+
+.heroDivider {
+  height: 1px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.heroDeltaUp,
+.heroDeltaDown,
+.heroDeltaMuted {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.heroDeltaUp { color: var(--color-warm); }
+.heroDeltaDown { color: var(--color-positive); }
+.heroDeltaMuted { color: rgba(255, 255, 255, 0.5); }
+
+.heroDeltaSub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.gauge {
+  position: relative;
+  flex: none;
+  width: clamp(78px, 24vw, 104px);
+  height: clamp(78px, 24vw, 104px);
+  margin-right: calc(var(--space-4) * -1);
+}
+
+.gaugeSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.gaugeCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.gaugeValue {
+  margin: 0;
+  font-size: clamp(13px, 4vw, 17px);
+  font-weight: 800;
+  color: var(--color-warm);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.gaugeUnit {
+  font-size: 0.6em;
+  font-weight: 700;
+}
+
+.gaugeSub {
+  margin: 2px 0 0;
+  font-size: clamp(8px, 2.6vw, 11px);
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 500;
+}
+
+/* ── Card ── */
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-fg);
+}
+
+.cardTitleSub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  letter-spacing: 0.02em;
+  margin-left: 4px;
+}
+
+.cardTitleRange {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-warm);
+}
+
+/* ── Summary tiles ── */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.tile {
+  padding: var(--space-3) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tileIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.tileLabel {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  font-weight: 600;
+}
+
+.tileValue {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tileDeltaUp,
+.tileDeltaDown,
+.tileDeltaMuted {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.tileDeltaUp { color: var(--color-positive); }
+.tileDeltaDown { color: var(--color-warm); }
+.tileDeltaMuted { color: var(--color-fg-subtle); }
+
+.tileDeltaSub {
+  margin: 0;
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Weekly comparison ── */
+.compareHead,
+.compareRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  column-gap: var(--space-3);
+}
+
+/* Both value columns get the same width so the two weeks line up. */
+.compareHead > :nth-child(2),
+.compareHead > :nth-child(3),
+.compareRow > :nth-child(2),
+.compareRow > :nth-child(3) {
+  width: 84px;
+  text-align: right;
+}
+
+.compareHeadLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-fg-muted);
+  text-transform: uppercase;
+}
+
+.compareHeadHot {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--color-warm);
+  text-transform: uppercase;
+}
+
+.compareName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-fg);
+  overflow-wrap: break-word;
+  line-height: 1.25;
+}
+
+.compareNameBold {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-fg);
+  overflow-wrap: break-word;
+  line-height: 1.25;
+}
+
+.compareValueHot {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-warm);
+  white-space: nowrap;
+}
+
+.compareValue {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+}
+
+.compareDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 2px 0;
+}
+
+/* ── Top suppliers ── */
+.rankList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.rankItem {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  min-width: 0;
+}
+
+.rank,
+.rankHot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--color-fg);
+}
+
+.rankHot {
+  background: var(--color-warm);
+}
+
+.rankName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.rankCost {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-fg);
+  white-space: nowrap;
+}
+
+.rankBarTrack {
+  grid-column: 2 / span 2;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.rankBarFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-warm);
+}
+
+.rankPct {
+  grid-column: 2 / span 2;
+  justify-self: end;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-warm);
+  white-space: nowrap;
+}
+
+.listEmpty {
+  margin: 0;
+  padding: var(--space-4) 0;
+  text-align: center;
+  color: var(--color-fg-muted);
+  font-size: 12px;
+}
+
+/* ── Meta ── */
+.errorMsg {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--color-negative);
+  font-size: 12px;
+}
+
+/* Tighter typography on very narrow phones so nothing overflows. */
+@media (max-width: 380px) {
+  .tileValue { font-size: 13px; }
+  .heroLabel { font-size: 11px; }
+  .datePillLabel { font-size: 12px; }
+  .compareHead > :nth-child(2),
+  .compareHead > :nth-child(3),
+  .compareRow > :nth-child(2),
+  .compareRow > :nth-child(3) { width: 72px; }
+  .compareName,
+  .compareNameBold,
+  .compareValue,
+  .compareValueHot { font-size: 11px; }
+}

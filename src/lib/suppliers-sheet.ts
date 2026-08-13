@@ -26,6 +26,14 @@ export type MonthlySuppliers = {
   total: number;
 };
 
+export type WeeklySuppliers = {
+  weekStart: string;
+  weekEnd: string;
+  tabTitle: string;
+  suppliers: SupplierRow[];
+  total: number;
+};
+
 type TabReader = {
   titles: string[];
   rowsForTab: (tabTitle: string) => Promise<unknown[][]>;
@@ -165,11 +173,15 @@ async function openTabReader(): Promise<TabReader> {
   return reader;
 }
 
-function parseTabRows(
-  rows: unknown[][],
-  monthISO: string,
-  tabTitle: string,
-): MonthlySuppliers | null {
+type TabLayout = {
+  headerIdx: number;
+  supplierCols: { name: string; col: number }[];
+  totalCol: number;
+  dayColumn: number;
+  dateColumn: number;
+};
+
+function readTabLayout(rows: unknown[][]): TabLayout | null {
   if (rows.length === 0) return null;
 
   let headerIdx = -1;
@@ -207,11 +219,31 @@ function parseTabRows(
     supplierCols.push({ name: label, col: c });
   }
 
-  const dayCol = header.findIndex((cell) => {
-    if (cell == null) return false;
-    return String(cell).trim().toLowerCase() === "day";
-  });
-  const dayColumn = dayCol >= 0 ? dayCol : header.length > 1 ? 1 : 0;
+  function labelledColumn(name: string, fallback: number): number {
+    const idx = header.findIndex(
+      (cell) => cell != null && String(cell).trim().toLowerCase() === name,
+    );
+    return idx >= 0 ? idx : fallback;
+  }
+
+  return {
+    headerIdx,
+    supplierCols,
+    totalCol,
+    dayColumn: labelledColumn("day", header.length > 1 ? 1 : 0),
+    dateColumn: labelledColumn("date", 0),
+  };
+}
+
+function parseTabRows(
+  rows: unknown[][],
+  monthISO: string,
+  tabTitle: string,
+): MonthlySuppliers | null {
+  const layout = readTabLayout(rows);
+  if (!layout) return null;
+  const { headerIdx, supplierCols, totalCol, dayColumn } = layout;
+  const header = rows[headerIdx];
 
   function isSundayRow(row: unknown[]): boolean {
     return String(row[dayColumn] ?? "").trim().toLowerCase() === "sun";
@@ -302,6 +334,107 @@ function parseTabRows(
     suppliers,
     total: Math.round(total * 100) / 100,
   };
+}
+
+function addDaysISO(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + n));
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
+ * Splits a month tab into its Mon–Sun weeks.
+ *
+ * The Date column only carries a day-of-month number, and tabs run from the
+ * Monday of their first week to the Sunday of their last — so a tab routinely
+ * opens in the previous month and closes in the next. Dates are therefore
+ * resolved by walking the rows in order and rolling the month over whenever
+ * the day number drops.
+ */
+function parseTabWeeks(
+  rows: unknown[][],
+  monthISO: string,
+  tabTitle: string,
+): WeeklySuppliers[] {
+  const layout = readTabLayout(rows);
+  if (!layout) return [];
+  const { headerIdx, supplierCols, totalCol, dayColumn, dateColumn } = layout;
+
+  const dataRows: { row: unknown[]; day: number }[] = [];
+  for (let r = headerIdx + 1; r < rows.length; r++) {
+    const row = rows[r] ?? [];
+    const day = Number(parseMoney(row[dateColumn]));
+    if (!Number.isInteger(day) || day < 1 || day > 31) continue;
+    dataRows.push({ row, day });
+  }
+  if (dataRows.length === 0) return [];
+
+  const [tabYear, tabMonth] = monthISO.split("-").map(Number);
+  // A tab that opens late in the month is showing the tail of the previous one.
+  let cursor = new Date(Date.UTC(tabYear, tabMonth - 1 + (dataRows[0].day > 15 ? -1 : 0), 1));
+  let prevDay = 0;
+
+  const weeks: WeeklySuppliers[] = [];
+  for (const { row, day } of dataRows) {
+    if (day < prevDay) cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+    prevDay = day;
+    if (String(row[dayColumn] ?? "").trim().toLowerCase() !== "sun") continue;
+
+    const weekEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), day))
+      .toISOString()
+      .slice(0, 10);
+
+    const suppliers: SupplierRow[] = [];
+    for (const { name, col } of supplierCols) {
+      const v = parseMoney(row[col]);
+      if (v && v > 0) suppliers.push({ name, cost: Math.round(v * 100) / 100 });
+    }
+    let total = totalCol !== -1 ? (parseMoney(row[totalCol]) ?? 0) : 0;
+    if (total <= 0) total = suppliers.reduce((s, r) => s + r.cost, 0);
+
+    weeks.push({
+      weekStart: addDaysISO(weekEnd, -6),
+      weekEnd,
+      tabTitle,
+      suppliers,
+      total: Math.round(total * 100) / 100,
+    });
+  }
+  return weeks;
+}
+
+/**
+ * Loads whole Mon–Sun weeks of supplier spend.
+ *
+ * A week is written into whichever month tab the owner filed it under, which
+ * may be the tab of its Monday or of its Sunday, so both are searched.
+ */
+export async function fetchSupplierWeeks(
+  weekStarts: string[],
+): Promise<Map<string, WeeklySuppliers | null>> {
+  const reader = await openTabReader();
+
+  const monthKeys = new Set<string>();
+  for (const ws of weekStarts) {
+    monthKeys.add(ws.slice(0, 7));
+    monthKeys.add(addDaysISO(ws, 6).slice(0, 7));
+  }
+
+  const byWeekStart = new Map<string, WeeklySuppliers>();
+  await Promise.all(
+    [...monthKeys].map(async (monthISO) => {
+      const match = reader.titles.find((t) => tabMatchesMonth(t, monthISO));
+      if (!match) return;
+      const rows = await reader.rowsForTab(match);
+      for (const week of parseTabWeeks(rows, monthISO, match)) {
+        const existing = byWeekStart.get(week.weekStart);
+        // Overlapping tabs repeat a week; keep whichever copy was filled in.
+        if (!existing || week.total > existing.total) byWeekStart.set(week.weekStart, week);
+      }
+    }),
+  );
+
+  return new Map(weekStarts.map((ws) => [ws, byWeekStart.get(ws) ?? null]));
 }
 
 export async function fetchSupplierTabTitles(): Promise<string[]> {
