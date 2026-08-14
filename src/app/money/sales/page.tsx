@@ -22,7 +22,10 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
  *   1. /api/square/weekly-daily — Square Reporting API daily Gross sales
  *      (net sales + taxes) for the selected week vs the prior week.
  *   2. /api/square/yearly-sales — same Gross sales basis for monthly YTD bars.
- *   3. /api/square/sales-categories for category breakdown of the selected week.
+ *   3. /api/square/weekly-service — the same weekly Gross sales, split at the
+ *      3pm service boundary into lunch and dinner.
+ *   4. Firestore `catering_orders` — catering is booked in the app, never
+ *      through Square, so it is summed here rather than fetched from an API.
  */
 
 const SYDNEY_TZ = "Australia/Sydney";
@@ -69,15 +72,45 @@ function fmtCurrency(n: number): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Whole days from `from` to `to` — negative when `to` is earlier. */
+function daysBetweenISO(from: string, to: string): number {
+  return Math.round(
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000,
+  );
+}
+
+function sumFirst(values: number[], n: number): number {
+  return values.slice(0, n).reduce((s, v) => s + v, 0);
+}
+
+function pctDelta(now: number, prev: number): number | null {
+  return prev > 0 ? ((now - prev) / prev) * 100 : null;
+}
+
 /* ── Types ── */
 
 type StoredDaily = { dateISO?: string; grossSales?: number };
 type DailyMap = Map<string, number>;
 
-type CategoryRow = {
-  name: string;
-  sales: number;
-  quantity: number;
+/** Mon–Sun gross sales cut at the 3pm service split. */
+type ServiceWeek = { lunch: number[]; dinner: number[] };
+type ServicePair = { thisWeek: ServiceWeek; lastWeek: ServiceWeek };
+
+type StoredCatering = {
+  deliveryDateISO?: string;
+  totalAmount?: number;
+  status?: string;
+};
+
+/** Mon–Sun buckets for the displayed week and the one before it. */
+type WeekPair = { thisWeek: number[]; lastWeek: number[] };
+
+type PerfIcon = "lunch" | "dinner" | "catering" | "average";
+
+type PerfRow = {
+  label: string;
+  icon: PerfIcon;
+  value: number | null;
   deltaPct: number | null;
 };
 
@@ -119,8 +152,10 @@ export default function SalesPage() {
   const [weekMondayISO, setWeekMondayISO] = useState<string>("");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [daily, setDaily] = useState<DailyMap | null>(null);
-  const [categories, setCategories] = useState<CategoryRow[] | null>(null);
-  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  // Lunch/dinner split of the same Gross Sales that draw the weekly chart.
+  const [serviceWeek, setServiceWeek] = useState<ServicePair | null>(null);
+  // Catering is booked in Firestore, not Square, so it is summed separately.
+  const [cateringWeek, setCateringWeek] = useState<WeekPair | null>(null);
   // sales_daily is only backfilled for recent months so the older months
   // of the current year read as zero. Hit Square directly for both
   // year buckets so the comparison is apples-to-apples.
@@ -282,28 +317,64 @@ export default function SalesPage() {
     };
   }, [allowed, todayKey]);
 
-  // ── Categories fetch for the currently-selected week.
+  // ── Lunch/dinner split for the selected week and the one before it.
+  //    Cached per week in sessionStorage like the weekly bars above.
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    const endISO = addDaysISO(weekMondayISO, 6);
-    setCategories(null);
-    setCategoriesError(null);
+    const cacheKey = `y.sales.weekService.v1.${weekMondayISO}`;
+    const cached = readSession<ServicePair>(cacheKey);
+    setServiceWeek(cached);
     (async () => {
       try {
-        const res = await fetch(
-          `/api/square/sales-categories?startDate=${weekMondayISO}&endDate=${endISO}`,
-        );
+        if (cached) return; // sessionStorage was still fresh
+        const res = await fetch(`/api/square/weekly-service?weekStart=${weekMondayISO}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as { categories: CategoryRow[] };
-        if (!cancelled) setCategories(data.categories ?? []);
+        const data = (await res.json()) as ServicePair;
+        if (cancelled) return;
+        setServiceWeek(data);
+        writeSession(cacheKey, data);
       } catch (err) {
-        console.error("[sales] categories fetch failed:", err);
-        if (!cancelled) {
-          setCategories([]);
-          setCategoriesError(err instanceof Error ? err.message : "Failed to load categories");
-        }
+        console.error("[sales] weekly-service fetch failed:", err);
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed, weekMondayISO]);
+
+  // ── Catering booked for the selected week and the one before it.
+  //    Cancelled orders are dropped — they were never money.
+  useEffect(() => {
+    if (!allowed || !weekMondayISO) return;
+    let cancelled = false;
+    const prevMondayISO = addDaysISO(weekMondayISO, -7);
+    const endISO = addDaysISO(weekMondayISO, 6);
+    setCateringWeek(null);
+    (async () => {
+      const thisWeek = new Array(7).fill(0);
+      const lastWeek = new Array(7).fill(0);
+      try {
+        const snap = await getDocs(
+          query(
+            collection(getDb(), "catering_orders"),
+            where("deliveryDateISO", ">=", prevMondayISO),
+            where("deliveryDateISO", "<=", endISO),
+          ),
+        );
+        snap.docs.forEach((d) => {
+          const order = d.data() as StoredCatering;
+          if (!order.deliveryDateISO || order.status === "CANCELLED") return;
+          const offset = daysBetweenISO(prevMondayISO, order.deliveryDateISO);
+          if (offset < 0 || offset > 13) return;
+          const amount = typeof order.totalAmount === "number" ? order.totalAmount : 0;
+          if (offset < 7) lastWeek[offset] += amount;
+          else thisWeek[offset - 7] += amount;
+        });
+      } catch (err) {
+        console.error("[sales] catering fetch failed:", err);
+      }
+      if (!cancelled) setCateringWeek({ thisWeek, lastWeek });
     })();
     return () => {
       cancelled = true;
@@ -363,10 +434,63 @@ export default function SalesPage() {
     return { thisYear, lastYear, thisYtd, lastYtd, deltaPct };
   }, [daily, todayKey, thisYearMonthly, lastYearMonthly]);
 
-  const totalCategorySales = useMemo(
-    () => (categories ?? []).reduce((s, c) => s + c.sales, 0),
-    [categories],
-  );
+  /* ── Derived: how much of the displayed week has actually happened ──
+   *   Measuring a half-finished week against a full one reads as a
+   *   collapse every Monday, so every comparison below is truncated to
+   *   the same number of days on both sides. */
+  const elapsedDays = useMemo(() => {
+    if (!weekMondayISO || !todayKey) return 7;
+    const offset = daysBetweenISO(weekMondayISO, todayKey);
+    if (offset >= 6) return 7;
+    return Math.max(offset + 1, 0);
+  }, [weekMondayISO, todayKey]);
+
+  /* ── Derived: this week's performance rows ──
+   *   Each row stays null until its own source lands so a slow catering
+   *   read doesn't hold back the lunch and dinner figures. */
+  const performance = useMemo<PerfRow[]>(() => {
+    const days = elapsedDays;
+    const row = (
+      label: string,
+      icon: PerfIcon,
+      pair: { thisWeek: number[]; lastWeek: number[] } | null,
+    ): PerfRow => {
+      if (!pair || days === 0) return { label, icon, value: null, deltaPct: null };
+      const now = sumFirst(pair.thisWeek, days);
+      return {
+        label,
+        icon,
+        value: now,
+        deltaPct: pctDelta(now, sumFirst(pair.lastWeek, days)),
+      };
+    };
+
+    const lunch = serviceWeek
+      ? { thisWeek: serviceWeek.thisWeek.lunch, lastWeek: serviceWeek.lastWeek.lunch }
+      : null;
+    const dinner = serviceWeek
+      ? { thisWeek: serviceWeek.thisWeek.dinner, lastWeek: serviceWeek.lastWeek.dinner }
+      : null;
+    const average = row("Average Daily Sales", "average", weekly);
+
+    return [
+      row("Lunch Sales", "lunch", lunch),
+      row("Dinner Sales", "dinner", dinner),
+      row("Catering Sales", "catering", cateringWeek),
+      // Same money as the row totals, spread over the days that have run.
+      { ...average, value: average.value === null ? null : average.value / days },
+    ];
+  }, [elapsedDays, serviceWeek, cateringWeek, weekly]);
+
+  /* ── Derived: best trading days so far this week ── */
+  const bestDays = useMemo(() => {
+    if (!weekly || elapsedDays === 0) return null;
+    return weekly.thisWeek
+      .slice(0, elapsedDays)
+      .map((value, i) => ({ label: DAY_LABELS[i], value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [weekly, elapsedDays]);
 
   if (authLoading || !user || !allowed) return <Splash />;
 
@@ -511,48 +635,62 @@ export default function SalesPage() {
         />
       </section>
 
-      {/* ── Sales by Category ── */}
+      {/* ── This Week Performance ── */}
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <p className={styles.cardTitle}>SALES BY CATEGORY</p>
+          <p className={styles.cardTitle}>THIS WEEK PERFORMANCE</p>
         </div>
-        <div className={styles.categoryBody}>
-          <DonutChart
-            slices={(categories ?? []).map((c) => c.sales)}
-            centerLabel="Total"
-            centerValue={fmtCurrency(totalCategorySales)}
-            loading={categories === null}
-          />
-          <ul className={styles.categoryList}>
-            {(categories ?? []).slice(0, 5).map((c, idx) => (
-              <li key={c.name} className={styles.categoryRow}>
-                <span
-                  className={styles.categoryDot}
-                  style={{ background: donutColorAt(idx) }}
-                  aria-hidden="true"
-                />
-                <span className={styles.categoryName}>{c.name}</span>
-                <span className={styles.categoryValue}>{fmtCurrency(c.sales)}</span>
-                <span
-                  className={
-                    c.deltaPct === null || c.deltaPct >= 0
-                      ? styles.categoryDeltaUp
-                      : styles.categoryDeltaDown
-                  }
-                >
-                  {c.deltaPct === null
-                    ? "—"
-                    : `${c.deltaPct >= 0 ? "↑" : "↓"} ${Math.abs(c.deltaPct).toFixed(1)}%`}
-                </span>
-              </li>
-            ))}
-            {categories && categories.length === 0 && !categoriesError && (
-              <li className={styles.emptyRow}>No category sales in this week yet.</li>
-            )}
-            {categoriesError && <li className={styles.emptyRow}>{categoriesError}</li>}
-          </ul>
+        <ul className={styles.perfList}>
+          {performance.map((row) => (
+            <li key={row.label} className={styles.perfRow}>
+              <span className={`${styles.perfIcon} ${styles[`perfIcon_${row.icon}`]}`} aria-hidden="true">
+                <PerfGlyph icon={row.icon} />
+              </span>
+              <span className={styles.perfLabel}>{row.label}</span>
+              <span className={styles.perfValue}>
+                {row.value === null ? "—" : fmtCurrency(row.value)}
+              </span>
+              <span
+                className={
+                  row.deltaPct === null
+                    ? styles.perfDeltaFlat
+                    : row.deltaPct >= 0
+                      ? styles.perfDeltaUp
+                      : styles.perfDeltaDown
+                }
+              >
+                {row.deltaPct === null
+                  ? "—"
+                  : `${row.deltaPct >= 0 ? "↑" : "↓"} ${Math.abs(row.deltaPct).toFixed(1)}%`}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className={styles.cardFoot}>
+          {elapsedDays < 7 ? `vs same ${elapsedDays} days last week` : "vs last week"}
+        </p>
+      </section>
+
+      {/* ── Best Sales Days ── */}
+      <section className={styles.card}>
+        <div className={styles.cardHead}>
+          <p className={styles.cardTitle}>BEST SALES DAYS (THIS WEEK)</p>
         </div>
-        <p className={styles.categoryFoot}>vs previous week</p>
+        <ul className={styles.rankList}>
+          {(bestDays ?? []).map((d, i) => (
+            <li key={d.label} className={styles.rankRow}>
+              <span className={`${styles.rankBadge} ${i === 0 ? styles.rankBadgeTop : ""}`}>
+                {i + 1}
+              </span>
+              <span className={styles.rankLabel}>{d.label}</span>
+              <span className={styles.rankValue}>{fmtCurrency(d.value)}</span>
+            </li>
+          ))}
+          {bestDays === null && <li className={styles.emptyRow}>Loading…</li>}
+          {bestDays !== null && bestDays.length === 0 && (
+            <li className={styles.emptyRow}>This week hasn&apos;t started yet.</li>
+          )}
+        </ul>
       </section>
     </div>
   );
@@ -664,108 +802,55 @@ function BarChart({
   );
 }
 
-/* ── Donut chart ── */
+/* ── Performance row glyphs ── */
 
-const DONUT_COLORS = [
-  "#FF6A13", // warm/orange — largest slice
-  "#1f2937", // near-black
-  "#6b7280", // gray
-  "#d1d5db", // light gray
-  "#f59e0b", // amber
-  "#10b981", // green
-] as const;
-
-function donutColorAt(i: number): string {
-  return DONUT_COLORS[i % DONUT_COLORS.length];
-}
-
-
-function DonutChart({
-  slices,
-  centerLabel,
-  centerValue,
-  loading,
-}: {
-  slices: number[];
-  centerLabel: string;
-  centerValue: string;
-  loading: boolean;
-}) {
-  const total = slices.reduce((s, v) => s + v, 0);
-  const radius = 60;
-  const stroke = 22;
-  const circumference = 2 * Math.PI * radius;
-  let offset = 0;
-
-  // Precompute the arc-center angle for each slice so we can drop a "% "
-  // label right on top of the ring. Only slices with a wide-enough sweep
-  // (≥ 5%) get a label — narrower ones would just overlap their neighbours.
-  const segments = slices.map((v, i) => {
-    const fraction = total > 0 ? v / total : 0;
-    const length = fraction * circumference;
-    // Angle at the middle of this slice, measured from 12 o'clock (‑Y axis)
-    // going clockwise; matches the `rotate(-90 80 80)` we apply below.
-    const midAngleRad = ((offset + length / 2) / circumference) * 2 * Math.PI - Math.PI / 2;
-    const labelX = 80 + Math.cos(midAngleRad) * radius;
-    const labelY = 80 + Math.sin(midAngleRad) * radius;
-    const seg = {
-      color: donutColorAt(i),
-      dashArray: `${length} ${circumference - length}`,
-      dashOffset: -offset,
-      fraction,
-      labelX,
-      labelY,
-    };
-    offset += length;
-    return seg;
-  });
-
-  return (
-    <div className={styles.donutWrap}>
-      <svg
-        viewBox="0 0 160 160"
-        className={styles.donutSvg}
-        role="img"
-        aria-label="Sales by category"
-      >
-        <circle cx={80} cy={80} r={radius} fill="none" stroke="#f3f4f6" strokeWidth={stroke} />
-        {total > 0 &&
-          segments.map((seg, i) => (
-            <circle
-              key={i}
-              cx={80}
-              cy={80}
-              r={radius}
-              fill="none"
-              stroke={seg.color}
-              strokeWidth={stroke}
-              strokeDasharray={seg.dashArray}
-              strokeDashoffset={seg.dashOffset}
-              transform="rotate(-90 80 80)"
-            />
-          ))}
-        {total > 0 &&
-          segments.map(
-            (seg, i) =>
-              seg.fraction >= 0.05 && (
-                <text
-                  key={`lbl-${i}`}
-                  x={seg.labelX}
-                  y={seg.labelY}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className={styles.donutSliceLabel}
-                >
-                  {Math.round(seg.fraction * 100)}%
-                </text>
-              ),
-          )}
+function PerfGlyph({ icon }: { icon: PerfIcon }) {
+  const common = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (icon === "lunch") {
+    // Fork and knife — the daytime service.
+    return (
+      <svg {...common}>
+        <path d="M6 3v7a2 2 0 0 0 4 0V3" />
+        <path d="M8 10v11" />
+        <path d="M17 3c-1.5 1.5-2 3-2 5s.5 2.5 2 2.5V21" />
       </svg>
-      <div className={styles.donutCenter}>
-        <p className={styles.donutCenterLabel}>{centerLabel}</p>
-        <p className={styles.donutCenterValue}>{loading ? "—" : centerValue}</p>
-      </div>
-    </div>
+    );
+  }
+  if (icon === "dinner") {
+    // Cloche — the evening service.
+    return (
+      <svg {...common}>
+        <path d="M3 18h18" />
+        <path d="M5 18a7 7 0 0 1 14 0" />
+        <path d="M12 8V6" />
+      </svg>
+    );
+  }
+  if (icon === "catering") {
+    // Briefcase — catering is booked as a job, not rung up on the till.
+    return (
+      <svg {...common}>
+        <rect x="3" y="7" width="18" height="13" rx="2" />
+        <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+        <path d="M3 12h18" />
+      </svg>
+    );
+  }
+  // Trend arrow — the daily average.
+  return (
+    <svg {...common}>
+      <path d="M3 17l6-6 4 4 7-7" />
+      <path d="M14 8h6v6" />
+    </svg>
   );
 }
 

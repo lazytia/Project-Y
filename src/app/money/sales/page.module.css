@@ -348,79 +348,8 @@
   font-size: 12px;
 }
 
-/* ?€?€ Category donut ?€?€
-   Two-column layout on desktop (donut + list side-by-side). On narrow
-   phones the list column would end up ~40 px wide, which caused names
-   like "Bento box" to break letter-by-letter ??so we stack instead,
-   donut on top and full-width list below. */
-.categoryBody {
-  display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: center;
-}
-
-@media (max-width: 600px) {
-  .categoryBody {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: stretch;
-    gap: var(--space-3);
-  }
-
-  .donutWrap {
-    justify-self: center;
-  }
-}
-
-.donutWrap {
-  position: relative;
-  width: 160px;
-  height: 160px;
-}
-
-.donutSvg {
-  width: 100%;
-  height: 100%;
-}
-
-.donutCenter {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.donutCenterLabel {
-  margin: 0;
-  font-size: 11px;
-  color: var(--color-fg-muted);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.donutCenterValue {
-  margin: 2px 0 0;
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--color-fg);
-  letter-spacing: -0.01em;
-}
-
-.donutSliceLabel {
-  font-family: var(--font-sans);
-  font-size: 8px;
-  font-weight: 700;
-  fill: #fff;
-  pointer-events: none;
-  paint-order: stroke;
-  stroke: rgba(0, 0, 0, 0.25);
-  stroke-width: 0.4;
-}
-
-.categoryList {
+/* -- This Week Performance -- */
+.perfList {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -429,54 +358,90 @@
   gap: var(--space-2);
 }
 
-.categoryRow {
+.perfRow {
   display: grid;
-  grid-template-columns: 8px 1fr auto auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
-.categoryDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.perfIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
 }
 
-.categoryName {
-  font-size: 12px;
-  color: var(--color-fg);
+.perfIcon_lunch {
+  background: rgba(255, 106, 19, 0.12);
+  color: #ff6a13;
+}
+
+.perfIcon_dinner {
+  background: rgba(43, 110, 246, 0.12);
+  color: #2b6ef6;
+}
+
+.perfIcon_catering {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+}
+
+.perfIcon_average {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.perfLabel {
+  font-size: 13px;
   font-weight: 600;
+  color: var(--color-fg);
   min-width: 0;
-  /* Break at word boundaries only. If the column is still too narrow,
-     let the name overflow rather than cascade into a vertical letter
-     stack. */
-  white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
   line-height: 1.3;
 }
 
-.categoryValue {
-  font-size: 11px;
+.perfValue {
+  font-size: 14px;
+  font-weight: 800;
   color: var(--color-fg);
-  font-weight: 600;
   text-align: right;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
-.categoryDeltaUp,
-.categoryDeltaDown {
+.perfDeltaUp,
+.perfDeltaDown,
+.perfDeltaFlat {
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
+  min-width: 46px;
+  text-align: right;
 }
 
-.categoryDeltaUp {
+.perfDeltaUp {
   color: var(--color-positive);
 }
 
-.categoryDeltaDown {
+.perfDeltaDown {
   color: var(--color-warm);
+}
+
+.perfDeltaFlat {
+  color: var(--color-fg-muted);
+}
+
+.cardFoot {
+  margin: 0;
+  padding-top: var(--space-1);
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  text-align: right;
 }
 
 .emptyRow {
@@ -486,10 +451,74 @@
   text-align: center;
 }
 
-.categoryFoot {
+/* -- Best sales days -- */
+.rankList {
+  list-style: none;
+  padding: 0;
   margin: 0;
-  padding-top: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rankRow {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rankBadge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
+  font-weight: 800;
+  background: rgba(17, 24, 39, 0.06);
   color: var(--color-fg-muted);
+  flex: none;
+}
+
+/* The best day of the week earns the accent fill. */
+.rankBadgeTop {
+  background: var(--color-warm);
+  color: #fff;
+}
+
+.rankLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-fg);
+  min-width: 0;
+}
+
+.rankValue {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-fg);
   text-align: right;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+/* Below ~360 px the four performance columns start clipping the delta,
+   so the icon shrinks first -- it carries no information the label
+   doesn't already give. */
+@media (max-width: 380px) {
+  .perfRow {
+    grid-template-columns: 28px minmax(0, 1fr) auto auto;
+    gap: 6px;
+  }
+
+  .perfIcon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .perfLabel {
+    font-size: 12px;
+  }
 }
