@@ -475,12 +475,15 @@ export default function SalesPage() {
       : null;
     const average = row("Average Daily Sales", "average", weekly);
 
+    // Sunday never trades, so spreading the week's money over 7 days would
+    // always understate the average — divide by the trading days that ran.
+    const tradingDays = Math.min(days, TRADING_DAY_COUNT);
+
     return [
       row("Lunch Sales", "lunch", lunch),
       row("Dinner Sales", "dinner", dinner),
       row("Catering Sales", "catering", cateringWeek),
-      // Same money as the row totals, spread over the days that have run.
-      { ...average, value: average.value === null ? null : average.value / days },
+      { ...average, value: average.value === null ? null : average.value / tradingDays },
     ];
   }, [elapsedDays, serviceWeek, cateringWeek, weekly]);
 
