@@ -88,9 +88,20 @@ function fmtWeekRange(mondayISO: string): string {
   const [sy, sm, sd] = sundayISO.split("-").map(Number);
   const mon = new Date(Date.UTC(my, mm - 1, md, 12));
   const sun = new Date(Date.UTC(sy, sm - 1, sd, 12));
-  const monPart = `${md} ${mon.toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" })}`;
-  const sunPart = sun.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  // en-GB, not en-AU: both are day-first, but en-AU spells out "June"/"July"
+  // for `month: "short"`, which made the two comparison headings different
+  // widths and wrapped one of them onto a second line.
+  const monPart = `${md} ${mon.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" })}`;
+  const sunPart = sun.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   return `${monPart} – ${sunPart}`;
+}
+
+/**
+ * What the employee is actually paid out — super is an employer contribution
+ * that never lands in their hands, so the "Total Pay" column leaves it out.
+ */
+function payoutExclSuper(emp: EmployeePayRow): number {
+  return emp.totalIncSuper - emp.superAnn;
 }
 
 function fmtCurrency(n: number): string {
@@ -209,7 +220,7 @@ export default function PayrollOverviewPage() {
   const topPaid = useMemo(() => {
     if (!summary) return [];
     return [...summary.current.employees]
-      .sort((a, b) => b.totalIncSuper - a.totalIncSuper)
+      .sort((a, b) => payoutExclSuper(b) - payoutExclSuper(a))
       .slice(0, 5);
   }, [summary]);
 
@@ -399,7 +410,7 @@ export default function PayrollOverviewPage() {
                         <span className={styles.empName}>{emp.name}</span>
                       </span>
                     </td>
-                    <td className={styles.tdRight}>{fmtCurrency(emp.totalIncSuper)}</td>
+                    <td className={styles.tdRight}>{fmtCurrency(payoutExclSuper(emp))}</td>
                   </tr>
                 ))
               )}
@@ -476,10 +487,10 @@ function ComparisonColumn({
   return (
     <div className={styles.comparisonCol}>
       <p className={highlight ? styles.comparisonLabelHot : styles.comparisonLabel}>{label}</p>
-      <ComparisonRow name="Net Pay" value={totals?.netPay} highlight={highlight} />
+      <ComparisonRow name="Net" value={totals?.netPay} highlight={highlight} />
       <ComparisonRow name="Tax" value={totals?.tax} highlight={highlight} />
       <ComparisonRow name="Super" value={totals?.superAnn} highlight={highlight} />
-      <ComparisonRow name="Cash Pay" value={totals?.cashPay} highlight={highlight} />
+      <ComparisonRow name="Cash" value={totals?.cashPay} highlight={highlight} />
       <div className={styles.comparisonDivider} />
       <ComparisonRow
         name="Total"

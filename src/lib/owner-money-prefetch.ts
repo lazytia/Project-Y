@@ -18,12 +18,12 @@ function isoMondayOf(dateKey: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
-/** Most recently finalised pay week (two Mondays back from today). */
+/** Most recently finalised pay week (the Monday before this one). */
 export function isoLastCompletedPayWeek(): string {
   const thisMonday = isoMondayOf(sydneyTodayKey());
   const [y, m, d] = thisMonday.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() - 14);
+  dt.setUTCDate(dt.getUTCDate() - 7);
   return dt.toISOString().slice(0, 10);
 }
 
