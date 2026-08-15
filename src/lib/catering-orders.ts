@@ -138,6 +138,97 @@ export async function saveOwnerNote(
   if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
 }
 
+export type CateringSchedule = { deliveryDateISO: string; deliveryTime: string };
+
+/** Read the owner's date/time override, or null when Square's slot still stands. */
+export async function fetchCateringSchedule(
+  user: User | null | undefined,
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<CateringSchedule | null> {
+  const res = await fetch(`/api/catering-orders/${encodeURIComponent(orderId)}/schedule`, {
+    cache: "no-store",
+    headers: await authHeader(user),
+    signal,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return null;
+  return (data?.schedule ?? null) as CateringSchedule | null;
+}
+
+/**
+ * Owner-only schedule override (Firestore only — Square is never mutated).
+ * `deliveryTime` is sent as a 24h "HH:MM" value straight from
+ * <input type="time">; the server turns it into the human label.
+ */
+export async function saveCateringSchedule(
+  user: User | null | undefined,
+  orderId: string,
+  schedule: { deliveryDateISO: string; deliveryTime: string },
+): Promise<CateringSchedule> {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(await authHeader(user)),
+  };
+  const res = await fetch(`/api/catering-orders/${encodeURIComponent(orderId)}/schedule`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(schedule),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+  return data.schedule as CateringSchedule;
+}
+
+/** Drop the override so the order falls back to Square's own date/time. */
+export async function clearCateringSchedule(
+  user: User | null | undefined,
+  orderId: string,
+): Promise<CateringSchedule | null> {
+  const res = await fetch(`/api/catering-orders/${encodeURIComponent(orderId)}/schedule`, {
+    method: "DELETE",
+    headers: await authHeader(user),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+  return (data.schedule ?? null) as CateringSchedule | null;
+}
+
+/**
+ * "11:30 AM" → "11:30", the value <input type="time"> expects.
+ * Tolerates the narrow no-break space Intl puts before AM/PM.
+ * Returns "" when the label can't be parsed (e.g. Square's "—").
+ */
+export function toTimeInputValue(label: string | undefined): string {
+  const raw = (label ?? "").trim();
+  const ampm = /^(\d{1,2}):(\d{2})\s*([AaPp])\.?[Mm]?\.?$/.exec(raw);
+  if (ampm) {
+    const hour = (parseInt(ampm[1], 10) % 12) + (ampm[3].toLowerCase() === "p" ? 12 : 0);
+    return `${String(hour).padStart(2, "0")}:${ampm[2]}`;
+  }
+  const h24 = /^(\d{1,2}):(\d{2})$/.exec(raw);
+  if (h24) return `${h24[1].padStart(2, "0")}:${h24[2]}`;
+  return "";
+}
+
+/**
+ * "14:30" → "2:30 PM". Mirrors the format `catering-square.ts` produces for
+ * Square-sourced times so an edited order reads identically to an untouched one.
+ */
+export function toTimeLabel(value: string | undefined): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec((value ?? "").trim());
+  if (!m) return "";
+  const hour = parseInt(m[1], 10);
+  const minute = parseInt(m[2], 10);
+  if (hour > 23 || minute > 59) return "";
+  return new Date(Date.UTC(2000, 0, 1, hour, minute)).toLocaleTimeString("en-US", {
+    timeZone: "UTC",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 /** YYYY-MM-DD in local timezone. */
 export function todayISO(): string {
   return new Date().toLocaleDateString("en-CA");

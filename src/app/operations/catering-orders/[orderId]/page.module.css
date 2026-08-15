@@ -149,6 +149,137 @@
   color: var(--color-fg);
 }
 
+/* ── Owner-only schedule edit (our app only — Square is never mutated) ── */
+.scheduleHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.scheduleEditBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: -2px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scheduleEditBtn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.scheduleEditBtn:hover {
+  color: var(--color-fg);
+  border-color: var(--color-fg);
+}
+
+.scheduleBadge {
+  margin: 6px 0 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+
+.scheduleEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.scheduleField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.scheduleFieldLabel {
+  flex: none;
+  width: 44px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+}
+
+.scheduleInput {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.scheduleActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.scheduleSaveBtn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-fg);
+  color: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.scheduleCancelBtn,
+.scheduleResetBtn {
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scheduleResetBtn {
+  margin-left: auto;
+}
+
+.scheduleSaveBtn:disabled,
+.scheduleCancelBtn:disabled,
+.scheduleResetBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.scheduleError {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.scheduleHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
 /* ── Contact ── */
 .contactName {
   margin: 0;

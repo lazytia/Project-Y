@@ -8,7 +8,7 @@
  * Collection: catering_orders/{squareOrderId}
  * Sub-collection: catering_orders/{squareOrderId}/history/{auto-id}
  */
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type DocumentData } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import type { CateringOrder } from "@/lib/catering-orders";
 
@@ -151,6 +151,112 @@ export async function fetchHiddenOrderIds(): Promise<Set<string>> {
     console.warn("[catering-firestore] hidden lookup failed:", err);
     return new Set();
   }
+}
+
+const SCHEDULE_COLLECTION = "catering_schedule";
+
+/**
+ * Owner-supplied date/time for a catering job.
+ *
+ * Square is the source of truth and is never mutated by this app, so when
+ * the owner corrects a pickup/delivery slot we store it here and overlay it
+ * on top of the Square order on read — same pattern as `catering_hidden`.
+ */
+export type CateringScheduleOverride = {
+  /** Local YYYY-MM-DD in the venue's timezone. */
+  deliveryDateISO: string;
+  /** Human label, e.g. "11:30 AM". */
+  deliveryTime: string;
+};
+
+function toScheduleOverride(data: DocumentData | undefined): CateringScheduleOverride | null {
+  const date = typeof data?.deliveryDateISO === "string" ? data.deliveryDateISO : "";
+  const time = typeof data?.deliveryTime === "string" ? data.deliveryTime : "";
+  if (!date && !time) return null;
+  return { deliveryDateISO: date, deliveryTime: time };
+}
+
+/** Overlay an override onto a Square order. Pure — safe to call with null. */
+export function applyScheduleOverride(
+  order: CateringOrder,
+  override: CateringScheduleOverride | null | undefined,
+): CateringOrder {
+  if (!override) return order;
+  return {
+    ...order,
+    deliveryDateISO: override.deliveryDateISO || order.deliveryDateISO,
+    deliveryTime: override.deliveryTime || order.deliveryTime,
+  };
+}
+
+/** Save the owner's date/time override + append to the order's history. */
+export async function saveScheduleOverride(
+  orderId: string,
+  override: CateringScheduleOverride,
+  updatedBy: string | null,
+): Promise<void> {
+  const db = adminDb();
+  await db
+    .collection(SCHEDULE_COLLECTION)
+    .doc(orderId)
+    .set(
+      {
+        ...override,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: updatedBy ?? null,
+      },
+      { merge: true },
+    );
+
+  await db.collection(COLLECTION).doc(orderId).collection("history").add({
+    action: "schedule_overridden",
+    ...override,
+    updatedBy: updatedBy ?? null,
+    timestamp: FieldValue.serverTimestamp(),
+  });
+}
+
+/** Drop the override so the order falls back to Square's own date/time. */
+export async function clearScheduleOverride(
+  orderId: string,
+  clearedBy: string | null,
+): Promise<void> {
+  const db = adminDb();
+  await db.collection(SCHEDULE_COLLECTION).doc(orderId).delete();
+  await db.collection(COLLECTION).doc(orderId).collection("history").add({
+    action: "schedule_override_cleared",
+    updatedBy: clearedBy ?? null,
+    timestamp: FieldValue.serverTimestamp(),
+  });
+}
+
+/** Read one order's override, or null when the owner hasn't set one. */
+export async function getScheduleOverride(
+  orderId: string,
+): Promise<CateringScheduleOverride | null> {
+  try {
+    const snap = await adminDb().collection(SCHEDULE_COLLECTION).doc(orderId).get();
+    if (!snap.exists) return null;
+    return toScheduleOverride(snap.data());
+  } catch (err) {
+    console.warn("[catering-firestore] schedule lookup failed:", err);
+    return null;
+  }
+}
+
+/** Read every override at once (used by the list endpoint). */
+export async function fetchScheduleOverrides(): Promise<Map<string, CateringScheduleOverride>> {
+  const map = new Map<string, CateringScheduleOverride>();
+  try {
+    const snap = await adminDb().collection(SCHEDULE_COLLECTION).get();
+    for (const doc of snap.docs) {
+      const override = toScheduleOverride(doc.data());
+      if (override) map.set(doc.id, override);
+    }
+  } catch (err) {
+    console.warn("[catering-firestore] schedule bulk lookup failed:", err);
+  }
+  return map;
 }
 
 /**

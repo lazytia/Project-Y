@@ -86,9 +86,9 @@
 .heroCard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
-  padding: var(--space-4);
+  padding: var(--space-3);
   border-radius: var(--radius-lg);
   background: var(--color-fg);
 }
@@ -103,7 +103,7 @@
 
 .heroLabel {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #fff;
@@ -111,8 +111,8 @@
 
 .heroBadge {
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.12);
   display: inline-flex;
@@ -124,7 +124,7 @@
    rather than overflowing its card. */
 .heroValue {
   margin: 0;
-  font-size: clamp(19px, 5.8vw, 32px);
+  font-size: clamp(18px, 5vw, 26px);
   font-weight: 900;
   color: #fff;
   letter-spacing: -0.03em;
@@ -133,12 +133,12 @@
 }
 
 .heroUnit {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
   margin-left: 2px;
 }
 
-/* The gauge repeats the number, so it may shrink away before the value does. */
+/* The gauge is decorative next to the value, so it shrinks away first. */
 .heroPctRow {
   display: flex;
   align-items: center;
@@ -152,7 +152,7 @@
 
 .heroDivider {
   height: 1px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   background: rgba(255, 255, 255, 0.18);
 }
 
@@ -160,7 +160,7 @@
 .heroDeltaDown,
 .heroDeltaMuted {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -169,54 +169,25 @@
 .heroDeltaMuted { color: rgba(255, 255, 255, 0.5); }
 
 .heroDeltaSub {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: 1px 0 0;
+  font-size: 11px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* Ring only — the figure lives in .heroValue beside it, so this stays small
+   enough that it never drives the card's height. */
 .gauge {
   position: relative;
   flex: none;
-  width: clamp(78px, 24vw, 104px);
-  height: clamp(78px, 24vw, 104px);
-  margin-right: calc(var(--space-4) * -1);
+  width: clamp(34px, 11vw, 46px);
+  height: clamp(34px, 11vw, 46px);
+  margin-right: calc(var(--space-2) * -1);
 }
 
 .gaugeSvg {
   width: 100%;
   height: 100%;
-}
-
-.gaugeCenter {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.gaugeValue {
-  margin: 0;
-  font-size: clamp(13px, 4vw, 17px);
-  font-weight: 800;
-  color: var(--color-warm);
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.gaugeUnit {
-  font-size: 0.6em;
-  font-weight: 700;
-}
-
-.gaugeSub {
-  margin: 2px 0 0;
-  font-size: clamp(8px, 2.6vw, 11px);
-  color: rgba(255, 255, 255, 0.65);
-  font-weight: 500;
 }
 
 /* ?�?� Card ?�?� */
@@ -433,8 +404,8 @@
   font-size: 12px;
   color: var(--color-fg);
   min-width: 0;
-  /* Wrap at word boundaries so "Total Payroll Cost" stacks across two
-     lines cleanly instead of splitting mid-word on 320-ish-px phones. */
+  /* Labels are all single words now, but keep word-boundary wrapping so a
+     longer one can never split mid-word on 320-ish-px phones. */
   overflow-wrap: break-word;
   word-break: normal;
   line-height: 1.25;
@@ -448,12 +419,14 @@
   font-weight: 800;
 }
 
+/* Only the Total row is bold — every other figure reads as regular weight
+   so the row that matters stands out. */
 .comparisonValue,
 .comparisonValueHot,
 .comparisonValueBold,
 .comparisonValueBoldHot {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--color-fg);
   white-space: nowrap;
   flex-shrink: 0;

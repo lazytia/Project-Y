@@ -216,10 +216,10 @@ export default function PayrollOverviewPage() {
   if (authLoading || !user || !allowed) return <Splash />;
 
   const totals = summary?.current.totals;
-  // The right-hand comparison card is labelled "2 Weeks Ago" so it must
-  // read from the twoWeeksAgo bucket, not the immediately-prior week.
-  const prevTotals = summary?.twoWeeksAgo.totals;
-  const previousLabel = summary ? fmtWeekRange(summary.twoWeeksAgo.weekStartISO) : "—";
+  // The right-hand comparison card is labelled "Previous Week" so it reads
+  // from the immediately-prior week, not the twoWeeksAgo bucket.
+  const prevTotals = summary?.previous.totals;
+  const previousLabel = summary ? fmtWeekRange(summary.previous.weekStartISO) : "—";
 
   return (
     <div className={styles.page}>
@@ -272,7 +272,7 @@ export default function PayrollOverviewPage() {
       <div className={styles.heroGrid}>
         <section className={styles.heroCard}>
           <div className={styles.heroHead}>
-            <p className={styles.heroLabel}>TOTAL PAYROLL COST</p>
+            <p className={styles.heroLabel}>PAYROLL COST</p>
             <span className={styles.heroBadge} aria-hidden="true"><WalletIcon /></span>
           </div>
           <p className={styles.heroValue}>
@@ -283,7 +283,7 @@ export default function PayrollOverviewPage() {
 
         <section className={styles.heroCard}>
           <div className={styles.heroHead}>
-            <p className={styles.heroLabel}>PAYROLL % OF SALES</p>
+            <p className={styles.heroLabel}>% OF SALES</p>
             <InfoIcon />
           </div>
           <div className={styles.heroPctRow}>
@@ -354,7 +354,7 @@ export default function PayrollOverviewPage() {
               <span className={`${styles.legendDot} ${styles.legendDotWarm}`} /> Recent Week
             </span>
             <span className={styles.legendItem}>
-              <span className={`${styles.legendDot} ${styles.legendDotMuted}`} /> 2 Weeks Ago
+              <span className={`${styles.legendDot} ${styles.legendDotMuted}`} /> Previous Week
             </span>
           </div>
         </div>
@@ -425,7 +425,7 @@ function HeroDelta({ pct }: { pct: number | null }) {
       ) : (
         <p className={styles.heroDeltaMuted}>—</p>
       )}
-      <p className={styles.heroDeltaSub}>vs 2 weeks ago</p>
+      <p className={styles.heroDeltaSub}>vs 2-wk avg</p>
     </div>
   );
 }
@@ -478,11 +478,11 @@ function ComparisonColumn({
       <p className={highlight ? styles.comparisonLabelHot : styles.comparisonLabel}>{label}</p>
       <ComparisonRow name="Net Pay" value={totals?.netPay} highlight={highlight} />
       <ComparisonRow name="Tax" value={totals?.tax} highlight={highlight} />
-      <ComparisonRow name="Superannuation" value={totals?.superAnn} highlight={highlight} />
+      <ComparisonRow name="Super" value={totals?.superAnn} highlight={highlight} />
       <ComparisonRow name="Cash Pay" value={totals?.cashPay} highlight={highlight} />
       <div className={styles.comparisonDivider} />
       <ComparisonRow
-        name="Total Payroll Cost"
+        name="Total"
         value={totals?.totalIncSuper}
         highlight={highlight}
         bold
@@ -522,9 +522,13 @@ function ComparisonRow({
   );
 }
 
+/**
+ * Ring only — the percentage itself is already printed beside it as the
+ * hero value, so repeating it inside the ring just duplicated the number.
+ */
 function GaugeChart({ pct }: { pct: number | null }) {
   const radius = 44;
-  const stroke = 10;
+  const stroke = 12;
   const circumference = 2 * Math.PI * radius;
   const capped = pct === null ? 0 : Math.max(0, Math.min(pct, 100));
   const fillLen = (capped / 100) * circumference;
@@ -553,13 +557,6 @@ function GaugeChart({ pct }: { pct: number | null }) {
           />
         )}
       </svg>
-      <div className={styles.gaugeCenter}>
-        <p className={styles.gaugeValue}>
-          {pct !== null ? pct.toFixed(1) : "—"}
-          <span className={styles.gaugeUnit}>%</span>
-        </p>
-        <p className={styles.gaugeSub}>of Sales</p>
-      </div>
     </div>
   );
 }

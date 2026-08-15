@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { listPlatterCateringOrders } from "@/lib/catering-square";
-import { fetchHiddenOrderIds, syncOrdersToFirestore } from "@/lib/catering-firestore";
+import {
+  applyScheduleOverride,
+  fetchHiddenOrderIds,
+  fetchScheduleOverrides,
+  syncOrdersToFirestore,
+} from "@/lib/catering-firestore";
 
 export const dynamic = "force-dynamic";
 
@@ -56,12 +61,19 @@ export async function GET(req: NextRequest) {
   const sundayKey = new Date(Date.UTC(my, mm - 1, md + 6)).toISOString().slice(0, 10);
 
   try {
-    const [ordersRaw, hiddenIds] = await Promise.all([
+    const [ordersRaw, hiddenIds, schedules] = await Promise.all([
       listPlatterCateringOrders(),
       fetchHiddenOrderIds(),
+      fetchScheduleOverrides(),
     ]);
-    const orders =
+    const visible =
       hiddenIds.size > 0 ? ordersRaw.filter((o) => !hiddenIds.has(o.id)) : ordersRaw;
+    // Owner-corrected slots must win here too, otherwise the dashboard's
+    // "next job" and week count would disagree with the calendar.
+    const orders =
+      schedules.size > 0
+        ? visible.map((o) => applyScheduleOverride(o, schedules.get(o.id)))
+        : visible;
     syncOrdersToFirestore(orders);
 
     const upcoming = orders

@@ -7,10 +7,14 @@ import { useAuth } from "@/components/AuthProvider";
 import { isStrictOwner } from "@/lib/permissions";
 import {
   type CateringOrder,
+  clearCateringSchedule,
   daysUntil,
   fetchCateringOrder,
+  fetchCateringSchedule,
   fetchOwnerNote,
+  saveCateringSchedule,
   saveOwnerNote,
+  toTimeInputValue,
 } from "@/lib/catering-orders";
 import styles from "./page.module.css";
 
@@ -114,20 +118,32 @@ export default function CateringOrderDetailPage() {
   const [cancelling, setCancelling] = useState(false);
   const canCancel = isStrictOwner(user);
   const canEditNotes = isStrictOwner(user);
+  // Owners may correct the pickup/delivery slot. The edit is stored in our
+  // Firestore only (`catering_schedule`) — the Square order is never mutated.
+  const canEditSchedule = isStrictOwner(user);
+
+  const [scheduleEditing, setScheduleEditing] = useState(false);
+  const [scheduleOverridden, setScheduleOverridden] = useState(false);
+  const [draftDate, setDraftDate] = useState("");
+  const [draftTime, setDraftTime] = useState("");
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!params?.orderId || !user) return;
     const controller = new AbortController();
     (async () => {
       try {
-        const [o, note] = await Promise.all([
+        const [o, note, schedule] = await Promise.all([
           fetchCateringOrder(user, params.orderId, controller.signal),
           fetchOwnerNote(user, params.orderId, controller.signal),
+          fetchCateringSchedule(user, params.orderId, controller.signal),
         ]);
         if (!o) setError("Order not found.");
         setOrder(o);
         setOwnerNote(note);
         setOwnerNoteOriginal(note);
+        setScheduleOverridden(schedule !== null);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Could not load order.");
@@ -179,6 +195,55 @@ export default function CateringOrderDetailPage() {
       /* best-effort */
     } finally {
       setNoteSaving(false);
+    }
+  }
+
+  /** Open the inline editor seeded with whatever is on screen right now. */
+  function startScheduleEdit() {
+    if (!order) return;
+    setDraftDate(order.deliveryDateISO);
+    setDraftTime(toTimeInputValue(order.deliveryTime));
+    setScheduleError(null);
+    setScheduleEditing(true);
+  }
+
+  async function handleSaveSchedule() {
+    if (!user || !params?.orderId || !order || scheduleSaving) return;
+    if (!draftDate || !draftTime) {
+      setScheduleError("Pick both a date and a time.");
+      return;
+    }
+    setScheduleSaving(true);
+    setScheduleError(null);
+    try {
+      const saved = await saveCateringSchedule(user, params.orderId, {
+        deliveryDateISO: draftDate,
+        deliveryTime: draftTime,
+      });
+      setOrder({ ...order, ...saved });
+      setScheduleOverridden(true);
+      setScheduleEditing(false);
+    } catch (err) {
+      setScheduleError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
+
+  /** Drop our override so the order shows Square's own slot again. */
+  async function handleResetSchedule() {
+    if (!user || !params?.orderId || !order || scheduleSaving) return;
+    setScheduleSaving(true);
+    setScheduleError(null);
+    try {
+      const square = await clearCateringSchedule(user, params.orderId);
+      if (square) setOrder({ ...order, ...square });
+      setScheduleOverridden(false);
+      setScheduleEditing(false);
+    } catch (err) {
+      setScheduleError(err instanceof Error ? err.message : "Failed to reset.");
+    } finally {
+      setScheduleSaving(false);
     }
   }
 
@@ -234,13 +299,85 @@ export default function CateringOrderDetailPage() {
         </div>
       </header>
 
-      {/* Pickup / Delivery */}
+      {/* Pickup / Delivery — owners can correct the slot in our app only */}
       <section className={styles.section}>
         <div className={styles.sectionIcon}><CalIcon /></div>
         <div className={styles.sectionBody}>
-          <p className={styles.sectionTitle}>{fulfillmentLabel.toUpperCase()}</p>
-          <p className={styles.pickupDate}>{fmtDate(order.deliveryDateISO)}</p>
-          <p className={styles.pickupTime}>{order.deliveryTime}</p>
+          <div className={styles.scheduleHead}>
+            <p className={styles.sectionTitle}>{fulfillmentLabel.toUpperCase()}</p>
+            {canEditSchedule && !scheduleEditing && (
+              <button
+                type="button"
+                className={styles.scheduleEditBtn}
+                onClick={startScheduleEdit}
+              >
+                <EditIcon /> Edit
+              </button>
+            )}
+          </div>
+
+          {scheduleEditing ? (
+            <div className={styles.scheduleEditor}>
+              <label className={styles.scheduleField}>
+                <span className={styles.scheduleFieldLabel}>Date</span>
+                <input
+                  type="date"
+                  className={styles.scheduleInput}
+                  value={draftDate}
+                  onChange={(e) => setDraftDate(e.target.value)}
+                />
+              </label>
+              <label className={styles.scheduleField}>
+                <span className={styles.scheduleFieldLabel}>Time</span>
+                <input
+                  type="time"
+                  className={styles.scheduleInput}
+                  value={draftTime}
+                  onChange={(e) => setDraftTime(e.target.value)}
+                />
+              </label>
+              {scheduleError && <p className={styles.scheduleError}>{scheduleError}</p>}
+              <div className={styles.scheduleActions}>
+                <button
+                  type="button"
+                  className={styles.scheduleSaveBtn}
+                  disabled={scheduleSaving}
+                  onClick={handleSaveSchedule}
+                >
+                  {scheduleSaving ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.scheduleCancelBtn}
+                  disabled={scheduleSaving}
+                  onClick={() => { setScheduleEditing(false); setScheduleError(null); }}
+                >
+                  Cancel
+                </button>
+                {scheduleOverridden && (
+                  <button
+                    type="button"
+                    className={styles.scheduleResetBtn}
+                    disabled={scheduleSaving}
+                    onClick={handleResetSchedule}
+                  >
+                    Reset to Square
+                  </button>
+                )}
+              </div>
+              <p className={styles.scheduleHint}>
+                Saved in our app only — the Square order is never changed.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className={styles.pickupDate}>{fmtDate(order.deliveryDateISO)}</p>
+              <p className={styles.pickupTime}>{order.deliveryTime}</p>
+              {scheduleOverridden && (
+                <p className={styles.scheduleBadge}>Edited in app · Square unchanged</p>
+              )}
+            </>
+          )}
         </div>
       </section>
 

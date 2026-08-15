@@ -6,7 +6,9 @@ import {
   listPlatterCateringOrders,
 } from "@/lib/catering-square";
 import {
+  applyScheduleOverride,
   fetchHiddenOrderIds,
+  fetchScheduleOverrides,
   syncOrderToFirestore,
   syncOrdersToFirestore,
 } from "@/lib/catering-firestore";
@@ -43,9 +45,10 @@ export async function GET(req: NextRequest) {
   const auth = await verifyAuth(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   try {
-    const [orders, hiddenIds] = await Promise.all([
+    const [orders, hiddenIds, schedules] = await Promise.all([
       listPlatterCateringOrders(),
       fetchHiddenOrderIds(),
+      fetchScheduleOverrides(),
     ]);
     // Filter out orders the owner has hidden in our app (Square is
     // the source of truth and stays untouched — we only skip these
@@ -53,8 +56,13 @@ export async function GET(req: NextRequest) {
     const visible = hiddenIds.size > 0
       ? orders.filter((o) => !hiddenIds.has(o.id))
       : orders;
-    syncOrdersToFirestore(visible);
-    return NextResponse.json({ orders: visible });
+    // Overlay any owner-corrected date/time before anything downstream
+    // (calendar grouping, D-countdown, Firestore mirror) reads the order.
+    const withSchedule = schedules.size > 0
+      ? visible.map((o) => applyScheduleOverride(o, schedules.get(o.id)))
+      : visible;
+    syncOrdersToFirestore(withSchedule);
+    return NextResponse.json({ orders: withSchedule });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load Square orders.";
     return NextResponse.json({ error: msg }, { status: 500 });

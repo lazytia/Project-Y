@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getPlatterCateringOrder } from "@/lib/catering-square";
-import { hideCateringOrder, syncOrderToFirestore } from "@/lib/catering-firestore";
+import {
+  applyScheduleOverride,
+  getScheduleOverride,
+  hideCateringOrder,
+  syncOrderToFirestore,
+} from "@/lib/catering-firestore";
 import { isStrictOwnerEmail } from "@/lib/permissions";
 
 /**
@@ -36,10 +41,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: st
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const { orderId } = await ctx.params;
   try {
-    const order = await getPlatterCateringOrder(orderId);
+    const [order, schedule] = await Promise.all([
+      getPlatterCateringOrder(orderId),
+      getScheduleOverride(orderId),
+    ]);
     if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
-    syncOrderToFirestore(order, "fetched");
-    return NextResponse.json({ order });
+    // The owner may have corrected the slot in our app; Square is untouched.
+    const withSchedule = applyScheduleOverride(order, schedule);
+    syncOrderToFirestore(withSchedule, "fetched");
+    return NextResponse.json({ order: withSchedule });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load Square order.";
     return NextResponse.json({ error: msg }, { status: 500 });
