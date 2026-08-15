@@ -9,8 +9,8 @@ import { shiftDateKey } from "@/lib/square";
  * GET /api/money/purchasing-cost/summary?weekStart=YYYY-MM-DD
  *
  * Powers /money/purchasing-cost. Returns the selected Mon–Sun week of
- * supplier spend from the shared Google Sheet alongside the same week two
- * weeks earlier, joined with matching Sydney-week Gross Sales so the
+ * supplier spend from the shared Google Sheet alongside the week before it,
+ * joined with matching Sydney-week Gross Sales so the
  * "% of sales" gauge is meaningful. Each week's sheet parse is cached in
  * `suppliers_week_cache/{weekStart}` so scrubbing week-to-week is instant
  * after the first hit.
@@ -134,25 +134,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "weekStart=YYYY-MM-DD required" }, { status: 400 });
   }
 
-  // "2 Weeks Ago" means the same week two weeks back, matching /payroll/payroll.
-  const twoWeeksAgo = shiftDateKey(weekStart, -14, TIMEZONE);
+  const previousWeek = shiftDateKey(weekStart, -7, TIMEZONE);
 
   try {
     const [weeks, sales] = await Promise.all([
-      loadWeeksBatch([weekStart, twoWeeksAgo]),
-      loadWeekSalesResolved([weekStart, twoWeeksAgo]),
+      loadWeeksBatch([weekStart, previousWeek]),
+      loadWeekSalesResolved([weekStart, previousWeek]),
     ]);
 
     const current = toView(weekStart, weeks[0]);
-    const previous = toView(twoWeeksAgo, weeks[1]);
+    const previous = toView(previousWeek, weeks[1]);
 
     return NextResponse.json(
       {
         weekStart,
         weekEnd: current.weekEnd,
         current,
-        twoWeeksAgo: previous,
-        sales: { current: sales[0], twoWeeksAgo: sales[1] },
+        previous,
+        sales: { current: sales[0], previous: sales[1] },
         costPctSales: pctOfSales(current.total, sales[0]),
         costPctSalesPrev: pctOfSales(previous.total, sales[1]),
         target: TARGET_PCT_OF_SALES,

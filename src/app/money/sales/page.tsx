@@ -30,6 +30,8 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
 
 const SYDNEY_TZ = "Australia/Sydney";
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+/** The venue is closed Sunday, so the day-by-day list stops at Saturday. */
+const TRADING_DAY_COUNT = 6;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
 /* ── Date helpers ── */
@@ -482,14 +484,14 @@ export default function SalesPage() {
     ];
   }, [elapsedDays, serviceWeek, cateringWeek, weekly]);
 
-  /* ── Derived: best trading days so far this week ── */
-  const bestDays = useMemo(() => {
+  /* ── Derived: each trading day so far this week, Mon → Sat ── */
+  const weekDays = useMemo(() => {
     if (!weekly || elapsedDays === 0) return null;
-    return weekly.thisWeek
-      .slice(0, elapsedDays)
-      .map((value, i) => ({ label: DAY_LABELS[i], value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
+    const days = weekly.thisWeek
+      .slice(0, Math.min(elapsedDays, TRADING_DAY_COUNT))
+      .map((value, i) => ({ label: DAY_LABELS[i], value }));
+    const best = Math.max(...days.map((d) => d.value));
+    return days.map((d) => ({ ...d, best: best > 0 && d.value === best }));
   }, [weekly, elapsedDays]);
 
   if (authLoading || !user || !allowed) return <Splash />;
@@ -671,23 +673,23 @@ export default function SalesPage() {
         </p>
       </section>
 
-      {/* ── Best Sales Days ── */}
+      {/* ── Day by day ── */}
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <p className={styles.cardTitle}>BEST SALES DAYS (THIS WEEK)</p>
+          <p className={styles.cardTitle}>THIS WEEK</p>
         </div>
         <ul className={styles.rankList}>
-          {(bestDays ?? []).map((d, i) => (
+          {(weekDays ?? []).map((d, i) => (
             <li key={d.label} className={styles.rankRow}>
-              <span className={`${styles.rankBadge} ${i === 0 ? styles.rankBadgeTop : ""}`}>
+              <span className={`${styles.rankBadge} ${d.best ? styles.rankBadgeTop : ""}`}>
                 {i + 1}
               </span>
               <span className={styles.rankLabel}>{d.label}</span>
               <span className={styles.rankValue}>{fmtCurrency(d.value)}</span>
             </li>
           ))}
-          {bestDays === null && <li className={styles.emptyRow}>Loading…</li>}
-          {bestDays !== null && bestDays.length === 0 && (
+          {weekDays === null && <li className={styles.emptyRow}>Loading…</li>}
+          {weekDays !== null && weekDays.length === 0 && (
             <li className={styles.emptyRow}>This week hasn&apos;t started yet.</li>
           )}
         </ul>

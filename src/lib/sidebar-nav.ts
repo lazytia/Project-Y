@@ -39,14 +39,6 @@ export const OWNER_NAV: NavGroup[] = [
       { label: "Sales Overview", href: "/money/sales" },
       { label: "Payroll", href: "/payroll/payroll" },
       { label: "Supplier Cost", href: "/money/purchasing-cost" },
-      {
-        label: "Other Operating Costs",
-        href: "/money/operating-costs",
-        children: [
-          { label: "Utilities", href: "/money/utilities" },
-          { label: "Maintenance", href: "/money/maintenance" },
-        ],
-      },
     ],
   },
   {

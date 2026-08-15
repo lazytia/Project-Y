@@ -19,8 +19,8 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
 /**
  * Owner Supplier Cost overview — reads from
  * /api/money/purchasing-cost/summary, which pulls the selected Mon–Sun
- * week of supplier spend from the shared Google Sheet plus the same week
- * two weeks earlier, and joins the matching Sydney-week Gross Sales so the
+ * week of supplier spend from the shared Google Sheet plus the week before
+ * it, and joins the matching Sydney-week Gross Sales so the
  * "% of sales" gauge is meaningful.
  */
 
@@ -38,8 +38,8 @@ type SummaryPayload = {
   weekStart: string;
   weekEnd: string;
   current: WeekView;
-  twoWeeksAgo: WeekView;
-  sales: { current: number; twoWeeksAgo: number };
+  previous: WeekView;
+  sales: { current: number; previous: number };
   costPctSales: number | null;
   costPctSalesPrev: number | null;
   target: number;
@@ -68,8 +68,10 @@ function fmtWeekRange(mondayISO: string): string {
   const [sy, sm, sd] = sundayISO.split("-").map(Number);
   const mon = new Date(Date.UTC(my, mm - 1, md, 12));
   const sun = new Date(Date.UTC(sy, sm - 1, sd, 12));
-  const monPart = `${md} ${mon.toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" })}`;
-  const sunPart = sun.toLocaleDateString("en-AU", {
+  // en-GB, not en-AU: both are day-first, but en-AU spells out "June"/"July"
+  // for `month: "short"`, which makes the heading noticeably wider.
+  const monPart = `${md} ${mon.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" })}`;
+  const sunPart = sun.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -139,7 +141,7 @@ export default function PurchasingCostPage() {
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    const cacheKey = `y.supplierCost.summary.v1.${weekMondayISO}`;
+    const cacheKey = `y.supplierCost.summary.v2.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
     if (cached && cached.current.total > 0) {
       setSummary(cached);
@@ -170,15 +172,15 @@ export default function PurchasingCostPage() {
   }, [allowed, weekMondayISO]);
 
   const current = summary?.current;
-  const previous = summary?.twoWeeksAgo;
+  const previous = summary?.previous;
 
   const deltas = useMemo(() => {
     if (!summary) return null;
     const curTop = topSupplier(summary.current);
-    const prevTop = topSupplier(summary.twoWeeksAgo);
+    const prevTop = topSupplier(summary.previous);
     return {
-      total: safePct(summary.current.total, summary.twoWeeksAgo.total),
-      sales: safePct(summary.sales.current, summary.sales.twoWeeksAgo),
+      total: safePct(summary.current.total, summary.previous.total),
+      sales: safePct(summary.sales.current, summary.sales.previous),
       pctSales:
         summary.costPctSales !== null && summary.costPctSalesPrev !== null
           ? safePct(summary.costPctSales, summary.costPctSalesPrev)
@@ -245,16 +247,16 @@ export default function PurchasingCostPage() {
       <div className={styles.heroGrid}>
         <section className={styles.heroCard}>
           <div className={styles.heroHead}>
-            <p className={styles.heroLabel}>TOTAL PURCHASING COST</p>
+            <p className={styles.heroLabel}>PURCHASING COST</p>
             <span className={styles.heroBadge} aria-hidden="true"><BoxIcon /></span>
           </div>
           <p className={styles.heroValue}>{current ? fmtCurrency(current.total) : "—"}</p>
-          <HeroFoot pct={deltas?.total ?? null} sub="vs 2 weeks ago" />
+          <HeroFoot pct={deltas?.total ?? null} sub="vs previous week" />
         </section>
 
         <section className={styles.heroCard}>
           <div className={styles.heroHead}>
-            <p className={styles.heroLabel}>PURCHASING % OF SALES</p>
+            <p className={styles.heroLabel}>% OF SALES</p>
             <InfoIcon />
           </div>
           <div className={styles.heroPctRow}>
@@ -290,7 +292,7 @@ export default function PurchasingCostPage() {
             label="Sales"
             value={summary ? fmtCurrency(summary.sales.current) : "—"}
             deltaPct={deltas?.sales ?? null}
-            sub="vs 2 weeks ago"
+            sub="vs previous week"
             loading={fetching && !summary}
           />
           <Tile
@@ -313,7 +315,7 @@ export default function PurchasingCostPage() {
       {/* ── Weekly comparison ── */}
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <p className={styles.cardTitle}>LAST WEEK VS 2 WEEKS AGO</p>
+          <p className={styles.cardTitle}>LAST WEEK VS PREVIOUS WEEK</p>
         </div>
 
         <div className={styles.compareHead}>
@@ -322,7 +324,7 @@ export default function PurchasingCostPage() {
             {summary ? fmtWeekRange(summary.current.weekStart).split(" – ")[0] : "—"}
           </span>
           <span className={styles.compareHeadLabel}>
-            {summary ? fmtWeekRange(summary.twoWeeksAgo.weekStart).split(" – ")[0] : "—"}
+            {summary ? fmtWeekRange(summary.previous.weekStart).split(" – ")[0] : "—"}
           </span>
         </div>
 
@@ -340,7 +342,7 @@ export default function PurchasingCostPage() {
         <CompareRow
           name="Sales"
           now={summary ? fmtCurrency(summary.sales.current) : "—"}
-          then={summary ? fmtCurrency(summary.sales.twoWeeksAgo) : "—"}
+          then={summary ? fmtCurrency(summary.sales.previous) : "—"}
         />
         <div className={styles.compareDivider} />
         <CompareRow
@@ -450,9 +452,13 @@ function CompareRow({
   );
 }
 
+/**
+ * Ring only — the percentage itself is already printed beside it as the
+ * hero value, so repeating it inside the ring just duplicated the number.
+ */
 function GaugeChart({ pct }: { pct: number | null }) {
   const radius = 44;
-  const stroke = 10;
+  const stroke = 12;
   const circumference = 2 * Math.PI * radius;
   const capped = pct === null ? 0 : Math.max(0, Math.min(pct, 100));
   const fillLen = (capped / 100) * circumference;
@@ -481,13 +487,6 @@ function GaugeChart({ pct }: { pct: number | null }) {
           />
         )}
       </svg>
-      <div className={styles.gaugeCenter}>
-        <p className={styles.gaugeValue}>
-          {pct !== null ? pct.toFixed(1) : "—"}
-          <span className={styles.gaugeUnit}>%</span>
-        </p>
-        <p className={styles.gaugeSub}>of Sales</p>
-      </div>
     </div>
   );
 }
