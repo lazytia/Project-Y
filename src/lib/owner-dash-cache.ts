@@ -7,7 +7,6 @@ export type DashCache = Partial<{
   todaySales: number;
   lunchSales: number;
   dinnerSales: number;
-  weeklyProgress: number;
   bestSellers: { name: string; sales: number; quantity: number }[];
   savedDaySales: number;
   lunchPax: number;
@@ -64,7 +63,6 @@ export function hasDashCache(dateKey: string): boolean {
   return (
     typeof cached.todaySales === "number" ||
     typeof cached.savedDaySales === "number" ||
-    typeof cached.weeklyProgress === "number" ||
     typeof cached.weekSalesDoc === "number"
   );
 }

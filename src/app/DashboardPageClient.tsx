@@ -183,10 +183,7 @@ type Stats = {
   lunchSales: number | null;
   dinnerSales: number | null;
   transactions: number;
-  transactionsChange: number;
   avgSpendPerTable: number;
-  avgSpendChange: number;
-  weeklyProgress: number;
   peakHour: string | null;
   peakHourOrders: number;
   bestSellers: { name: string; sales: number; quantity: number }[];
@@ -198,10 +195,7 @@ function emptyStats(sales = 0): Stats {
     lunchSales: null,
     dinnerSales: null,
     transactions: 0,
-    transactionsChange: 0,
     avgSpendPerTable: 0,
-    avgSpendChange: 0,
-    weeklyProgress: 0,
     peakHour: null,
     peakHourOrders: 0,
     bestSellers: [],
@@ -225,12 +219,24 @@ const METRICS_PENDING: MetricsReady = {
   week: false,
   catering: false,
 };
-const METRICS_ALL_READY: MetricsReady = {
-  sales: true,
-  reservations: true,
-  week: true,
-  catering: true,
-};
+/** Square-backed groups — served by /api routes, no Firebase client needed. */
+const SQUARE_GROUPS = ["sales", "week"] as const;
+/** Firestore-backed groups — can only run once the client SDK has a user. */
+const FIRESTORE_GROUPS = ["reservations", "catering"] as const;
+
+/** If a fetch hangs, reveal whatever we have rather than leaving "—" up. */
+const REVEAL_TIMEOUT_MS = 8_000;
+
+/** Flip a whole round of gates at once — each effect owns its own groups. */
+function setGates(
+  prev: MetricsReady,
+  groups: readonly MetricGroup[],
+  ready: boolean,
+): MetricsReady {
+  const next = { ...prev };
+  for (const g of groups) next[g] = ready;
+  return next;
+}
 
 function OwnerDashboard({
   sessionDashboard = null,
@@ -318,7 +324,6 @@ function OwnerDashboard({
           ...emptyStats(seedSales),
           lunchSales: initialCache?.lunchSales ?? null,
           dinnerSales: initialCache?.dinnerSales ?? null,
-          weeklyProgress: initialCache?.weeklyProgress ?? 0,
           bestSellers: initialCache?.bestSellers ?? [],
         }
       : null,
@@ -366,7 +371,6 @@ function OwnerDashboard({
     const hasNumbers =
       typeof cache.todaySales === "number" ||
       typeof cache.savedDaySales === "number" ||
-      typeof cache.weeklyProgress === "number" ||
       typeof cache.weekSalesDoc === "number" ||
       typeof cache.lunchPax === "number";
     if (!hasNumbers) return false;
@@ -383,7 +387,6 @@ function OwnerDashboard({
         todaySales: sales,
         lunchSales: cache.lunchSales ?? prev?.lunchSales ?? null,
         dinnerSales: cache.dinnerSales ?? prev?.dinnerSales ?? null,
-        weeklyProgress: cache.weeklyProgress ?? prev?.weeklyProgress ?? 0,
         bestSellers: cache.bestSellers ?? prev?.bestSellers ?? [],
       }));
     }
@@ -417,29 +420,13 @@ function OwnerDashboard({
     return true;
   }, []);
 
-  const fetchSalesBrief = useCallback(async (dateKey: string) => {
-    try {
-      const res = await fetch(
-        `/api/square/today-sales-brief?date=${encodeURIComponent(dateKey)}`,
-      );
-      if (!res.ok) return;
-      const data = (await res.json()) as { todaySales?: number };
-      if (typeof data.todaySales !== "number") return;
-      setStats((prev) => ({
-        ...(prev ?? emptyStats(data.todaySales!)),
-        todaySales: data.todaySales!,
-      }));
-      setStatsError(false);
-      setLastUpdated(new Date());
-      writeDashCache(dateKey, {
-        todaySales: data.todaySales,
-        savedDaySales: data.todaySales,
-      });
-    } catch {
-      /* full today-stats still runs */
-    }
-  }, []);
-
+  /**
+   * One Square sweep per day, not two. This used to be preceded by a
+   * /api/square/today-sales-brief call so the headline figure could paint
+   * early, but today-stats now costs the same as the brief did, so the second
+   * request only doubled the load on Square for the same number at the same
+   * time. The brief endpoint stays — the manager/chef dashboard still uses it.
+   */
   const fetchStats = useCallback(async (dateKey: string) => {
     try {
       const res = await fetch(`/api/square/today-stats?date=${encodeURIComponent(dateKey)}`);
@@ -452,7 +439,6 @@ function OwnerDashboard({
         todaySales: data.todaySales,
         lunchSales: data.lunchSales ?? undefined,
         dinnerSales: data.dinnerSales ?? undefined,
-        weeklyProgress: data.weeklyProgress,
         bestSellers: data.bestSellers,
       });
       // Persist the day's gross sales to Firestore so past days keep
@@ -601,9 +587,13 @@ function OwnerDashboard({
     [markMetricReady],
   );
 
-  // Live refresh. Needs the Firebase client SDK, so it waits for `user`.
+  // Square-backed cards. These hit /api routes that authenticate on the
+  // server, so they must NOT sit behind the Firebase client SDK restoring the
+  // session — doing that added the whole auth round trip (dynamic import of
+  // firebase/auth + the IndexedDB session read) to the front of every
+  // dashboard open before a single number was even requested.
   useEffect(() => {
-    if (!selectedDate || !user) return;
+    if (!selectedDate) return;
     let cancelled = false;
     const isCancelled = () => cancelled;
 
@@ -613,25 +603,49 @@ function OwnerDashboard({
     // the `selectedDate` effect, so on resume — same date, component never
     // unmounted — it stayed true and last session's numbers rendered with no
     // "—" phase at all, then silently changed once the refetch landed.
-    setMetricsReady(METRICS_PENDING);
+    setMetricsReady((prev) => setGates(prev, SQUARE_GROUPS, false));
 
     // Safety valve: if a fetch hangs we still reveal whatever we have
     // (usually the cache) rather than leaving the owner staring at "—".
+    // Scoped to this effect's own groups so a stuck Square call can't force
+    // the Firestore cards to show stale numbers, or the other way round.
     const reveal = setTimeout(() => {
-      if (!cancelled) setMetricsReady(METRICS_ALL_READY);
-    }, 8_000);
+      if (!cancelled) setMetricsReady((prev) => setGates(prev, SQUARE_GROUPS, true));
+    }, REVEAL_TIMEOUT_MS);
 
     void Promise.allSettled([
-      runMetricGroup("sales", isCancelled, [
-        fetchSalesBrief(selectedDate),
-        fetchStats(selectedDate),
-      ]),
+      runMetricGroup("sales", isCancelled, [fetchStats(selectedDate)]),
+      runMetricGroup("week", isCancelled, [fetchWeekDaily(weekMondayISO)]),
+    ]).then(() => {
+      clearTimeout(reveal);
+    });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(reveal);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, weekMondayISO, refreshTick]);
+
+  // Firestore-backed cards. These go through the Firebase client SDK, so they
+  // genuinely have to wait for `user`.
+  useEffect(() => {
+    if (!selectedDate || !user) return;
+    let cancelled = false;
+    const isCancelled = () => cancelled;
+
+    setMetricsReady((prev) => setGates(prev, FIRESTORE_GROUPS, false));
+
+    const reveal = setTimeout(() => {
+      if (!cancelled) setMetricsReady((prev) => setGates(prev, FIRESTORE_GROUPS, true));
+    }, REVEAL_TIMEOUT_MS);
+
+    void Promise.allSettled([
       runMetricGroup("reservations", isCancelled, [fetchReservations(selectedDate)]),
       runMetricGroup("catering", isCancelled, [fetchCatering()]),
-      runMetricGroup("week", isCancelled, [
-        fetchWeekDaily(weekMondayISO),
-        fetchWeekSales(weekMondayISO, selectedDate),
-      ]),
+      // Only a fallback for the week card, so it deliberately gates nothing —
+      // otherwise the card would wait on Firestore even with weekly-daily in.
+      fetchWeekSales(weekMondayISO, selectedDate),
       fetchReviewNote(selectedDate),
     ]).then(() => {
       clearTimeout(reveal);
@@ -735,8 +749,7 @@ function OwnerDashboard({
     [weekDayOffset],
   );
 
-  const weeklySales =
-    sumToSelectedDay(weekDaily?.thisWeek) ?? weekSalesDoc ?? stats?.weeklyProgress ?? null;
+  const weeklySales = sumToSelectedDay(weekDaily?.thisWeek) ?? weekSalesDoc ?? null;
   const lastWeekToDate = sumToSelectedDay(weekDaily?.lastWeek);
 
   const lastWeekDelta =

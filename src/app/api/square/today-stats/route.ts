@@ -2,20 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getDateRange,
   getSalesDayRange,
-  getWeekToDateRange,
   fetchOrders,
   isLunchInstant,
   localHourIn,
-  sumRefundCents,
   sumRefundCentsByService,
   squareEnv,
   netAmountCents,
   squareGrossSalesCents,
   todayDateKey,
-  shiftDateKey,
   SALES_DAY_START_HOUR,
   SALES_DAY_END_HOUR,
 } from "@/lib/square";
+
+/**
+ * Every figure below is derived from ONE day of orders plus that day's
+ * refunds. Anything needing a second Square sweep has been dropped: the
+ * owner dashboard is the only caller and it rendered none of it, yet the
+ * extra week-wide (paginated) and previous-day sweeps roughly doubled this
+ * route's response time on every dashboard open.
+ *
+ * Removed with their sweeps: weeklyProgress (the week card reads
+ * /api/square/weekly-daily, falling back to the sales_weekly doc) and
+ * transactionsChange / avgSpendChange (never displayed).
+ */
 
 export const dynamic = "force-dynamic";
 
@@ -35,13 +44,6 @@ function formatHour(h: number): string {
 
 function sumDollars<T>(orders: T[], cents: (o: T) => number): number {
   return orders.reduce((s, o) => s + cents(o), 0) / 100;
-}
-
-function shiftKey(dateKey: string, dayOffset: number): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + dayOffset);
-  return dt.toISOString().slice(0, 10);
 }
 
 /** Returns true if the order's createdAt falls within the 9am–10pm sales window in the given timezone. */
@@ -75,53 +77,28 @@ export async function GET(req: NextRequest) {
       ? requestedDate
       : todayDateKey(timezone);
   const isToday = selectedDate === todayDateKey(timezone);
-  const prevDate = shiftKey(selectedDate, -1);
 
   try {
-    const today     = getDateRange(timezone, 0, selectedDate);
-    const yesterday = getDateRange(timezone, 0, prevDate);
+    const today = getDateRange(timezone, 0, selectedDate);
     const todaySalesWindow = getSalesDayRange(timezone, selectedDate);
-
-    // Monday of the current week
-    const dow = new Date(
-      new Date(`${selectedDate}T12:00:00`).toLocaleString("en-US", { timeZone: timezone }),
-    ).getDay();
-    const monKey = shiftDateKey(selectedDate, -((dow + 6) % 7), timezone);
-    const week = getWeekToDateRange(timezone, selectedDate);
 
     const RESTAURANT_STATES = ["OPEN", "COMPLETED"];
 
-    const [
-      todayOrders,
-      yesterdayOrders,
-      weekRestaurantOrders,
-      restaurantRefunds,
-      weekRestaurantRefunds,
-    ] = await Promise.all([
+    const [todayOrders, restaurantRefunds] = await Promise.all([
       fetchOrders(locationId, today.startAt, today.endAt, RESTAURANT_STATES),
-      fetchOrders(locationId, yesterday.startAt, yesterday.endAt, RESTAURANT_STATES),
-      // Single weekly window — filter 9am–10pm in memory
-      fetchOrders(locationId, week.startAt, week.endAt, RESTAURANT_STATES),
       sumRefundCentsByService(
         locationId,
         todaySalesWindow.startAt,
         todaySalesWindow.endAt,
         timezone,
       ),
-      sumRefundCents(locationId, week.startAt, week.endAt),
     ]);
 
     // Derive today's 9am–10pm orders from the full-day fetch (no extra API call)
     const todayOrdersWindow = todayOrders.filter(o => inSalesWindow(o, timezone));
 
-    // Weekly progress: filter to 9am–10pm per day in memory, subtract weekly refunds
-    const weeklyRestaurantInWindow = weekRestaurantOrders.filter(o => inSalesWindow(o, timezone));
-    const weeklyProgress =
-      sumDollars(weeklyRestaurantInWindow, squareGrossSalesCents) - weekRestaurantRefunds / 100;
-
     // Transactions = restaurant order count (OPEN+COMPLETED, all-day)
-    const transactions     = todayOrders.length;
-    const yestTransactions = yesterdayOrders.length;
+    const transactions = todayOrders.length;
 
     // Sales (gross, 9am–10pm, refunds removed)
     const todaySales = sumDollars(todayOrdersWindow, squareGrossSalesCents)
@@ -139,9 +116,6 @@ export async function GET(req: NextRequest) {
     const restaurantNet = sumDollars(todayOrders, netAmountCents);
     const avgSpend =
       transactions > 0 ? Math.round((restaurantNet / transactions) * 100) / 100 : 0;
-    const yestNet = sumDollars(yesterdayOrders, netAmountCents);
-    const yestAvgSpend =
-      yestTransactions > 0 ? Math.round((yestNet / yestTransactions) * 100) / 100 : 0;
 
     // Peak hour
     const hourCounts: Record<number, number> = {};
@@ -175,19 +149,14 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.sales - a.sales)
       .slice(0, 3);
 
-    void monKey; // used for week boundary calculation above
-
     return NextResponse.json({
       date: selectedDate,
       isToday,
       todaySales,
       lunchSales,
       dinnerSales,
-      weeklyProgress,
       transactions,
-      transactionsChange: transactions - yestTransactions,
       avgSpendPerTable: avgSpend,
-      avgSpendChange: Math.round((avgSpend - yestAvgSpend) * 100) / 100,
       peakHour,
       peakHourOrders,
       bestSellers,
