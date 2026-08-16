@@ -94,8 +94,12 @@ function pctDelta(now: number, prev: number): number | null {
 type StoredDaily = { dateISO?: string; grossSales?: number };
 type DailyMap = Map<string, number>;
 
-/** Mon–Sun gross sales cut at the 3pm service split. */
-type ServiceWeek = { lunch: number[]; dinner: number[] };
+/**
+ * Mon–Sun gross sales cut at the 3pm service split, plus the slice that came
+ * in through the website. `online` is the same money cut by channel rather
+ * than by clock, so it overlaps lunch and dinner instead of extending them.
+ */
+type ServiceWeek = { lunch: number[]; dinner: number[]; online: number[] };
 type ServicePair = { thisWeek: ServiceWeek; lastWeek: ServiceWeek };
 
 type StoredCatering = {
@@ -107,7 +111,7 @@ type StoredCatering = {
 /** Mon–Sun buckets for the displayed week and the one before it. */
 type WeekPair = { thisWeek: number[]; lastWeek: number[] };
 
-type PerfIcon = "lunch" | "dinner" | "catering" | "average";
+type PerfIcon = "lunch" | "dinner" | "online" | "catering" | "average";
 
 type PerfRow = {
   label: string;
@@ -324,7 +328,7 @@ export default function SalesPage() {
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    const cacheKey = `y.sales.weekService.v1.${weekMondayISO}`;
+    const cacheKey = `y.sales.weekService.v2.${weekMondayISO}`;
     const cached = readSession<ServicePair>(cacheKey);
     setServiceWeek(cached);
     (async () => {
@@ -473,6 +477,11 @@ export default function SalesPage() {
     const dinner = serviceWeek
       ? { thisWeek: serviceWeek.thisWeek.dinner, lastWeek: serviceWeek.lastWeek.dinner }
       : null;
+    // Already counted inside lunch and dinner — this row answers "how much of
+    // it came through the website", so the column deliberately doesn't sum.
+    const online = serviceWeek
+      ? { thisWeek: serviceWeek.thisWeek.online, lastWeek: serviceWeek.lastWeek.online }
+      : null;
     const average = row("Average Daily Sales", "average", weekly);
 
     // Sunday never trades, so spreading the week's money over 7 days would
@@ -482,6 +491,7 @@ export default function SalesPage() {
     return [
       row("Lunch Sales", "lunch", lunch),
       row("Dinner Sales", "dinner", dinner),
+      row("Online Sales", "online", online),
       row("Catering Sales", "catering", cateringWeek),
       { ...average, value: average.value === null ? null : average.value / tradingDays },
     ];
@@ -837,6 +847,16 @@ function PerfGlyph({ icon }: { icon: PerfIcon }) {
         <path d="M3 18h18" />
         <path d="M5 18a7 7 0 0 1 14 0" />
         <path d="M12 8V6" />
+      </svg>
+    );
+  }
+  if (icon === "online") {
+    // Globe — the web store, as opposed to the till in the room.
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3 12h18" />
+        <path d="M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z" />
       </svg>
     );
   }

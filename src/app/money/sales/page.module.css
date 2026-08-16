@@ -385,6 +385,11 @@
   color: #2b6ef6;
 }
 
+.perfIcon_online {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0ea5e9;
+}
+
 .perfIcon_catering {
   background: rgba(139, 92, 246, 0.12);
   color: #8b5cf6;
