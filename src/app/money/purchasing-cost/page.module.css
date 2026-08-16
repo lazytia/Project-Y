@@ -266,6 +266,21 @@
   font-weight: 600;
 }
 
+/* Qualifier under the label — currently the week a figure covers. */
+.tileMeta {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-warm);
+  letter-spacing: 0.02em;
+  /* Reserved even when empty so the three tiles keep their value rows on
+     the same baseline. */
+  min-height: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tileValue {
   margin: 0;
   font-size: 14px;

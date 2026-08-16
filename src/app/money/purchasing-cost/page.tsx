@@ -80,6 +80,25 @@ function fmtWeekRange(mondayISO: string): string {
   return `${monPart} – ${sunPart}`;
 }
 
+/**
+ * Compact Mon–Sun range for the summary tiles: "3–9 Aug", or
+ * "31 Aug – 6 Sep" when the week straddles two months. The tiles are three
+ * across a phone, so the long form only appears when it has to.
+ */
+function fmtWeekShort(mondayISO: string): string {
+  const sundayISO = addDaysISO(mondayISO, 6);
+  const [my, mm, md] = mondayISO.split("-").map(Number);
+  const [sy, sm, sd] = sundayISO.split("-").map(Number);
+  const monthOf = (y: number, m: number, d: number) =>
+    new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-GB", {
+      month: "short",
+      timeZone: "UTC",
+    });
+  return mm === sm
+    ? `${md}–${sd} ${monthOf(sy, sm, sd)}`
+    : `${md} ${monthOf(my, mm, md)} – ${sd} ${monthOf(sy, sm, sd)}`;
+}
+
 function fmtCurrency(n: number): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -287,9 +306,14 @@ export default function PurchasingCostPage() {
         </div>
 
         <div className={styles.summaryGrid}>
+          {/* This page opens on the last completed week while /money/sales
+              opens on the running one, so the same figure legitimately differs
+              between the two. Naming the week on the tile itself makes that
+              obvious without having to trace it back to the card header. */}
           <Tile
             icon={<SalesIcon />}
             label="Sales"
+            meta={summary ? fmtWeekShort(summary.current.weekStart) : ""}
             value={summary ? fmtCurrency(summary.sales.current) : "—"}
             deltaPct={deltas?.sales ?? null}
             sub="vs previous week"
@@ -405,6 +429,7 @@ function HeroFoot({ pct, sub }: { pct: number | null; sub: string }) {
 function Tile({
   icon,
   label,
+  meta = "",
   value,
   deltaPct = null,
   sub,
@@ -412,6 +437,8 @@ function Tile({
 }: {
   icon: React.ReactNode;
   label: string;
+  /** Optional qualifier under the label — currently the week a figure covers. */
+  meta?: string;
   value: string;
   deltaPct?: number | null;
   sub: string;
@@ -421,6 +448,9 @@ function Tile({
     <div className={styles.tile}>
       <span className={styles.tileIcon} aria-hidden="true">{icon}</span>
       <p className={styles.tileLabel}>{label}</p>
+      {/* Always rendered, empty or not, so the three tiles keep their values
+          on the same baseline when only one of them carries a qualifier. */}
+      <p className={styles.tileMeta}>{meta}</p>
       <p className={styles.tileValue}>{loading ? "…" : value}</p>
       {deltaPct !== null && (
         <p className={deltaPct >= 0 ? styles.tileDeltaUp : styles.tileDeltaDown}>
