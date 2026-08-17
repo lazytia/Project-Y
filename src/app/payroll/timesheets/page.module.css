@@ -700,6 +700,33 @@
   margin: 6px 0 0;
 }
 
+/* What the employee's own clock recorded, under the paid times it produced.
+   The time leads and the label follows, so the clocked figure sits on the same
+   left edge as the chips above it and the two can be read down a column —
+   which is the only reason to show it here. */
+.clockedNote {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.clockedNoteRange {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-fg);
+  font-weight: 600;
+}
+
+/* On a narrow card the label drops to its own line whole, rather than breaking
+   after "Clocked by" and leaving "staff" stranded. */
+.clockedNoteLabel {
+  white-space: nowrap;
+}
+
 .editedBadge {
   display: inline-flex;
   padding: 2px 6px;

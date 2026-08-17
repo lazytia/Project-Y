@@ -594,8 +594,8 @@ export default function StaffDetailPage() {
                 )}
                 {clocked && (
                   <p className={styles.clockedRow}>
-                    <span className={styles.clockedLabel}>Clocked by staff</span>
                     <span className={styles.clockedRange}>{clocked}</span>
+                    <span className={styles.clockedLabel}>Clocked by staff</span>
                   </p>
                 )}
                 <p className={styles.storeNote}>

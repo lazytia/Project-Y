@@ -16,6 +16,11 @@ type ShiftFromApi = {
   endAt: string | null;
   hours: number;
   hourlyRateCents: number | null;
+  /** What the employee's own clock recorded, before the quarter-hour snap and
+   *  before any owner correction. Null for a shift that never went through the
+   *  clock — an owner backfill, which has no clock record to show. */
+  clockedStartAt?: string | null;
+  clockedEndAt?: string | null;
 };
 
 type TeamMemberFromApi = { firstName?: string; lastName?: string };
@@ -43,6 +48,18 @@ function fmtClockTime(iso: string | null): { hhmm: string; ampm: string } {
 
 function fmtHours(h: number): string {
   return `${h.toFixed(2)} hrs`;
+}
+
+/** The clock-in/out as the employee left it, for display under the paid times.
+ *  An open shift shows its start and an em dash rather than "--:--", which
+ *  would read as a missing record instead of one still running. */
+function fmtClockedRange(startAt: string | null, endAt: string | null): string | null {
+  if (!startAt) return null;
+  const s = fmtClockTime(startAt);
+  const head = `${s.hhmm} ${s.ampm}`.trim();
+  if (!endAt) return `${head} –`;
+  const e = fmtClockTime(endAt);
+  return `${head} – ${`${e.hhmm} ${e.ampm}`.trim()}`;
 }
 
 /** Paid hours for a corrected window. An owner's times stand exactly as typed,
@@ -260,6 +277,10 @@ export function DayExpandedPanel({
         const end = fmtClockTime(s.endAt);
         const editRec = edits[s.id];
         const isEdited = !!editRec;
+        // Only a genuine clock record earns this line. An owner backfill has
+        // none, and the pre-edit time on an edit doc is a paid figure someone
+        // typed — labelling that "clocked by staff" would invent evidence.
+        const clockedRange = fmtClockedRange(s.clockedStartAt ?? null, s.clockedEndAt ?? null);
         const isSaving = savingEditId === s.id;
         const editingStart = editingField?.shiftId === s.id && editingField.field === "start";
         const editingEnd = editingField?.shiftId === s.id && editingField.field === "end";
@@ -337,6 +358,15 @@ export function DayExpandedPanel({
                   })()}
                 </p>
               ) : null}
+              {clockedRange && (
+                /* Last line, as on the staff detail page: the times above can
+                   all be traced back to this one, so it reads as the record
+                   they rest on rather than another figure to compare. */
+                <p className={styles.clockedNote}>
+                  <span className={styles.clockedNoteRange}>{clockedRange}</span>
+                  <span className={styles.clockedNoteLabel}>Clocked by staff</span>
+                </p>
+              )}
             </div>
             <span className={styles.shiftHoursBadge}>{fmtHours(s.hours)}</span>
             <button

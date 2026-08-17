@@ -43,6 +43,12 @@ type ShiftFromApi = {
   endAt: string | null;
   hours: number;
   hourlyRateCents: number | null;
+  /** What the employee's own clock recorded, before the quarter-hour snap and
+   *  before any owner correction. Null for a shift that never went through the
+   *  clock — an owner backfill. Carried through to the day panel, which shows
+   *  it under the paid times. */
+  clockedStartAt?: string | null;
+  clockedEndAt?: string | null;
 };
 
 type TeamMemberFromApi = { firstName?: string; lastName?: string };

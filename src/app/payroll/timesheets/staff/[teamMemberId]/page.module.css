@@ -485,11 +485,16 @@
 /* The employee's own clock record, set apart from the adjustments above it by
    a rule. Nothing in the office produced this line, so it is the one figure a
    disputed timesheet can be checked against — worth finding without reading
-   the chain that follows from it. */
+   the chain that follows from it.
+
+   Shares .trailRow's column layout so the clocked time starts on the same left
+   edge as the paid time above it. Reading this line against that one is the
+   whole point of showing it, and two times on a common edge compare at a
+   glance where times pushed to opposite margins have to be hunted for. */
 .clockedRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
-  justify-content: space-between;
   gap: 8px;
   margin: 8px 0 0;
   padding-top: 8px;
@@ -498,6 +503,10 @@
 }
 
 .clockedLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-fg-muted);
 }
 
