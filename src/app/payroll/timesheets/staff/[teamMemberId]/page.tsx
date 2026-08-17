@@ -129,13 +129,29 @@ function hoursFromIso(startAt: string, endAt: string | null): number {
 /*
  * Every paid window is the end of a short chain: the employee clocked, the
  * app snapped that to the quarter-hour grid, and sometimes an owner corrected
- * it afterwards. The card lists the chain so a figure can always be traced
+ * it afterwards. The card shows the chain so a figure can always be traced
  * back to the clock, with each step attributed to whoever moved it.
+ *
+ * The clock record is held apart from the adjustments rather than sitting at
+ * the top of the same list. It is the one line nobody in the office typed —
+ * the employee's own record, and the thing an argument about a timesheet
+ * ultimately appeals to — so it reads as evidence rather than as step one of
+ * a calculation.
  */
 const AUTO_AUTHOR = "AI";
 const OWNER_AUTHOR = "Yurica";
 
-type Adjustment = { label: string; range: string; author: string | null };
+/** Every adjustment has someone behind it — the app or the owner. The clock
+ *  record, which has neither, is kept separately. */
+type Adjustment = { label: string; range: string; author: string };
+
+type ClockTrail = {
+  /** What the employee's own clock-in/out recorded, untouched. Null for a
+   *  shift that never went through the clock — an owner backfill. */
+  clocked: string | null;
+  /** Everything applied to that record since, oldest first. */
+  adjustments: Adjustment[];
+};
 
 function clockRange(startAt: string | null, endAt: string | null): string {
   const s = fmtClock(startAt);
@@ -157,31 +173,29 @@ function sameWindow(
  * kept, so replaying them beats keeping a fourth copy that could drift from
  * the three.
  */
-function adjustmentsFor(s: ShiftFromApi, edit: EditDoc | undefined): Adjustment[] {
+function clockTrailFor(s: ShiftFromApi, edit: EditDoc | undefined): ClockTrail {
   // A shift edited before we started keeping clock records still has its
   // originals on the edit doc.
   const clockedStart = s.clockedStartAt ?? edit?.originalStartAt ?? null;
   const clockedEnd = s.clockedEndAt ?? edit?.originalEndAt ?? null;
 
-  const out: Adjustment[] = [];
+  const adjustments: Adjustment[] = [];
   if (!clockedStart) {
     if (edit?.startAt) {
-      out.push({
+      adjustments.push({
         label: "Edited",
         range: clockRange(edit.startAt, edit.endAt),
         author: OWNER_AUTHOR,
       });
     }
-    return out;
+    return { clocked: null, adjustments };
   }
-
-  out.push({ label: "Clocked", range: clockRange(clockedStart, clockedEnd), author: null });
 
   const snapped = snapClockWindow(clockedStart, clockedEnd);
   const clocked = { start: clockedStart, end: clockedEnd };
   const paid = { start: snapped.startAt, end: snapped.endAt };
   if (!sameWindow(clocked, paid)) {
-    out.push({
+    adjustments.push({
       label: `Rounded to ${ROUNDING_MINUTES} min`,
       range: clockRange(snapped.startAt, snapped.endAt),
       author: AUTO_AUTHOR,
@@ -189,13 +203,14 @@ function adjustmentsFor(s: ShiftFromApi, edit: EditDoc | undefined): Adjustment[
   }
 
   if (edit?.startAt && !sameWindow(paid, { start: edit.startAt, end: edit.endAt })) {
-    out.push({
+    adjustments.push({
       label: "Edited",
       range: clockRange(edit.startAt, edit.endAt),
       author: OWNER_AUTHOR,
     });
   }
-  return out;
+
+  return { clocked: clockRange(clockedStart, clockedEnd), adjustments };
 }
 
 function applyEditToShift(s: ShiftFromApi, edit: EditDoc | undefined): ShiftFromApi {
@@ -499,10 +514,10 @@ export default function StaffDetailPage() {
               endHHMM: hhmmFromIso(s.endAt),
             };
             const editRec = edits[s.id];
-            const trail = adjustmentsFor(s, editRec);
+            const { clocked, adjustments } = clockTrailFor(s, editRec);
             // An edit that lands where the automatic snap already put it
             // changed nothing, so it doesn't earn the badge.
-            const isEdited = trail.some((a) => a.author === OWNER_AUTHOR);
+            const isEdited = adjustments.some((a) => a.author === OWNER_AUTHOR);
             const isSaving = savingEditId === s.id;
             const isDirty = dirty.has(s.id);
             const editingStart = editingField?.shiftId === s.id && editingField.field === "start";
@@ -564,18 +579,22 @@ export default function StaffDetailPage() {
                   )}
                 </div>
                 {isEdited && <span className={styles.editedBadge}>EDITED</span>}
-                {trail.length > 0 && (
+                {adjustments.length > 0 && (
                   <ol className={styles.trail}>
-                    {trail.map((a) => (
+                    {adjustments.map((a) => (
                       <li key={a.label} className={styles.trailRow}>
                         <span className={styles.trailRange}>{a.range}</span>
                         <span className={styles.trailLabel}>{a.label}</span>
-                        {a.author && (
-                          <span className={styles.trailAuthor}>by {a.author}</span>
-                        )}
+                        <span className={styles.trailAuthor}>by {a.author}</span>
                       </li>
                     ))}
                   </ol>
+                )}
+                {clocked && (
+                  <p className={styles.clockedRow}>
+                    <span className={styles.clockedLabel}>Clocked by staff</span>
+                    <span className={styles.clockedRange}>{clocked}</span>
+                  </p>
                 )}
                 <p className={styles.storeNote}>
                   Store time (Australia/Sydney) · paid in {ROUNDING_MINUTES}-minute steps

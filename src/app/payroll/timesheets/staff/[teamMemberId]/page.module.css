@@ -430,9 +430,9 @@
   border-radius: 4px;
 }
 
-/* How the paid window came to be: the clock record, then each adjustment
-   stacked on top of it. Times sit in a fixed first column so the steps line
-   up and the eye can follow one figure down the list. */
+/* Each adjustment made to the clock record, oldest first. Times sit in a
+   fixed first column so the steps line up and the eye can follow one figure
+   down the list. */
 .trail {
   list-style: none;
   margin: 8px 0 0;
@@ -458,13 +458,6 @@
   font-weight: 600;
 }
 
-/* The first row is the raw clock record — context, not a correction, so it
-   stays quieter than the adjustments made to it. */
-.trailRow:first-child .trailRange {
-  color: var(--color-fg-muted);
-  font-weight: 500;
-}
-
 .trailLabel {
   min-width: 0;
   overflow: hidden;
@@ -477,6 +470,32 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+/* The employee's own clock record, set apart from the adjustments above it by
+   a rule. Nothing in the office produced this line, so it is the one figure a
+   disputed timesheet can be checked against — worth finding without reading
+   the chain that follows from it. */
+.clockedRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+  font-size: 11px;
+}
+
+.clockedLabel {
+  color: var(--color-fg-muted);
+}
+
+.clockedRange {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-fg);
+  font-weight: 600;
 }
 
 .storeNote {
