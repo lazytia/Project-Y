@@ -5,6 +5,7 @@ import { collection, doc, getDocs, query, serverTimestamp, setDoc, where, delete
 import { getDb } from "@/lib/firebase";
 import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
 import { sortShiftsByStaffThenStart } from "@/lib/timesheet-sort";
+import { ROUNDING_STEP_SECONDS } from "@/lib/timesheet-rounding";
 import styles from "./page.module.css";
 
 type ShiftFromApi = {
@@ -247,6 +248,7 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
                 {editingStart ? (
                   <input
                     type="time"
+                    step={ROUNDING_STEP_SECONDS}
                     className={styles.timeInput}
                     defaultValue={s.startAt.slice(11, 16)}
                     autoFocus
@@ -271,6 +273,7 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
                 {editingEnd ? (
                   <input
                     type="time"
+                    step={ROUNDING_STEP_SECONDS}
                     className={styles.timeInput}
                     defaultValue={s.endAt ? s.endAt.slice(11, 16) : ""}
                     autoFocus

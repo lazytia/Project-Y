@@ -5,15 +5,24 @@
 import { squareClient, squareEnv } from "@/lib/square";
 import { adminDb } from "@/lib/firebase-admin";
 import { rateForDateISO, readStaffRates, type StaffRates } from "@/lib/staff-rates";
+import { snapClockWindow } from "@/lib/timesheet-rounding";
 
 export type TimesheetShift = {
   id: string;
   teamMemberId: string;
   dateISO: string;
+  /** Paid start — a Square clock-in snapped to the quarter-hour grid, or the
+   *  exact time an owner set. */
   startAt: string;
   endAt: string | null;
   hours: number;
   hourlyRateCents: number | null;
+  /** What the clock actually recorded, before snapping. Null for shifts that
+   *  never went through the clock — owner backfills. Kept so the drill-down
+   *  can show where a paid figure came from, and so every consumer of `hours`
+   *  agrees on one rounded number instead of each rounding for itself. */
+  clockedStartAt: string | null;
+  clockedEndAt: string | null;
 };
 
 export type TimesheetTeamMember = {
@@ -115,9 +124,12 @@ async function fetchSquareShifts(
     .map((s) => {
       const startIso = s.startAt as string;
       const endIso = s.endAt ?? null;
+      // Keep the shift on the day the employee turned up, even if snapping a
+      // late clock-in rolls the paid start past midnight.
       const dateISO = startIso.slice(0, 10);
-      const startMs = new Date(startIso).getTime();
-      const endMs = endIso ? new Date(endIso).getTime() : null;
+      const paid = snapClockWindow(startIso, endIso);
+      const startMs = new Date(paid.startAt).getTime();
+      const endMs = paid.endAt ? new Date(paid.endAt).getTime() : null;
       let breakMs = 0;
       for (const b of s.breaks ?? []) {
         if (!b.startAt || !b.endAt) continue;
@@ -131,10 +143,12 @@ async function fetchSquareShifts(
         id: s.id ?? "",
         teamMemberId: s.teamMemberId ?? "",
         dateISO,
-        startAt: startIso,
-        endAt: endIso,
+        startAt: paid.startAt,
+        endAt: paid.endAt,
         hours: round2(paidMs / 3_600_000),
         hourlyRateCents,
+        clockedStartAt: startIso,
+        clockedEndAt: endIso,
       };
     })
     .filter((s) => s.dateISO >= startDate && s.dateISO <= endDate);
@@ -144,6 +158,8 @@ async function fetchSquareShifts(
 
 type EditDoc = { startAt?: string; endAt?: string; dateISO?: string };
 
+/** An owner correction replaces the paid window as typed — deliberately not
+ *  re-snapped — while the clocked times underneath stay for the audit trail. */
 function applyEdit(shift: TimesheetShift, edit: EditDoc | undefined): TimesheetShift {
   if (!edit?.startAt || !edit.endAt) return shift;
   const hours = round2(
@@ -185,6 +201,9 @@ async function fetchExtraShifts(startDate: string, endDate: string): Promise<Tim
       hours: typeof data.hours === "number" ? round2(data.hours) : 0,
       hourlyRateCents:
         typeof data.hourlyRateCents === "number" ? data.hourlyRateCents : null,
+      // Backfills were typed in, never clocked — nothing to snap or trace.
+      clockedStartAt: null,
+      clockedEndAt: null,
     };
   });
 }

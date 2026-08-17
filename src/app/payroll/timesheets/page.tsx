@@ -22,6 +22,7 @@ import {
 } from "@/lib/payroll-attention";
 import { readTimesheetsCache, writeTimesheetsCache } from "@/lib/timesheets-cache";
 import { sortShiftsByStaffThenStart } from "@/lib/timesheet-sort";
+import { ROUNDING_STEP_SECONDS } from "@/lib/timesheet-rounding";
 import { DayExpandedPanel } from "./DayExpandedPanel";
 import styles from "./page.module.css";
 
@@ -811,6 +812,7 @@ export default function TimesheetsPage() {
                 <input
                   className={styles.formInput}
                   type="time"
+                  step={ROUNDING_STEP_SECONDS}
                   value={addForm.startHHMM}
                   onChange={(e) => setAddForm((p) => ({ ...p, startHHMM: e.target.value }))}
                   disabled={savingAdd}
@@ -821,6 +823,7 @@ export default function TimesheetsPage() {
                 <input
                   className={styles.formInput}
                   type="time"
+                  step={ROUNDING_STEP_SECONDS}
                   value={addForm.endHHMM}
                   onChange={(e) => setAddForm((p) => ({ ...p, endHHMM: e.target.value }))}
                   disabled={savingAdd}

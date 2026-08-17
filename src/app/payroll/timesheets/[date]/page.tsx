@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
 import { sortShiftsByStaffThenStart } from "@/lib/timesheet-sort";
+import { ROUNDING_STEP_SECONDS } from "@/lib/timesheet-rounding";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
@@ -465,6 +466,7 @@ export default function DayDetailsPage() {
                     {editingStart ? (
                       <input
                         type="time"
+                        step={ROUNDING_STEP_SECONDS}
                         className={styles.timeInput}
                         defaultValue={s.startAt.slice(11, 16)}
                         autoFocus
@@ -494,6 +496,7 @@ export default function DayDetailsPage() {
                     {editingEnd ? (
                       <input
                         type="time"
+                        step={ROUNDING_STEP_SECONDS}
                         className={styles.timeInput}
                         defaultValue={s.endAt ? s.endAt.slice(11, 16) : ""}
                         autoFocus
@@ -625,6 +628,7 @@ export default function DayDetailsPage() {
                 <input
                   className={styles.formInput}
                   type="time"
+                  step={ROUNDING_STEP_SECONDS}
                   value={addForm.startHHMM}
                   onChange={(e) => setAddForm((p) => ({ ...p, startHHMM: e.target.value }))}
                   disabled={savingAdd}
@@ -635,6 +639,7 @@ export default function DayDetailsPage() {
                 <input
                   className={styles.formInput}
                   type="time"
+                  step={ROUNDING_STEP_SECONDS}
                   value={addForm.endHHMM}
                   onChange={(e) => setAddForm((p) => ({ ...p, endHHMM: e.target.value }))}
                   disabled={savingAdd}

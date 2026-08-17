@@ -18,6 +18,11 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { dismissSquareShift } from "@/lib/timesheet-dismiss-client";
+import {
+  ROUNDING_MINUTES,
+  ROUNDING_STEP_SECONDS,
+  snapClockWindow,
+} from "@/lib/timesheet-rounding";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -36,6 +41,9 @@ type ShiftFromApi = {
   endAt: string | null;
   hours: number;
   hourlyRateCents: number | null;
+  /** Raw clock record behind the paid window; null for owner backfills. */
+  clockedStartAt?: string | null;
+  clockedEndAt?: string | null;
 };
 type TeamMemberFromApi = { firstName?: string; lastName?: string };
 type EditDoc = {
@@ -118,6 +126,78 @@ function hoursFromIso(startAt: string, endAt: string | null): number {
   const h = Math.round(((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100) / 100;
   return h > 0 ? h : 0;
 }
+/*
+ * Every paid window is the end of a short chain: the employee clocked, the
+ * app snapped that to the quarter-hour grid, and sometimes an owner corrected
+ * it afterwards. The card lists the chain so a figure can always be traced
+ * back to the clock, with each step attributed to whoever moved it.
+ */
+const AUTO_AUTHOR = "AI";
+const OWNER_AUTHOR = "Yurica";
+
+type Adjustment = { label: string; range: string; author: string | null };
+
+function clockRange(startAt: string | null, endAt: string | null): string {
+  const s = fmtClock(startAt);
+  const e = fmtClock(endAt);
+  const one = (c: { hhmm: string; ampm: string }) =>
+    c.ampm ? `${c.hhmm} ${c.ampm}` : c.hhmm;
+  return `${one(s)} – ${one(e)}`;
+}
+
+function sameWindow(
+  a: { start: string | null; end: string | null },
+  b: { start: string | null; end: string | null },
+): boolean {
+  return a.start === b.start && a.end === b.end;
+}
+
+/**
+ * Rebuilt rather than stored: the clock record, the snap and the edit are all
+ * kept, so replaying them beats keeping a fourth copy that could drift from
+ * the three.
+ */
+function adjustmentsFor(s: ShiftFromApi, edit: EditDoc | undefined): Adjustment[] {
+  // A shift edited before we started keeping clock records still has its
+  // originals on the edit doc.
+  const clockedStart = s.clockedStartAt ?? edit?.originalStartAt ?? null;
+  const clockedEnd = s.clockedEndAt ?? edit?.originalEndAt ?? null;
+
+  const out: Adjustment[] = [];
+  if (!clockedStart) {
+    if (edit?.startAt) {
+      out.push({
+        label: "Edited",
+        range: clockRange(edit.startAt, edit.endAt),
+        author: OWNER_AUTHOR,
+      });
+    }
+    return out;
+  }
+
+  out.push({ label: "Clocked", range: clockRange(clockedStart, clockedEnd), author: null });
+
+  const snapped = snapClockWindow(clockedStart, clockedEnd);
+  const clocked = { start: clockedStart, end: clockedEnd };
+  const paid = { start: snapped.startAt, end: snapped.endAt };
+  if (!sameWindow(clocked, paid)) {
+    out.push({
+      label: `Rounded to ${ROUNDING_MINUTES} min`,
+      range: clockRange(snapped.startAt, snapped.endAt),
+      author: AUTO_AUTHOR,
+    });
+  }
+
+  if (edit?.startAt && !sameWindow(paid, { start: edit.startAt, end: edit.endAt })) {
+    out.push({
+      label: "Edited",
+      range: clockRange(edit.startAt, edit.endAt),
+      author: OWNER_AUTHOR,
+    });
+  }
+  return out;
+}
+
 function applyEditToShift(s: ShiftFromApi, edit: EditDoc | undefined): ShiftFromApi {
   if (!edit?.startAt || !edit?.endAt) return s;
   return {
@@ -325,8 +405,10 @@ export default function StaffDetailPage() {
     const patch: EditDoc = {
       shiftId: shift.id,
       dateISO: shift.dateISO,
-      originalStartAt: existing?.originalStartAt ?? base.startAt,
-      originalEndAt: existing?.originalEndAt ?? base.endAt,
+      // "was" has to mean what the clock said, not the snapped window we
+      // showed on top of it.
+      originalStartAt: existing?.originalStartAt ?? base.clockedStartAt ?? base.startAt,
+      originalEndAt: existing?.originalEndAt ?? base.clockedEndAt ?? base.endAt,
       startAt: newStart,
       endAt: newEnd,
     };
@@ -417,7 +499,10 @@ export default function StaffDetailPage() {
               endHHMM: hhmmFromIso(s.endAt),
             };
             const editRec = edits[s.id];
-            const isEdited = !!editRec;
+            const trail = adjustmentsFor(s, editRec);
+            // An edit that lands where the automatic snap already put it
+            // changed nothing, so it doesn't earn the badge.
+            const isEdited = trail.some((a) => a.author === OWNER_AUTHOR);
             const isSaving = savingEditId === s.id;
             const isDirty = dirty.has(s.id);
             const editingStart = editingField?.shiftId === s.id && editingField.field === "start";
@@ -439,6 +524,7 @@ export default function StaffDetailPage() {
                       type="time"
                       className={styles.timeInput}
                       value={draft.startHHMM}
+                      step={ROUNDING_STEP_SECONDS}
                       autoFocus
                       disabled={isSaving}
                       onChange={(e) => updateDraft(s.id, { startHHMM: e.target.value })}
@@ -460,6 +546,7 @@ export default function StaffDetailPage() {
                       type="time"
                       className={styles.timeInput}
                       value={draft.endHHMM}
+                      step={ROUNDING_STEP_SECONDS}
                       autoFocus
                       disabled={isSaving}
                       onChange={(e) => updateDraft(s.id, { endHHMM: e.target.value })}
@@ -476,19 +563,23 @@ export default function StaffDetailPage() {
                     </button>
                   )}
                 </div>
-                {isEdited && editRec ? (
-                  <p className={styles.editedNote}>
-                    <span className={styles.editedBadge}>EDITED</span>
-                    {" · was "}
-                    {(() => {
-                      const os = fmtClock(editRec.originalStartAt);
-                      const oe = fmtClock(editRec.originalEndAt);
-                      return `${os.hhmm} – ${oe.hhmm}`;
-                    })()}
-                  </p>
-                ) : (
-                  <p className={styles.storeNote}>Store time (Australia/Sydney) · 5-minute steps</p>
+                {isEdited && <span className={styles.editedBadge}>EDITED</span>}
+                {trail.length > 0 && (
+                  <ol className={styles.trail}>
+                    {trail.map((a) => (
+                      <li key={a.label} className={styles.trailRow}>
+                        <span className={styles.trailRange}>{a.range}</span>
+                        <span className={styles.trailLabel}>{a.label}</span>
+                        {a.author && (
+                          <span className={styles.trailAuthor}>by {a.author}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
                 )}
+                <p className={styles.storeNote}>
+                  Store time (Australia/Sydney) · paid in {ROUNDING_MINUTES}-minute steps
+                </p>
                 <div className={styles.shiftFooter}>
                   <span className={styles.shiftHours}>{fmtHoursLong(draftHours(s))}</span>
                   <div className={styles.shiftActions}>
@@ -702,6 +793,7 @@ export default function StaffDetailPage() {
                   className={styles.formInput}
                   type="time"
                   value={addForm.startHHMM}
+                  step={ROUNDING_STEP_SECONDS}
                   onChange={(e) => setAddForm((p) => ({ ...p, startHHMM: e.target.value }))}
                   disabled={savingAdd}
                 />
@@ -712,6 +804,7 @@ export default function StaffDetailPage() {
                   className={styles.formInput}
                   type="time"
                   value={addForm.endHHMM}
+                  step={ROUNDING_STEP_SECONDS}
                   onChange={(e) => setAddForm((p) => ({ ...p, endHHMM: e.target.value }))}
                   disabled={savingAdd}
                 />
