@@ -291,13 +291,15 @@ export default function StaffDetailPage() {
     }
   }, [searchParams]);
 
-  const load = useCallback(async () => {
+  /** `fresh` skips the server's short Square cache, so a reload that follows
+   *  a write can't hand back the numbers from before it. */
+  const load = useCallback(async (opts?: { fresh?: boolean }) => {
     if (!startISO || !endISO) return;
     setBusy(true);
     setFetchError(null);
     try {
       const res = await fetch(
-        `/api/payroll/timesheets?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`,
+        `/api/payroll/timesheets?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}${opts?.fresh ? "&fresh=1" : ""}`,
         { cache: "no-store" },
       );
       const data = await res.json().catch(() => ({}));
@@ -469,7 +471,7 @@ export default function StaffDetailPage() {
     if (extraIds.has(shift.id)) {
       try {
         await deleteDoc(doc(getDb(), "timesheet_extra_shifts", shift.id));
-        void load();
+        void load({ fresh: true });
       } catch (err) {
         console.error("[timesheet_extra_shifts] delete failed:", err);
         setEditError(err instanceof Error ? err.message : "Delete failed.");
@@ -479,7 +481,7 @@ export default function StaffDetailPage() {
     try {
       await dismissSquareShift(shift, user.uid);
       setDismissed((prev) => new Set(prev).add(shift.id));
-      void load();
+      void load({ fresh: true });
     } catch (err) {
       console.error("[timesheet_dismissed] save failed:", err);
       setEditError(err instanceof Error ? err.message : "Delete failed.");
@@ -700,7 +702,7 @@ export default function StaffDetailPage() {
           >
             + Add shift
           </button>
-          <button type="button" className={styles.refreshBtn} onClick={() => void load()} disabled={busy}>
+          <button type="button" className={styles.refreshBtn} onClick={() => void load({ fresh: true })} disabled={busy}>
             <RefreshIcon /> Refresh
           </button>
         </div>
@@ -742,6 +744,13 @@ export default function StaffDetailPage() {
                     </p>
                     <p className={styles.detailGrossLabel}>Est. gross pay</p>
                     <p className={styles.detailGross}>{fmtMoney(staff.gross)}</p>
+                    {staffRates.weekday == null && staffRates.saturday == null && (
+                      /* Without a rate the estimate is $0.00, which reads as
+                         "worked for nothing" rather than "we don't know yet". */
+                      <p className={styles.detailRateMissing}>
+                        No rate set on this employee&rsquo;s profile — these hours are unpriced.
+                      </p>
+                    )}
                   </div>
                   {!splitLayout &&
                     renderShiftsBlock(shiftsForStaff(staff.teamMemberId), styles.inlineShifts)}
@@ -868,7 +877,7 @@ export default function StaffDetailPage() {
                     });
                     setAddOpen(false);
                     setAddForm({ dateISO: "", startHHMM: "10:00", endHHMM: "14:30" });
-                    void load();
+                    void load({ fresh: true });
                   } catch (err) {
                     console.error("[timesheet_extra_shifts] add failed:", err);
                     setAddError(err instanceof Error ? err.message : "Save failed.");

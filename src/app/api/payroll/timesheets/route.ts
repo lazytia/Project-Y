@@ -13,6 +13,13 @@ import { squareEnv } from "@/lib/square";
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * Square's Labor API is slow and rate-limited, so a range is held briefly and
+ * reused. `?fresh=1` skips that: an owner who has just corrected a shift is
+ * watching the totals, and replaying a body computed before the correction
+ * reads as the save having failed. Callers that just wrote ask for fresh; the
+ * result still re-primes the cache for everyone else.
+ */
 const TIMESHEETS_CACHE_TTL_MS = 90 * 1000;
 const timesheetsCache = new Map<
   string,
@@ -36,9 +43,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const fresh = url.searchParams.get("fresh") === "1";
     const cacheKey = `${startDate}_${endDate}`;
     const hit = timesheetsCache.get(cacheKey);
-    if (hit && Date.now() - hit.savedAt < TIMESHEETS_CACHE_TTL_MS) {
+    if (!fresh && hit && Date.now() - hit.savedAt < TIMESHEETS_CACHE_TTL_MS) {
       return NextResponse.json({
         ...hit.body,
         locationId,

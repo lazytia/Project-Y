@@ -332,6 +332,16 @@
   letter-spacing: -0.02em;
 }
 
+/* Sits directly under the $0.00 it explains — the estimate is unknown, not
+   zero, and the difference decides whether the owner needs to act. */
+.detailRateMissing {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-warm);
+  margin: 6px 0 0;
+}
+
 .shiftsPanelDesktop {
   min-width: 0;
 }

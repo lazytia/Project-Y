@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   addDoc,
@@ -241,15 +241,28 @@ export default function TimesheetsPage() {
   const [payrollStaff, setPayrollStaff] = useState<PayrollStaffRecord[]>([]);
   const [attentionBusy, setAttentionBusy] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  /**
+   * `fresh` skips the server's short Square cache — used after a write, so the
+   * reconciling fetch can't hand back the numbers from before it.
+   *
+   * Corrections come in bursts, and each one starts its own reload. Only the
+   * newest is allowed to land: an earlier reply arriving late carries a
+   * timesheet that predates the last edit, and applying it would roll the
+   * owner's own correction back on screen.
+   */
+  const loadSeq = useRef(0);
+  const load = useCallback(async (opts?: { fresh?: boolean }) => {
     if (!startISO || !endISO) return;
+    const seq = (loadSeq.current += 1);
+    const superseded = () => seq !== loadSeq.current;
     setBusy(true);
     setFetchError(null);
     try {
       const res = await fetch(
-        `/api/payroll/timesheets?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}`,
+        `/api/payroll/timesheets?startDate=${encodeURIComponent(startISO)}&endDate=${encodeURIComponent(endISO)}${opts?.fresh ? "&fresh=1" : ""}`,
       );
       const data = await res.json().catch(() => ({}));
+      if (superseded()) return;
       if (!res.ok) throw new Error(data?.error ?? `Fetch failed (${res.status})`);
       const nextShifts = Array.isArray(data.shifts) ? (data.shifts as ShiftFromApi[]) : [];
       const nextMembers =
@@ -260,6 +273,7 @@ export default function TimesheetsPage() {
       setTeamMembers(nextMembers);
       writeTimesheetsCache(startISO, endISO, nextShifts, nextMembers);
     } catch (err) {
+      if (superseded()) return;
       const msg = err instanceof Error ? err.message : "Timesheet fetch failed.";
       console.error("[timesheets] fetch failed:", err);
       setFetchError(msg);
@@ -268,8 +282,10 @@ export default function TimesheetsPage() {
         return prev.length === 0 ? [] : prev;
       });
     } finally {
-      setBusy(false);
-      setLoading(false);
+      if (!superseded()) {
+        setBusy(false);
+        setLoading(false);
+      }
     }
   }, [startISO, endISO]);
 
@@ -332,19 +348,46 @@ export default function TimesheetsPage() {
     return () => window.removeEventListener("focus", onFocus);
   }, [authLoading, allowed, loadStaff]);
 
-  /* Filter shifts down to the requested range (the API pads by a day on
-     each side to catch overnight shifts) and fold into per-day + per-
-     staff aggregates. */
-  const { days, byStaff, totalHours, totalShifts, totalStaff, totalGross } = useMemo(() => {
+  /**
+   * Fold the loaded shifts into the totals the page shows. Everything on
+   * screen — the two tiles, each day's pill, each staff card — is derived
+   * here, so a shift patched in after an edit moves all of them at once.
+   *
+   * A shift whose employee has no rate on their profile is counted in the
+   * hours but priced at nothing. That is reported rather than absorbed:
+   * an "Est. gross pay" quietly missing someone's shift is worse than one
+   * that admits the gap.
+   */
+  const {
+    days,
+    byStaff,
+    totalHours,
+    totalShifts,
+    totalStaff,
+    totalGross,
+    unratedNames,
+    unratedHours,
+  } = useMemo(() => {
     const days: DayAgg[] = [];
     const staffAgg: Record<string, StaffAgg> = {};
     let totalHours = 0;
     let totalShifts = 0;
     let totalGross = 0;
+    let unratedHours = 0;
     const allTMs = new Set<string>();
+    const unratedTMs = new Set<string>();
 
     if (!startISO || !endISO) {
-      return { days, byStaff: [] as StaffAgg[], totalHours, totalShifts, totalStaff: 0, totalGross };
+      return {
+        days,
+        byStaff: [] as StaffAgg[],
+        totalHours,
+        totalShifts,
+        totalStaff: 0,
+        totalGross,
+        unratedNames: [] as string[],
+        unratedHours,
+      };
     }
 
     const byDate: Record<string, DayAgg> = {};
@@ -354,8 +397,13 @@ export default function TimesheetsPage() {
 
     for (const s of shifts) {
       if (!byDate[s.dateISO]) continue; // outside the requested range
-      const rate = typeof s.hourlyRateCents === "number" ? s.hourlyRateCents / 100 : 0;
+      const hasRate = typeof s.hourlyRateCents === "number";
+      const rate = hasRate ? (s.hourlyRateCents as number) / 100 : 0;
       const gross = s.hours * rate;
+      if (!hasRate) {
+        unratedHours += s.hours;
+        unratedTMs.add(s.teamMemberId);
+      }
 
       const day = byDate[s.dateISO];
       day.entries.push(s);
@@ -400,8 +448,43 @@ export default function TimesheetsPage() {
       totalShifts,
       totalStaff: allTMs.size,
       totalGross,
+      unratedNames: [...unratedTMs]
+        .map((id) => nameOfTeamMember(id, teamMembers[id]))
+        .sort((a, b) => a.localeCompare(b, "en-AU")),
+      unratedHours,
     };
   }, [shifts, teamMembers, startISO, endISO]);
+
+  /**
+   * Fold a just-saved change straight into the loaded shifts, then reconcile
+   * with the server. The write itself is already committed; waiting on a
+   * Square round-trip before the totals move makes a saved edit look lost.
+   */
+  const applyLocalChange = useCallback(
+    (mutate: (prev: ShiftFromApi[]) => ShiftFromApi[]) => {
+      const next = mutate(shifts);
+      setShifts(next);
+      writeTimesheetsCache(startISO, endISO, next, teamMembers);
+      void load({ fresh: true });
+    },
+    [shifts, startISO, endISO, teamMembers, load],
+  );
+
+  const handleShiftEdited = useCallback(
+    (shiftId: string, patch: { startAt: string; endAt: string | null; hours: number }) => {
+      applyLocalChange((prev) =>
+        prev.map((s) => (s.id === shiftId ? { ...s, ...patch } : s)),
+      );
+    },
+    [applyLocalChange],
+  );
+
+  const handleShiftRemoved = useCallback(
+    (shiftId: string) => {
+      applyLocalChange((prev) => prev.filter((s) => s.id !== shiftId));
+    },
+    [applyLocalChange],
+  );
 
   const attentionItems = useMemo(() => buildPayrollAttentionItems(payrollStaff), [payrollStaff]);
   const todayISO = useMemo(() => sydneyTodayISO(), []);
@@ -449,6 +532,17 @@ export default function TimesheetsPage() {
 
   const showShiftSkeleton = loading && shifts.length === 0;
 
+  // Name the people the estimate is missing — the owner can only close the
+  // gap if they know whose profile to open.
+  const grossSub =
+    !showShiftSkeleton && unratedNames.length > 0
+      ? `No rate: ${
+          unratedNames.length <= 2
+            ? unratedNames.join(", ")
+            : `${unratedNames.slice(0, 2).join(", ")} +${unratedNames.length - 2}`
+        } · ${unratedHours.toFixed(2)} h unpriced`
+      : "Shift date rate × paid hours";
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -470,7 +564,11 @@ export default function TimesheetsPage() {
         <div className={`${styles.summaryCard} ${styles.summaryCardGreen} ${showShiftSkeleton ? styles.summarySkeleton : ""}`}>
           <p className={styles.summaryLabel}>Est. gross pay</p>
           <p className={styles.summaryValue}>{showShiftSkeleton ? "—" : fmtMoney(totalGross)}</p>
-          <p className={styles.summarySub}>Shift date rate × paid hours</p>
+          <p
+            className={`${styles.summarySub} ${unratedNames.length > 0 && !showShiftSkeleton ? styles.summarySubWarn : ""}`}
+          >
+            {grossSub}
+          </p>
         </div>
       </section>
 
@@ -640,7 +738,7 @@ export default function TimesheetsPage() {
           <button
             type="button"
             className={styles.refreshBtn}
-            onClick={() => void load()}
+            onClick={() => void load({ fresh: true })}
             disabled={busy}
           >
             <RefreshIcon /> Refresh
@@ -683,7 +781,8 @@ export default function TimesheetsPage() {
                     entries={d.entries}
                     teamMembers={teamMembers}
                     userId={user.uid}
-                    onChanged={() => void load()}
+                    onShiftEdited={handleShiftEdited}
+                    onShiftRemoved={handleShiftRemoved}
                   />
                 )}
               </li>
@@ -880,7 +979,7 @@ export default function TimesheetsPage() {
                     });
                     setAddOpen(false);
                     setAddForm({ teamMemberId: "", dateISO: "", startHHMM: "10:00", endHHMM: "14:30" });
-                    void load();
+                    void load({ fresh: true });
                   } catch (err) {
                     console.error("[timesheet_extra_shifts] add failed:", err);
                     setAddError(err instanceof Error ? err.message : "Save failed.");

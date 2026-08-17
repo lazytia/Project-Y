@@ -84,6 +84,20 @@
   margin: 4px 0 0;
 }
 
+/* Names the people the estimate above is missing a rate for. Reads as a
+   caveat on the figure rather than an error elsewhere on the page, so it sits
+   in the tile — but at full opacity, because it changes what the number
+   means. */
+.summarySubWarn {
+  opacity: 1;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 5px;
+  padding: 3px 6px;
+  margin-top: 6px;
+  align-self: flex-start;
+}
+
 .summarySkeleton {
   animation: timesheetPulse 1.4s ease-in-out infinite;
 }

@@ -45,6 +45,16 @@ function fmtHours(h: number): string {
   return `${h.toFixed(2)} hrs`;
 }
 
+/** Paid hours for a corrected window. An owner's times stand exactly as typed,
+ *  so this is a plain difference — the quarter-hour grid only ever applies to
+ *  raw clock records, upstream on the server. */
+function hoursBetween(startAt: string, endAt: string | null): number {
+  if (!endAt) return 0;
+  const h =
+    Math.round(((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100) / 100;
+  return h > 0 ? h : 0;
+}
+
 function nameOfTeamMember(id: string, tm: TeamMemberFromApi | undefined): string {
   const first = (tm?.firstName ?? "").trim();
   const last = (tm?.lastName ?? "").trim();
@@ -78,10 +88,24 @@ type Props = {
   entries: ShiftFromApi[];
   teamMembers: Record<string, TeamMemberFromApi>;
   userId: string;
-  onChanged?: () => void;
+  /** Hand a saved correction back to the page. The paid hours it carries feed
+   *  every total above this panel, which would otherwise keep showing the
+   *  figures from before the edit. */
+  onShiftEdited?: (
+    shiftId: string,
+    patch: { startAt: string; endAt: string | null; hours: number },
+  ) => void;
+  onShiftRemoved?: (shiftId: string) => void;
 };
 
-export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChanged }: Props) {
+export function DayExpandedPanel({
+  dateISO,
+  entries,
+  teamMembers,
+  userId,
+  onShiftEdited,
+  onShiftRemoved,
+}: Props) {
   const [loading, setLoading] = useState(true);
   const [edits, setEdits] = useState<Record<string, EditDoc>>({});
   const [extras, setExtras] = useState<ShiftFromApi[]>([]);
@@ -138,17 +162,19 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
   function withEdit(s: ShiftFromApi): ShiftFromApi {
     const e = edits[s.id];
     if (!e) return s;
-    let hours = s.hours;
-    if (e.startAt && e.endAt) {
-      hours = Math.round(((new Date(e.endAt).getTime() - new Date(e.startAt).getTime()) / 3_600_000) * 100) / 100;
-      if (hours < 0) hours = 0;
-    }
+    const hours = e.startAt && e.endAt ? hoursBetween(e.startAt, e.endAt) : s.hours;
     return { ...s, startAt: e.startAt, endAt: e.endAt, hours };
   }
 
   const visibleShifts = useMemo(() => {
-    const merged = [...entries, ...extras];
-    const filtered = merged
+    /* Backfills reach this panel twice — once through the merged feed the page
+       loaded, and once from the direct Firestore read that picks up any added
+       since. Key by id and keep the fed copy, which already carries the rate
+       resolved from the employee's profile. */
+    const byId = new Map(entries.map((s) => [s.id, s]));
+    for (const x of extras) if (!byId.has(x.id)) byId.set(x.id, x);
+
+    const filtered = [...byId.values()]
       .filter((s) => s.dateISO === dateISO && !dismissed.has(s.id))
       .map(withEdit);
     return sortShiftsByStaffThenStart(filtered, teamMembers);
@@ -181,6 +207,11 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
       );
       setEdits((prev) => ({ ...prev, [shift.id]: patch }));
       setEditingField(null);
+      onShiftEdited?.(shift.id, {
+        startAt: newStart,
+        endAt: newEnd,
+        hours: hoursBetween(newStart, newEnd),
+      });
     } catch (err) {
       console.error("[timesheet_edits] save failed:", err);
       setEditError(err instanceof Error ? err.message : "Save failed.");
@@ -194,7 +225,7 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
       try {
         await deleteDoc(doc(getDb(), "timesheet_extra_shifts", shift.id));
         void loadDayMeta();
-        onChanged?.();
+        onShiftRemoved?.(shift.id);
       } catch (err) {
         console.error("[timesheet_extra_shifts] delete failed:", err);
         setEditError(err instanceof Error ? err.message : "Delete failed.");
@@ -204,7 +235,7 @@ export function DayExpandedPanel({ dateISO, entries, teamMembers, userId, onChan
     try {
       await dismissSquareShift(shift, userId);
       setDismissed((prev) => new Set(prev).add(shift.id));
-      onChanged?.();
+      onShiftRemoved?.(shift.id);
     } catch (err) {
       console.error("[timesheet_dismissed] save failed:", err);
       setEditError(err instanceof Error ? err.message : "Delete failed.");
