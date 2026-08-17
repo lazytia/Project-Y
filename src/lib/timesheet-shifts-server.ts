@@ -173,6 +173,30 @@ function applyEdit(shift: TimesheetShift, edit: EditDoc | undefined): TimesheetS
   };
 }
 
+/**
+ * Square team members who clock in at the till but are not on this payroll —
+ * an owner punching the clock alongside the staff, or a device left logged in
+ * under a test account. Their shifts are real in Square and stay there; the
+ * app just declines to price them.
+ *
+ * Kept as data rather than a name in this file: who is and isn't on payroll is
+ * the owner's call and changes with the roster, and a hardcoded name would
+ * quietly keep excluding whoever inherited it.
+ *
+ * Doc id is the Square team member id.
+ */
+async function fetchExcludedTeamMemberIds(): Promise<Set<string>> {
+  try {
+    const snap = await adminDb().collection("timesheet_excluded_team_members").get();
+    return new Set(snap.docs.map((d) => d.id));
+  } catch (err) {
+    // Excluding nobody shows too many people; failing the whole timesheet
+    // shows none. The first is recoverable by looking, so carry on.
+    console.warn("[timesheet-shifts] excluded team member lookup failed:", err);
+    return new Set<string>();
+  }
+}
+
 async function fetchDismissedShiftIds(startDate: string, endDate: string): Promise<Set<string>> {
   const snap = await adminDb()
     .collection("timesheet_dismissed")
@@ -285,13 +309,20 @@ export async function fetchMergedTimesheetShifts(
     extras,
     dismissedIds,
     rateIndex,
+    excludedTeamMemberIds,
   ] = await Promise.all([
     fetchSquareShifts(startDate, endDate),
     fetchExtraShifts(startDate, endDate),
     fetchDismissedShiftIds(startDate, endDate),
     fetchStaffRates(),
+    fetchExcludedTeamMemberIds(),
   ]);
   const staffRates = resolveRatesByTeamMember(staffIdByTeamMember, rateIndex);
+
+  // Drop them from the roster as well as the shifts. Leaving the name behind
+  // would still list them with zero hours, and would still offer them in the
+  // add-shift picker — which is how an excluded person gets back in.
+  for (const id of excludedTeamMemberIds) delete teamMembers[id];
 
   const editsSnap = await adminDb()
     .collection("timesheet_edits")
@@ -302,7 +333,7 @@ export async function fetchMergedTimesheetShifts(
   for (const d of editsSnap.docs) edits[d.id] = d.data() as EditDoc;
 
   const merged = [...squareShifts.map((s) => applyEdit(s, edits[s.id])), ...extras]
-    .filter((s) => !dismissedIds.has(s.id))
+    .filter((s) => !dismissedIds.has(s.id) && !excludedTeamMemberIds.has(s.teamMemberId))
     .map((s) => applyConfiguredRate(s, staffRates[s.teamMemberId]));
   return { shifts: merged, teamMembers };
 }
