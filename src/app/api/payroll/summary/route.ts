@@ -31,6 +31,13 @@ const TIMEZONE = "Australia/Sydney";
 const PAST_TTL_MS = 60 * 60 * 1000;
 const CURRENT_TTL_MS = 15 * 60 * 1000;
 
+/** Bump whenever the sheet parser changes how a total is derived. Cached
+ *  docs carrying any other version are ignored and re-parsed, so a figure
+ *  computed by a retired parser can never be replayed — a past bug had
+ *  the cache serving Total Pay + Super + Cash (double-counting cash)
+ *  long after the parser itself was fixed. */
+const PARSE_VERSION = 1;
+
 const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=1800",
 } as const;
@@ -38,6 +45,7 @@ const CACHE_HEADERS = {
 type CachedDetail = {
   detail: WeekPayrollDetail;
   computedAt?: Timestamp;
+  parseVersion?: number;
 };
 
 function todayKey(): string {
@@ -89,6 +97,10 @@ async function readSummaryCaches(
       const weekStart = weekStarts[i];
       const data = snap.data() as CachedDetail | undefined;
       if (!data?.detail) return null;
+      // Written by a parser generation we no longer trust — even as the
+      // last-resort stale read, a number of unknown provenance is worse
+      // than none.
+      if (data.parseVersion !== PARSE_VERSION) return null;
       const normalised = normaliseDetail(data.detail);
       if (isEmptyPayrollDetail(normalised)) return null;
 
@@ -160,7 +172,7 @@ async function persistDetailCache(weekStart: string, detail: WeekPayrollDetail):
     .collection("payroll_summary_cache")
     .doc(weekStart)
     .set(
-      { detail, computedAt: Timestamp.now() },
+      { detail, computedAt: Timestamp.now(), parseVersion: PARSE_VERSION },
       { merge: true },
     )
     .catch((err) => console.warn("[payroll/summary] cache write failed:", err));

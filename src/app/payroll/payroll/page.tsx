@@ -168,7 +168,8 @@ export default function PayrollOverviewPage() {
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    const cacheKey = `y.payroll.summary.v7.${weekMondayISO}`;
+    // v8: drops entries holding the double-counted-cash total.
+    const cacheKey = `y.payroll.summary.v8.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
     const cachedHasPayroll =
       cached && (cached.current?.totals?.totalIncSuper ?? 0) > 0;
