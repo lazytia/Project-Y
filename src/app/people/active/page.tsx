@@ -16,7 +16,7 @@ import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import { isActiveEmployee } from "@/lib/staff-active";
-import { readStaffRates } from "@/lib/staff-rates";
+import { readStaffRates, type StaffRates } from "@/lib/staff-rates";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -31,7 +31,9 @@ type Staff = {
   name: string;
   positionKind: "hall" | "kitchen" | "other";
   positionLabel: string;
-  rate: number | null;
+  /** Both rates, because Saturday is paid at its own. Showing only the
+   *  weekday one made the list look like a single-rate roster. */
+  rates: StaffRates;
   visaExpiry: Date | null;
   dob: Date | null;
 };
@@ -209,13 +211,12 @@ export default function ActiveEmployeesPage() {
             if (!isTeamMember(raw)) return null;
             if (!isActiveEmployee(raw)) return null;
             const { kind, label } = positionOf(raw);
-            const rate = readStaffRates(raw as Record<string, unknown>).weekday;
             return {
               uid: d.id,
               name: fullNameOf(raw),
               positionKind: kind,
               positionLabel: label,
-              rate,
+              rates: readStaffRates(raw as Record<string, unknown>),
               visaExpiry: toDate(raw.documents?.visaExpiry ?? raw.visaExpiry ?? null),
               dob: toDate(raw.dateOfBirth ?? null),
             };
@@ -465,7 +466,22 @@ export default function ActiveEmployeesPage() {
                     )}
                   </span>
                   <span className={styles.rowRate}>
-                    {noticeMode ? "" : fmtRate(row.rate)}
+                    {!noticeMode && (
+                      <>
+                        <span className={styles.rowRateWeekday}>
+                          {fmtRate(row.rates.weekday)}
+                        </span>
+                        {/* Only when one is actually set. A "Sat —" line on
+                            every row would put the reader to work ruling out
+                            an absence on people who have no Saturday rate to
+                            begin with. */}
+                        {row.rates.saturday !== null && (
+                          <span className={styles.rowRateSat}>
+                            Sat {fmtRate(row.rates.saturday)}
+                          </span>
+                        )}
+                      </>
+                    )}
                   </span>
                   <span className={styles.rowSide}>
                     {readyToTerminate && rowNotice ? (

@@ -402,11 +402,30 @@
   background: #fff;
 }
 
+/* Stacks the weekday rate over the Saturday one, right-aligned so the two
+   figures share an edge and can be compared down the list. */
 .rowRate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
   font-size: 14px;
   font-weight: 500;
   color: var(--color-fg);
   white-space: nowrap;
+}
+
+.rowRateWeekday {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Deliberately quieter than the weekday rate: most shifts are weekdays, so
+   that is the number being looked for. This one answers a follow-up. */
+.rowRateSat {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .rowSide {
