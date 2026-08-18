@@ -45,6 +45,11 @@ export const OWNER_NAV: NavGroup[] = [
     icon: "👥",
     label: "People",
     children: [
+      // The queue of things waiting on someone: pending holiday and
+      // availability requests, visas about to expire, onboarding forms
+      // submitted but not approved. First in the group because it is the
+      // only entry here that is asking to be acted on.
+      { label: "Attention Required", href: "/attention-required" },
       { label: "New Employees", href: "/people/onboarding" },
       { label: "Active Employees", href: "/people/active" },
       { label: "Notice Given", href: "/people/notice-given" },
@@ -113,6 +118,7 @@ const SHIFT_LEAD_NAV: NavGroup[] = [
     icon: "👥",
     label: "Team",
     children: [
+      { label: "Attention Required", href: "/attention-required" },
       { label: "New Staff Requests", href: "/people/onboarding" },
       { label: "HR Notes", href: "/people/hr-notes" },
       { label: "Notice Given", href: "/people/notice-given" },
