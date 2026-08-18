@@ -22,26 +22,39 @@ export async function POST(req: NextRequest) {
 
   try {
     const rows = await fetchWeeklyPayrollTotals();
-    const synced: string[] = [];
-    for (const iso of Object.keys(rows)) {
-      const r = rows[iso];
-      await adminDb().collection("payroll_weekly").doc(iso).set(
-        {
-          weekStartISO: r.weekStartISO,
-          weekEndISO: r.weekEndISO,
-          totalIncSuper: r.totalIncSuper,
-          // Keep the legacy field name the Insights page reads
-          // (gross + super combined into a single total).
-          gross: r.totalIncSuper,
-          super: 0,
-          source: "google-sheet",
-          syncedAt: Timestamp.now(),
-        },
-        { merge: true },
-      );
-      synced.push(iso);
+    const isos = Object.keys(rows);
+
+    // The sheet holds every week ever run, and this used to await one
+    // document write per week in series — a round trip each, so the
+    // endpoint got slower every payday. Batched, the whole sheet lands in
+    // a couple of commits, which is what makes a sheet edit visible in
+    // Insights within seconds rather than after a long tail of writes.
+    const db = adminDb();
+    const BATCH_LIMIT = 400; // Firestore allows 500 ops; leave headroom.
+    const syncedAt = Timestamp.now();
+    for (let i = 0; i < isos.length; i += BATCH_LIMIT) {
+      const batch = db.batch();
+      for (const iso of isos.slice(i, i + BATCH_LIMIT)) {
+        const r = rows[iso];
+        batch.set(
+          db.collection("payroll_weekly").doc(iso),
+          {
+            weekStartISO: r.weekStartISO,
+            weekEndISO: r.weekEndISO,
+            totalIncSuper: r.totalIncSuper,
+            // Keep the legacy field name the Insights page reads
+            // (gross + super combined into a single total).
+            gross: r.totalIncSuper,
+            super: 0,
+            source: "google-sheet",
+            syncedAt,
+          },
+          { merge: true },
+        );
+      }
+      await batch.commit();
     }
-    return NextResponse.json({ ok: true, weeks: synced.length, synced });
+    return NextResponse.json({ ok: true, weeks: isos.length, synced: isos });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Sync failed.";
     return NextResponse.json({ error: msg }, { status: 500 });

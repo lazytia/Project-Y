@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   collection,
   getDocs,
+  onSnapshot,
   type QuerySnapshot,
   type Timestamp,
 } from "firebase/firestore";
@@ -43,14 +44,6 @@ function shiftHours(startTime: string, endHour: number, fallbackHours: number): 
   return Math.max(0, endHour - h - (m ?? 0) / 60);
 }
 const TREND_WEEKS = 4; // current + previous 3
-
-/**
- * How long an already-finished week's figures are trusted before the page
- * syncs them again. Long enough that opening Insights repeatedly through a
- * shift costs nothing, short enough that a correction typed into the
- * payroll sheet turns up the same day without anyone having to ask for it.
- */
-const AUTO_SYNC_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 type Meal = "lunch" | "dinner";
 
@@ -96,9 +89,6 @@ type WeeklySales = {
   /** How many of the week's 7 days Square had data for at sync time. A
    *  week synced while still running lands here with fewer than 7. */
   daysIncluded?: number;
-  /** When the sync job last wrote this week. Absent on rows written
-   *  before the field existed, which counts as "too old to trust". */
-  syncedAt?: Timestamp;
 };
 
 type DailySales = {
@@ -284,6 +274,33 @@ export default function InsightsPage() {
       setLoading(false);
     })();
   }, [authLoading, allowed, router]);
+
+  /**
+   * Keep the three collections the sync jobs rewrite live.
+   *
+   * The load above is a one-shot read, so a figure corrected in the payroll
+   * sheet — which reaches Firestore via /api/payroll/sync moments later —
+   * would not appear on a page that was already open. These listeners close
+   * that gap: the write lands, the numbers re-render, no reload needed.
+   *
+   * Attached after the first paint so they can never delay it, and Firestore
+   * answers their opening snapshot from the cache the read above just
+   * filled. Roster, onboarding and staff stay one-shot — nothing writes to
+   * them while this page is being read.
+   */
+  useEffect(() => {
+    if (loading || !allowed) return;
+    const db = getDb();
+    const noop = () => {};
+    const unsubs = [
+      onSnapshot(collection(db, "payroll_weekly"), (s) => setPayroll(docsToMap<WeeklyPayroll>(s)), noop),
+      onSnapshot(collection(db, "sales_weekly"), (s) => setSalesMap(docsToMap<WeeklySales>(s)), noop),
+      onSnapshot(collection(db, "sales_daily"), (s) => setDailySalesMap(docsToMap<DailySales>(s)), noop),
+    ];
+    return () => {
+      for (const u of unsubs) u();
+    };
+  }, [loading, allowed]);
 
   // Week anchors
   const [today, setTodayDate] = useState<Date>(() => {
@@ -582,69 +599,57 @@ export default function InsightsPage() {
   const rangeOverTarget = rangePayrollPct !== null && rangePayrollPct > TARGET_PAYROLL_PCT;
 
   /**
-   * True when every week the refresh endpoint would sync is already on
-   * record, can no longer change, and was read recently enough to trust —
-   * i.e. when syncing again would only rewrite the same numbers.
+   * True when every trend week's sales are already final, so there is
+   * nothing for the expensive half of the sync to discover.
    *
-   * `daysIncluded === 7` says Square was read after the week had finished,
-   * so its sales are final; a week synced while still running stores fewer
-   * and stays eligible. Payroll has to be present too, because the sheet is
-   * filled in a few days after the week ends — a week with sales but no pay
-   * row yet is exactly the case worth re-syncing for.
+   * `daysIncluded === 7` means Square was read after the week had ended;
+   * takings for a finished week cannot change afterwards. A week synced
+   * while it was still running stores fewer than 7 and stays eligible.
    *
-   * Final is not the same as correct, though: a figure can still be fixed
-   * in the sheet after the fact. So freshness is capped rather than
-   * permanent — once AUTO_SYNC_MAX_AGE_MS has passed the next visit syncs
-   * one more time and picks the correction up. That cap is what replaces
-   * the old manual ↻ button.
+   * Only Square is gated. Payroll is deliberately not, because the sheet
+   * is filled in by hand and corrected afterwards — gating it on "we
+   * already have a number" is what made a correction invisible.
    */
-  const trendWeeksFresh = useMemo(() => {
-    const cutoff = Date.now() - AUTO_SYNC_MAX_AGE_MS;
+  const squareWeeksSettled = useMemo(() => {
     for (let i = 0; i < TREND_WEEKS; i += 1) {
       const iso = isoDate(addDays(currentWeekStart, -7 * i));
-      const week = salesMap[iso];
-      if (week?.daysIncluded !== 7) return false;
-      if (typeof payroll[iso]?.gross !== "number") return false;
-      if (!week.syncedAt || week.syncedAt.toMillis() < cutoff) return false;
+      if (salesMap[iso]?.daysIncluded !== 7) return false;
     }
     return true;
-  }, [currentWeekStart, salesMap, payroll]);
+  }, [currentWeekStart, salesMap]);
 
   // Auto-sync when the page first loads (and when the manager picks
   // a different week). Runs in the background — the existing
   // Firestore-read pass renders any stale data immediately so the
   // page never blocks on Square / Xero round-trips.
   //
-  // It is skipped while the four trend weeks are fresh. The endpoint walks
-  // 4 weeks × 7 days and makes two Square calls per day, plus a full read
-  // of the payroll sheet — and the page opens on LAST week by default, so
-  // that entire chain used to run on every single visit only to rewrite
-  // figures that were already final.
-  //
-  // This is now the only thing that triggers a sync — the header's manual
-  // ↻ button is gone — so the skip is deliberately time-limited rather
-  // than permanent. See trendWeeksFresh.
+  // Since the header's ↻ button is gone this is the only thing that
+  // triggers a sync, so it always runs — but it asks for the narrowest
+  // scope that can still turn up something new. Once the trend weeks'
+  // sales are final that is payroll alone: one spreadsheet read instead of
+  // 4 weeks × 7 days × 2 Square calls. Cheap enough to pay on every visit,
+  // which is what keeps a hand-corrected pay figure from going unnoticed.
   const hasAutoRefreshed = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (authLoading || loading || !user || !allowed) return;
     if (refreshing) return;
-    if (trendWeeksFresh) return;
     if (hasAutoRefreshed.current.has(selectedWeekISO)) return;
     hasAutoRefreshed.current.add(selectedWeekISO);
+    const scope = squareWeeksSettled ? "payroll" : "all";
     const id = setTimeout(() => {
-      void handleRefresh();
+      void handleRefresh(scope);
     }, 50);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, loading, user, allowed, selectedWeekISO, trendWeeksFresh]);
+  }, [authLoading, loading, user, allowed, selectedWeekISO, squareWeeksSettled]);
 
-  async function handleRefresh() {
+  async function handleRefresh(scope: "all" | "payroll" = "all") {
     if (refreshing || !user) return;
     setRefreshing(true);
     setRefreshError(null);
     try {
       const idToken = await user.getIdToken();
-      const res = await fetch(`/api/insights/refresh?week=${selectedWeekISO}`, {
+      const res = await fetch(`/api/insights/refresh?week=${selectedWeekISO}&scope=${scope}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${idToken}` },
       });
@@ -663,16 +668,8 @@ export default function InsightsPage() {
       } else {
         setRefreshError(null);
       }
-      // Re-read the three maps the sync just rewrote — in parallel, for
-      // the same reason as the initial load.
-      const [payrollSnap, salesSnap, dailySnap] = await Promise.all([
-        readAll("payroll_weekly"),
-        readAll("sales_weekly"),
-        readAll("sales_daily"),
-      ]);
-      setPayroll(docsToMap<WeeklyPayroll>(payrollSnap));
-      setSalesMap(docsToMap<WeeklySales>(salesSnap));
-      setDailySalesMap(docsToMap<DailySales>(dailySnap));
+      // No re-read here: the listeners above watch these exact three
+      // collections, so whatever the sync just wrote arrives on its own.
     } catch (err) {
       setRefreshError(err instanceof Error ? err.message : "Refresh failed.");
     } finally {
