@@ -31,8 +31,8 @@ import { emailToUsername } from "@/lib/username";
  *     tax: number,
  *     super: number,
  *     netPay: number,
- *     weekdayHours: number | null,   // sheet col E, null when not recorded
- *     saturdayHours: number | null,  // sheet col F, null when not recorded
+ *     weekdayHours: number | null,   // sheet "Weekday Payslip", null when absent
+ *     saturdayHours: number | null,  // sheet "Sat Payslip", null when absent
  *   }, ...]
  * }
  */
@@ -40,6 +40,15 @@ import { emailToUsername } from "@/lib/username";
 export const dynamic = "force-dynamic";
 
 const TIMEZONE = "Australia/Sydney";
+/**
+ * First pay week published to staff, for everyone (Monday, ISO).
+ *
+ * Owner's call. It is also the first week whose sheet block splits hours into
+ * the cash-paid part and the payslip part, so it is the first week where a
+ * payslip can state hours it actually paid for. Earlier blocks only record
+ * everything worked, which would overstate the payslip.
+ */
+const FIRST_PUBLISHED_PAY_WEEK_ISO = "2026-08-10";
 /** How many past weeks to read from the Firestore cache. 60 covers
  *  a full year — payslip UI only shows the last 12 months anyway. */
 const CACHE_WEEKS_LIMIT = 60;
@@ -204,6 +213,8 @@ export async function GET(req: NextRequest) {
 
   const payslips: Payslip[] = [];
   for (const week of allWeeks) {
+    // ISO dates compare correctly as strings.
+    if (week.weekStartISO < FIRST_PUBLISHED_PAY_WEEK_ISO) continue;
     // First: exact fullName match. Fallback: order-independent token
     // match against fullName or given+family — catches "Tanaka Sakura"
     // vs "Sakura Tanaka" style spellings without matching partials.

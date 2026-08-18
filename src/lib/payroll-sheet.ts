@@ -42,10 +42,12 @@ export type EmployeePayRow = {
   superAnn: number;
   cashPay: number;
   totalIncSuper: number;
-  /** Hours the pay was actually calculated from — sheet columns E and F,
-   *  written there by /api/payroll/push from the app's own timesheets.
-   *  Null when the block has no hours columns (older Pay History blocks),
-   *  which is different from a genuine zero and must not be shown as one. */
+  /** Hours behind the payslip — the sheet's "Weekday Payslip" / "Sat Payslip"
+   *  columns, which hold the part of the week that is paid through the
+   *  payslip rather than in cash. Blocks written before those columns existed
+   *  fall back to "Week Hour" / "Sat Hours" (everything worked, cash included).
+   *  Null when neither is present, which is different from a genuine zero and
+   *  must not be shown as one. */
   weekdayHours: number | null;
   saturdayHours: number | null;
 };
@@ -164,14 +166,47 @@ type MoneyCols = {
   totalIncCol: number;
   weekHoursCol: number;
   satHoursCol: number;
+  weekdayPayslipCol: number;
+  satPayslipCol: number;
 };
 
+/**
+ * Hours for a row, preferring the payslip split over the hours worked.
+ *
+ * The sheet carries both: "Week Hour"/"Sat Hours" are everything the person
+ * worked, then "Weekday Cash Pay"/"Sat Cash Pay" and "Weekday Payslip"/
+ * "Sat Payslip" divide that between cash and the payslip. A payslip must
+ * show its own half, or it claims to cover hours it never paid for. Blocks
+ * from before the split was added only have the worked hours, so those stay
+ * as the fallback rather than reading as zero.
+ */
+function payslipHours(r: unknown[], payslipCol: number, workedCol: number): number | null {
+  if (payslipCol >= 0) {
+    const v = parseMoney(r[payslipCol]);
+    if (v !== null) return v;
+  }
+  return workedCol >= 0 ? parseMoney(r[workedCol]) : null;
+}
+
 function resolveMoneyCols(cols: unknown[]): MoneyCols {
+  /**
+   * First column matching the earliest pattern that matches anything.
+   *
+   * Patterns are listed exact-first, loose-last, and the loop honours that:
+   * every column is tried against pattern 1 before any is tried against
+   * pattern 2. Scanning columns first instead let a loose pattern claim a
+   * column standing to the left of the exact one — when the sheet gained
+   * "Weekday Cash Pay" and "Sat Cash Pay" (hours, columns G and H), the
+   * loose /cash\s*(pay|wage|amount)/ took column G and every employee's
+   * cash pay became their cash *hours*, which then flowed into the
+   * Total Inc Super fallback.
+   */
   function findCol(...patterns: RegExp[]): number {
-    for (let k = 0; k < cols.length; k += 1) {
-      const c = cols[k];
-      if (typeof c !== "string") continue;
-      for (const p of patterns) if (p.test(c)) return k;
+    for (const p of patterns) {
+      for (let k = 0; k < cols.length; k += 1) {
+        const c = cols[k];
+        if (typeof c === "string" && p.test(c)) return k;
+      }
     }
     return -1;
   }
@@ -197,9 +232,22 @@ function resolveMoneyCols(cols: unknown[]): MoneyCols {
     /sat(urday)?\s*hours?/i,
   );
 
+  // Anchored on purpose: "Weekday Payslip" sits next to "Weekday Cash Pay",
+  // and a loose /week.*pay/ would take whichever came first.
+  const weekdayPayslipCol = findCol(
+    /^\s*week(day)?s?\s*payslip\s*(hours?)?\s*$/i,
+    /^\s*payslip\s*week(day)?s?\s*(hours?)?\s*$/i,
+  );
+  const satPayslipCol = findCol(
+    /^\s*sat(urday)?\s*payslip\s*(hours?)?\s*$/i,
+    /^\s*payslip\s*sat(urday)?\s*(hours?)?\s*$/i,
+  );
+
   return {
     weekHoursCol,
     satHoursCol,
+    weekdayPayslipCol,
+    satPayslipCol,
     employeeCol: findCol(/^\s*employee\s*$/i, /^\s*staff\s*$/i, /^\s*name\s*$/i, /employee|staff|name/i),
     grossPayCol: findCol(/^\s*gross\s*pay\s*$/i, /gross\s*pay/i, /gross\s*earnings/i),
     netPayCol: findCol(
@@ -380,6 +428,8 @@ export function parseWeekPayrollDetailFromRows(
       totalIncCol,
       weekHoursCol,
       satHoursCol,
+      weekdayPayslipCol,
+      satPayslipCol,
     } = moneyCols;
 
     if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
@@ -442,8 +492,8 @@ export function parseWeekPayrollDetailFromRows(
 
       // A blank hours cell means the block predates the timesheet push, not
       // that the employee worked nothing — keep the two cases apart.
-      const weekdayHours = weekHoursCol >= 0 ? parseMoney(r[weekHoursCol]) : null;
-      const saturdayHours = satHoursCol >= 0 ? parseMoney(r[satHoursCol]) : null;
+      const weekdayHours = payslipHours(r, weekdayPayslipCol, weekHoursCol);
+      const saturdayHours = payslipHours(r, satPayslipCol, satHoursCol);
 
       employees.push({
         name,

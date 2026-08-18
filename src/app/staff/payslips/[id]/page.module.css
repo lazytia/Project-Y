@@ -155,6 +155,16 @@
   color: var(--color-fg);
 }
 
+/* The hours rows describe how the pay was worked out — they aren't an
+   amount anyone receives. Held a step lighter, in regular weight, so
+   Gross Pay / Tax / Super stay the first thing read in the card. */
+.summaryLabelMuted,
+.summaryValueMuted {
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--color-fg-muted);
+}
+
 /* ── Info box ── */
 .infoBox {
   display: flex;

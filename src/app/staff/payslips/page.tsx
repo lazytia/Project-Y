@@ -20,8 +20,11 @@ type PayslipsResponse = {
 };
 
 /** SessionStorage key + version. Bump the version whenever the API's
- *  response shape changes so old cached blobs don't render weirdly. */
-const CACHE_KEY_PREFIX = "y.payslips.v1.";
+ *  response shape or contents change so old cached blobs don't render
+ *  weirdly. v2: payslips start at the 10 Aug 2026 week and the hours rows
+ *  now come from the sheet's payslip columns, so a v1 blob would keep
+ *  showing withdrawn weeks and pre-split hours. */
+const CACHE_KEY_PREFIX = "y.payslips.v2.";
 /** Serve cached copy for 5 min before revalidating in the background. */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 

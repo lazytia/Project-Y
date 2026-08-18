@@ -131,8 +131,8 @@ export default function PayslipDetailPage({
               <>
                 <div className={styles.summaryDivider} />
                 <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Weekdays Hours</span>
-                  <span className={styles.summaryValue}>{fmtHours(slip.weekdayHours)}</span>
+                  <span className={styles.summaryLabelMuted}>Weekdays Hours</span>
+                  <span className={styles.summaryValueMuted}>{fmtHours(slip.weekdayHours)}</span>
                 </div>
               </>
             )}
@@ -141,8 +141,8 @@ export default function PayslipDetailPage({
               <>
                 <div className={styles.summaryDivider} />
                 <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Saturday Hours</span>
-                  <span className={styles.summaryValue}>{fmtHours(slip.saturdayHours)}</span>
+                  <span className={styles.summaryLabelMuted}>Saturday Hours</span>
+                  <span className={styles.summaryValueMuted}>{fmtHours(slip.saturdayHours)}</span>
                 </div>
               </>
             )}
