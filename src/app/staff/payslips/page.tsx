@@ -21,12 +21,13 @@ type PayslipsResponse = {
 
 /** SessionStorage key + version. Bump the version whenever the API's
  *  response shape or contents change so old cached blobs don't render
- *  weirdly. v2: payslips start at the 10 Aug 2026 week and the hours rows
- *  now come from the sheet's payslip columns, so a v1 blob would keep
- *  showing withdrawn weeks and pre-split hours. */
-const CACHE_KEY_PREFIX = "y.payslips.v2.";
-/** Serve cached copy for 5 min before revalidating in the background. */
-const CACHE_TTL_MS = 5 * 60 * 1000;
+ *  weirdly. v3: only pay weeks the owner has published are returned, so a
+ *  v2 blob would keep listing every week the sheet happens to hold. */
+const CACHE_KEY_PREFIX = "y.payslips.v3.";
+/** Serve the cached copy briefly before revalidating in the background.
+ *  Kept short because publishing a pay week is a change staff are waiting
+ *  on — a long TTL would leave the list looking empty after it went live. */
+const CACHE_TTL_MS = 60 * 1000;
 
 type CachedEnvelope = { data: PayslipsResponse; cachedAt: number };
 

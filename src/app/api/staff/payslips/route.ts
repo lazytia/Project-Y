@@ -6,6 +6,7 @@ import {
   isEmptyPayrollDetail,
   type WeekPayrollDetail,
 } from "@/lib/payroll-sheet";
+import { fetchPublishedWeekStarts } from "@/lib/payslip-publication";
 import { shiftDateKey } from "@/lib/square";
 import { emailToUsername } from "@/lib/username";
 
@@ -16,6 +17,12 @@ import { emailToUsername } from "@/lib/username";
  * Powers /staff/payslips. Reads the shared Google Sheet payroll history
  * once, then filters to the rows that match the signed-in staff member's
  * name (fullName / givenName+familyName from their staff_onboarding doc).
+ *
+ * Only pay weeks the owner has published on /payroll/timesheets are
+ * returned. The sheet holds a week's numbers from the moment hours are
+ * pushed, well before they have been checked, so unpublished weeks are
+ * withheld here rather than in the page — a staff member who guesses a
+ * payslip URL gets the same nothing as one who scrolls the list.
  *
  * Response shape:
  * {
@@ -40,24 +47,18 @@ import { emailToUsername } from "@/lib/username";
 export const dynamic = "force-dynamic";
 
 const TIMEZONE = "Australia/Sydney";
-/**
- * First pay week published to staff, for everyone (Monday, ISO).
- *
- * Owner's call. It is also the first week whose sheet block splits hours into
- * the cash-paid part and the payslip part, so it is the first week where a
- * payslip can state hours it actually paid for. Earlier blocks only record
- * everything worked, which would overstate the payslip.
- */
-const FIRST_PUBLISHED_PAY_WEEK_ISO = "2026-08-10";
 /** How many past weeks to read from the Firestore cache. 60 covers
  *  a full year — payslip UI only shows the last 12 months anyway. */
 const CACHE_WEEKS_LIMIT = 60;
-/** Cache the JSON response at the edge for 5 min, serve stale for
- *  another 30 min while we revalidate. Numbers barely change during
- *  a pay cycle, and the cache read is already fast — this lets a
- *  second page load return instantly. */
+/**
+ * Short private cache so a second page load returns instantly without
+ * hiding a publish for long: the owner clicking Publish is a change staff
+ * are waiting on, and a 5-minute cache would have them refreshing at a
+ * list that stays empty. A minute of staleness costs nothing — the numbers
+ * themselves barely move inside a pay cycle.
+ */
 const CACHE_HEADERS = {
-  "Cache-Control": "private, max-age=300, stale-while-revalidate=1800",
+  "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
 } as const;
 
 type Payslip = {
@@ -211,10 +212,23 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Fail closed: if the publication lookup throws we show nothing rather
+  // than falling back to "everything in the sheet", which would release
+  // every unchecked week at once.
+  let publishedWeeks: Set<string>;
+  try {
+    publishedWeeks = await fetchPublishedWeekStarts();
+  } catch (err) {
+    console.error("[staff/payslips] publication lookup failed:", err);
+    return NextResponse.json(
+      { error: "Could not check which pay weeks are published." },
+      { status: 503 },
+    );
+  }
+
   const payslips: Payslip[] = [];
   for (const week of allWeeks) {
-    // ISO dates compare correctly as strings.
-    if (week.weekStartISO < FIRST_PUBLISHED_PAY_WEEK_ISO) continue;
+    if (!publishedWeeks.has(week.weekStartISO)) continue;
     // First: exact fullName match. Fallback: order-independent token
     // match against fullName or given+family — catches "Tanaka Sakura"
     // vs "Sakura Tanaka" style spellings without matching partials.

@@ -125,6 +125,28 @@ function fmtDayLabel(iso: string): string {
   });
 }
 
+/** "10 – 16 Aug 2026", collapsing the month when both ends share one. */
+function fmtPayPeriod(startISO: string, endISO: string): string {
+  if (!startISO || !endISO) return "—";
+  const [sy, sm, sd] = startISO.split("-").map(Number);
+  const [ey, em, ed] = endISO.split("-").map(Number);
+  const end = new Date(Date.UTC(ey, em - 1, ed, 12)).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const start =
+    sy === ey && sm === em
+      ? String(sd)
+      : new Date(Date.UTC(sy, sm - 1, sd, 12)).toLocaleDateString("en-AU", {
+          day: "numeric",
+          month: "short",
+          timeZone: "UTC",
+        });
+  return `${start} – ${end}`;
+}
+
 function fmtRangeSubtitle(startISO: string, endISO: string): string {
   const [sy, sm, sd] = startISO.split("-").map(Number);
   const [ey, em, ed] = endISO.split("-").map(Number);
@@ -188,6 +210,23 @@ function staffNameOf(raw: Record<string, unknown>): string {
   return `${first}${last ? ` ${last}` : ""}`.trim() || "Unknown";
 }
 
+/** Reply from /api/payroll/payslips/publish, narrowed to what the card shows. */
+type PublicationState = {
+  published: boolean;
+  publishedAt: string | null;
+  /** Null when the sheet could not be read — not the same as nobody paid. */
+  employeeCount: number | null;
+};
+
+function readPublication(data: unknown): PublicationState {
+  const d = (data ?? {}) as Record<string, unknown>;
+  return {
+    published: d.published === true,
+    publishedAt: typeof d.publishedAt === "string" ? d.publishedAt : null,
+    employeeCount: typeof d.employeeCount === "number" ? d.employeeCount : null,
+  };
+}
+
 /* ── page ────────────────────────────────────────────────────────── */
 
 type ViewMode = "day" | "staff";
@@ -246,6 +285,77 @@ export default function TimesheetsPage() {
   const [pushMessage, setPushMessage] = useState<string | null>(null);
   const [payrollStaff, setPayrollStaff] = useState<PayrollStaffRecord[]>([]);
   const [attentionBusy, setAttentionBusy] = useState<string | null>(null);
+
+  /**
+   * Payslip release switch.
+   *
+   * Pay weeks run Monday–Sunday, but this page's date range is free-form —
+   * the default is the last 7 days, which starts mid-week. So the week the
+   * button releases is derived from the range's start date, and the card
+   * prints the Monday–Sunday period it resolved to: the owner should never
+   * have to work out which week a click will publish.
+   */
+  const payWeekStartISO = useMemo(() => (startISO ? isoMondayOf(startISO) : ""), [startISO]);
+  const payWeekEndISO = useMemo(
+    () => (payWeekStartISO ? isoSundayOfWeek(payWeekStartISO) : ""),
+    [payWeekStartISO],
+  );
+  const [publication, setPublication] = useState<PublicationState | null>(null);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!allowed || !user || !payWeekStartISO) return;
+    let cancelled = false;
+    setPublishLoading(true);
+    // Drop the previous week's answer immediately — showing "Published"
+    // against a week we haven't checked yet would be a lie in the one
+    // place the owner is trusting the screen.
+    setPublication(null);
+    setPublishError(null);
+    (async () => {
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch(
+          `/api/payroll/payslips/publish?week=${encodeURIComponent(payWeekStartISO)}`,
+          { headers: { Authorization: `Bearer ${idToken}` }, cache: "no-store" },
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+        if (!cancelled) setPublication(readPublication(data));
+      } catch (err) {
+        if (!cancelled) setPublishError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setPublishLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed, user, payWeekStartISO]);
+
+  const togglePublish = useCallback(async () => {
+    if (!user || !payWeekStartISO) return;
+    const next = !(publication?.published ?? false);
+    setPublishBusy(true);
+    setPublishError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/payroll/payslips/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ weekStartISO: payWeekStartISO, published: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+      setPublication(readPublication(data));
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPublishBusy(false);
+    }
+  }, [user, payWeekStartISO, publication]);
 
   /**
    * `fresh` skips the server's short Square cache — used after a write, so the
@@ -576,6 +686,72 @@ export default function TimesheetsPage() {
             {grossSub}
           </p>
         </div>
+      </section>
+
+      {/* Payslip release. Sits directly under the totals because it is the
+          decision made after reading them — the week's hours look right, so
+          staff may now see what they were paid. Until this is on, the staff
+          payslip feed returns nothing for the week, so an unchecked week
+          can't be reached by guessing a URL either. */}
+      <section className={styles.publishCard} aria-label="Payslip publishing">
+        <div className={styles.publishHead}>
+          <span className={styles.publishIcon} aria-hidden="true">
+            <PayslipIcon />
+          </span>
+          <p className={styles.publishTitle}>Payslips</p>
+          <span
+            className={`${styles.publishStatus} ${
+              publication?.published ? styles.publishStatusOn : ""
+            }`}
+          >
+            <span className={styles.publishDot} aria-hidden="true" />
+            {publishLoading && !publication
+              ? "Checking…"
+              : publication?.published
+                ? "Published"
+                : "Not Published"}
+          </span>
+        </div>
+
+        <p className={styles.publishMeta}>
+          <span className={styles.publishMetaIcon} aria-hidden="true">
+            <PeopleIcon />
+          </span>
+          {publication?.employeeCount == null
+            ? "Employee count unavailable"
+            : `${publication.employeeCount} ${
+                publication.employeeCount === 1 ? "employee" : "employees"
+              }`}
+        </p>
+        <p className={styles.publishMeta}>
+          <span className={styles.publishMetaIcon} aria-hidden="true">
+            <CalIconSm />
+          </span>
+          For pay period {fmtPayPeriod(payWeekStartISO, payWeekEndISO)}
+        </p>
+
+        <button
+          type="button"
+          className={`${styles.publishBtn} ${
+            publication?.published ? styles.publishBtnOn : ""
+          }`}
+          disabled={publishBusy || publishLoading || !payWeekStartISO}
+          onClick={togglePublish}
+        >
+          {publishBusy
+            ? "Saving…"
+            : publication?.published
+              ? "Unpublish Payslips"
+              : "Publish Payslips"}
+        </button>
+
+        <p className={styles.publishCaption}>
+          {publication?.published
+            ? "Employees can see their payslips for this pay period."
+            : "Employees will be able to view their payslips after publishing."}
+        </p>
+
+        {publishError && <p className={styles.publishError}>{publishError}</p>}
       </section>
 
       {attentionItems.length > 0 && (
@@ -1032,6 +1208,26 @@ function CalIconSm() {
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
       <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+function PayslipIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  );
+}
+function PeopleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }

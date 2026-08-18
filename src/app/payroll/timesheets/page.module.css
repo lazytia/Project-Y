@@ -107,6 +107,124 @@
   50% { opacity: 0.55; }
 }
 
+/* ── payslip publishing ──
+   Dark like the summary cards above it so the three read as one block:
+   the totals, then the switch that releases them. */
+.publishCard {
+  background: linear-gradient(145deg, #333333 0%, #111111 100%);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.publishHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.publishIcon {
+  display: flex;
+  align-items: center;
+  color: var(--color-warm);
+  flex-shrink: 0;
+}
+
+.publishTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Pushed to the far edge of the header row — the status is the one thing
+   on this card that gets read before the words. */
+.publishStatus {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.publishDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+}
+
+.publishStatusOn {
+  color: #4ade80;
+}
+
+.publishStatusOn .publishDot {
+  background: #4ade80;
+}
+
+.publishMeta {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.publishMetaIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.publishBtn {
+  margin-top: 4px;
+  padding: 13px 18px;
+  border: none;
+  border-radius: 12px;
+  background: var(--color-warm);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Once published, the button undoes rather than repeats — so it stops
+   looking like the primary action and reads as the way back out. */
+.publishBtnOn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.publishBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.publishCaption {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+}
+
+.publishError {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fca5a5;
+}
+
 /* ── payroll attention ── */
 .attentionCard {
   background: var(--color-warm-bg);
