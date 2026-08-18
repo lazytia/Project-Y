@@ -227,8 +227,11 @@ export async function GET(req: NextRequest) {
   }
 
   const payslips: Payslip[] = [];
+  // Latest pay date this person has a sheet row for, published or not. The
+  // next payday is a schedule fact, not a payslip — withholding it while a
+  // week is being checked would blank the top card for no reason.
+  let latestPayDate: string | null = null;
   for (const week of allWeeks) {
-    if (!publishedWeeks.has(week.weekStartISO)) continue;
     // First: exact fullName match. Fallback: order-independent token
     // match against fullName or given+family — catches "Tanaka Sakura"
     // vs "Sakura Tanaka" style spellings without matching partials.
@@ -242,6 +245,9 @@ export async function GET(req: NextRequest) {
     // Pay date = Friday of the week AFTER the pay week (weekEnd is
     // Sunday, +5 days → Friday). Matches weekly payday.
     const payDate = shiftDateKey(week.weekEndISO, 5, TIMEZONE);
+    // ISO dates compare correctly as strings.
+    if (!latestPayDate || payDate > latestPayDate) latestPayDate = payDate;
+    if (!publishedWeeks.has(week.weekStartISO)) continue;
     payslips.push({
       id: `p-${week.weekStartISO}`,
       payDate,
@@ -260,8 +266,8 @@ export async function GET(req: NextRequest) {
   }
 
   payslips.sort((a, b) => (a.payDate < b.payDate ? 1 : -1));
-  const nextPayDateISO = payslips.length > 0
-    ? shiftDateKey(payslips[0].payDate, 7, TIMEZONE)
+  const nextPayDateISO = latestPayDate
+    ? shiftDateKey(latestPayDate, 7, TIMEZONE)
     : null;
 
   return NextResponse.json(
