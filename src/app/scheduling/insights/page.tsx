@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   collection,
   getDocs,
+  type QuerySnapshot,
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -42,6 +43,14 @@ function shiftHours(startTime: string, endHour: number, fallbackHours: number): 
   return Math.max(0, endHour - h - (m ?? 0) / 60);
 }
 const TREND_WEEKS = 4; // current + previous 3
+
+/**
+ * How long an already-finished week's figures are trusted before the page
+ * syncs them again. Long enough that opening Insights repeatedly through a
+ * shift costs nothing, short enough that a correction typed into the
+ * payroll sheet turns up the same day without anyone having to ask for it.
+ */
+const AUTO_SYNC_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 type Meal = "lunch" | "dinner";
 
@@ -84,6 +93,12 @@ type WeeklySales = {
   grossSales?: number;
   currency?: string;
   source?: "square" | "manual";
+  /** How many of the week's 7 days Square had data for at sync time. A
+   *  week synced while still running lands here with fewer than 7. */
+  daysIncluded?: number;
+  /** When the sync job last wrote this week. Absent on rows written
+   *  before the field existed, which counts as "too old to trust". */
+  syncedAt?: Timestamp;
 };
 
 type DailySales = {
@@ -183,6 +198,19 @@ function aggregateWeek(weekStart: Date, doc: WeekDoc | undefined, rates: Record<
   return stats;
 }
 
+/** Snapshot → { docId: data }. Tolerates a failed read as an empty map,
+ *  which is how every one of these collections was already treated. */
+function docsToMap<T>(snap: QuerySnapshot | null): Record<string, T> {
+  const map: Record<string, T> = {};
+  for (const d of snap?.docs ?? []) map[d.id] = d.data() as T;
+  return map;
+}
+
+/** Read a whole collection, or null if it isn't readable. */
+function readAll(name: string): Promise<QuerySnapshot | null> {
+  return getDocs(collection(getDb(), name)).catch(() => null);
+}
+
 export default function InsightsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -205,74 +233,54 @@ export default function InsightsPage() {
       return;
     }
     (async () => {
-      try {
-        const snap = await getDocs(collection(getDb(), "rosters_published"));
-        const map: Record<string, WeekDoc> = {};
-        for (const d of snap.docs) map[d.id] = d.data() as WeekDoc;
-        setDocs(map);
-      } catch {
-        /* keep empty */
+      // Six independent collections. They used to be awaited one after
+      // another, so nothing rendered until six round trips had completed
+      // in series — and the whole payload is well under 100 KB, so that
+      // wait was almost entirely latency rather than transfer. Fanned out,
+      // the page waits for the slowest single read instead of the sum.
+      const [rosterSnap, payrollSnap, salesSnap, dailySnap, onboardingSnap, staffSnap] =
+        await Promise.all([
+          readAll("rosters_published"),
+          readAll("payroll_weekly"),   // from the payroll sheet sync (or manual)
+          readAll("sales_weekly"),     // from the Square sync — gross sales per week
+          readAll("sales_daily"),
+          readAll("staff_onboarding"),
+          readAll("staff"),
+        ]);
+
+      setDocs(docsToMap<WeekDoc>(rosterSnap));
+      setPayroll(docsToMap<WeeklyPayroll>(payrollSnap));
+      setSalesMap(docsToMap<WeeklySales>(salesSnap));
+      setDailySalesMap(docsToMap<DailySales>(dailySnap));
+
+      const ratesMap: Record<string, StaffRate> = {};
+      for (const d of onboardingSnap?.docs ?? []) {
+        const data = d.data() as Record<string, unknown>;
+        const weekRate =
+          (typeof data.weekRate === "number" ? data.weekRate : undefined) ??
+          (typeof data.weeklyRate === "number" ? data.weeklyRate : undefined) ??
+          (typeof data.hourlyRate === "number" ? data.hourlyRate : undefined) ??
+          (typeof data.baseRate === "number" ? data.baseRate : undefined) ??
+          EST_HOURLY_RATE;
+        const satRate =
+          (typeof data.satRate === "number" ? data.satRate : undefined) ??
+          (typeof data.saturdayRate === "number" ? data.saturdayRate : undefined) ??
+          weekRate;
+        ratesMap[d.id] = { weekRate, satRate };
       }
-      try {
-        // Pulled from Xero by the sync job (or entered manually).
-        const snap = await getDocs(collection(getDb(), "payroll_weekly"));
-        const map: Record<string, WeeklyPayroll> = {};
-        for (const d of snap.docs) map[d.id] = d.data() as WeeklyPayroll;
-        setPayroll(map);
-      } catch {
-        /* keep empty */
+      for (const d of staffSnap?.docs ?? []) {
+        const data = d.data() as Record<string, unknown>;
+        const weekdayRate = typeof data.weekdayRate === "number" ? data.weekdayRate : undefined;
+        const saturdayRate = typeof data.saturdayRate === "number" ? data.saturdayRate : undefined;
+        if (weekdayRate !== undefined || saturdayRate !== undefined) {
+          const ex = ratesMap[d.id];
+          ratesMap[d.id] = {
+            weekRate: weekdayRate ?? ex?.weekRate ?? EST_HOURLY_RATE,
+            satRate: saturdayRate ?? ex?.satRate ?? (weekdayRate ?? EST_HOURLY_RATE),
+          };
+        }
       }
-      try {
-        // Pulled from Square by the sync job (gross sales for the week).
-        const snap = await getDocs(collection(getDb(), "sales_weekly"));
-        const map: Record<string, WeeklySales> = {};
-        for (const d of snap.docs) map[d.id] = d.data() as WeeklySales;
-        setSalesMap(map);
-      } catch {
-        /* keep empty */
-      }
-      try {
-        const dailySnap = await getDocs(collection(getDb(), "sales_daily"));
-        const dmap: Record<string, DailySales> = {};
-        for (const d of dailySnap.docs) dmap[d.id] = d.data() as DailySales;
-        setDailySalesMap(dmap);
-      } catch { /* ignore */ }
-      {
-        const ratesMap: Record<string, StaffRate> = {};
-        try {
-          const snap = await getDocs(collection(getDb(), "staff_onboarding"));
-          for (const d of snap.docs) {
-            const data = d.data() as Record<string, unknown>;
-            const weekRate =
-              (typeof data.weekRate === "number" ? data.weekRate : undefined) ??
-              (typeof data.weeklyRate === "number" ? data.weeklyRate : undefined) ??
-              (typeof data.hourlyRate === "number" ? data.hourlyRate : undefined) ??
-              (typeof data.baseRate === "number" ? data.baseRate : undefined) ??
-              EST_HOURLY_RATE;
-            const satRate =
-              (typeof data.satRate === "number" ? data.satRate : undefined) ??
-              (typeof data.saturdayRate === "number" ? data.saturdayRate : undefined) ??
-              weekRate;
-            ratesMap[d.id] = { weekRate, satRate };
-          }
-        } catch { /* keep empty */ }
-        try {
-          const snap = await getDocs(collection(getDb(), "staff"));
-          for (const d of snap.docs) {
-            const data = d.data() as Record<string, unknown>;
-            const weekdayRate = typeof data.weekdayRate === "number" ? data.weekdayRate : undefined;
-            const saturdayRate = typeof data.saturdayRate === "number" ? data.saturdayRate : undefined;
-            if (weekdayRate !== undefined || saturdayRate !== undefined) {
-              const ex = ratesMap[d.id];
-              ratesMap[d.id] = {
-                weekRate: weekdayRate ?? ex?.weekRate ?? EST_HOURLY_RATE,
-                satRate: saturdayRate ?? ex?.satRate ?? (weekdayRate ?? EST_HOURLY_RATE),
-              };
-            }
-          }
-        } catch { /* keep empty */ }
-        setStaffRates(ratesMap);
-      }
+      setStaffRates(ratesMap);
       setLoading(false);
     })();
   }, [authLoading, allowed, router]);
@@ -573,14 +581,54 @@ export default function InsightsPage() {
   const rangePayrollPct = rangeHasSales ? (rangePayrollCost / rangeSales) * 100 : null;
   const rangeOverTarget = rangePayrollPct !== null && rangePayrollPct > TARGET_PAYROLL_PCT;
 
+  /**
+   * True when every week the refresh endpoint would sync is already on
+   * record, can no longer change, and was read recently enough to trust —
+   * i.e. when syncing again would only rewrite the same numbers.
+   *
+   * `daysIncluded === 7` says Square was read after the week had finished,
+   * so its sales are final; a week synced while still running stores fewer
+   * and stays eligible. Payroll has to be present too, because the sheet is
+   * filled in a few days after the week ends — a week with sales but no pay
+   * row yet is exactly the case worth re-syncing for.
+   *
+   * Final is not the same as correct, though: a figure can still be fixed
+   * in the sheet after the fact. So freshness is capped rather than
+   * permanent — once AUTO_SYNC_MAX_AGE_MS has passed the next visit syncs
+   * one more time and picks the correction up. That cap is what replaces
+   * the old manual ↻ button.
+   */
+  const trendWeeksFresh = useMemo(() => {
+    const cutoff = Date.now() - AUTO_SYNC_MAX_AGE_MS;
+    for (let i = 0; i < TREND_WEEKS; i += 1) {
+      const iso = isoDate(addDays(currentWeekStart, -7 * i));
+      const week = salesMap[iso];
+      if (week?.daysIncluded !== 7) return false;
+      if (typeof payroll[iso]?.gross !== "number") return false;
+      if (!week.syncedAt || week.syncedAt.toMillis() < cutoff) return false;
+    }
+    return true;
+  }, [currentWeekStart, salesMap, payroll]);
+
   // Auto-sync when the page first loads (and when the manager picks
   // a different week). Runs in the background — the existing
   // Firestore-read pass renders any stale data immediately so the
   // page never blocks on Square / Xero round-trips.
+  //
+  // It is skipped while the four trend weeks are fresh. The endpoint walks
+  // 4 weeks × 7 days and makes two Square calls per day, plus a full read
+  // of the payroll sheet — and the page opens on LAST week by default, so
+  // that entire chain used to run on every single visit only to rewrite
+  // figures that were already final.
+  //
+  // This is now the only thing that triggers a sync — the header's manual
+  // ↻ button is gone — so the skip is deliberately time-limited rather
+  // than permanent. See trendWeeksFresh.
   const hasAutoRefreshed = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (authLoading || loading || !user || !allowed) return;
     if (refreshing) return;
+    if (trendWeeksFresh) return;
     if (hasAutoRefreshed.current.has(selectedWeekISO)) return;
     hasAutoRefreshed.current.add(selectedWeekISO);
     const id = setTimeout(() => {
@@ -588,7 +636,7 @@ export default function InsightsPage() {
     }, 50);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, loading, user, allowed, selectedWeekISO]);
+  }, [authLoading, loading, user, allowed, selectedWeekISO, trendWeeksFresh]);
 
   async function handleRefresh() {
     if (refreshing || !user) return;
@@ -615,25 +663,16 @@ export default function InsightsPage() {
       } else {
         setRefreshError(null);
       }
-      // Re-read both Firestore maps after the sync wrote new docs.
-      try {
-        const snap = await getDocs(collection(getDb(), "payroll_weekly"));
-        const map: Record<string, WeeklyPayroll> = {};
-        for (const d of snap.docs) map[d.id] = d.data() as WeeklyPayroll;
-        setPayroll(map);
-      } catch { /* ignore */ }
-      try {
-        const snap = await getDocs(collection(getDb(), "sales_weekly"));
-        const map: Record<string, WeeklySales> = {};
-        for (const d of snap.docs) map[d.id] = d.data() as WeeklySales;
-        setSalesMap(map);
-      } catch { /* ignore */ }
-      try {
-        const dailySnap = await getDocs(collection(getDb(), "sales_daily"));
-        const dmap: Record<string, DailySales> = {};
-        for (const d of dailySnap.docs) dmap[d.id] = d.data() as DailySales;
-        setDailySalesMap(dmap);
-      } catch { /* ignore */ }
+      // Re-read the three maps the sync just rewrote — in parallel, for
+      // the same reason as the initial load.
+      const [payrollSnap, salesSnap, dailySnap] = await Promise.all([
+        readAll("payroll_weekly"),
+        readAll("sales_weekly"),
+        readAll("sales_daily"),
+      ]);
+      setPayroll(docsToMap<WeeklyPayroll>(payrollSnap));
+      setSalesMap(docsToMap<WeeklySales>(salesSnap));
+      setDailySalesMap(docsToMap<DailySales>(dailySnap));
     } catch (err) {
       setRefreshError(err instanceof Error ? err.message : "Refresh failed.");
     } finally {
@@ -658,28 +697,10 @@ export default function InsightsPage() {
           </svg>
         </button>
         <h1 className={styles.title}>Roster Insight</h1>
-        <button
-          type="button"
-          className={styles.iconBtn}
-          onClick={handleRefresh}
-          disabled={refreshing}
-          aria-label="Refresh from Square / Xero"
-          title="Refresh from Square / Xero"
-        >
-          {refreshing ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9" strokeDasharray="36 36" strokeDashoffset="0">
-                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite" />
-              </circle>
-            </svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-          )}
-        </button>
+        {/* The header grid keeps a 36px track here so the title stays
+            optically centred against the back button. The refresh control
+            that used to sit in it is gone — syncing is automatic. */}
+        <span aria-hidden="true" />
       </header>
 
       {refreshError && refreshError.startsWith("Square:") && (

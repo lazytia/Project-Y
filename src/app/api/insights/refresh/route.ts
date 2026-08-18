@@ -43,9 +43,10 @@ async function verifyOwnerOrChef(req: NextRequest): Promise<{ ok: true } | { ok:
   }
   const email = decoded.email ?? "";
   const username = emailToUsername(email).toLowerCase();
-  // Chefs read Roster Insights, so they need to be able to force a resync
-  // from the same ↻ button owners use. All writes here are idempotent
-  // (they overwrite Firestore with a fresh Square/Sheet snapshot).
+  // Chefs read Roster Insights too, and the page syncs itself on open, so
+  // their session has to be accepted here or the board would go stale for
+  // them. All writes are idempotent (they overwrite Firestore with a fresh
+  // Square/Sheet snapshot), so an extra caller costs nothing but a resync.
   if (!OWNER_USERNAMES.has(username) && !CHEF_USERNAMES.has(username)) {
     return {
       ok: false,
