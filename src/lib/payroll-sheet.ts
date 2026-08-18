@@ -42,6 +42,12 @@ export type EmployeePayRow = {
   superAnn: number;
   cashPay: number;
   totalIncSuper: number;
+  /** Hours the pay was actually calculated from — sheet columns E and F,
+   *  written there by /api/payroll/push from the app's own timesheets.
+   *  Null when the block has no hours columns (older Pay History blocks),
+   *  which is different from a genuine zero and must not be shown as one. */
+  weekdayHours: number | null;
+  saturdayHours: number | null;
 };
 
 export type WeekPayrollDetail = {
@@ -156,6 +162,8 @@ type MoneyCols = {
   superCol: number;
   cashPayCol: number;
   totalIncCol: number;
+  weekHoursCol: number;
+  satHoursCol: number;
 };
 
 function resolveMoneyCols(cols: unknown[]): MoneyCols {
@@ -176,7 +184,22 @@ function resolveMoneyCols(cols: unknown[]): MoneyCols {
   // Pay History blocks keep Cash Pay in column L (0-based index 11).
   if (cashPayCol < 0 && cols.length > 11) cashPayCol = 11;
 
+  // The sheet writes these as "Week Hour" / "Sat Hours" (singular on one,
+  // plural on the other). Anchored patterns first so neither can capture
+  // the "Total Hour" column sitting right beside them.
+  const weekHoursCol = findCol(
+    /^\s*week(day)?s?\s*hours?\s*$/i,
+    /^\s*ord(inary)?\s*hours?\s*$/i,
+    /week(day)?s?\s*hours?/i,
+  );
+  const satHoursCol = findCol(
+    /^\s*sat(urday)?\s*hours?\s*$/i,
+    /sat(urday)?\s*hours?/i,
+  );
+
   return {
+    weekHoursCol,
+    satHoursCol,
     employeeCol: findCol(/^\s*employee\s*$/i, /^\s*staff\s*$/i, /^\s*name\s*$/i, /employee|staff|name/i),
     grossPayCol: findCol(/^\s*gross\s*pay\s*$/i, /gross\s*pay/i, /gross\s*earnings/i),
     netPayCol: findCol(
@@ -355,6 +378,8 @@ export function parseWeekPayrollDetailFromRows(
       superCol,
       cashPayCol,
       totalIncCol,
+      weekHoursCol,
+      satHoursCol,
     } = moneyCols;
 
     if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
@@ -415,6 +440,11 @@ export function parseWeekPayrollDetailFromRows(
         continue;
       }
 
+      // A blank hours cell means the block predates the timesheet push, not
+      // that the employee worked nothing — keep the two cases apart.
+      const weekdayHours = weekHoursCol >= 0 ? parseMoney(r[weekHoursCol]) : null;
+      const saturdayHours = satHoursCol >= 0 ? parseMoney(r[satHoursCol]) : null;
+
       employees.push({
         name,
         grossPay,
@@ -423,6 +453,8 @@ export function parseWeekPayrollDetailFromRows(
         superAnn,
         cashPay,
         totalIncSuper: Math.round(totalIncSuper * 100) / 100,
+        weekdayHours,
+        saturdayHours,
       });
       totalNet += netPay;
       totalTax += tax;

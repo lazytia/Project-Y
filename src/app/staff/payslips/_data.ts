@@ -12,6 +12,11 @@ export type Payslip = {
   tax: number;
   super: number;
   netPay: number;
+  /** Hours the pay was calculated from. Null — not zero — when the pay week
+   *  predates the timesheet push and the sheet has no hours recorded; the UI
+   *  omits the row rather than claiming the employee worked nothing. */
+  weekdayHours: number | null;
+  saturdayHours: number | null;
 };
 
 export function fmtCurrency(n: number): string {
@@ -21,6 +26,15 @@ export function fmtCurrency(n: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
+}
+
+/** "8.0 hrs", "34.5 hrs" — but hours are tracked to the quarter, so 6.25
+ *  must survive as "6.25 hrs" rather than rounding to a false half-hour. */
+export function fmtHours(n: number): string {
+  return `${new Intl.NumberFormat("en-AU", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 2,
+  }).format(n)} hrs`;
 }
 
 export function fmtDateLong(iso: string): string {

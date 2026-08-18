@@ -123,33 +123,15 @@ export const MANAGER_NAV: NavGroup[] = [
 ];
 
 // Chef (Chuck) gets his own dedicated nav — spec approved by owner:
-// Dashboard, Team (New Staff Requests / Staff Handbook / Beer Guide
-// / Training Manual / HR Notes / Notice Given / Cash Payments), Scheduling, Operations,
-// Payroll. Different enough from MANAGER_NAV that filtering via
-// chefHidden was getting awkward — keeping them separate is clearer.
+// Dashboard, Operations, Team, Training, Scheduling, Payslip, in that
+// order. Reference material (Staff Handbook / Beer Guide / Training
+// Manual) sits in its own Training group rather than under Team, which
+// is now purely people admin. Payslip is a single page, so it is a plain
+// link rather than a group wrapping one child.
+// Different enough from MANAGER_NAV that filtering via chefHidden was
+// getting awkward — keeping them separate is clearer.
 export const CHEF_NAV: NavGroup[] = [
   { icon: "🏠", label: "Dashboard", href: "/" },
-  {
-    icon: "👥",
-    label: "Team",
-    children: [
-      { label: "New Staff Requests", href: "/people/onboarding" },
-      { label: "Staff Handbook", href: "/staff/handbook" },
-      { label: "Beer Guide", href: "/staff/beer-guide" },
-      { label: "Training Manual", href: "/staff/training-manual" },
-      { label: "HR Notes", href: "/people/hr-notes" },
-      { label: "Notice Given", href: "/people/notice-given" },
-      { label: "Cash Payments", href: "/people/cash-payments" },
-    ],
-  },
-  {
-    icon: "📅",
-    label: "Scheduling",
-    children: [
-      { label: "Roster", href: "/scheduling/roster" },
-      { label: "Roster Insights", href: "/scheduling/insights" },
-    ],
-  },
   {
     icon: "🍽",
     label: "Operations",
@@ -160,10 +142,33 @@ export const CHEF_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "💰",
-    label: "Payroll",
-    children: [{ label: "Payslips", href: "/payslips" }],
+    icon: "👥",
+    label: "Team",
+    children: [
+      { label: "New Staff Requests", href: "/people/onboarding" },
+      { label: "HR Notes", href: "/people/hr-notes" },
+      { label: "Notice Given", href: "/people/notice-given" },
+      { label: "Cash Payments", href: "/people/cash-payments" },
+    ],
   },
+  {
+    icon: "📚",
+    label: "Training",
+    children: [
+      { label: "Staff Handbook", href: "/staff/handbook" },
+      { label: "Beer Guide", href: "/staff/beer-guide" },
+      { label: "Training Manual", href: "/staff/training-manual" },
+    ],
+  },
+  {
+    icon: "📅",
+    label: "Scheduling",
+    children: [
+      { label: "Roster", href: "/scheduling/roster" },
+      { label: "Roster Insights", href: "/scheduling/insights" },
+    ],
+  },
+  { icon: "💰", label: "Payslip", href: "/payslips" },
 ];
 
 export const STAFF_NAV: NavGroup[] = [

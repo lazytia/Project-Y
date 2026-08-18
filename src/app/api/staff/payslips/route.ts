@@ -31,6 +31,8 @@ import { emailToUsername } from "@/lib/username";
  *     tax: number,
  *     super: number,
  *     netPay: number,
+ *     weekdayHours: number | null,   // sheet col E, null when not recorded
+ *     saturdayHours: number | null,  // sheet col F, null when not recorded
  *   }, ...]
  * }
  */
@@ -58,6 +60,8 @@ type Payslip = {
   tax: number;
   super: number;
   netPay: number;
+  weekdayHours: number | null;
+  saturdayHours: number | null;
 };
 
 /** Turn any spelling into a comparable token: lowercase, collapse
@@ -222,6 +226,11 @@ export async function GET(req: NextRequest) {
       tax: match.tax,
       super: match.superAnn,
       netPay: match.netPay,
+      // The cache fallback above returns documents written before these
+      // fields existed, so they can be absent at runtime whatever the
+      // type says. Coerce anything non-numeric to null ("not recorded").
+      weekdayHours: typeof match.weekdayHours === "number" ? match.weekdayHours : null,
+      saturdayHours: typeof match.saturdayHours === "number" ? match.saturdayHours : null,
     });
   }
 

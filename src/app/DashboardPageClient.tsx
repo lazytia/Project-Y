@@ -128,7 +128,10 @@ export default function DashboardPageClient({
   const dashKind = effectiveDashboard ?? hintedDash;
 
   const managerProps = {
-    hideAttention: false,
+    // Holiday requests, availability changes and visa expiries are the
+    // store manager's queue, not the kitchen's — the chef can neither
+    // approve nor action any of them, so the block is hidden for Chuck.
+    hideAttention: dashKind === "chef",
     roleLabel: dashKind === "chef" ? "Head Chef" : "Store Manager",
     displayName: dashKind === "chef" ? "Chuck" : undefined,
     sessionDashboard: isManagerDashboardKind(dashKind) ? dashKind : effectiveDashboard,
@@ -165,7 +168,7 @@ export default function DashboardPageClient({
   if (userIsManager) {
     return (
       <ManagerDashboard
-        hideAttention={false}
+        hideAttention={userIsChef}
         roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
         displayName={userIsChef ? "Chuck" : undefined}
         sessionDashboard={userIsChef ? "chef" : "manager"}
@@ -749,7 +752,40 @@ function OwnerDashboard({
     [weekDayOffset],
   );
 
-  const weeklySales = sumToSelectedDay(weekDaily?.thisWeek) ?? weekSalesDoc ?? null;
+  // Defined here rather than with the other `shown*` values below, because
+  // week-to-date reuses this exact figure for today — see `weeklySales`.
+  const shownTodaySales =
+    metricsReady.sales && typeof stats?.todaySales === "number" ? stats.todaySales : null;
+
+  /**
+   * Week to date, with today's share taken from the live day figure instead
+   * of the weekly snapshot.
+   *
+   * The snapshot is fetched once per dashboard open; today's sales are
+   * re-fetched every 30 seconds. So the week tile froze at whatever was on
+   * the books when the page loaded while the day tile kept climbing with each
+   * new order — and on a Monday, when the two must be equal, week to date read
+   * LOWER than the single day it contained.
+   *
+   * Reading today off the number the day tile is already showing makes the two
+   * incapable of disagreeing, and costs nothing: that figure is polled either
+   * way. It also avoids re-polling the weekly endpoint, whose paid-sales half
+   * is a 10-minute cache — a ticket being paid would drop out of the live open
+   * total before the cache picked it up, and the week figure would sag for
+   * minutes on every payment.
+   *
+   * Only today is substituted. Earlier days in the week are settled, and the
+   * snapshot is the better source for them.
+   */
+  const weeklySales = useMemo(() => {
+    const daily = weekDaily?.thisWeek;
+    if (!daily) return weekSalesDoc ?? null;
+    const beforeToday = daily.slice(0, weekDayOffset).reduce((sum, n) => sum + (n || 0), 0);
+    const selectedDay =
+      isToday && shownTodaySales !== null ? shownTodaySales : (daily[weekDayOffset] ?? 0);
+    return Math.round((beforeToday + selectedDay) * 100) / 100;
+  }, [weekDaily, weekDayOffset, weekSalesDoc, isToday, shownTodaySales]);
+
   const lastWeekToDate = sumToSelectedDay(weekDaily?.lastWeek);
 
   const lastWeekDelta =
@@ -762,8 +798,7 @@ function OwnerDashboard({
   // hand back null so each card falls through to its "—" placeholder,
   // rather than briefly showing a cached figure that the live fetch is
   // about to overwrite with a different number.
-  const shownTodaySales =
-    metricsReady.sales && typeof stats?.todaySales === "number" ? stats.todaySales : null;
+  // shownTodaySales is defined above, next to the week math that reuses it.
   const shownLunchSales =
     metricsReady.sales && typeof stats?.lunchSales === "number" ? stats.lunchSales : null;
   const shownDinnerSales =

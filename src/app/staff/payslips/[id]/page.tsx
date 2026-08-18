@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import {
   fmtCurrency,
   fmtDateLong,
+  fmtHours,
   fmtPeriod,
   type Payslip,
 } from "../_data";
@@ -121,6 +122,30 @@ export default function PayslipDetailPage({
           <section className={styles.summaryCard}>
             <p className={styles.netLabel}>Net Pay</p>
             <p className={styles.netAmount}>{fmtCurrency(slip.netPay)}</p>
+
+            {/* Hours the pay was worked out from. Weeks that predate the
+                timesheet push have no hours in the sheet, so each row is
+                shown only when its own figure is recorded — a missing
+                value must not be rendered as "0.0 hrs". */}
+            {typeof slip.weekdayHours === "number" && (
+              <>
+                <div className={styles.summaryDivider} />
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryLabel}>Weekdays Hours</span>
+                  <span className={styles.summaryValue}>{fmtHours(slip.weekdayHours)}</span>
+                </div>
+              </>
+            )}
+
+            {typeof slip.saturdayHours === "number" && (
+              <>
+                <div className={styles.summaryDivider} />
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryLabel}>Saturday Hours</span>
+                  <span className={styles.summaryValue}>{fmtHours(slip.saturdayHours)}</span>
+                </div>
+              </>
+            )}
 
             <div className={styles.summaryDivider} />
 

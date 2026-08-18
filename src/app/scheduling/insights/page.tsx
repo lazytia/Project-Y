@@ -30,7 +30,7 @@ import styles from "./page.module.css";
  * Tune the constants below once the real data sources land.
  * ──────────────────────────────────────────────────────────────────── */
 
-const TARGET_PAYROLL_PCT = 25;
+const TARGET_PAYROLL_PCT = 28;
 const EST_HOURLY_RATE = 25;
 const LUNCH_END_H = 14;   // 2:00 pm
 const DINNER_END_H = 21;  // 9:00 pm
@@ -883,11 +883,10 @@ export default function InsightsPage() {
       </section>
 
       {rangeOverTarget && (
-        <button
-          type="button"
-          className={styles.alertBanner}
-          onClick={() => router.push("/scheduling/roster")}
-        >
+        // Read-only notice. It used to link through to the roster, but the
+        // roster is one tap away in the nav and the jump lost the range the
+        // reader had selected here — so this states the fact and nothing more.
+        <div className={styles.alertBanner}>
           <span className={styles.alertIcon} aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
@@ -899,8 +898,7 @@ export default function InsightsPage() {
             <p className={styles.alertTitle}>Payroll % was over target this week.</p>
             <p className={styles.alertSub}>Consider adjusting roster or reviewing shifts.</p>
           </div>
-          <span className={styles.alertChev} aria-hidden="true">›</span>
-        </button>
+        </div>
       )}
     </div>
   );
@@ -1081,11 +1079,11 @@ function buildTrendChart(
         y: padTop + ((yMax - v) / (yMax - yMin)) * (height - padTop - padBottom),
       });
     }
-    // The target already has its own "Target 25.0%" label anchored on the
+    // The target already has its own "Target 28.0%" label anchored on the
     // right of the chart, so we only inject a left-axis tick for it when
     // it lands far enough from every existing tick to read cleanly. Within
     // half a tick step it just piles on top of the neighbouring number
-    // (e.g. "25%" sitting on "24%").
+    // (e.g. "28%" sitting on "27%").
     const targetTooClose = yLabels.some(
       (l) => Math.abs(l.value - targetPct) < tickStep / 2,
     );

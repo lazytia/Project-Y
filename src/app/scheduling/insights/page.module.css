@@ -608,7 +608,9 @@
 .highVsAvgWarm { color: var(--color-warm); }
 .highVsAvgDanger { color: #c14545; }
 
-/* ── Over-target alert banner ── */
+/* ── Over-target alert banner ──
+   Read-only notice, not a control: no pointer cursor and no hover state,
+   so nothing invites a tap that would do nothing. */
 .alertBanner {
   display: flex;
   align-items: center;
@@ -618,14 +620,6 @@
   background: var(--color-warm-bg);
   border: 1px solid rgba(255, 106, 19, 0.25);
   border-radius: var(--radius-lg);
-  cursor: pointer;
-  font-family: var(--font-sans);
-  text-align: left;
-  color: inherit;
-}
-
-.alertBanner:hover {
-  background: rgba(255, 106, 19, 0.12);
 }
 
 .alertIcon {
@@ -660,12 +654,6 @@
   font-size: 12px;
   color: var(--color-fg-muted);
   line-height: 1.4;
-}
-
-.alertChev {
-  font-size: 20px;
-  color: var(--color-fg-muted);
-  flex-shrink: 0;
 }
 
 /* ── Refresh error banner ── */
