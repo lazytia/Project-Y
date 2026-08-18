@@ -96,14 +96,6 @@ function fmtWeekRange(mondayISO: string): string {
   return `${monPart} – ${sunPart}`;
 }
 
-/**
- * What the employee is actually paid out — super is an employer contribution
- * that never lands in their hands, so the "Total Pay" column leaves it out.
- */
-function payoutExclSuper(emp: EmployeePayRow): number {
-  return emp.totalIncSuper - emp.superAnn;
-}
-
 function fmtCurrency(n: number): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -218,10 +210,14 @@ export default function PayrollOverviewPage() {
     return safePct(summary.payrollPctSales, summary.payrollPctPrev);
   }, [summary]);
 
+  // Ranked by the same number the table prints — total including super, the
+  // sheet's own "Total Inc Super" column. Super is a per-employee figure from
+  // the sheet (not one shared rate), so ordering by a pay-out-only total
+  // could put the list in a different order than the amounts shown.
   const topPaid = useMemo(() => {
     if (!summary) return [];
     return [...summary.current.employees]
-      .sort((a, b) => payoutExclSuper(b) - payoutExclSuper(a))
+      .sort((a, b) => b.totalIncSuper - a.totalIncSuper)
       .slice(0, 5);
   }, [summary]);
 
@@ -392,7 +388,7 @@ export default function PayrollOverviewPage() {
             <thead>
               <tr>
                 <th className={styles.thLeft}>Employee</th>
-                <th className={styles.thRight}>Total Pay</th>
+                <th className={styles.thRight}>Total Inc Super</th>
               </tr>
             </thead>
             <tbody>
@@ -411,7 +407,7 @@ export default function PayrollOverviewPage() {
                         <span className={styles.empName}>{emp.name}</span>
                       </span>
                     </td>
-                    <td className={styles.tdRight}>{fmtCurrency(payoutExclSuper(emp))}</td>
+                    <td className={styles.tdRight}>{fmtCurrency(emp.totalIncSuper)}</td>
                   </tr>
                 ))
               )}

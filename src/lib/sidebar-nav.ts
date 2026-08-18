@@ -45,15 +45,16 @@ export const OWNER_NAV: NavGroup[] = [
     icon: "👥",
     label: "People",
     children: [
-      // The queue of things waiting on someone: pending holiday and
-      // availability requests, visas about to expire, onboarding forms
-      // submitted but not approved. First in the group because it is the
-      // only entry here that is asking to be acted on.
-      { label: "Attention Required", href: "/attention-required" },
+      // The four staff lists first, in lifecycle order, because that is what
+      // this group is browsed for day to day.
       { label: "New Employees", href: "/people/onboarding" },
       { label: "Active Employees", href: "/people/active" },
       { label: "Notice Given", href: "/people/notice-given" },
       { label: "Terminated", href: "/people/terminated" },
+      // The queue of things waiting on someone: pending holiday and
+      // availability requests, visas about to expire, onboarding forms
+      // submitted but not approved. Last, below the lists it draws from.
+      { label: "Attention Required", href: "/attention-required" },
     ],
   },
   {
@@ -88,6 +89,14 @@ export const OWNER_NAV: NavGroup[] = [
   },
 ];
 
+/** Team links every shift lead gets. */
+const TEAM_ADMIN_LINKS: NavItem[] = [
+  { label: "New Staff Requests", href: "/people/onboarding" },
+  { label: "HR Notes", href: "/people/hr-notes" },
+  { label: "Notice Given", href: "/people/notice-given" },
+  { label: "Cash Payments", href: "/people/cash-payments" },
+];
+
 // The two shift leads — chef (Chuck) and store manager (Yurina) — run the
 // same menu: Dashboard, Operations, Team, Training, Scheduling, Payslip,
 // in that order. Spec approved by owner.
@@ -97,57 +106,58 @@ export const OWNER_NAV: NavGroup[] = [
 // admin. Payslip is a single page, so it is a plain link rather than a
 // group wrapping one child.
 //
-// Written once and shared by both exports below. They were separate
-// literals while the menus genuinely differed; now that they don't, two
-// copies would only invite one of them to be edited alone. If a role needs
-// its own tree again, copy this array back out under that role's name —
-// don't add role flags to it, which is what made the earlier shared
-// version awkward to read.
-const SHIFT_LEAD_NAV: NavGroup[] = [
-  { icon: "🏠", label: "Dashboard", href: "/" },
-  {
-    icon: "🍽",
-    label: "Operations",
-    children: [
-      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
-      { label: "Reservations", href: "/operations/reservations" },
-      { label: "Catering Orders", href: "/operations/catering-orders" },
-    ],
-  },
-  {
-    icon: "👥",
-    label: "Team",
-    children: [
-      { label: "Attention Required", href: "/attention-required" },
-      { label: "New Staff Requests", href: "/people/onboarding" },
-      { label: "HR Notes", href: "/people/hr-notes" },
-      { label: "Notice Given", href: "/people/notice-given" },
-      { label: "Cash Payments", href: "/people/cash-payments" },
-    ],
-  },
-  {
-    icon: "📚",
-    label: "Training",
-    children: [
-      { label: "Staff Handbook", href: "/staff/handbook" },
-      { label: "Beer Guide", href: "/staff/beer-guide" },
-      { label: "Training Manual", href: "/staff/training-manual" },
-    ],
-  },
-  {
-    icon: "📅",
-    label: "Scheduling",
-    children: [
-      { label: "Roster", href: "/scheduling/roster" },
-      { label: "Roster Insights", href: "/scheduling/insights" },
-    ],
-  },
-  { icon: "💰", label: "Payslip", href: "/payslips" },
-];
+// Built by a factory rather than written twice: the two menus differ by
+// exactly one Team link (Attention Required, manager only), and two 45-line
+// copies would only invite one of them to be edited alone. The difference
+// is passed in, so it stays visible at each call site instead of turning
+// into a role flag buried in the tree — flags are what made the earlier
+// shared version awkward to read.
+function shiftLeadNav(teamChildren: NavItem[]): NavGroup[] {
+  return [
+    { icon: "🏠", label: "Dashboard", href: "/" },
+    {
+      icon: "🍽",
+      label: "Operations",
+      children: [
+        { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
+        { label: "Reservations", href: "/operations/reservations" },
+        { label: "Catering Orders", href: "/operations/catering-orders" },
+      ],
+    },
+    {
+      icon: "👥",
+      label: "Team",
+      children: teamChildren,
+    },
+    {
+      icon: "📚",
+      label: "Training",
+      children: [
+        { label: "Staff Handbook", href: "/staff/handbook" },
+        { label: "Beer Guide", href: "/staff/beer-guide" },
+        { label: "Training Manual", href: "/staff/training-manual" },
+      ],
+    },
+    {
+      icon: "📅",
+      label: "Scheduling",
+      children: [
+        { label: "Roster", href: "/scheduling/roster" },
+        { label: "Roster Insights", href: "/scheduling/insights" },
+      ],
+    },
+    { icon: "💰", label: "Payslip", href: "/payslips" },
+  ];
+}
 
-export const MANAGER_NAV: NavGroup[] = SHIFT_LEAD_NAV;
+// The manager triages the request queue; the chef doesn't, so his Team group
+// is the plain admin list.
+export const MANAGER_NAV: NavGroup[] = shiftLeadNav([
+  { label: "Attention Required", href: "/attention-required" },
+  ...TEAM_ADMIN_LINKS,
+]);
 
-export const CHEF_NAV: NavGroup[] = SHIFT_LEAD_NAV;
+export const CHEF_NAV: NavGroup[] = shiftLeadNav(TEAM_ADMIN_LINKS);
 
 export const STAFF_NAV: NavGroup[] = [
   { icon: "🏠", label: "Home", href: "/staff" },

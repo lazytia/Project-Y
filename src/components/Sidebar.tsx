@@ -151,10 +151,10 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     [t],
   );
 
-  // Chef and manager currently share one tree, so this branch picks the
-  // same thing either way. It stays because the two are separate exports
-  // and the role that owns each menu should be visible here the day they
-  // diverge again. Owners use ownerNav computed above.
+  // Chef and manager run the same menu apart from one Team link — the
+  // manager triages Attention Required, the chef doesn't — so the two trees
+  // are separate exports and this branch picks between them.
+  // Owners use ownerNav computed above.
   const managerNav: NavGroup[] = userIsChef ? CHEF_NAV : MANAGER_NAV;
 
   const visibleNav: NavGroup[] = userIsManager ? managerNav : ownerNav;
