@@ -60,12 +60,13 @@ export async function computeWeekPair(
 }
 
 /**
- * Gross value of tickets opened on `dateKey` that are still unpaid.
+ * Gross value of tickets opened on `dateKey` that nobody has paid for yet.
  *
- * Square's Sales reports only recognise an order once it is paid, so a full
- * dining room sitting on open tabs leaves the week-to-date figure flat. These
- * orders are counted here and drop out of the OPEN state the moment they are
- * paid, at which point Reporting picks them up — so nothing is counted twice.
+ * Square's Sales reports only recognise an order once it is paid, so open tabs
+ * would otherwise leave the week-to-date figure flat. The floor leaves tickets
+ * OPEN until the table is cleared, long after they are tendered, so the OPEN
+ * state alone is not a proxy for "Reporting has not seen it" — counting those
+ * double-counted them on top of the Reporting total.
  */
 export async function fetchOpenOrderGross(
   locationId: string,
@@ -74,7 +75,9 @@ export async function fetchOpenOrderGross(
 ): Promise<number> {
   const { startAt, endAt } = getDateRange(timezone, 0, dateKey);
   const orders = await fetchOrders(locationId, startAt, endAt, ["OPEN"]);
-  const cents = orders.reduce((sum, o) => sum + squareGrossSalesCents(o), 0);
+  const cents = orders
+    .filter((o) => (o.tenders ?? []).length === 0)
+    .reduce((sum, o) => sum + squareGrossSalesCents(o), 0);
   return Math.round(cents) / 100;
 }
 
