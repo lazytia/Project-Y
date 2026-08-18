@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
@@ -29,6 +29,19 @@ function isNavChildActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   if (href === "/onboarding" && pathname.startsWith("/onboarding")) return true;
   return pathname.startsWith(`${href}/`);
+}
+
+/**
+ * Label of the group that contains the current page, or null. Searched
+ * through the rendered tree — including grandchildren — so the answer is
+ * always whatever the menu actually looks like for this role.
+ */
+function groupOwningPath(nav: NavGroup[], pathname: string): string | null {
+  const owns = (items: NavItem[]): boolean =>
+    items.some(
+      (i) => isNavChildActive(pathname, i.href) || (i.children ? owns(i.children) : false),
+    );
+  return nav.find((g) => g.children && owns(g.children))?.label ?? null;
 }
 
 function NavChildList({
@@ -94,30 +107,76 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     else if (label === "Inventory") runWhenIdle(() => prefetchOwnerInventorySummaries(), 0);
   };
 
-  useEffect(() => {
-    if (pathname.startsWith("/onboarding") || pathname.startsWith("/staff/handbook") || pathname.startsWith("/staff/beer-guide")) {
-      setOpenGroup(t("nav.onboarding"));
-    } else if (pathname.startsWith("/staff/schedule")) {
-      setOpenGroup(t("nav.schedule"));
-    }
-  }, [pathname, t]);
-
   // Managers (yurina) get a curated nav — narrower than the owner nav and
   // explicit so the structure isn't accidentally widened later.
-  const ownerNav = OWNER_NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
-    .map((group) => ({
-      ...group,
-      children: group.children?.filter((c) => !c.ownerOnly || userIsStrictOwner),
-    }))
-    .filter(
-      (group) => group.href || (group.children && group.children.length > 0),
-    );
+  const ownerNav = useMemo(
+    () =>
+      OWNER_NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
+        .map((group) => ({
+          ...group,
+          children: group.children?.filter((c) => !c.ownerOnly || userIsStrictOwner),
+        }))
+        .filter((group) => group.href || (group.children && group.children.length > 0)),
+    [userIsStrictOwner],
+  );
+
+  // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
+  // Built here rather than inside the staff branch below so the open-group
+  // effect can see the same tree the staff member is looking at.
+  const staffNav: NavGroup[] = useMemo(
+    () => [
+      { icon: "🏠", label: t("nav.home"), href: "/staff" },
+      {
+        icon: "📋",
+        label: t("nav.onboarding"),
+        children: [
+          { label: t("nav.onboardingOverview"), href: "/onboarding" },
+          { label: t("nav.staffHandbook"), href: "/staff/handbook" },
+          { label: t("nav.beerGuide"), href: "/staff/beer-guide" },
+        ],
+      },
+      {
+        icon: "📅",
+        label: t("nav.schedule"),
+        children: [
+          { label: t("nav.roster"), href: "/staff/schedule/roster" },
+          { label: t("nav.requestHoliday"), href: "/staff/schedule/request-holiday" },
+          { label: t("nav.availabilityChange"), href: "/staff/schedule/availability-change" },
+        ],
+      },
+      { icon: "💰", label: t("nav.payslips"), href: "/staff/payslips" },
+      { icon: "📄", label: t("nav.myDocuments"), href: "/staff/documents" },
+      { icon: "⚙️", label: t("nav.settings"), href: "/staff/settings" },
+    ],
+    [t],
+  );
 
   // Chef gets his own dedicated tree (CHEF_NAV); managers still use
   // the manager tree. Owners use ownerNav computed above.
   const managerNav: NavGroup[] = userIsChef ? CHEF_NAV : MANAGER_NAV;
 
   const visibleNav: NavGroup[] = userIsManager ? managerNav : ownerNav;
+
+  /** The tree actually rendered below, so the effect and the markup agree. */
+  const activeNav: NavGroup[] = !userIsOwner && !userIsChef ? staffNav : visibleNav;
+
+  /**
+   * Keep the group containing the current page open.
+   *
+   * This used to be a list of path prefixes, with /staff/handbook and
+   * /staff/beer-guide wired to the staff menu's "Onboarding" group. Once
+   * those pages moved under the chef's new "Training" group, opening one
+   * closed Training and tried to open a group that isn't in his menu at
+   * all — so every Training link collapsed the accordion. Asking the tree
+   * which group owns the path can't drift out of step with the menu.
+   *
+   * Depends on the path and the tree, never on openGroup: a group the user
+   * expands by hand stays expanded until they navigate somewhere else.
+   */
+  useEffect(() => {
+    const owner = groupOwningPath(activeNav, pathname);
+    if (owner) setOpenGroup(owner);
+  }, [pathname, activeNav]);
 
   // Staff who haven't completed onboarding get a stripped sidebar — no nav
   // links, just brand + sign out. AuthProvider keeps them locked to
@@ -149,31 +208,8 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
   }
 
   // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
+  // staffNav is built above, next to the other trees.
   if (!userIsOwner && !userIsChef) {
-    const staffNav: NavGroup[] = [
-      { icon: "🏠", label: t("nav.home"), href: "/staff" },
-      {
-        icon: "📋",
-        label: t("nav.onboarding"),
-        children: [
-          { label: t("nav.onboardingOverview"), href: "/onboarding" },
-          { label: t("nav.staffHandbook"), href: "/staff/handbook" },
-          { label: t("nav.beerGuide"), href: "/staff/beer-guide" },
-        ],
-      },
-      {
-        icon: "📅",
-        label: t("nav.schedule"),
-        children: [
-          { label: t("nav.roster"), href: "/staff/schedule/roster" },
-          { label: t("nav.requestHoliday"), href: "/staff/schedule/request-holiday" },
-          { label: t("nav.availabilityChange"), href: "/staff/schedule/availability-change" },
-        ],
-      },
-      { icon: "💰", label: t("nav.payslips"), href: "/staff/payslips" },
-      { icon: "📄", label: t("nav.myDocuments"), href: "/staff/documents" },
-      { icon: "⚙️", label: t("nav.settings"), href: "/staff/settings" },
-    ];
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
         <div className={styles.brand}>YURICA</div>
