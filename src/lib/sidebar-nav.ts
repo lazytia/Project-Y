@@ -83,54 +83,22 @@ export const OWNER_NAV: NavGroup[] = [
   },
 ];
 
-export const MANAGER_NAV: NavGroup[] = [
-  { icon: "🏠", label: "Dashboard", href: "/" },
-  {
-    icon: "👥",
-    label: "Team",
-    children: [
-      { label: "New Staff Requests", href: "/people/onboarding" },
-      { label: "Staff Handbook", href: "/staff/handbook" },
-      { label: "Beer Guide", href: "/staff/beer-guide" },
-      { label: "Training Manual", href: "/staff/training-manual" },
-      { label: "HR Notes", href: "/people/hr-notes" },
-      { label: "Notice Given", href: "/people/notice-given" },
-      { label: "Cash Payments", href: "/people/cash-payments" },
-    ],
-  },
-  {
-    icon: "📅",
-    label: "Scheduling",
-    children: [
-      { label: "Roster", href: "/scheduling/roster" },
-      { label: "Roster Insights", href: "/scheduling/insights" },
-    ],
-  },
-  {
-    icon: "🍽",
-    label: "Operations",
-    children: [
-      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
-      { label: "Reservations", href: "/operations/reservations" },
-      { label: "Catering Orders", href: "/operations/catering-orders" },
-    ],
-  },
-  {
-    icon: "💰",
-    label: "Payroll",
-    children: [{ label: "Payslips", href: "/payslips" }],
-  },
-];
-
-// Chef (Chuck) gets his own dedicated nav — spec approved by owner:
-// Dashboard, Operations, Team, Training, Scheduling, Payslip, in that
-// order. Reference material (Staff Handbook / Beer Guide / Training
-// Manual) sits in its own Training group rather than under Team, which
-// is now purely people admin. Payslip is a single page, so it is a plain
-// link rather than a group wrapping one child.
-// Different enough from MANAGER_NAV that filtering via chefHidden was
-// getting awkward — keeping them separate is clearer.
-export const CHEF_NAV: NavGroup[] = [
+// The two shift leads — chef (Chuck) and store manager (Yurina) — run the
+// same menu: Dashboard, Operations, Team, Training, Scheduling, Payslip,
+// in that order. Spec approved by owner.
+//
+// Reference material (Staff Handbook / Beer Guide / Training Manual) sits
+// in its own Training group rather than under Team, which is purely people
+// admin. Payslip is a single page, so it is a plain link rather than a
+// group wrapping one child.
+//
+// Written once and shared by both exports below. They were separate
+// literals while the menus genuinely differed; now that they don't, two
+// copies would only invite one of them to be edited alone. If a role needs
+// its own tree again, copy this array back out under that role's name —
+// don't add role flags to it, which is what made the earlier shared
+// version awkward to read.
+const SHIFT_LEAD_NAV: NavGroup[] = [
   { icon: "🏠", label: "Dashboard", href: "/" },
   {
     icon: "🍽",
@@ -170,6 +138,10 @@ export const CHEF_NAV: NavGroup[] = [
   },
   { icon: "💰", label: "Payslip", href: "/payslips" },
 ];
+
+export const MANAGER_NAV: NavGroup[] = SHIFT_LEAD_NAV;
+
+export const CHEF_NAV: NavGroup[] = SHIFT_LEAD_NAV;
 
 export const STAFF_NAV: NavGroup[] = [
   { icon: "🏠", label: "Home", href: "/staff" },

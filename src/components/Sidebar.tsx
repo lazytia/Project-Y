@@ -151,8 +151,10 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     [t],
   );
 
-  // Chef gets his own dedicated tree (CHEF_NAV); managers still use
-  // the manager tree. Owners use ownerNav computed above.
+  // Chef and manager currently share one tree, so this branch picks the
+  // same thing either way. It stays because the two are separate exports
+  // and the role that owns each menu should be visible here the day they
+  // diverge again. Owners use ownerNav computed above.
   const managerNav: NavGroup[] = userIsChef ? CHEF_NAV : MANAGER_NAV;
 
   const visibleNav: NavGroup[] = userIsManager ? managerNav : ownerNav;
