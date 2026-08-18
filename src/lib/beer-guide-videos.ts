@@ -1,4 +1,10 @@
 /** YURICA Beer Guide training videos (Firebase Storage). */
+
+/** Recorded alongside a staff member's signature so a future re-cut of the
+ *  videos can be told apart from the set they actually acknowledged. */
+export const BEER_GUIDE_VERSION = "1.0";
+export const BEER_GUIDE_UPDATED = "June 2026";
+
 export const BEER_GUIDE_VIDEOS = [
   {
     titleKey: "staff.beerGuide.introduce",

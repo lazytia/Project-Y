@@ -342,9 +342,7 @@ const EN: Dict = {
   "staff.time.hAgo": "h ago",
   "staff.time.dAgo": "d ago",
   "staff.time.wAgo": "w ago",
-  "staff.handbook.subtitle": "Your signed copy of the YURICA Staff Handbook.",
-  "staff.handbook.signedOn": "Signed on",
-  "staff.handbook.notSigned": "No signature on file.",
+  "staff.handbook.subtitle": "Your copy of the YURICA Staff Handbook.",
   "staff.beerGuide.subtitle": "Training videos for beer service and glassware.",
   "staff.beerGuide.introduce": "Introduce",
   "staff.beerGuide.forManagers": "For Managers",
@@ -354,6 +352,24 @@ const EN: Dict = {
   "staff.beerGuide.cleanBeerTap1": "How to clean beer tap — Part 1",
   "staff.beerGuide.cleanBeerTap2": "How to clean beer tap — Part 2",
   "staff.beerGuide.cleanBeerTap3": "How to clean beer tap — Part 3",
+
+  // Employee acknowledgement (signing block at the foot of a document)
+  "doc.ack.title": "Employee Acknowledgement",
+  "doc.ack.body.handbook":
+    "Please confirm that you have read, understood, and agree to follow the policies and expectations outlined in the YURICA Staff Handbook.",
+  "doc.ack.body.beerGuide":
+    "Please confirm that you have watched these training videos, understood them, and agree to follow the beer service standards they set out.",
+  "doc.ack.status": "Signature status",
+  "doc.ack.notSigned": "Not signed",
+  "doc.ack.signed": "Signed",
+  "doc.ack.tapToSign": "Tap to sign",
+  "doc.ack.hint": "Sign in the box above",
+  "doc.ack.button": "Acknowledge & Sign",
+  "doc.ack.saving": "Saving…",
+  "doc.ack.saveError": "Could not save your signature.",
+  "doc.ack.version": "Version",
+  "doc.ack.updated": "Last Updated",
+  "doc.ack.signedOn": "Signed on",
 
   // My Documents
   "docs.title": "My Documents",
@@ -792,9 +808,7 @@ const JA: Dict = {
   "staff.time.hAgo": "時間前",
   "staff.time.dAgo": "日前",
   "staff.time.wAgo": "週間前",
-  "staff.handbook.subtitle": "署名済みのYURICAスタッフハンドブックです。",
-  "staff.handbook.signedOn": "署名日",
-  "staff.handbook.notSigned": "署名記録がありません。",
+  "staff.handbook.subtitle": "YURICAスタッフハンドブックです。",
   "staff.beerGuide.subtitle": "ビール提供とグラスの扱いに関する研修動画です。",
   "staff.beerGuide.introduce": "イントロダクション",
   "staff.beerGuide.forManagers": "マネージャー向け",
@@ -804,6 +818,24 @@ const JA: Dict = {
   "staff.beerGuide.cleanBeerTap1": "ビールタップの清掃 — パート 1",
   "staff.beerGuide.cleanBeerTap2": "ビールタップの清掃 — パート 2",
   "staff.beerGuide.cleanBeerTap3": "ビールタップの清掃 — パート 3",
+
+  // Employee acknowledgement
+  "doc.ack.title": "従業員確認署名",
+  "doc.ack.body.handbook":
+    "YURICAスタッフハンドブックに記載された方針と期待事項を読み、理解し、遵守することに同意することを確認してください。",
+  "doc.ack.body.beerGuide":
+    "これらの研修動画を視聴し、内容を理解した上で、ビール提供の基準に従うことに同意することを確認してください。",
+  "doc.ack.status": "署名の状態",
+  "doc.ack.notSigned": "未署名",
+  "doc.ack.signed": "署名済み",
+  "doc.ack.tapToSign": "タップして署名",
+  "doc.ack.hint": "上のボックスに署名してください",
+  "doc.ack.button": "確認して署名する",
+  "doc.ack.saving": "保存中…",
+  "doc.ack.saveError": "署名を保存できませんでした。",
+  "doc.ack.version": "バージョン",
+  "doc.ack.updated": "最終更新",
+  "doc.ack.signedOn": "署名日",
 
   // My Documents
   "docs.title": "マイドキュメント",

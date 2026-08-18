@@ -157,6 +157,14 @@ service cloud.firestore {
       allow read, write: if isOwner() && request.auth.uid == uid;
     }
 
+    // Signed acknowledgements of internal documents (Staff Handbook, Beer
+    // Guide), one doc per signer. Kept out of staff_onboarding because that
+    // collection is enumerated to build the People lists — a manager signing
+    // the handbook must not become an employee record.
+    match /document_signatures/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

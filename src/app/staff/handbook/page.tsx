@@ -1,78 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, type Timestamp } from "firebase/firestore";
-import { getDb } from "@/lib/firebase";
-import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
+import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
 import StaffHandbookDocument, {
   HANDBOOK_UPDATED,
   HANDBOOK_VERSION,
 } from "@/components/StaffHandbookDocument";
-import Splash from "@/components/Splash";
 import handbookStyles from "@/app/onboarding/policies/staff-handbook/page.module.css";
 import styles from "./page.module.css";
 
-function tsToDate(v: unknown): Date | null {
-  if (!v) return null;
-  if (v instanceof Date) return v;
-  if (typeof v === "object" && v !== null && "toDate" in v) {
-    return (v as Timestamp).toDate();
-  }
-  return null;
-}
-
-function fmtDate(d: Date | null): string {
-  if (!d) return "—";
-  return d.toLocaleDateString("en-AU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-type HandbookPolicies = {
-  handbookSignedAt?: Timestamp;
-  handbookVersion?: string;
-  handbookSignature?: string;
-};
-
 export default function StaffHandbookPage() {
   const router = useRouter();
-  const { user } = useAuth();
   const { t } = useLang();
-  const [loading, setLoading] = useState(true);
-  const [policies, setPolicies] = useState<HandbookPolicies | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
-        const data = snap.data() ?? {};
-        setPolicies((data.policies ?? {}) as HandbookPolicies);
-      } catch {
-        setPolicies(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user]);
-
-  if (loading) return <Splash />;
-
-  const signedAt = tsToDate(policies?.handbookSignedAt);
-  const signature = policies?.handbookSignature ?? null;
-  const version = policies?.handbookVersion ?? HANDBOOK_VERSION;
 
   return (
     <div className={styles.page}>
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => router.push("/onboarding")}
+        onClick={() => router.back()}
         aria-label={t("common.back")}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -89,44 +36,12 @@ export default function StaffHandbookPage() {
       <div className={handbookStyles.page}>
         <StaffHandbookDocument />
 
-        <section className={handbookStyles.section}>
-          <h2 className={handbookStyles.ackTitle}>{t("onb.pol.hb.ack.title")}</h2>
-          <div className={handbookStyles.ackUnderline} />
-          <p className={handbookStyles.ackBody}>{t("onb.pol.hb.ack.body")}</p>
-
-          <div className={handbookStyles.signatureBlock}>
-            <span className={handbookStyles.signatureLabel}>
-              {t("onb.pol.signatureIntroHandbook")}
-            </span>
-            {signature ? (
-              <div className={handbookStyles.signaturePreview}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={signature}
-                  alt="Your signature"
-                  className={handbookStyles.signatureImg}
-                />
-              </div>
-            ) : (
-              <p className={styles.unsigned}>{t("staff.handbook.notSigned")}</p>
-            )}
-          </div>
-
-          <div className={handbookStyles.metaRow}>
-            <div className={handbookStyles.metaItem}>
-              <span>{t("onb.pol.hb.meta.version")}</span>
-              <span>{version}</span>
-            </div>
-            <div className={handbookStyles.metaItem}>
-              <span>{t("onb.pol.hb.meta.updated")}</span>
-              <span>{HANDBOOK_UPDATED}</span>
-            </div>
-            <div className={handbookStyles.metaItem}>
-              <span>{t("staff.handbook.signedOn")}</span>
-              <span>{fmtDate(signedAt)}</span>
-            </div>
-          </div>
-        </section>
+        <DocumentAcknowledgement
+          documentKey="handbook"
+          version={HANDBOOK_VERSION}
+          updated={HANDBOOK_UPDATED}
+          bodyKey="doc.ack.body.handbook"
+        />
       </div>
     </div>
   );

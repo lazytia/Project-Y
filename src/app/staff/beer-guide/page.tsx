@@ -2,7 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useLang } from "@/components/LanguageProvider";
-import { BEER_GUIDE_VIDEOS } from "@/lib/beer-guide-videos";
+import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
+import {
+  BEER_GUIDE_UPDATED,
+  BEER_GUIDE_VERSION,
+  BEER_GUIDE_VIDEOS,
+} from "@/lib/beer-guide-videos";
 import styles from "./page.module.css";
 
 export default function BeerGuidePage() {
@@ -47,6 +52,13 @@ export default function BeerGuidePage() {
           </li>
         ))}
       </ol>
+
+      <DocumentAcknowledgement
+        documentKey="beerGuide"
+        version={BEER_GUIDE_VERSION}
+        updated={BEER_GUIDE_UPDATED}
+        bodyKey="doc.ack.body.beerGuide"
+      />
     </div>
   );
 }

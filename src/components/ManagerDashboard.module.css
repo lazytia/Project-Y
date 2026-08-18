@@ -5,7 +5,7 @@
   padding: var(--space-4) var(--space-5) var(--space-7);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
 /* ── Greeting ── */
@@ -39,31 +39,35 @@
   color: var(--color-fg);
 }
 
-/* Training Manual / Staff Handbook "action required" banner for the
-   Chef dashboard. Warm-tinted card with the update summary on the left
-   and a solid CTA on the right. */
-.trainingBanner {
+/* "You still have to sign this" rows, directly under the greeting. One
+   per unsigned document; each links into the document and disappears
+   once the signature is stored. */
+.signBanners {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.signBanner {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--color-warm-bg);
   border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
 }
 
-.trainingIconWrap {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--color-warm);
-  color: #fff;
+.signBanner:hover { filter: brightness(0.97); }
+
+.signBannerIcon {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--color-warm);
   flex-shrink: 0;
 }
 
-.trainingBody {
+.signBannerBody {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -71,41 +75,23 @@
   gap: 2px;
 }
 
-.trainingEyebrow {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--color-warm);
-}
-
-.trainingTitle {
-  margin: 0;
-  font-size: 15px;
+.signBannerTitle {
+  font-size: 14px;
   font-weight: 800;
   color: var(--color-fg);
 }
 
-.trainingSub {
-  margin: 0;
-  font-size: 13px;
+.signBannerSub {
+  font-size: 12px;
   color: var(--color-fg-muted);
 }
 
-.trainingCta {
-  padding: 10px 16px;
-  background: var(--color-warm);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 13px;
+.signBannerCta {
+  font-size: 12px;
   font-weight: 700;
-  text-decoration: none;
+  color: var(--color-warm);
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-.trainingCta:hover {
-  filter: brightness(0.95);
 }
 
 .sectionHead {
@@ -155,8 +141,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: var(--space-4) var(--space-2);
+  gap: 2px;
+  padding: var(--space-3) var(--space-2);
   text-decoration: none;
   color: inherit;
   border-right: 1px solid var(--color-border);
@@ -171,8 +157,8 @@
 }
 
 .attentionValue {
-  margin: 6px 0 0;
-  font-size: 28px;
+  margin: 3px 0 0;
+  font-size: 23px;
   font-weight: 800;
   color: var(--color-warm);
   letter-spacing: -0.02em;
@@ -180,12 +166,12 @@
 }
 
 .attentionLabel {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 2px 0 0;
+  font-size: 11px;
   font-weight: 600;
   color: var(--color-fg);
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 /* ── Today's Operations ── */
@@ -198,8 +184,8 @@
 .opsCard {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: var(--space-4);
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -215,8 +201,8 @@
 }
 
 .opsValue {
-  margin: 6px 0 0;
-  font-size: 30px;
+  margin: 3px 0 0;
+  font-size: 26px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.02em;
@@ -231,8 +217,8 @@
 }
 
 .opsLabel {
-  margin: 6px 0 0;
-  font-size: 13px;
+  margin: 3px 0 0;
+  font-size: 12px;
   color: var(--color-fg-muted);
   font-weight: 500;
 }
@@ -244,14 +230,14 @@
 }
 
 .opsHeadLabel {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-fg);
 }
 
 .opsCountdown {
-  margin: 6px 0 0;
-  font-size: 30px;
+  margin: 3px 0 0;
+  font-size: 26px;
   font-weight: 800;
   color: var(--color-warm);
   letter-spacing: -0.02em;
@@ -262,16 +248,16 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 8px 0 0;
-  font-size: 12px;
+  margin: 5px 0 0;
+  font-size: 11px;
   color: var(--color-fg-muted);
 }
 
 .opsWeekLine {
-  margin: 8px 0 0;
-  font-size: 12px;
+  margin: 5px 0 0;
+  font-size: 11px;
   color: var(--color-fg-muted);
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .opsViewLink {
@@ -279,8 +265,8 @@
   align-items: center;
   gap: 4px;
   margin-top: auto;
-  padding-top: 8px;
-  font-size: 13px;
+  padding-top: 6px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-warm);
   text-decoration: none;

@@ -18,8 +18,18 @@ import type { ManagerDashServerSnapshot } from "@/lib/manager-dash-server";
 import type { DashboardKind } from "@/lib/session-dashboard";
 import { isManagerDashboardKind } from "@/lib/session-dashboard";
 import { sydneyTodayKey } from "@/lib/sydney-date";
+import {
+  fetchDocumentSignatures,
+  SIGNABLE_DOCUMENT_KEYS,
+  type SignableDocumentKey,
+} from "@/lib/document-signatures";
 import DashboardReadyMarker from "@/components/DashboardReadyMarker";
 import styles from "./ManagerDashboard.module.css";
+
+const SIGNABLE_DOCS: Record<SignableDocumentKey, { label: string; href: string; cta: string }> = {
+  handbook: { label: "Staff Handbook", href: "/staff/handbook", cta: "Go to Handbook" },
+  beerGuide: { label: "Beer Guide", href: "/staff/beer-guide", cta: "Go to Beer Guide" },
+};
 
 type AttentionCounts = {
   holidayRequests: number;
@@ -310,6 +320,24 @@ export default function ManagerDashboard({
     })();
   }, [hideAttention]);
 
+  const [unsignedDocs, setUnsignedDocs] = useState<SignableDocumentKey[]>([]);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const signatures = await fetchDocumentSignatures(user.uid);
+        if (!cancelled) {
+          setUnsignedDocs(SIGNABLE_DOCUMENT_KEYS.filter((key) => !signatures[key]));
+        }
+      } catch {
+        // Stay silent on a read failure: a "not signed" banner that signing
+        // cannot clear is worse than showing no banner at all.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
   const fetchLiveData = useCallback(async () => {
     const [salesResult, reservationsResult, cateringResult, teamResult] = await Promise.allSettled([
       fetch(`/api/square/today-sales-brief?date=${encodeURIComponent(todayKey)}`).then(async (res) => {
@@ -413,29 +441,28 @@ export default function ManagerDashboard({
         <p className={styles.greetingRole}>{roleLabel}</p>
       </header>
 
-      {/* Chef-only: Training Manual / Staff Handbook update banner.
-          Static v2.4 for now — full version tracking is a follow-up
-          (needs a training_manual_versions Firestore collection and
-          per-user ack tracking). "Review Now" jumps into the review
-          page where Chuck signs to acknowledge the changes. */}
-      {sessionDashboard === "chef" && (
-        <section className={styles.trainingBanner}>
-          <div className={styles.trainingIconWrap} aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="12" y1="12" x2="12" y2="18" />
-              <line x1="9" y1="15" x2="15" y2="15" />
-            </svg>
-          </div>
-          <div className={styles.trainingBody}>
-            <p className={styles.trainingEyebrow}>ACTION REQUIRED</p>
-            <p className={styles.trainingTitle}>Training Manual Updated</p>
-            <p className={styles.trainingSub}>Please review and sign v2.4.</p>
-          </div>
-          <Link href="/staff/training-manual" className={styles.trainingCta}>
-            Review Now <span aria-hidden="true">→</span>
-          </Link>
+      {/* Documents this account still has to sign. Each row links straight
+          into the document and disappears once the signature is stored. */}
+      {unsignedDocs.length > 0 && (
+        <section className={styles.signBanners}>
+          {unsignedDocs.map((key) => (
+            <Link key={key} href={SIGNABLE_DOCS[key].href} className={styles.signBanner}>
+              <span className={styles.signBannerIcon} aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </span>
+              <span className={styles.signBannerBody}>
+                <span className={styles.signBannerTitle}>{SIGNABLE_DOCS[key].label} not signed</span>
+                <span className={styles.signBannerSub}>Please review and sign</span>
+              </span>
+              <span className={styles.signBannerCta}>
+                {SIGNABLE_DOCS[key].cta} <span aria-hidden="true">›</span>
+              </span>
+            </Link>
+          ))}
         </section>
       )}
 
@@ -448,7 +475,7 @@ export default function ManagerDashboard({
           </div>
           <div className={styles.attentionCard}>
             <Link href="/attention-required?filter=holiday" className={styles.attentionCell}>
-              <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className={styles.attentionIcon} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" />
@@ -459,7 +486,7 @@ export default function ManagerDashboard({
             </Link>
 
             <Link href="/attention-required?filter=availability" className={styles.attentionCell}>
-              <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className={styles.attentionIcon} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
                 <circle cx="19" cy="8" r="3" />
@@ -469,7 +496,7 @@ export default function ManagerDashboard({
             </Link>
 
             <Link href="/attention-required?filter=compliance" className={styles.attentionCell}>
-              <svg className={styles.attentionIcon} width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className={styles.attentionIcon} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="16" rx="2" />
                 <circle cx="9" cy="11" r="2.2" />
                 <path d="M5.5 17c0-1.6 1.6-2.7 3.5-2.7s3.5 1.1 3.5 2.7" />
@@ -488,7 +515,7 @@ export default function ManagerDashboard({
         <div className={styles.opsRow}>
           <div className={styles.opsCard}>
             <div className={styles.opsCardHead}>
-              <svg className={styles.opsIcon} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg className={styles.opsIcon} width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" />
@@ -508,7 +535,7 @@ export default function ManagerDashboard({
 
           <div className={styles.opsCard}>
             <div className={styles.opsCardHead}>
-              <svg className={styles.opsIcon} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg className={styles.opsIcon} width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 18h18" />
                 <path d="M5 18a7 7 0 0 1 14 0" />
                 <circle cx="12" cy="6" r="1.6" />
