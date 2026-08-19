@@ -1085,3 +1085,26 @@
   border-radius: var(--radius-sm);
   padding: 8px 10px;
 }
+
+/* Cancelled covers. Shown as a negative beside the totals they have already
+   been taken out of, so a day reads as booked minus cancelled rather than
+   quietly losing the seats. */
+.serviceCardLost {
+  margin: 6px 0 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-negative);
+  text-align: center;
+}
+
+.heroLost {
+  margin: 4px 0 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-negative);
+}
+
+.sectionStatsLost {
+  color: var(--color-negative);
+  font-weight: 700;
+}

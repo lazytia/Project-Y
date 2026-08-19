@@ -428,3 +428,11 @@
 }
 .bestName { flex: 1; color: var(--color-fg); font-size: var(--font-size-sm); }
 .bestSales { color: var(--color-fg); font-weight: 700; font-size: var(--font-size-sm); }
+
+/* Guests booked into this service and then cancelled. Already off the PAX
+   count beside it, so it reads as a deduction rather than a second total. */
+.mealLost {
+  margin-left: 4px;
+  font-weight: 700;
+  color: var(--color-negative);
+}

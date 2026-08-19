@@ -44,6 +44,48 @@ export type Reservation = {
   customerUpdatedAt?: FirestoreTimestamp;
 };
 
+/**
+ * Upstream status spellings mapped onto the ones this app uses.
+ *
+ * The booking platform writes a cancellation as "canceled" while everything
+ * here — including the status we send it — says "cancelled". Nothing ever
+ * matched, so a cancelled booking was read as a live one and its guests kept
+ * counting towards the covers on the dashboard and the reservations page.
+ * Keys are compared with every non-letter stripped, so "no-show", "no_show"
+ * and "NO SHOW" all land on the same entry.
+ */
+const STATUS_ALIASES: Record<string, ReservationStatus> = {
+  pending: "pending",
+  unconfirmed: "unconfirmed",
+  updated: "updated",
+  confirmed: "confirmed",
+  seated: "seated",
+  noshow: "no-show",
+  cancelled: "cancelled",
+  canceled: "cancelled",
+};
+
+/** Canonical status for a raw upstream value, or undefined if unrecognised. */
+export function normalizeReservationStatus(raw: unknown): ReservationStatus | undefined {
+  if (typeof raw !== "string") return undefined;
+  return STATUS_ALIASES[raw.trim().toLowerCase().replace(/[^a-z]/g, "")];
+}
+
+/** Cancelled bookings are still real rows — they just don't seat anyone. */
+export function isCancelled(r: Reservation): boolean {
+  return r.status === "cancelled";
+}
+
+/** Guests on the given bookings, cancellations excluded. */
+export function guestCount(rows: Reservation[]): number {
+  return rows.reduce((sum, r) => (isCancelled(r) ? sum : sum + r.count), 0);
+}
+
+/** Guests that were booked and then cancelled — reported as a negative. */
+export function cancelledGuestCount(rows: Reservation[]): number {
+  return rows.reduce((sum, r) => (isCancelled(r) ? sum + r.count : sum), 0);
+}
+
 /** Convert Firestore-style timestamp (or epoch / ISO string) into a Date. */
 export function tsToDate(ts: FirestoreTimestamp): Date | null {
   if (ts == null) return null;
@@ -98,7 +140,11 @@ export async function fetchReservationsForDate(
   const res = await fetch(url, { cache: "no-store", headers: await authHeader(user) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
-  return ((data?.reservations ?? []) as Reservation[]).sort((a, b) => a.time.localeCompare(b.time));
+  // Normalised on the way in, so every screen downstream can compare against
+  // one spelling instead of guessing which one the platform sent.
+  return ((data?.reservations ?? []) as Reservation[])
+    .map((r) => ({ ...r, status: normalizeReservationStatus(r.status) }))
+    .sort((a, b) => a.time.localeCompare(b.time));
 }
 
 export async function createReservation(

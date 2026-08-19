@@ -31,7 +31,10 @@ import {
 } from "@/lib/sydney-date";
 import {
   type Reservation,
+  cancelledGuestCount,
   fetchReservationsForDate,
+  guestCount,
+  isCancelled,
   serviceFor,
 } from "@/lib/reservations";
 import {
@@ -470,7 +473,7 @@ function OwnerDashboard({
     try {
       const data = await fetchReservationsForDate(user, dateKey, "northsydney");
       setReservations(data);
-      const active = data.filter((r) => r.status !== "cancelled" && r.status !== "no-show");
+      const active = data.filter((r) => !isCancelled(r) && r.status !== "no-show");
       const lunchPax = active
         .filter((r) => serviceFor(r.time) === "LUNCH")
         .reduce((s, r) => s + r.count, 0);
@@ -701,15 +704,21 @@ function OwnerDashboard({
 
   const resCounts = useMemo(() => {
     if (reservations) {
-      const active = reservations.filter((r) => r.status !== "cancelled" && r.status !== "no-show");
-      const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
-      const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
+      const seatable = reservations.filter((r) => r.status !== "no-show");
+      const lunch = seatable.filter((r) => serviceFor(r.time) === "LUNCH");
+      const dinner = seatable.filter((r) => serviceFor(r.time) === "DINNER");
+      // Cancellations are off the covers but still worth seeing, so they come
+      // back alongside the pax rather than disappearing into the filter.
       return {
-        lunchPax: lunch.reduce((s, r) => s + r.count, 0),
-        dinnerPax: dinner.reduce((s, r) => s + r.count, 0),
+        lunchPax: guestCount(lunch),
+        dinnerPax: guestCount(dinner),
+        lunchCancelled: cancelledGuestCount(lunch),
+        dinnerCancelled: cancelledGuestCount(dinner),
       };
     }
-    return cachedPax;
+    // The session cache only ever stored pax, so a cold paint shows no
+    // cancellations until the live fetch lands a moment later.
+    return cachedPax && { ...cachedPax, lunchCancelled: 0, dinnerCancelled: 0 };
   }, [reservations, cachedPax]);
 
   const nextCatering = useMemo((): { deliveryDateISO: string } | null => {
@@ -940,6 +949,9 @@ function OwnerDashboard({
                 </p>
                 <p className={styles.mealSub}>
                   <span aria-hidden="true">👤</span> {shownResCounts?.lunchPax ?? "—"} PAX
+                  {!!shownResCounts?.lunchCancelled && (
+                    <span className={styles.mealLost}>−{shownResCounts.lunchCancelled}</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -952,6 +964,9 @@ function OwnerDashboard({
                 </p>
                 <p className={styles.mealSub}>
                   <span aria-hidden="true">👥</span> {shownResCounts?.dinnerPax ?? "—"} PAX
+                  {!!shownResCounts?.dinnerCancelled && (
+                    <span className={styles.mealLost}>−{shownResCounts.dinnerCancelled}</span>
+                  )}
                 </p>
               </div>
             </div>
