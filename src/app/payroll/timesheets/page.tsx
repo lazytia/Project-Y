@@ -232,6 +232,10 @@ function readPublication(data: unknown): PublicationState {
 type ViewMode = "day" | "staff";
 type DatePreset = "today" | "yesterday" | "this-week" | "last-7" | "last-30" | "custom";
 
+/** How many pay weeks the publish picker lists, newest first. 52 covers the
+ *  same 12 months the staff payslip page is willing to show. */
+const PAY_WEEK_CHOICES = 52;
+
 function rangeForPreset(preset: DatePreset): { start: string; end: string } {
   const today = sydneyTodayISO();
   if (preset === "today") return { start: today, end: today };
@@ -290,16 +294,37 @@ export default function TimesheetsPage() {
    * Payslip release switch.
    *
    * Pay weeks run Monday–Sunday, but this page's date range is free-form —
-   * the default is the last 7 days, which starts mid-week. So the week the
-   * button releases is derived from the range's start date, and the card
-   * prints the Monday–Sunday period it resolved to: the owner should never
-   * have to work out which week a click will publish.
+   * the default is the last 7 days, which starts mid-week. The card therefore
+   * picks its own week rather than inheriting the range verbatim, seeded from
+   * the Monday the range starts in so the common case needs no interaction,
+   * and re-seeded whenever the range moves. The owner can override it from the
+   * card's own picker: publishing a week you are not currently looking at (a
+   * late correction to a fortnight-old week, say) shouldn't mean rewriting the
+   * date range and losing your place in the shift list.
    */
-  const payWeekStartISO = useMemo(() => (startISO ? isoMondayOf(startISO) : ""), [startISO]);
+  const rangePayWeekISO = useMemo(() => (startISO ? isoMondayOf(startISO) : ""), [startISO]);
+  const [payWeekStartISO, setPayWeekStartISO] = useState(rangePayWeekISO);
+  useEffect(() => {
+    setPayWeekStartISO(rangePayWeekISO);
+  }, [rangePayWeekISO]);
   const payWeekEndISO = useMemo(
     () => (payWeekStartISO ? isoSundayOfWeek(payWeekStartISO) : ""),
     [payWeekStartISO],
   );
+  /** Weeks offered in the picker. Matched to the 12 months the staff payslip
+   *  page offers — there is no point releasing a week nobody can open. */
+  const payWeekChoices = useMemo(() => {
+    const weeks = new Set<string>();
+    let cur = isoMondayOf(sydneyTodayISO());
+    for (let i = 0; i < PAY_WEEK_CHOICES; i++) {
+      weeks.add(cur);
+      cur = addDaysISO(cur, -7);
+    }
+    // A range dragged back past the window would otherwise leave the select
+    // with no matching option, which renders as a blank control.
+    if (payWeekStartISO) weeks.add(payWeekStartISO);
+    return [...weeks].sort().reverse();
+  }, [payWeekStartISO]);
   const [publication, setPublication] = useState<PublicationState | null>(null);
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
@@ -723,12 +748,26 @@ export default function TimesheetsPage() {
                 publication.employeeCount === 1 ? "employee" : "employees"
               }`}
         </p>
-        <p className={styles.publishMeta}>
+        <label className={styles.publishWeek}>
           <span className={styles.publishMetaIcon} aria-hidden="true">
             <CalIconSm />
           </span>
-          For pay period {fmtPayPeriod(payWeekStartISO, payWeekEndISO)}
-        </p>
+          <span className={styles.publishWeekLabel}>For pay period</span>
+          <select
+            className={styles.publishWeekSelect}
+            value={payWeekStartISO}
+            // Saving writes the week captured at click time, so let the
+            // picker settle before it can be moved again.
+            disabled={publishBusy}
+            onChange={(e) => setPayWeekStartISO(e.target.value)}
+          >
+            {payWeekChoices.map((weekISO) => (
+              <option key={weekISO} value={weekISO}>
+                {fmtPayPeriod(weekISO, isoSundayOfWeek(weekISO))}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <button
           type="button"

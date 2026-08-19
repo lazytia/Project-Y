@@ -184,6 +184,54 @@
   flex-shrink: 0;
 }
 
+/* The week picker reads as one more line of card metadata, not a form field:
+   same size and colour as .publishMeta, with the select itself carrying the
+   only affordance so the card stays quiet until you reach for it. */
+.publishWeek {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.publishWeekLabel {
+  flex-shrink: 0;
+}
+
+.publishWeekSelect {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  padding: 6px 28px 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.08);
+  /* Chevron drawn inline so the control needs no extra markup and the arrow
+     inherits the card's palette instead of the OS default. */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='0.6'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.publishWeekSelect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Native option lists render on the OS surface, so they need explicit
+   colours — inheriting white-on-transparent from the card leaves the
+   menu unreadable on light system themes. */
+.publishWeekSelect option {
+  background: #1a1a1a;
+  color: #fff;
+}
+
 .publishBtn {
   margin-top: 4px;
   padding: 13px 18px;
