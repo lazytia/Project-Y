@@ -100,6 +100,13 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
   // 기본값: 모두 닫힘. 한 번에 하나만 열림.
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 
+  /** Shut the drawer on the way out, so signing back in doesn't land on an
+   *  open menu left over from the previous session. */
+  const handleSignOut = () => {
+    onClose?.();
+    void signOut();
+  };
+
   const toggleGroup = (label: string) => {
     setOpenGroup((prev) => (prev === label ? null : label));
     if (!userIsStrictOwner) return;
@@ -201,7 +208,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
         </nav>
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
-          <button type="button" onClick={signOut} className={styles.signOut}>
+          <button type="button" onClick={handleSignOut} className={styles.signOut}>
             {t("nav.signOut")}
           </button>
         </div>
@@ -257,7 +264,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
         </nav>
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
-          <button type="button" onClick={signOut} className={styles.signOut}>
+          <button type="button" onClick={handleSignOut} className={styles.signOut}>
             {t("nav.signOut")}
           </button>
         </div>
@@ -310,7 +317,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
       </nav>
       <div className={styles.footer}>
         <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
-        <button type="button" onClick={signOut} className={styles.signOut}>
+        <button type="button" onClick={handleSignOut} className={styles.signOut}>
           Sign out
         </button>
       </div>

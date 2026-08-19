@@ -34,6 +34,13 @@ export function clearClientSessionHint(): void {
   } catch {
     /* private mode */
   }
+  // y_sess is deliberately not httpOnly so the client can read it, and
+  // hasClientSessionHint() below trusts it over localStorage. Dropping it
+  // here rather than waiting for the sign-out DELETE keeps the shell from
+  // painting a signed-in chrome over a user who has already left.
+  if (typeof document !== "undefined") {
+    document.cookie = "y_sess=; path=/; max-age=0; samesite=lax";
+  }
 }
 
 /** Readable by inline scripts (httpOnly uid cookie is not). */

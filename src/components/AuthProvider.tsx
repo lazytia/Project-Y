@@ -5,6 +5,7 @@ import type { User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
 import { AUTH_READY_EVENT } from "@/lib/app-ready";
+import { hideServerAppShell } from "@/lib/boot-splash";
 import { clearClientSessionHint, hasClientSessionHint, setClientSessionHint, setClientDashboardHint } from "@/lib/client-session-hint";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath, postLoginRoute } from "@/lib/routes";
@@ -97,6 +98,7 @@ export function AuthProvider({
   const router = useRouter();
   const pathname = usePathname();
   const loginRedirectStarted = useRef(false);
+  const signOutStarted = useRef(false);
 
   useEffect(() => {
     if (!user) loginRedirectStarted.current = false;
@@ -380,21 +382,41 @@ export function AuthProvider({
     }
   }, [user, authRestored, pathname, router, staffCompletedStep, staffNeedsOnboarding, notificationsPromptSeen, staffProfileConfirmed]);
 
+  /**
+   * Sign out on the first press.
+   *
+   * Order matters. This used to await the session-cookie DELETE and only
+   * then reach Firebase, so a press spent its first network round trip
+   * doing nothing the user could see — and `clearClientSessionHint()` left
+   * the client-readable `y_sess` cookie behind, so the shell kept believing
+   * a session was live. Revoking Firebase locally is instant and needs no
+   * network, so it goes first; clearing the server cookie is the slow part
+   * and only the refresh below has to wait on it.
+   */
   const signOut = async () => {
-    clearStaffStepCache();
-    clearClientSessionHint();
-    document.documentElement.classList.remove("y-has-session");
-    document.getElementById("static-chrome-fallback")?.setAttribute("hidden", "");
-    setUser(null);
-    setLoading(false);
-    await clearAuthSession();
+    if (signOutStarted.current) return;
+    signOutStarted.current = true;
+
     const [{ signOut: fbSignOut }, { getAuth }] = await Promise.all([
       import("firebase/auth"),
       import("@/lib/firebase"),
     ]);
-    await fbSignOut(getAuth());
+    await fbSignOut(getAuth()).catch(() => {/* revoke the UI regardless */});
+
+    clearStaffStepCache();
+    clearClientSessionHint();
+    document.documentElement.classList.remove("y-has-session");
+    hideServerAppShell();
+    document.getElementById("static-chrome-fallback")?.setAttribute("hidden", "");
+    setUser(null);
+    setLoading(false);
     router.replace(ROUTES.login);
+
+    // The login page is server-rendered from the `uid` cookie, so it can only
+    // be trusted once the DELETE has landed — refresh after, not before.
+    await clearAuthSession();
     router.refresh();
+    signOutStarted.current = false;
   };
 
   return (
