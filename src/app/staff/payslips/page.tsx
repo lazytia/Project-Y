@@ -28,6 +28,11 @@ const CACHE_KEY_PREFIX = "y.payslips.v3.";
  *  Kept short because publishing a pay week is a change staff are waiting
  *  on — a long TTL would leave the list looking empty after it went live. */
 const CACHE_TTL_MS = 60 * 1000;
+/** Give up on the payslip fetch rather than sit on the loading line. The
+ *  route reads a Google Sheet live, and a slow read has already held a
+ *  request open for three minutes — with no deadline the page just says
+ *  "Loading your payslips…" the whole time, which reads as a freeze. */
+const FETCH_TIMEOUT_MS = 15 * 1000;
 
 type CachedEnvelope = { data: PayslipsResponse; cachedAt: number };
 
@@ -75,11 +80,15 @@ export default function PayslipsPage() {
       if (cacheFresh) setLoading(false);
     }
 
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), FETCH_TIMEOUT_MS);
+
     (async () => {
       try {
         const idToken = await user.getIdToken();
         const res = await fetch("/api/staff/payslips", {
           headers: { Authorization: `Bearer ${idToken}` },
+          signal: abort.signal,
         });
         const payload = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(payload?.error ?? `Failed (${res.status}).`);
@@ -90,13 +99,25 @@ export default function PayslipsPage() {
         // If we already painted from cache, keep those numbers on screen
         // and swallow the error — the user isn't left staring at nothing.
         if (!cancelled && !cached) {
-          setError(err instanceof Error ? err.message : String(err));
+          const timedOut = err instanceof DOMException && err.name === "AbortError";
+          setError(
+            timedOut
+              ? "The server took too long to answer. Pull down to try again."
+              : err instanceof Error
+                ? err.message
+                : String(err),
+          );
         }
       } finally {
+        clearTimeout(timer);
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      abort.abort();
+    };
   }, [authLoading, user]);
 
   const payslips = data?.payslips ?? [];

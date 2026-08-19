@@ -15,13 +15,6 @@ import { adminDb } from "@/lib/firebase-admin";
  */
 export const PAYSLIP_PUBLICATIONS_COLLECTION = "payslip_publications";
 
-/**
- * How many pay weeks to read when listing publications. The staff payslip
- * page only offers the last 12 months, so a year of weeks plus headroom is
- * everything that can be displayed.
- */
-export const PUBLICATION_WEEKS_LIMIT = 60;
-
 export type PayslipPublication = {
   weekStartISO: string;
   weekEndISO: string;
@@ -61,23 +54,25 @@ export async function readPayslipPublication(
 /**
  * The set of pay weeks staff are allowed to see.
  *
- * Doc ids are weekStartISO (YYYY-MM-DD), so ordering by `__name__` desc gives
- * the newest weeks first without needing a composite index — and lets the
- * `published` flag be filtered in memory, so a week that was published and
- * then withdrawn drops out with no index maintenance.
+ * Filtered in the query rather than in memory. An earlier version paged the
+ * newest 60 docs with `orderBy("__name__", "desc")` and tested `published`
+ * afterwards; Firestore cannot serve a descending sort on `__name__` alone,
+ * so the moment the first publication doc existed every read threw
+ * FAILED_PRECONDITION and the route failed closed on a missing index. An
+ * equality filter runs off the automatic single-field index, so there is no
+ * index to create or keep in step.
+ *
+ * Unbounded on purpose: this holds one small doc per pay week, so even years
+ * of history is a few hundred documents. A `limit` here would silently start
+ * hiding weeks once the collection outgrew it, which is the failure mode
+ * least likely to be noticed — staff would just see a payslip go missing.
  */
 export async function fetchPublishedWeekStarts(): Promise<Set<string>> {
   const snap = await adminDb()
     .collection(PAYSLIP_PUBLICATIONS_COLLECTION)
-    .orderBy("__name__", "desc")
-    .limit(PUBLICATION_WEEKS_LIMIT)
+    .where("published", "==", true)
     .get();
-  const out = new Set<string>();
-  for (const doc of snap.docs) {
-    const d = (doc.data() ?? {}) as Record<string, unknown>;
-    if (d.published === true) out.add(doc.id);
-  }
-  return out;
+  return new Set(snap.docs.map((doc) => doc.id));
 }
 
 /** Write the switch for one pay week. Publishing and withdrawing both land here. */

@@ -185,11 +185,13 @@ export async function GET(req: NextRequest) {
   }
   if (allWeeks.length === 0) {
     try {
-      // Doc IDs are weekStartISO (YYYY-MM-DD) so ordering by __name__
-      // desc gives the newest weeks first — cheap and index-free.
+      // Order on the stored date field, not `__name__`: Firestore cannot
+      // serve a descending sort on `__name__` on its own and rejects the
+      // query outright, which would turn this last-resort fallback into a
+      // second failure exactly when the sheet is already unreachable.
       const snap = await adminDb()
         .collection("payroll_summary_cache")
-        .orderBy("__name__", "desc")
+        .orderBy("detail.weekStartISO", "desc")
         .limit(CACHE_WEEKS_LIMIT)
         .get();
       allWeeks = snap.docs
