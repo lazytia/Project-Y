@@ -41,7 +41,7 @@ export default function DocumentAcknowledgement({ documentKey, version, updated,
     let cancelled = false;
     (async () => {
       try {
-        const all = await fetchDocumentSignatures(user.uid);
+        const all = await fetchDocumentSignatures(user);
         if (!cancelled) setSigned(all[documentKey] ?? null);
       } catch {
         // Leave the block in its unsigned state; signing again is harmless.
@@ -57,8 +57,7 @@ export default function DocumentAcknowledgement({ documentKey, version, updated,
     setSaving(true);
     setError(null);
     try {
-      await saveDocumentSignature(user.uid, documentKey, { signature: draft, version });
-      setSigned({ signature: draft, version, signedAt: new Date() });
+      setSigned(await saveDocumentSignature(user, documentKey, { signature: draft, version }));
       setDraft(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -66,8 +65,6 @@ export default function DocumentAcknowledgement({ documentKey, version, updated,
       setSaving(false);
     }
   }, [user, draft, saving, documentKey, version]);
-
-  const preview = signed?.signature ?? draft;
 
   return (
     <section className={styles.ack}>
@@ -86,11 +83,20 @@ export default function DocumentAcknowledgement({ documentKey, version, updated,
           </span>
         </div>
 
-        {preview ? (
+        {signed ? (
           <div className={styles.signatureBox}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt={t("doc.ack.title")} className={styles.signatureImg} />
+            <img src={signed.signature} alt={t("doc.ack.title")} className={styles.signatureImg} />
           </div>
+        ) : draft ? (
+          <button
+            type="button"
+            className={`${styles.signatureBox} ${styles.signatureDraft}`}
+            onClick={() => setPadOpen(true)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={draft} alt={t("doc.ack.title")} className={styles.signatureImg} />
+          </button>
         ) : (
           <button type="button" className={styles.signBox} onClick={() => setPadOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -112,7 +118,7 @@ export default function DocumentAcknowledgement({ documentKey, version, updated,
           >
             {saving ? t("doc.ack.saving") : t("doc.ack.button")}
           </button>
-          {!draft && <p className={styles.hint}>{t("doc.ack.hint")}</p>}
+          <p className={styles.hint}>{t(draft ? "doc.ack.draftHint" : "doc.ack.hint")}</p>
         </>
       )}
       {error && <p className={styles.error}>{t("doc.ack.saveError")} {error}</p>}

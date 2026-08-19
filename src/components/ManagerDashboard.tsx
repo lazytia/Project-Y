@@ -326,7 +326,7 @@ export default function ManagerDashboard({
     let cancelled = false;
     (async () => {
       try {
-        const signatures = await fetchDocumentSignatures(user.uid);
+        const signatures = await fetchDocumentSignatures(user);
         if (!cancelled) {
           setUnsignedDocs(SIGNABLE_DOCUMENT_KEYS.filter((key) => !signatures[key]));
         }

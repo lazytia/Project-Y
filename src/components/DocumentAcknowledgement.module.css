@@ -86,6 +86,16 @@
   border-radius: var(--radius-lg);
 }
 
+/* A drawn-but-unsaved signature. Dashed like the empty box it replaces, so
+   the card never looks finished before the acknowledgement is stored. */
+.signatureDraft {
+  width: 100%;
+  border-style: dashed;
+  border-color: var(--color-warm);
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .signatureImg {
   max-width: 100%;
   max-height: 110px;

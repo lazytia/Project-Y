@@ -1,5 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { getDb } from "@/lib/firebase";
+import type { User } from "firebase/auth";
 
 /**
  * Signed acknowledgements of internal documents (Staff Handbook, Beer Guide).
@@ -8,9 +7,15 @@ import { getDb } from "@/lib/firebase";
  * enumerate that collection to build the People lists, Attention Required and
  * roster pickers, so writing a manager's handbook signature there would turn
  * Yurina and Chuck into employee records.
+ *
+ * Both directions go through /api/staff/document-signatures rather than the
+ * browser's Firestore client, so the record is written by our server against
+ * the caller's verified uid.
  */
 
 export const DOCUMENT_SIGNATURES_COLLECTION = "document_signatures";
+
+const ENDPOINT = "/api/staff/document-signatures";
 
 export type SignableDocumentKey = "handbook" | "beerGuide";
 
@@ -24,71 +29,61 @@ export type DocumentSignature = {
 
 export type DocumentSignatures = Partial<Record<SignableDocumentKey, DocumentSignature>>;
 
-function toDate(v: unknown): Date | null {
-  if (v instanceof Date) return v;
-  if (typeof v === "object" && v !== null && "toDate" in v) {
-    try {
-      return (v as { toDate: () => Date }).toDate();
-    } catch {
-      return null;
-    }
+/** What crosses the wire. Dates do not survive JSON, so the route sends ISO. */
+export type DocumentSignatureWire = {
+  signature: string;
+  signedAtISO: string | null;
+  version: string;
+};
+
+export type DocumentSignaturesWire = Partial<Record<SignableDocumentKey, DocumentSignatureWire>>;
+
+function fromWire(w: DocumentSignatureWire): DocumentSignature {
+  const parsed = w.signedAtISO ? new Date(w.signedAtISO) : null;
+  return {
+    signature: w.signature,
+    signedAt: parsed && !Number.isNaN(parsed.getTime()) ? parsed : null,
+    version: w.version,
+  };
+}
+
+async function call(user: User, init?: RequestInit): Promise<unknown> {
+  const res = await fetch(ENDPOINT, {
+    ...init,
+    cache: "no-store",
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${await user.getIdToken()}`,
+    },
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error((payload as { error?: string })?.error ?? `Request failed (${res.status}).`);
   }
-  return null;
+  return payload;
 }
 
-function readEntry(v: unknown): DocumentSignature | null {
-  if (typeof v !== "object" || v === null) return null;
-  const d = v as Record<string, unknown>;
-  const signature = typeof d.signature === "string" ? d.signature : "";
-  if (!signature) return null;
-  return {
-    signature,
-    signedAt: toDate(d.signedAt),
-    version: typeof d.version === "string" ? d.version : "",
-  };
-}
-
-/** Staff who signed the handbook during onboarding have it under
- *  staff_onboarding/{uid}.policies, written before this collection existed —
- *  without this they would be asked to sign the same document a second time. */
-async function legacyHandbookSignature(uid: string): Promise<DocumentSignature | null> {
-  const snap = await getDoc(doc(getDb(), "staff_onboarding", uid));
-  const policies = (snap.data()?.policies ?? {}) as Record<string, unknown>;
-  const signature = typeof policies.handbookSignature === "string" ? policies.handbookSignature : "";
-  if (!signature) return null;
-  return {
-    signature,
-    signedAt: toDate(policies.handbookSignedAt),
-    version: typeof policies.handbookVersion === "string" ? policies.handbookVersion : "",
-  };
-}
-
-export async function fetchDocumentSignatures(uid: string): Promise<DocumentSignatures> {
-  const snap = await getDoc(doc(getDb(), DOCUMENT_SIGNATURES_COLLECTION, uid));
-  const data = (snap.data() ?? {}) as Record<string, unknown>;
+export async function fetchDocumentSignatures(user: User): Promise<DocumentSignatures> {
+  const payload = (await call(user)) as DocumentSignaturesWire;
   const signatures: DocumentSignatures = {};
   for (const key of SIGNABLE_DOCUMENT_KEYS) {
-    const entry = readEntry(data[key]);
-    if (entry) signatures[key] = entry;
-  }
-  if (!signatures.handbook) {
-    const legacy = await legacyHandbookSignature(uid);
-    if (legacy) signatures.handbook = legacy;
+    const entry = payload?.[key];
+    if (entry?.signature) signatures[key] = fromWire(entry);
   }
   return signatures;
 }
 
+/** Resolves with the stored record, so the caller shows what the server kept
+ *  rather than what it hoped it had sent. */
 export async function saveDocumentSignature(
-  uid: string,
+  user: User,
   key: SignableDocumentKey,
   input: { signature: string; version: string },
-): Promise<void> {
-  await setDoc(
-    doc(getDb(), DOCUMENT_SIGNATURES_COLLECTION, uid),
-    {
-      [key]: { ...input, signedAt: serverTimestamp() },
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+): Promise<DocumentSignature> {
+  const payload = (await call(user, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key, ...input }),
+  })) as DocumentSignatureWire;
+  return fromWire(payload);
 }
