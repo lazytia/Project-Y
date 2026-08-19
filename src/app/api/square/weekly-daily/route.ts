@@ -3,7 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import {
   computeWeekPair,
-  fetchOpenOrderGross,
+  fetchDayOrderGross,
   weekCacheIsSettled,
   WEEKLY_DAILY_COMPUTE_VERSION,
 } from "@/lib/square-weekly-daily";
@@ -16,7 +16,7 @@ import { shiftDateKey, squareEnv } from "@/lib/square";
  * the immediately preceding week from Square Reporting API (Sales Summary
  * Gross sales = net sales + taxes). Powers /money/sales weekly chart.
  *
- * Today additionally carries the value of orders that are still open, so the
+ * Today is the exception: it comes from the Orders API instead, so the
  * running total moves the moment a table orders rather than when it pays.
  */
 
@@ -34,7 +34,7 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=1800",
 } as const;
 
-/** The current week carries live open tickets — never serve it from a CDN. */
+/** The current week carries a live order-based today — never serve it from a CDN. */
 const LIVE_HEADERS = { "Cache-Control": "no-store" } as const;
 
 type CachedWeekPair = {
@@ -60,11 +60,14 @@ function dayOffsetInWeek(weekStart: string, dateKey: string): number {
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Add today's unpaid open tickets onto the running week. Kept out of the
- * Firestore cache on purpose: the cached document stays a clean Reporting
- * snapshot, and the live open amount is folded in on every request.
+ * Replace today's Reporting figure with the live order-based one.
+ *
+ * Kept out of the Firestore cache on purpose: the cached document stays a
+ * clean Reporting snapshot of the week, and today is recomputed from orders
+ * on every request. Substituted rather than added — the two are the same
+ * money counted at different moments, so summing them double-counts.
  */
-async function withOpenOrders(
+async function withLiveToday(
   pair: Pick<CachedWeekPair, "thisWeek" | "lastWeek">,
   weekStart: string,
   today: string,
@@ -74,17 +77,18 @@ async function withOpenOrders(
   const offset = dayOffsetInWeek(weekStart, today);
   if (offset < 0) return pair;
 
-  const openGross = await fetchOpenOrderGross(locationId, timezone, today).catch((err) => {
-    console.warn("[weekly-daily] open order lookup failed:", err);
-    return 0;
+  const live = await fetchDayOrderGross(locationId, timezone, today).catch((err) => {
+    console.warn("[weekly-daily] live order lookup failed:", err);
+    return null;
   });
-  if (openGross <= 0) return pair;
+  if (live === null) return pair;
 
   const daily = [...pair.thisWeek.daily];
-  daily[offset] = round2((daily[offset] ?? 0) + openGross);
+  const previous = daily[offset] ?? 0;
+  daily[offset] = round2(live);
   return {
     ...pair,
-    thisWeek: { daily, total: round2(pair.thisWeek.total + openGross) },
+    thisWeek: { daily, total: round2(pair.thisWeek.total - previous + live) },
   };
 }
 
@@ -116,7 +120,7 @@ export async function GET(req: NextRequest) {
           ? weekCacheIsSettled(weekStart, computedAt, timezone)
           : computedAt !== null && Date.now() - computedAt.getTime() < CURRENT_WEEK_TTL_MS);
       if (fresh && data?.thisWeek && data?.lastWeek) {
-        const live = await withOpenOrders(
+        const live = await withLiveToday(
           { thisWeek: data.thisWeek, lastWeek: data.lastWeek },
           weekStart,
           today,
@@ -152,7 +156,7 @@ export async function GET(req: NextRequest) {
       )
       .catch((err) => console.warn("[weekly-daily] cache write failed:", err));
 
-    const live = await withOpenOrders(pair, weekStart, today, locationId, timezone);
+    const live = await withLiveToday(pair, weekStart, today, locationId, timezone);
     return NextResponse.json(
       { weekStart, ...live },
       { headers: isPastWeek ? CACHE_HEADERS : LIVE_HEADERS },

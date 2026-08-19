@@ -243,7 +243,10 @@ export default function SalesPage() {
     }
     (async () => {
       try {
-        if (cached) return; // sessionStorage was still fresh
+        // The week in progress carries today's live order total, so the cache
+        // only paints it instantly — it never stands in for a fetch. Finished
+        // weeks cannot move, so those stop here.
+        if (cached && weekMondayISO !== isoMondayOf(todayKey)) return;
         const res = await fetch(`/api/square/weekly-daily?weekStart=${weekMondayISO}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as {
@@ -264,7 +267,7 @@ export default function SalesPage() {
     return () => {
       cancelled = true;
     };
-  }, [allowed, weekMondayISO]);
+  }, [allowed, weekMondayISO, todayKey]);
 
   // ── Yearly monthly totals (this + last year, both from Square).
   //    sales_daily doesn't have a full backfill so we always hit the API

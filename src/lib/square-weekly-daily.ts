@@ -3,10 +3,11 @@ import { Timestamp } from "firebase-admin/firestore";
 import { fetchDailyGrossSalesFromReporting } from "@/lib/square-reporting";
 import {
   fetchOrders,
-  getDateRange,
+  getSalesDayRange,
   shiftDateKey,
   squareEnv,
   squareGrossSalesCents,
+  sumRefundCentsByService,
 } from "@/lib/square";
 
 /** Bump when gross-sales formula or data source changes. */
@@ -60,25 +61,34 @@ export async function computeWeekPair(
 }
 
 /**
- * Gross value of tickets opened on `dateKey` that nobody has paid for yet.
+ * Gross Sales for `dateKey` read straight from the orders, not from a report.
  *
- * Square's Sales reports only recognise an order once it is paid, so open tabs
- * would otherwise leave the week-to-date figure flat. The floor leaves tickets
- * OPEN until the table is cleared, long after they are tendered, so the OPEN
- * state alone is not a proxy for "Reporting has not seen it" — counting those
- * double-counted them on top of the Reporting total.
+ * Square's Sales reports only recognise an order once it is paid, so a day
+ * still being traded reads low all service and only catches up afterwards.
+ * The owner dashboard has always answered "today" from the orders instead,
+ * which is why the two screens disagreed during service; this is the same
+ * arithmetic, so the week card now moves when a table orders rather than
+ * when it pays.
+ *
+ * OPEN and COMPLETED both count — a ticket the floor has not cleared yet is
+ * money that has been ordered. Refunds inside the same window come off, and
+ * the window is Square's 9am–10pm sales day so the figure lines up with the
+ * Reporting numbers on the days either side of it.
  */
-export async function fetchOpenOrderGross(
+export async function fetchDayOrderGross(
   locationId: string,
   timezone: string,
   dateKey: string,
 ): Promise<number> {
-  const { startAt, endAt } = getDateRange(timezone, 0, dateKey);
-  const orders = await fetchOrders(locationId, startAt, endAt, ["OPEN"]);
-  const cents = orders
-    .filter((o) => (o.tenders ?? []).length === 0)
-    .reduce((sum, o) => sum + squareGrossSalesCents(o), 0);
-  return Math.round(cents) / 100;
+  const { startAt, endAt } = getSalesDayRange(timezone, dateKey);
+  const [orders, refunds] = await Promise.all([
+    fetchOrders(locationId, startAt, endAt, ["OPEN", "COMPLETED"]),
+    sumRefundCentsByService(locationId, startAt, endAt, timezone),
+  ]);
+  const cents =
+    orders.reduce((sum, o) => sum + squareGrossSalesCents(o), 0) -
+    (refunds.lunch + refunds.dinner);
+  return Math.max(0, Math.round(cents)) / 100;
 }
 
 /** Pull Gross Sales for a week from Square and write sales_weekly_daily. */
