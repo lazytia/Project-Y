@@ -33,6 +33,9 @@ const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 /** The venue is closed Sunday, so the day-by-day list stops at Saturday. */
 const TRADING_DAY_COUNT = 6;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+/** Share of gross sales held back each week for the quarterly BAS/GST bill. */
+const BAS_RESERVE_RATE = 0.06;
+const BAS_RESERVE_LABEL = `${BAS_RESERVE_RATE * 100}%`;
 
 /* ── Date helpers ── */
 
@@ -689,6 +692,39 @@ export default function SalesPage() {
         </p>
       </section>
 
+      {/* ── BAS reserve ── */}
+      <section className={styles.card}>
+        <div className={styles.cardHead}>
+          <p className={styles.cardTitle}>BAS RESERVE</p>
+        </div>
+        <p className={styles.cardNote}>
+          {BAS_RESERVE_LABEL} of gross sales set aside for GST.
+        </p>
+        <div className={styles.basHero}>
+          <span className={styles.basIcon} aria-hidden="true">
+            <JarGlyph />
+          </span>
+          <div className={styles.basHeroText}>
+            <p className={styles.basHeroLabel}>Set aside this week</p>
+            <p className={styles.basHeroValue}>
+              {weekly ? fmtCurrency(weekly.thisTotal * BAS_RESERVE_RATE) : "—"}
+            </p>
+          </div>
+        </div>
+        <ul className={styles.basList}>
+          <li className={styles.basRow}>
+            <span className={styles.basRowLabel}>This week sales</span>
+            <span className={styles.basRowValue}>
+              {weekly ? fmtCurrency(weekly.thisTotal) : "—"}
+            </span>
+          </li>
+          <li className={styles.basRow}>
+            <span className={styles.basRowLabel}>Reserve rate</span>
+            <span className={styles.basRowValue}>{BAS_RESERVE_LABEL}</span>
+          </li>
+        </ul>
+      </section>
+
       {/* ── Day by day ── */}
       <section className={styles.card}>
         <div className={styles.cardHead}>
@@ -883,6 +919,18 @@ function PerfGlyph({ icon }: { icon: PerfIcon }) {
 }
 
 /* ── Icons ── */
+
+function JarGlyph() {
+  // Money jar — the week's GST is put by, not spent.
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="3" width="14" height="3" rx="1" />
+      <path d="M6 6h12v12a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3V6z" />
+      <path d="M12 10v7" />
+      <path d="M13.8 11.4h-2.4a1.35 1.35 0 0 0 0 2.7h1.2a1.35 1.35 0 0 1 0 2.7h-2.4" />
+    </svg>
+  );
+}
 
 function ChevronLeft() {
   return (
