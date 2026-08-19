@@ -76,14 +76,15 @@ export function isCancelled(r: Reservation): boolean {
   return r.status === "cancelled";
 }
 
-/** Guests on the given bookings, cancellations excluded. */
+/**
+ * Guests actually expected on the given bookings.
+ *
+ * Cancellations are subtracted rather than reported separately: 50 booked
+ * with 20 cancelled is simply 30, because that is the only number the floor
+ * needs to lay tables for.
+ */
 export function guestCount(rows: Reservation[]): number {
   return rows.reduce((sum, r) => (isCancelled(r) ? sum : sum + r.count), 0);
-}
-
-/** Guests that were booked and then cancelled — reported as a negative. */
-export function cancelledGuestCount(rows: Reservation[]): number {
-  return rows.reduce((sum, r) => (isCancelled(r) ? sum + r.count : sum), 0);
 }
 
 /** Convert Firestore-style timestamp (or epoch / ISO string) into a Date. */

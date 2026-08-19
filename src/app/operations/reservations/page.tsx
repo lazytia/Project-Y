@@ -6,9 +6,7 @@ import {
   type Reservation,
   type ReservationBranch,
   type ReservationSeating,
-  type ReservationService,
   type ReservationStatus,
-  cancelledGuestCount,
   createReservation,
   fetchReservationsForDate,
   guestCount,
@@ -201,9 +199,9 @@ export default function ReservationsPage() {
   }, [dateISO, user]);
 
   const active = useMemo(() => list.filter((r) => !isCancelled(r) && r.status !== "no-show"), [list]);
-  // Cancelled bookings stay visible in the day list (with a badge) but are
-  // excluded from guest/booking totals via `active` above, and reported
-  // separately as a negative so the day still shows what it lost.
+  // Cancelled bookings stay visible in the day list (with a badge) but drop
+  // out of every guest/booking total via `active` above. The totals are the
+  // net figure only — 50 booked with 20 cancelled simply reads as 30.
   const listed = useMemo(() => list.filter((r) => r.status !== "no-show"), [list]);
 
   // Recent activity to surface in the alert strip: cancellations first, then
@@ -237,29 +235,17 @@ export default function ReservationsPage() {
   }, [list, clearedActivity]);
 
   const serviceTotals = useMemo(() => {
-    function calc(rows: Reservation[], all: Reservation[]) {
+    function calc(rows: Reservation[]) {
       const indoor = rows.filter((r) => r.seating === "indoor").reduce((s, r) => s + r.count, 0);
       const outdoor = rows.filter((r) => r.seating !== "indoor").reduce((s, r) => s + r.count, 0);
-      // Cancellations are already out of `rows`; carried alongside so the card
-      // can show what the day lost rather than quietly dropping it.
-      return {
-        bookings: rows.length,
-        guests: indoor + outdoor,
-        indoor,
-        outdoor,
-        cancelled: cancelledGuestCount(all),
-      };
+      return { bookings: rows.length, guests: indoor + outdoor, indoor, outdoor };
     }
-    const forService = (svc: ReservationService) => (r: Reservation) => serviceFor(r.time) === svc;
-    const l = calc(active.filter(forService("LUNCH")), list.filter(forService("LUNCH")));
-    const d = calc(active.filter(forService("DINNER")), list.filter(forService("DINNER")));
-    return {
-      lunch: l,
-      dinner: d,
-      total: l.guests + d.guests,
-      cancelled: l.cancelled + d.cancelled,
-    };
-  }, [active, list]);
+    const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
+    const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
+    const l = calc(lunch);
+    const d = calc(dinner);
+    return { lunch: l, dinner: d, total: l.guests + d.guests };
+  }, [active]);
 
   const filteredListed = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -335,11 +321,6 @@ export default function ReservationsPage() {
               <p className={styles.serviceCardStatLabel}>Bookings</p>
             </div>
           </div>
-          {serviceTotals.lunch.cancelled > 0 && (
-            <p className={styles.serviceCardLost}>
-              −{serviceTotals.lunch.cancelled} guests cancelled
-            </p>
-          )}
           <div className={styles.serviceCardStats}>
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatLabel}>Indoor</p>
@@ -374,11 +355,6 @@ export default function ReservationsPage() {
               <p className={styles.serviceCardStatLabel}>Bookings</p>
             </div>
           </div>
-          {serviceTotals.dinner.cancelled > 0 && (
-            <p className={styles.serviceCardLost}>
-              −{serviceTotals.dinner.cancelled} guests cancelled
-            </p>
-          )}
           <div className={styles.serviceCardStats}>
             <div className={styles.serviceCardStat}>
               <p className={styles.serviceCardStatLabel}>Indoor</p>
@@ -398,11 +374,6 @@ export default function ReservationsPage() {
       <div className={styles.hero}>
         <p className={styles.heroNumber}>{serviceTotals.total}</p>
         <p className={styles.heroLabel}>TODAY&apos;S GUESTS</p>
-        {serviceTotals.cancelled > 0 && (
-          <p className={styles.heroLost}>
-            −{serviceTotals.cancelled} cancelled · {serviceTotals.total + serviceTotals.cancelled} booked
-          </p>
-        )}
       </div>
 
       {activity.length > 0 && (
@@ -459,16 +430,12 @@ export default function ReservationsPage() {
         sections.map((sec) => {
           const activeRows = sec.rows.filter((r) => !isCancelled(r));
           const guests = guestCount(sec.rows);
-          const lost = cancelledGuestCount(sec.rows);
           return (
             <section key={sec.key} className={styles.section}>
               <div className={styles.sectionHead}>
                 <span className={styles.sectionLabel}>{sec.label}</span>
                 <span className={styles.sectionWindow}>{sec.window}</span>
-                <span className={styles.sectionStats}>
-                  {guests} Guests · {activeRows.length} Bookings
-                  {lost > 0 && <span className={styles.sectionStatsLost}> · −{lost} cancelled</span>}
-                </span>
+                <span className={styles.sectionStats}>{guests} Guests · {activeRows.length} Bookings</span>
               </div>
               {sec.rows.length === 0 ? (
                 <p className={styles.sectionEmpty}>No reservations.</p>
