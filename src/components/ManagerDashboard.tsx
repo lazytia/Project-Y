@@ -53,7 +53,7 @@ const VISA_EXPIRING_WINDOW_DAYS = 60;
 
 /** day-of-week daily sales targets (0=Sun … 6=Sat) */
 const DAILY_TARGETS: Record<number, number> = {
-  0: 0, 1: 3_800, 2: 5_200, 3: 5_500, 4: 6_500, 5: 6_000, 6: 3_000,
+  0: 0, 1: 4_000, 2: 5_500, 3: 6_000, 4: 6_000, 5: 6_000, 6: 4_000,
 };
 
 function isoDateToMonday(dateKey: string): string {
