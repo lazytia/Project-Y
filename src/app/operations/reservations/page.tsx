@@ -3,15 +3,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import {
+  AREA_LABELS,
+  type BlockSeating,
+  type BlockedDate,
+  type BlockedDateCreateInput,
   type Reservation,
   type ReservationBranch,
   type ReservationSeating,
+  type ReservationService,
   type ReservationStatus,
+  SERVICE_WINDOWS,
+  createBlockedDate,
   createReservation,
+  deleteBlockedDate,
+  describeBlock,
+  fetchBlockedDates,
   fetchReservationsForDate,
-  guestCount,
+  fmt12h,
   isCancelled,
   serviceFor,
+  serviceTimeOptions,
   setReservationStatus,
   todayISO,
   tsToDate,
@@ -22,6 +33,8 @@ import styles from "./page.module.css";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** Render order for the summary columns and the Lunch/Dinner toggle. */
+const SERVICES: ReservationService[] = ["LUNCH", "DINNER"];
 
 function fmtHeaderDate(iso: string): string {
   if (!iso) return "";
@@ -32,13 +45,6 @@ function fmtHeaderDate(iso: string): string {
 function fmtLongDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return `${d} ${MONTH_SHORT[m - 1]} ${y}`;
-}
-function fmt12h(time: string): string {
-  const [h, m] = time.split(":").map(Number);
-  if (Number.isNaN(h)) return time;
-  const meridian = h < 12 ? "AM" : "PM";
-  const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${display}:${String(m ?? 0).padStart(2, "0")} ${meridian}`;
 }
 function shortTime(time: string): string {
   const [h, m] = time.split(":");
@@ -104,11 +110,26 @@ function CancelledIcon() {
 function PlusIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
 }
-function SunIcon() {
-  return <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>;
+function SunIcon({ size = 28 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>;
 }
-function MoonIcon() {
-  return <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /><circle cx="19" cy="5" r="1" fill="currentColor" stroke="none" /><circle cx="17" cy="9" r="0.5" fill="currentColor" stroke="none" /></svg>;
+function MoonIcon({ size = 28 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /><circle cx="19" cy="5" r="1" fill="currentColor" stroke="none" /><circle cx="17" cy="9" r="0.5" fill="currentColor" stroke="none" /></svg>;
+}
+/** ⊘ — the header action that opens the availability blocking sheet. */
+function BlockIcon({ size = 20 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><line x1="5.6" y1="5.6" x2="18.4" y2="18.4" /></svg>;
+}
+function XIcon({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
+}
+/** Entire Service — a filled block spanning the whole window. */
+function ServiceScopeIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
+}
+/** Area — seating zones laid out as a grid. */
+function AreaScopeIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>;
 }
 
 /* ── Page ── */
@@ -123,6 +144,12 @@ export default function ReservationsPage() {
   useEffect(() => {
     if (!dateISO) setDateISO(todayISO());
   }, [dateISO]);
+  // Open on whichever service is running now, so an evening shift doesn't
+  // land on an empty lunch list. Client-only for the same hydration reason.
+  const [service, setService] = useState<ReservationService>("LUNCH");
+  useEffect(() => {
+    setService(serviceFor(new Date().toTimeString().slice(0, 5)));
+  }, []);
   const [branch] = useState<ReservationBranch>("northsydney");
   const [list, setList] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +158,8 @@ export default function ReservationsPage() {
   const [focused, setFocused] = useState<Reservation | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Reservation | null>(null);
+  const [blocks, setBlocks] = useState<BlockedDate[]>([]);
+  const [blockOpen, setBlockOpen] = useState(false);
   // Native date picker — we toss a hidden input into the page and call
   // its showPicker() so a tap on the calendar icon goes straight to the
   // OS picker instead of opening an intermediate sheet.
@@ -193,8 +222,23 @@ export default function ReservationsPage() {
     }
   }
 
+  /**
+   * Blocks load separately from the bookings: a failure here must not blank
+   * out the day's reservations, so it only clears the local list rather than
+   * setting the page-level error.
+   */
+  async function reloadBlocks() {
+    if (!user || !dateISO) return;
+    try {
+      setBlocks(await fetchBlockedDates(user, dateISO, branch));
+    } catch {
+      setBlocks([]);
+    }
+  }
+
   useEffect(() => {
     reload();
+    reloadBlocks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateISO, user]);
 
@@ -234,17 +278,17 @@ export default function ReservationsPage() {
       .slice(0, 4);
   }, [list, clearedActivity]);
 
+  // Keyed by ReservationService so the summary card can be rendered from a
+  // single loop over ["LUNCH", "DINNER"] instead of two copies of the markup.
   const serviceTotals = useMemo(() => {
     function calc(rows: Reservation[]) {
       const indoor = rows.filter((r) => r.seating === "indoor").reduce((s, r) => s + r.count, 0);
       const outdoor = rows.filter((r) => r.seating !== "indoor").reduce((s, r) => s + r.count, 0);
       return { bookings: rows.length, guests: indoor + outdoor, indoor, outdoor };
     }
-    const lunch = active.filter((r) => serviceFor(r.time) === "LUNCH");
-    const dinner = active.filter((r) => serviceFor(r.time) === "DINNER");
-    const l = calc(lunch);
-    const d = calc(dinner);
-    return { lunch: l, dinner: d, total: l.guests + d.guests };
+    const LUNCH = calc(active.filter((r) => serviceFor(r.time) === "LUNCH"));
+    const DINNER = calc(active.filter((r) => serviceFor(r.time) === "DINNER"));
+    return { LUNCH, DINNER, total: LUNCH.guests + DINNER.guests };
   }, [active]);
 
   const filteredListed = useMemo(() => {
@@ -257,15 +301,11 @@ export default function ReservationsPage() {
     });
   }, [listed, query]);
 
-  const sections = useMemo(() => {
-    const groups: Record<"LUNCH" | "DINNER", Reservation[]> = { LUNCH: [], DINNER: [] };
-    for (const r of filteredListed) groups[serviceFor(r.time)].push(r);
-    // Always show both sections; pages should scroll naturally between them.
-    return [
-      { key: "LUNCH" as const, label: "LUNCH", window: "11:30 – 14:00", rows: groups.LUNCH },
-      { key: "DINNER" as const, label: "DINNER", window: "17:00 – 21:00", rows: groups.DINNER },
-    ];
-  }, [filteredListed]);
+  // The list shows one service at a time; the toggle above it picks which.
+  const visibleRows = useMemo(
+    () => filteredListed.filter((r) => serviceFor(r.time) === service),
+    [filteredListed, service],
+  );
 
   async function applyStatus(id: string, status: "confirmed" | "seated" | "no-show" | "cancelled") {
     if (!user) return;
@@ -279,6 +319,18 @@ export default function ReservationsPage() {
     }
   }
 
+  /** Lift a block — the slot becomes bookable again on the customer site. */
+  async function removeBlock(id: string) {
+    if (!user) return;
+    try {
+      await deleteBlockedDate(user, id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove the block.");
+    } finally {
+      await reloadBlocks();
+    }
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -289,6 +341,14 @@ export default function ReservationsPage() {
         <div className={styles.headerActions}>
           <button type="button" className={styles.iconBtn} onClick={reload} aria-label="Refresh"><RefreshIcon /></button>
           <button type="button" className={styles.iconBtn} onClick={openDatePicker} aria-label="Pick date"><CalIcon /></button>
+          <button
+            type="button"
+            className={`${styles.iconBtn} ${styles.iconBtnBlock}`}
+            onClick={() => setBlockOpen(true)}
+            aria-label="Block availability"
+          >
+            <BlockIcon />
+          </button>
           <input
             ref={dateInputRef}
             type="date"
@@ -301,80 +361,80 @@ export default function ReservationsPage() {
         </div>
       </div>
 
-      <div className={styles.serviceCards}>
-        <div className={`${styles.serviceCard} ${styles.serviceCardLunch}`}>
-          <div className={styles.serviceCardHead}>
-            <span className={styles.serviceCardIcon}><SunIcon /></span>
-            <div>
-              <p className={styles.serviceCardTitle}>LUNCH</p>
-              <p className={styles.serviceCardWindow}>11:30 – 14:00</p>
-            </div>
-          </div>
-          <div className={styles.serviceCardStats}>
-            <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatValue}>{serviceTotals.lunch.guests}</p>
-              <p className={styles.serviceCardStatLabel}>Guests</p>
-            </div>
-            <span className={styles.serviceCardDivider} aria-hidden="true" />
-            <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatValueSm}>{serviceTotals.lunch.bookings}</p>
-              <p className={styles.serviceCardStatLabel}>Bookings</p>
-            </div>
-          </div>
-          <div className={styles.serviceCardStats}>
-            <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatLabel}>Indoor</p>
-              <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.indoor}</p>
-              <p className={styles.serviceCardStatLabel}>Guests</p>
-            </div>
-            <span className={styles.serviceCardDivider} aria-hidden="true" />
-            <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatLabel}>Outdoor</p>
-              <p className={styles.serviceCardStatAccent}>{serviceTotals.lunch.outdoor}</p>
-              <p className={styles.serviceCardStatLabel}>Guests</p>
-            </div>
-          </div>
+      {/* One card: the day's net total on top, then the two services side by
+          side underneath, so the headline number and its breakdown read as a
+          single figure rather than three competing cards. */}
+      <div className={styles.dayCard}>
+        <div className={styles.dayCardHero}>
+          <p className={styles.heroNumber}>{serviceTotals.total}</p>
+          <p className={styles.heroLabel}>TODAY&apos;S GUESTS</p>
         </div>
-
-        <div className={`${styles.serviceCard} ${styles.serviceCardDinner}`}>
-          <div className={styles.serviceCardHead}>
-            <span className={styles.serviceCardIcon}><MoonIcon /></span>
-            <div>
-              <p className={styles.serviceCardTitle}>DINNER</p>
-              <p className={styles.serviceCardWindow}>17:30 – 22:00</p>
-            </div>
-          </div>
-          <div className={styles.serviceCardStats}>
-            <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatValue}>{serviceTotals.dinner.guests}</p>
-              <p className={styles.serviceCardStatLabel}>Guests</p>
-            </div>
-            <span className={styles.serviceCardDivider} aria-hidden="true" />
-            <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatValueSm}>{serviceTotals.dinner.bookings}</p>
-              <p className={styles.serviceCardStatLabel}>Bookings</p>
-            </div>
-          </div>
-          <div className={styles.serviceCardStats}>
-            <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatLabel}>Indoor</p>
-              <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.indoor}</p>
-              <p className={styles.serviceCardStatLabel}>Guests</p>
-            </div>
-            <span className={styles.serviceCardDivider} aria-hidden="true" />
-            <div className={styles.serviceCardStat}>
-              <p className={styles.serviceCardStatLabel}>Outdoor</p>
-              <p className={styles.serviceCardStatAccent}>{serviceTotals.dinner.outdoor}</p>
-              <p className={styles.serviceCardStatLabel}>Guests</p>
-            </div>
-          </div>
+        <div className={styles.dayCardServices}>
+          {SERVICES.map((svc) => {
+            const t = serviceTotals[svc];
+            const { start, end } = SERVICE_WINDOWS[svc];
+            return (
+              <div key={svc} className={styles.dayCardService}>
+                <div className={styles.serviceCardHead}>
+                  <span className={styles.serviceCardIcon}>
+                    {svc === "LUNCH" ? <SunIcon size={22} /> : <MoonIcon size={22} />}
+                  </span>
+                  <div>
+                    <p className={styles.serviceCardTitle}>{svc}</p>
+                    <p className={styles.serviceCardWindow}>{start} – {end}</p>
+                  </div>
+                </div>
+                <div className={styles.serviceCardStats}>
+                  <div className={styles.serviceCardStat}>
+                    <p className={styles.serviceCardStatValue}>{t.guests}</p>
+                    <p className={styles.serviceCardStatLabel}>Guests</p>
+                  </div>
+                  <span className={styles.serviceCardDivider} aria-hidden="true" />
+                  <div className={styles.serviceCardStat}>
+                    <p className={styles.serviceCardStatValueSm}>{t.bookings}</p>
+                    <p className={styles.serviceCardStatLabel}>Bookings</p>
+                  </div>
+                </div>
+                <div className={styles.serviceCardStats}>
+                  <div className={styles.serviceCardStat}>
+                    <p className={styles.serviceCardStatLabel}>Indoor</p>
+                    <p className={styles.serviceCardStatAccent}>{t.indoor}</p>
+                  </div>
+                  <span className={styles.serviceCardDivider} aria-hidden="true" />
+                  <div className={styles.serviceCardStat}>
+                    <p className={styles.serviceCardStatLabel}>Outdoor</p>
+                    <p className={styles.serviceCardStatAccent}>{t.outdoor}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <div className={styles.hero}>
-        <p className={styles.heroNumber}>{serviceTotals.total}</p>
-        <p className={styles.heroLabel}>TODAY&apos;S GUESTS</p>
-      </div>
+      {blocks.length > 0 && (
+        <section className={styles.blockSection}>
+          <p className={styles.blockHeading}>Availability</p>
+          <ul className={styles.blockList}>
+            {blocks.map((b) => (
+              <li key={b.id} className={styles.blockRow}>
+                <span className={styles.blockIcon}><BlockIcon size={16} /></span>
+                <span className={styles.blockText}>
+                  {describeBlock(b)} · <strong>BLOCKED</strong>
+                </span>
+                <button
+                  type="button"
+                  className={styles.blockRemove}
+                  onClick={() => removeBlock(b.id)}
+                  aria-label={`Remove block: ${describeBlock(b)}`}
+                >
+                  <XIcon />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {activity.length > 0 && (
         <ul className={styles.activityList}>
@@ -412,6 +472,22 @@ export default function ReservationsPage() {
         </ul>
       )}
 
+      <div className={styles.serviceToggle} role="tablist" aria-label="Service">
+        {SERVICES.map((svc) => (
+          <button
+            key={svc}
+            type="button"
+            role="tab"
+            aria-selected={service === svc}
+            className={`${styles.serviceToggleBtn} ${service === svc ? styles.serviceToggleBtnActive : ""}`}
+            onClick={() => setService(svc)}
+          >
+            {svc === "LUNCH" ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+            <span>{svc === "LUNCH" ? "Lunch" : "Dinner"}</span>
+          </button>
+        ))}
+      </div>
+
       <div className={styles.searchWrap}>
         <span className={styles.searchIcon}><SearchIcon /></span>
         <input
@@ -427,58 +503,48 @@ export default function ReservationsPage() {
       ) : error ? (
         <p className={styles.error}>{error}</p>
       ) : (
-        sections.map((sec) => {
-          const activeRows = sec.rows.filter((r) => !isCancelled(r));
-          const guests = guestCount(sec.rows);
-          return (
-            <section key={sec.key} className={styles.section}>
-              <div className={styles.sectionHead}>
-                <span className={styles.sectionLabel}>{sec.label}</span>
-                <span className={styles.sectionWindow}>{sec.window}</span>
-                <span className={styles.sectionStats}>{guests} Guests · {activeRows.length} Bookings</span>
-              </div>
-              {sec.rows.length === 0 ? (
-                <p className={styles.sectionEmpty}>No reservations.</p>
-              ) : (
-                <ul className={styles.cardList}>
-                  {sec.rows.map((r) => (
-                    <li key={r.id}>
-                      <button type="button" className={styles.card} onClick={() => setFocused(r)}>
-                        <span className={styles.cardBar} aria-hidden="true" />
-                        <span className={styles.cardTime}>{shortTime(r.time)}</span>
-                        <span className={styles.cardBody}>
-                          <span className={styles.cardName}>{r.name}</span>
-                          <span className={styles.cardMeta}>{r.count} Guests · {prettySeating(r.seating)}</span>
-                        </span>
-                        {(() => {
-                          // Only render a pill for statuses staff need to act on.
-                          // "unconfirmed", "confirmed", "pending" are the
-                          // normal flow and don't need a badge.
-                          switch (r.status) {
-                            case "no-show":
-                              return <span className={`${styles.statusPill} ${styles.statusPillNoShow}`}>No Show</span>;
-                            case "seated":
-                              return <span className={`${styles.statusPill} ${styles.statusPillSeated}`}>Seated</span>;
-                            case "cancelled":
-                              return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Cancelled</span>;
-                            case "updated":
-                              return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Updated</span>;
-                            default:
-                              if (r.customerUpdated) {
-                                return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Updated</span>;
-                              }
-                              return null;
+        <section className={styles.section}>
+          <p className={styles.listHeading}>Upcoming bookings</p>
+          {visibleRows.length === 0 ? (
+            <p className={styles.sectionEmpty}>No reservations.</p>
+          ) : (
+            <ul className={styles.cardList}>
+              {visibleRows.map((r) => (
+                <li key={r.id}>
+                  <button type="button" className={styles.card} onClick={() => setFocused(r)}>
+                    <span className={styles.cardBar} aria-hidden="true" />
+                    <span className={styles.cardTime}>{shortTime(r.time)}</span>
+                    <span className={styles.cardBody}>
+                      <span className={styles.cardName}>{r.name}</span>
+                      <span className={styles.cardMeta}>{r.count} Guests · {prettySeating(r.seating)}</span>
+                    </span>
+                    {(() => {
+                      // Only render a pill for statuses staff need to act on.
+                      // "unconfirmed", "confirmed", "pending" are the
+                      // normal flow and don't need a badge.
+                      switch (r.status) {
+                        case "no-show":
+                          return <span className={`${styles.statusPill} ${styles.statusPillNoShow}`}>No Show</span>;
+                        case "seated":
+                          return <span className={`${styles.statusPill} ${styles.statusPillSeated}`}>Seated</span>;
+                        case "cancelled":
+                          return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Cancelled</span>;
+                        case "updated":
+                          return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Updated</span>;
+                        default:
+                          if (r.customerUpdated) {
+                            return <span className={`${styles.statusPill} ${styles.statusPillUpdated}`}>Updated</span>;
                           }
-                        })()}
-                        <span className={styles.cardChev}><ChevronRight /></span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })
+                          return null;
+                      }
+                    })()}
+                    <span className={styles.cardChev}><ChevronRight /></span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       <button type="button" className={styles.addBtn} onClick={() => { setEditing(null); setAddOpen(true); }}>
@@ -494,6 +560,19 @@ export default function ReservationsPage() {
           onSeat={() => applyStatus(focused.id, "seated")}
           onMarkNoShow={() => applyStatus(focused.id, "no-show")}
           onCancel={() => applyStatus(focused.id, "cancelled")}
+        />
+      )}
+
+      {blockOpen && (
+        <BlockAvailabilityModal
+          dateISO={dateISO}
+          branch={branch}
+          service={service}
+          onClose={() => setBlockOpen(false)}
+          onSaved={async () => {
+            setBlockOpen(false);
+            await reloadBlocks();
+          }}
         />
       )}
 
@@ -874,6 +953,212 @@ function FieldBlock({ label, children }: { label: string; children: React.ReactN
     <div className={styles.fieldBlock}>
       <p className={styles.fieldBlockLabel}>{label}</p>
       <div className={styles.fieldBlockInput}>{children}</div>
+    </div>
+  );
+}
+
+/* ── Block Availability Sheet ── */
+
+/**
+ * Shown to guests on book.yurica.com.au next to a slot they can't take. The
+ * booking site already renders blocked slots as full, so the wording matches
+ * what they'd read there rather than anything internal.
+ */
+const BLOCK_REASON = "Fully Booked";
+
+/**
+ * The three ways staff describe a closure, mapped onto the upstream shape:
+ *
+ *   service → whole lunch or dinner, every area   (timeslot lunch|dinner, seating all)
+ *   time    → an arbitrary window, chosen areas   (timeslot custom + start/end)
+ *   area    → a whole service, but only one area  (timeslot lunch|dinner + seating)
+ *
+ * Keeping them distinct is what lets one sheet cover "we're closed tonight",
+ * "no bookings 12–1" and "the garden is out of action" without three sheets.
+ */
+const BLOCK_SCOPES = ["service", "time", "area"] as const;
+type BlockScope = (typeof BLOCK_SCOPES)[number];
+
+const SCOPE_LABELS: Record<BlockScope, string> = {
+  service: "Entire Service",
+  time: "Time Range",
+  area: "Area",
+};
+
+function ChevronDownIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>;
+}
+
+function BlockAvailabilityModal({
+  dateISO, branch, service: initialService, onClose, onSaved,
+}: {
+  dateISO: string;
+  branch: ReservationBranch;
+  service: ReservationService;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const { user } = useAuth();
+  const [date, setDate] = useState(dateISO);
+  const [service, setService] = useState<ReservationService>(initialService);
+  const [scope, setScope] = useState<BlockScope>("service");
+  const [seating, setSeating] = useState<BlockSeating>("all");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Both dropdowns only ever offer marks inside the chosen service, so a
+  // window that couldn't be booked in the first place can't be created.
+  const timeOptions = useMemo(() => serviceTimeOptions(service), [service]);
+  const [startTime, setStartTime] = useState(() => serviceTimeOptions(initialService)[0]);
+  const [endTime, setEndTime] = useState(() => {
+    const opts = serviceTimeOptions(initialService);
+    // Default to a one-hour window — the common case is closing a single hour.
+    return opts[Math.min(4, opts.length - 1)];
+  });
+
+  // Switching service leaves the old service's times selected, which upstream
+  // would happily store as an unreachable window. Snap them back in range.
+  useEffect(() => {
+    const opts = serviceTimeOptions(service);
+    setStartTime(opts[0]);
+    setEndTime(opts[Math.min(4, opts.length - 1)]);
+  }, [service]);
+
+  const dateRef = useRef<HTMLInputElement | null>(null);
+  function pickDate() {
+    const el = dateRef.current;
+    if (!el) return;
+    try {
+      (el as unknown as { showPicker?: () => void }).showPicker?.();
+    } catch { /* ignore — older browsers fall through to focus() */ }
+    el.focus();
+  }
+
+  async function submit() {
+    if (!user) return;
+    if (scope === "time" && startTime >= endTime) {
+      setError("The end time has to be after the start time.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const input: BlockedDateCreateInput = {
+        date,
+        reason: BLOCK_REASON,
+        branch,
+        timeslot: scope === "time" ? "custom" : (service === "LUNCH" ? "lunch" : "dinner"),
+        // Closing a whole service closes every area with it; the other two
+        // scopes take whatever the area chips say.
+        seating: scope === "service" ? "all" : seating,
+        ...(scope === "time" ? { startTime, endTime } : {}),
+      };
+      await createBlockedDate(user, input);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not block that slot.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className={styles.sheetBackdrop} role="dialog" aria-label="Block availability" onClick={onClose}>
+      <div className={styles.sheet} onClick={(e) => e.stopPropagation()}>
+        <span className={styles.sheetGrabber} aria-hidden="true" />
+        <p className={styles.sheetTitle}>Block Availability</p>
+        <p className={styles.sheetSubtitle}>2-second quick block</p>
+
+        <div className={styles.blockField}>
+          <span className={styles.blockFieldLabel}>Date</span>
+          <button type="button" className={styles.blockSelect} onClick={pickDate}>
+            <span>{fmtHeaderDate(date)}</span>
+            <ChevronDownIcon />
+          </button>
+          <input
+            ref={dateRef}
+            type="date"
+            className={styles.hiddenDateInput}
+            value={date}
+            onChange={(e) => { if (e.target.value) setDate(e.target.value); }}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+        </div>
+
+        <div className={styles.serviceToggle}>
+          {SERVICES.map((svc) => (
+            <button
+              key={svc}
+              type="button"
+              className={`${styles.serviceToggleBtn} ${service === svc ? styles.serviceToggleBtnActive : ""}`}
+              onClick={() => setService(svc)}
+            >
+              {svc === "LUNCH" ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+              <span>{svc === "LUNCH" ? "Lunch" : "Dinner"}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.scopeGrid}>
+          {BLOCK_SCOPES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`${styles.scopeBtn} ${scope === s ? styles.scopeBtnActive : ""}`}
+              onClick={() => setScope(s)}
+            >
+              {s === "service" ? <ServiceScopeIcon /> : s === "time" ? <ClockIcon /> : <AreaScopeIcon />}
+              <span>{SCOPE_LABELS[s]}</span>
+            </button>
+          ))}
+        </div>
+
+        {scope === "time" && (
+          <div className={styles.blockTimeRow}>
+            <div className={styles.blockField}>
+              <span className={styles.blockFieldLabel}>From</span>
+              <div className={styles.blockSelect}>
+                <select value={startTime} onChange={(e) => setStartTime(e.target.value)}>
+                  {timeOptions.map((t) => <option key={t} value={t}>{fmt12h(t)}</option>)}
+                </select>
+                <ChevronDownIcon />
+              </div>
+            </div>
+            <div className={styles.blockField}>
+              <span className={styles.blockFieldLabel}>To</span>
+              <div className={styles.blockSelect}>
+                <select value={endTime} onChange={(e) => setEndTime(e.target.value)}>
+                  {timeOptions.map((t) => <option key={t} value={t}>{fmt12h(t)}</option>)}
+                </select>
+                <ChevronDownIcon />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {scope !== "service" && (
+          <div className={styles.areaChips}>
+            {(Object.keys(AREA_LABELS) as BlockSeating[]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`${styles.areaChip} ${seating === s ? styles.areaChipActive : ""}`}
+                onClick={() => setSeating(s)}
+              >
+                {AREA_LABELS[s]}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {error ? <p className={styles.error}>{error}</p> : null}
+
+        <button type="button" className={styles.blockCta} onClick={submit} disabled={submitting}>
+          {submitting ? "Blocking…" : "Block Availability →"}
+        </button>
+        <p className={styles.blockNote}>Blocked times appear as FULL on the booking side.</p>
+      </div>
     </div>
   );
 }

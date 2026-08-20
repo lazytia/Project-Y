@@ -50,14 +50,36 @@
   padding: 0;
 }
 
-/* ?�?� Hero ?�?� */
-.hero {
+/* ?�?� Day summary card (hero + both services in one box) ?�?� */
+.dayCard {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+}
+
+.dayCardHero {
   padding: var(--space-4);
   text-align: center;
-  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dayCardServices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Only between the two columns, so the card keeps a single outer border. */
+.dayCardService + .dayCardService {
+  border-left: 1px solid var(--color-border);
+}
+
+.dayCardService {
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .heroNumber {
@@ -76,27 +98,7 @@
   color: var(--color-warm);
 }
 
-/* ?�?� Service summary cards (Lunch / Dinner) ?�?� */
-.serviceCards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: var(--space-3);
-}
-
-.serviceCard {
-  border-radius: var(--radius-lg);
-  padding: 14px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.serviceCardLunch,
-.serviceCardDinner {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-}
+/* ?�?� Service column internals (shared by Lunch and Dinner) ?�?� */
 
 .serviceCardHead {
   display: flex;
@@ -111,8 +113,7 @@
   flex-shrink: 0;
 }
 
-.serviceCardLunch .serviceCardIcon { color: var(--color-fg); }
-.serviceCardDinner .serviceCardIcon { color: var(--color-fg); }
+.serviceCardIcon { color: var(--color-fg); }
 
 .serviceCardTitle {
   margin: 0;
@@ -120,9 +121,6 @@
   font-weight: 800;
   letter-spacing: 0.04em;
 }
-
-.serviceCardLunch .serviceCardTitle { color: var(--color-fg); }
-.serviceCardDinner .serviceCardTitle { color: var(--color-fg); }
 
 .serviceCardWindow {
   margin: 1px 0 0 0;
@@ -154,10 +152,9 @@
   font-size: 28px;
   font-weight: 800;
   line-height: 1.15;
+  color: #ea580c;
 }
 
-.serviceCardLunch .serviceCardStatValue,
-.serviceCardDinner .serviceCardStatValue { color: #ea580c; }
 
 .serviceCardStatValueSm {
   margin: 0;
@@ -360,30 +357,14 @@
   margin-bottom: var(--space-4);
 }
 
-.sectionHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+/* The service label moved into the toggle above, so the list only needs a
+   plain heading now. */
+.listHeading {
+  margin: 0 0 var(--space-2) 0;
   padding: 0 4px;
-}
-
-.sectionLabel {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--color-fg);
-}
-
-.sectionWindow {
-  flex: 1;
-  font-size: 11px;
-  color: var(--color-fg-muted);
-}
-
-.sectionStats {
-  font-size: 11px;
-  color: var(--color-fg-muted);
 }
 
 .sectionEmpty {
@@ -1032,30 +1013,6 @@
 
 .fullSheetSave:disabled { opacity: 0.5; cursor: progress; }
 
-/* Seating toggle (older simpler variant ??kept for compatibility) */
-.seatToggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-}
-
-.seatToggleBtn {
-  padding: 8px 10px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-fg);
-  cursor: pointer;
-}
-
-.seatToggleBtnActive {
-  border-color: var(--color-warm);
-  background: var(--color-warm-bg);
-  color: var(--color-warm);
-}
-
 .formGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1084,4 +1041,257 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
+}
+
+/* ?�?� Lunch / Dinner pills ?�?� */
+.serviceToggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  margin-bottom: var(--space-3);
+}
+
+.serviceToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+/* Selected reads as a solid black pill, matching the sticky add bar below. */
+.serviceToggleBtnActive {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+/* ?�?� Availability blocks ?�?� */
+.iconBtnBlock {
+  color: var(--color-warm);
+  border-color: var(--color-warm);
+}
+
+.blockSection {
+  margin-bottom: var(--space-3);
+}
+
+.blockHeading {
+  margin: 0 0 var(--space-2) 0;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+}
+
+.blockList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.blockRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--space-3);
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-md);
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+.blockIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.blockText {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.blockRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 4px;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ?�?� Block Availability sheet ?�?� */
+.sheetGrabber {
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 0 auto var(--space-3) auto;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+
+.sheetTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.sheetSubtitle {
+  margin: 2px 0 var(--space-4) 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.blockField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+  min-width: 0;
+}
+
+.blockFieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+}
+
+/*
+ * Wraps either a button (date) or a native <select> (times). The select is
+ * stretched over the whole box and made transparent so the OS picker still
+ * opens on tap while our own chevron stays visible.
+ */
+.blockSelect {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 11px var(--space-3);
+  box-sizing: border-box;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+  text-align: left;
+}
+
+.blockSelect select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.scopeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+
+.scopeBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-3) 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  text-align: center;
+}
+
+.scopeBtnActive {
+  border-color: var(--color-fg);
+  color: var(--color-fg);
+}
+
+.blockTimeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.areaChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+
+.areaChip {
+  padding: 8px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.areaChipActive {
+  background: var(--color-fg);
+  border-color: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.blockCta {
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--color-fg);
+  color: var(--color-bg);
+  border: none;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.blockCta:disabled { opacity: 0.5; cursor: progress; }
+
+.blockNote {
+  margin: var(--space-3) 0 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--color-fg-muted);
 }

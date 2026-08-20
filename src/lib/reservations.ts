@@ -119,11 +119,47 @@ export function todayISO(): string {
   return new Date().toLocaleDateString("en-CA");
 }
 
-/** Lunch: 11:30 – 14:00. Dinner: 17:00 – 21:00. */
+/**
+ * Service windows in venue local time. Single definition so the summary card
+ * headings and the time options offered when blocking part of a service can
+ * never drift apart.
+ */
+export const SERVICE_WINDOWS: Record<ReservationService, { start: string; end: string }> = {
+  LUNCH: { start: "11:30", end: "14:00" },
+  DINNER: { start: "17:30", end: "22:00" },
+};
+
+/** Which service a booking time falls in. Anything before 15:00 is lunch. */
 export function serviceFor(time: string): ReservationService {
   const [h, m] = time.split(":").map(Number);
   const mins = (h ?? 12) * 60 + (m ?? 0);
   return mins < 15 * 60 ? "LUNCH" : "DINNER";
+}
+
+function toMins(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+function fromMins(mins: number): string {
+  return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+}
+
+/** Every mark inside a service window, e.g. 11:30, 11:45 … 14:00. */
+export function serviceTimeOptions(service: ReservationService, stepMins = 15): string[] {
+  const { start, end } = SERVICE_WINDOWS[service];
+  const out: string[] = [];
+  for (let t = toMins(start); t <= toMins(end); t += stepMins) out.push(fromMins(t));
+  return out;
+}
+
+/** "13:30" → "1:30 PM". */
+export function fmt12h(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  if (Number.isNaN(h)) return time;
+  const meridian = h < 12 ? "AM" : "PM";
+  const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${display}:${String(m ?? 0).padStart(2, "0")} ${meridian}`;
 }
 
 async function authHeader(user: User | null | undefined): Promise<HeadersInit> {
@@ -185,6 +221,107 @@ export async function updateReservation(
     method: "PUT",
     headers: { "Content-Type": "application/json", ...(await authHeader(user)) },
     body: JSON.stringify(patch),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+}
+
+/* ── Availability blocks ── */
+
+/**
+ * A block closes part of a day on the customer booking site. That site reads
+ * these same records and refuses any slot a block covers, which is what makes
+ * "blocked" mean "cannot be booked" rather than a note only we can see.
+ *
+ * "all" covers the whole day, "lunch"/"dinner" a whole service, and "custom"
+ * a start–end window compared as plain strings.
+ */
+export const BLOCK_TIMESLOTS = ["all", "lunch", "dinner", "custom"] as const;
+export type BlockTimeslot = (typeof BLOCK_TIMESLOTS)[number];
+
+export const BLOCK_SEATINGS = ["all", "indoor", "outdoor", "bar"] as const;
+export type BlockSeating = (typeof BLOCK_SEATINGS)[number];
+
+/**
+ * Area names as guests see them on book.yurica.com.au. "outdoor" is sold
+ * there as Garden Dining, so staff closing it should read the same word.
+ */
+export const AREA_LABELS: Record<BlockSeating, string> = {
+  all: "All Areas",
+  indoor: "Indoor",
+  outdoor: "Garden",
+  bar: "Bar",
+};
+
+export type BlockedDate = {
+  id: string;
+  date: string;
+  reason?: string;
+  branch?: ReservationBranch | "all";
+  timeslot?: BlockTimeslot;
+  seating?: BlockSeating;
+  startTime?: string | null;
+  endTime?: string | null;
+  createdAt?: FirestoreTimestamp;
+};
+
+export type BlockedDateCreateInput = {
+  date: string;
+  reason?: string;
+  branch: ReservationBranch | "all";
+  timeslot: BlockTimeslot;
+  seating: BlockSeating;
+  startTime?: string;
+  endTime?: string;
+};
+
+/** What a block covers, e.g. "12:00 PM – 1:00 PM · Indoor". */
+export function describeBlock(b: BlockedDate): string {
+  const slot = b.timeslot ?? "all";
+  const scope =
+    slot === "custom" && b.startTime && b.endTime
+      ? `${fmt12h(b.startTime)} – ${fmt12h(b.endTime)}`
+      : slot === "lunch"
+        ? "Lunch service"
+        : slot === "dinner"
+          ? "Dinner service"
+          : "All day";
+  return `${scope} · ${AREA_LABELS[b.seating ?? "all"]}`;
+}
+
+export async function fetchBlockedDates(
+  user: User | null | undefined,
+  date: string,
+  branch: ReservationBranch = "northsydney",
+): Promise<BlockedDate[]> {
+  const url = `/api/reservations/blocked-dates?date=${encodeURIComponent(date)}&branch=${encodeURIComponent(branch)}`;
+  const res = await fetch(url, { cache: "no-store", headers: await authHeader(user) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+  return (data?.blockedDates ?? []) as BlockedDate[];
+}
+
+export async function createBlockedDate(
+  user: User | null | undefined,
+  input: BlockedDateCreateInput,
+): Promise<{ id?: string }> {
+  const res = await fetch("/api/reservations/blocked-dates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeader(user)) },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+  return { id: data?.id };
+}
+
+export async function deleteBlockedDate(
+  user: User | null | undefined,
+  id: string,
+): Promise<void> {
+  const res = await fetch(`/api/reservations/blocked-dates/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: await authHeader(user),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
