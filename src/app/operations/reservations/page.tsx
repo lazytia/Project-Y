@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   AREA_LABELS,
@@ -12,17 +12,20 @@ import {
   type ReservationSeating,
   type ReservationService,
   type ReservationStatus,
-  SERVICE_WINDOWS,
+  SERVICES,
   createBlockedDate,
   createReservation,
   deleteBlockedDate,
   describeBlock,
   fetchBlockedDates,
   fetchReservationsForDate,
+  fetchUpcomingBlockedDates,
   fmt12h,
   isCancelled,
+  openServices,
   serviceFor,
   serviceTimeOptions,
+  serviceWindow,
   setReservationStatus,
   todayISO,
   tsToDate,
@@ -33,8 +36,6 @@ import styles from "./page.module.css";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-/** Render order for the summary columns and the Lunch/Dinner toggle. */
-const SERVICES: ReservationService[] = ["LUNCH", "DINNER"];
 
 function fmtHeaderDate(iso: string): string {
   if (!iso) return "";
@@ -372,7 +373,7 @@ export default function ReservationsPage() {
         <div className={styles.dayCardServices}>
           {SERVICES.map((svc) => {
             const t = serviceTotals[svc];
-            const { start, end } = SERVICE_WINDOWS[svc];
+            const window = serviceWindow(svc, dateISO, branch);
             return (
               <div key={svc} className={styles.dayCardService}>
                 <div className={styles.serviceCardHead}>
@@ -381,7 +382,9 @@ export default function ReservationsPage() {
                   </span>
                   <div>
                     <p className={styles.serviceCardTitle}>{svc}</p>
-                    <p className={styles.serviceCardWindow}>{start} – {end}</p>
+                    <p className={styles.serviceCardWindow}>
+                      {window ? `${window.start} – ${window.end}` : "Closed"}
+                    </p>
                   </div>
                 </div>
                 <div className={styles.serviceCardStats}>
@@ -569,10 +572,7 @@ export default function ReservationsPage() {
           branch={branch}
           service={service}
           onClose={() => setBlockOpen(false)}
-          onSaved={async () => {
-            setBlockOpen(false);
-            await reloadBlocks();
-          }}
+          onChanged={reloadBlocks}
         />
       )}
 
@@ -990,13 +990,13 @@ function ChevronDownIcon() {
 }
 
 function BlockAvailabilityModal({
-  dateISO, branch, service: initialService, onClose, onSaved,
+  dateISO, branch, service: initialService, onClose, onChanged,
 }: {
   dateISO: string;
   branch: ReservationBranch;
   service: ReservationService;
   onClose: () => void;
-  onSaved: () => void | Promise<void>;
+  onChanged: () => void | Promise<void>;
 }) {
   const { user } = useAuth();
   const [date, setDate] = useState(dateISO);
@@ -1005,24 +1005,46 @@ function BlockAvailabilityModal({
   const [seating, setSeating] = useState<BlockSeating>("all");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [upcoming, setUpcoming] = useState<BlockedDate[]>([]);
+  const [lifting, setLifting] = useState<string | null>(null);
 
-  // Both dropdowns only ever offer marks inside the chosen service, so a
-  // window that couldn't be booked in the first place can't be created.
-  const timeOptions = useMemo(() => serviceTimeOptions(service), [service]);
-  const [startTime, setStartTime] = useState(() => serviceTimeOptions(initialService)[0]);
-  const [endTime, setEndTime] = useState(() => {
-    const opts = serviceTimeOptions(initialService);
-    // Default to a one-hour window — the common case is closing a single hour.
-    return opts[Math.min(4, opts.length - 1)];
-  });
-
-  // Switching service leaves the old service's times selected, which upstream
-  // would happily store as an unreachable window. Snap them back in range.
+  // Only the services the venue actually trades that day — North Sydney sells
+  // no Saturday lunch, and a block against a service nobody could book is
+  // just a row that does nothing.
+  const services = useMemo(() => openServices(date, branch), [date, branch]);
   useEffect(() => {
-    const opts = serviceTimeOptions(service);
-    setStartTime(opts[0]);
-    setEndTime(opts[Math.min(4, opts.length - 1)]);
-  }, [service]);
+    if (services.length > 0 && !services.includes(service)) setService(services[0]);
+  }, [services, service]);
+
+  // Both dropdowns only ever offer marks inside the chosen service on the
+  // chosen day, so a window that couldn't be booked can't be created.
+  const timeOptions = useMemo(() => serviceTimeOptions(service, date, branch), [service, date, branch]);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  // A time only means something within one service on one day, so changing
+  // either invalidates the pair. Upstream would happily store the stale one
+  // as a window falling outside trading hours, which blocks nothing at all.
+  useEffect(() => {
+    setStartTime(timeOptions[0] ?? "");
+    // Default to a one-hour window — the common case is closing a single hour.
+    setEndTime(timeOptions[Math.min(4, timeOptions.length - 1)] ?? "");
+  }, [timeOptions]);
+
+  /**
+   * Every block from today onwards, not just the day on screen. A block set
+   * for next Friday is otherwise unreachable unless staff happen to navigate
+   * to that date, so this is the one place they can all be lifted.
+   */
+  const loadUpcoming = useCallback(async () => {
+    if (!user) return;
+    try {
+      setUpcoming(await fetchUpcomingBlockedDates(user, todayISO(), branch));
+    } catch {
+      setUpcoming([]);
+    }
+  }, [user, branch]);
+
+  useEffect(() => { loadUpcoming(); }, [loadUpcoming]);
 
   const dateRef = useRef<HTMLInputElement | null>(null);
   function pickDate() {
@@ -1054,11 +1076,28 @@ function BlockAvailabilityModal({
         ...(scope === "time" ? { startTime, endTime } : {}),
       };
       await createBlockedDate(user, input);
-      await onSaved();
+      // Stays open on purpose: the new block lands in the list below, which
+      // both confirms it took and puts the undo one tap away.
+      await Promise.all([onChanged(), loadUpcoming()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not block that slot.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  /** Lift a block — the slot goes back on sale on the customer site. */
+  async function lift(id: string) {
+    if (!user) return;
+    setLifting(id);
+    setError(null);
+    try {
+      await deleteBlockedDate(user, id);
+      await Promise.all([onChanged(), loadUpcoming()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not lift that block.");
+    } finally {
+      setLifting(null);
     }
   }
 
@@ -1087,7 +1126,7 @@ function BlockAvailabilityModal({
         </div>
 
         <div className={styles.serviceToggle}>
-          {SERVICES.map((svc) => (
+          {services.map((svc) => (
             <button
               key={svc}
               type="button"
@@ -1158,6 +1197,35 @@ function BlockAvailabilityModal({
           {submitting ? "Blocking…" : "Block Availability →"}
         </button>
         <p className={styles.blockNote}>Blocked times appear as FULL on the booking side.</p>
+
+        <section className={styles.manageSection}>
+          <p className={styles.blockHeading}>Currently blocked</p>
+          {upcoming.length === 0 ? (
+            <p className={styles.manageEmpty}>Nothing is blocked from today onwards.</p>
+          ) : (
+            <ul className={styles.manageList}>
+              {upcoming.map((b) => (
+                <li key={b.id} className={styles.manageRow}>
+                  <span className={styles.manageIcon}><BlockIcon size={16} /></span>
+                  <span className={styles.manageBody}>
+                    <span className={styles.manageDate}>
+                      {fmtHeaderDate(b.date)} {b.date.slice(0, 4)}
+                    </span>
+                    <span className={styles.manageDesc}>{describeBlock(b)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.manageLift}
+                    onClick={() => lift(b.id)}
+                    disabled={lifting === b.id}
+                  >
+                    {lifting === b.id ? "Lifting…" : "Unblock"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );

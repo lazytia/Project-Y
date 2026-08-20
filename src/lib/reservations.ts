@@ -119,15 +119,48 @@ export function todayISO(): string {
   return new Date().toLocaleDateString("en-CA");
 }
 
+/** Render order wherever both services are listed. */
+export const SERVICES: ReservationService[] = ["LUNCH", "DINNER"];
+
+export type ServiceWindow = { start: string; end: string };
+
 /**
- * Service windows in venue local time. Single definition so the summary card
- * headings and the time options offered when blocking part of a service can
- * never drift apart.
+ * Trading windows in venue local time, mirroring the ones book.yurica.com.au
+ * offers guests. The customer site decides which service a time belongs to
+ * from these exact boundaries and refuses anything outside them, so a window
+ * that drifted here would let staff close a slot nobody could book anyway.
  */
-export const SERVICE_WINDOWS: Record<ReservationService, { start: string; end: string }> = {
-  LUNCH: { start: "11:30", end: "14:00" },
-  DINNER: { start: "17:30", end: "22:00" },
+const WEEKDAY_WINDOWS: Record<ReservationService, ServiceWindow> = {
+  LUNCH: { start: "11:30", end: "14:15" },
+  DINNER: { start: "17:30", end: "20:00" },
 };
+
+/** North Sydney trades dinner only on Saturdays, over a slightly wider window. */
+const SATURDAY_DINNER: ServiceWindow = { start: "17:00", end: "20:15" };
+
+function isSaturdayDinnerOnly(date: string, branch: ReservationBranch): boolean {
+  if (branch !== "northsydney") return false;
+  const [y, m, d] = date.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  return new Date(y, m - 1, d).getDay() === 6;
+}
+
+/** The window a service trades on the given day, or null when it's closed. */
+export function serviceWindow(
+  service: ReservationService,
+  date: string,
+  branch: ReservationBranch,
+): ServiceWindow | null {
+  if (isSaturdayDinnerOnly(date, branch)) {
+    return service === "DINNER" ? SATURDAY_DINNER : null;
+  }
+  return WEEKDAY_WINDOWS[service];
+}
+
+/** Services actually trading on the given day. */
+export function openServices(date: string, branch: ReservationBranch): ReservationService[] {
+  return SERVICES.filter((s) => serviceWindow(s, date, branch) !== null);
+}
 
 /** Which service a booking time falls in. Anything before 15:00 is lunch. */
 export function serviceFor(time: string): ReservationService {
@@ -145,11 +178,21 @@ function fromMins(mins: number): string {
   return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 }
 
-/** Every mark inside a service window, e.g. 11:30, 11:45 … 14:00. */
-export function serviceTimeOptions(service: ReservationService, stepMins = 15): string[] {
-  const { start, end } = SERVICE_WINDOWS[service];
+/**
+ * Every bookable mark in a service, e.g. 11:30, 11:45 … 14:15. Empty when the
+ * service doesn't trade that day, which is what stops the blocking sheet from
+ * offering a window no guest could have booked.
+ */
+export function serviceTimeOptions(
+  service: ReservationService,
+  date: string,
+  branch: ReservationBranch,
+  stepMins = 15,
+): string[] {
+  const window = serviceWindow(service, date, branch);
+  if (!window) return [];
   const out: string[] = [];
-  for (let t = toMins(start); t <= toMins(end); t += stepMins) out.push(fromMins(t));
+  for (let t = toMins(window.start); t <= toMins(window.end); t += stepMins) out.push(fromMins(t));
   return out;
 }
 
@@ -289,16 +332,52 @@ export function describeBlock(b: BlockedDate): string {
   return `${scope} · ${AREA_LABELS[b.seating ?? "all"]}`;
 }
 
+/**
+ * True when a block only restates a service the venue doesn't trade anyway.
+ *
+ * The platform stores one of these for every Saturday to mirror the
+ * dinner-only roster — forty of them stretch out past next May. Listing them
+ * would bury the handful of blocks staff actually set, and offering an
+ * "unblock" on one implies a Saturday lunch service that doesn't exist.
+ */
+function isClosedServiceBlock(b: BlockedDate): boolean {
+  const slot = b.timeslot ?? "all";
+  if (slot !== "lunch" && slot !== "dinner") return false;
+  const branch = b.branch && b.branch !== "all" ? b.branch : "northsydney";
+  return serviceWindow(slot === "lunch" ? "LUNCH" : "DINNER", b.date, branch) === null;
+}
+
+async function getBlocks(
+  user: User | null | undefined,
+  params: Record<string, string>,
+): Promise<BlockedDate[]> {
+  const url = `/api/reservations/blocked-dates?${new URLSearchParams(params)}`;
+  const res = await fetch(url, { cache: "no-store", headers: await authHeader(user) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+  return ((data?.blockedDates ?? []) as BlockedDate[]).filter((b) => !isClosedServiceBlock(b));
+}
+
 export async function fetchBlockedDates(
   user: User | null | undefined,
   date: string,
   branch: ReservationBranch = "northsydney",
 ): Promise<BlockedDate[]> {
-  const url = `/api/reservations/blocked-dates?date=${encodeURIComponent(date)}&branch=${encodeURIComponent(branch)}`;
-  const res = await fetch(url, { cache: "no-store", headers: await authHeader(user) });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
-  return (data?.blockedDates ?? []) as BlockedDate[];
+  return getBlocks(user, { date, branch });
+}
+
+/** Blocks from `from` onwards, for the manage list in the blocking sheet. */
+export async function fetchUpcomingBlockedDates(
+  user: User | null | undefined,
+  from: string,
+  branch: ReservationBranch = "northsydney",
+): Promise<BlockedDate[]> {
+  const rows = await getBlocks(user, { from, branch });
+  return rows.sort((a, b) =>
+    a.date === b.date
+      ? (a.startTime ?? "").localeCompare(b.startTime ?? "")
+      : a.date.localeCompare(b.date),
+  );
 }
 
 export async function createBlockedDate(

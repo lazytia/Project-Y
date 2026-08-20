@@ -1188,6 +1188,7 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
+  min-height: 44px;
   padding: 11px var(--space-3);
   box-sizing: border-box;
   background: var(--color-bg);
@@ -1201,9 +1202,17 @@
   text-align: left;
 }
 
+/*
+ * Stretched over the whole box, not just sat inside it: laid out in flow the
+ * select only answered taps that landed on the value text, so the chevron and
+ * the padding either side of it looked pressable and did nothing.
+ */
 .blockSelect select {
-  flex: 1;
-  min-width: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0 36px 0 var(--space-3);
+  box-sizing: border-box;
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
@@ -1212,6 +1221,12 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
+}
+
+/* Decoration only — it must never sit between the tap and the field. */
+.blockSelect svg {
+  margin-left: auto;
+  pointer-events: none;
 }
 
 .scopeGrid {
@@ -1295,3 +1310,77 @@
   font-size: 11px;
   color: var(--color-fg-muted);
 }
+
+/* Blocks already in place, listed inside the sheet so any of them can be
+   lifted — not only the ones falling on the date currently on screen. */
+.manageSection {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.manageEmpty {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--color-fg-subtle);
+}
+
+.manageList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manageRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.manageIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-warm);
+}
+
+.manageBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.manageDate {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.manageDesc {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.manageLift {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.manageLift:disabled { opacity: 0.5; cursor: progress; }

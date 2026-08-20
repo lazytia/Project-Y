@@ -12,6 +12,7 @@ import {
  * Availability blocks on the booking platform.
  *
  *   GET  /api/reservations/blocked-dates?date=&branch= → blocks for that day
+ *   GET  /api/reservations/blocked-dates?from=&branch= → that day onwards
  *   POST /api/reservations/blocked-dates               → create one
  *
  * The customer-facing booking site reads the same records and refuses any
@@ -33,15 +34,18 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const date = url.searchParams.get("date");
+  const from = url.searchParams.get("from");
   const branch = url.searchParams.get("branch");
 
   const res = await callBooking<{ blockedDates?: BlockedDate[] }>("/blocked-dates");
   if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
 
-  // Upstream hands back every block it has ever stored, so narrow to the day
-  // on the server and keep the payload proportional to what the page shows.
+  // Upstream hands back every block it has ever stored, so narrow it here and
+  // keep the payload proportional to what the caller asked for. Dates are
+  // YYYY-MM-DD, which compares correctly as a plain string.
   let blocks = res.data?.blockedDates ?? [];
   if (date) blocks = blocks.filter((b) => b.date === date);
+  if (from) blocks = blocks.filter((b) => b.date >= from);
   if (branch) blocks = blocks.filter((b) => matchesBranch(b, branch));
 
   return NextResponse.json({ blockedDates: blocks });
