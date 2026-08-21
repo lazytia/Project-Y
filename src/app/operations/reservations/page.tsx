@@ -28,7 +28,6 @@ import {
   serviceWindow,
   setReservationStatus,
   todayISO,
-  tsToDate,
   updateReservation,
 } from "@/lib/reservations";
 import { resolveCompany } from "@/lib/reservation-company";
@@ -63,9 +62,6 @@ function RefreshIcon() {
 }
 function CalIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
-}
-function AlertIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12" y2="17" /></svg>;
 }
 function SearchIcon() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>;
@@ -173,42 +169,6 @@ export default function ReservationsPage() {
     } catch { /* ignore — older browsers fall through to focus() */ }
     el.focus();
   }
-  // Activity entries the user has dismissed via the Clear button. Stored
-  // in localStorage so the Clear state is per-device and survives page
-  // reloads — clearing on one phone never affects what another phone
-  // sees, since each device keeps its own dismissed list.
-  //
-  // MUST NOT read localStorage in the useState initializer — it runs
-  // during SSR of this "use client" component too and returns an empty
-  // Set on the server but a populated one on the client. That mismatch
-  // is exactly what surfaces as "Application error: a client-side
-  // exception has occurred" when navigating to this page. Initialize
-  // empty on both sides; the effect below hydrates from localStorage
-  // after mount.
-  const [clearedActivity, setClearedActivity] = useState<Set<string>>(
-    () => new Set(),
-  );
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("reservations-cleared-activity");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as string[];
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        setClearedActivity(new Set(parsed));
-      }
-    } catch { /* corrupt or blocked storage — keep empty */ }
-  }, []);
-  function clearActivity(key: string) {
-    setClearedActivity((prev) => {
-      const next = new Set(prev);
-      next.add(key);
-      try {
-        localStorage.setItem("reservations-cleared-activity", JSON.stringify([...next]));
-      } catch { /* ignore */ }
-      return next;
-    });
-  }
-
   async function reload() {
     if (!user || !dateISO) return;
     setLoading(true);
@@ -248,36 +208,6 @@ export default function ReservationsPage() {
   // out of every guest/booking total via `active` above. The totals are the
   // net figure only — 50 booked with 20 cancelled simply reads as 30.
   const listed = useMemo(() => list.filter((r) => r.status !== "no-show"), [list]);
-
-  // Recent activity to surface in the alert strip: cancellations first, then
-  // brand-new bookings, then customer-updated edits. Each row carries a tag
-  // so the UI can colour them differently.
-  const activity = useMemo(() => {
-    type Item = { reservation: Reservation; kind: "cancelled" | "new" | "updated"; at: number };
-    const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000; // surface anything from the last 24h
-    const now = Date.now();
-    const out: Item[] = [];
-    for (const r of list) {
-      if (isCancelled(r)) {
-        const t = tsToDate(r.customerUpdatedAt ?? r.createdAt ?? null);
-        out.push({ reservation: r, kind: "cancelled", at: t?.getTime() ?? 0 });
-        continue;
-      }
-      const createdMs = tsToDate(r.createdAt ?? null)?.getTime();
-      if (typeof createdMs === "number" && now - createdMs <= RECENT_WINDOW_MS) {
-        out.push({ reservation: r, kind: "new", at: createdMs });
-        continue;
-      }
-      const updatedMs = tsToDate(r.customerUpdatedAt ?? null)?.getTime();
-      if (r.customerUpdated && typeof updatedMs === "number" && now - updatedMs <= RECENT_WINDOW_MS) {
-        out.push({ reservation: r, kind: "updated", at: updatedMs });
-      }
-    }
-    return out
-      .filter((item) => !clearedActivity.has(`${item.kind}-${item.reservation.id}`))
-      .sort((a, b) => b.at - a.at)
-      .slice(0, 4);
-  }, [list, clearedActivity]);
 
   // Keyed by ReservationService so the summary card can be rendered from a
   // single loop over ["LUNCH", "DINNER"] instead of two copies of the markup.
@@ -437,42 +367,6 @@ export default function ReservationsPage() {
             ))}
           </ul>
         </section>
-      )}
-
-      {activity.length > 0 && (
-        <ul className={styles.activityList}>
-          {activity.map(({ reservation, kind }) => (
-            <li
-              key={`${kind}-${reservation.id}`}
-              className={`${styles.activityRow} ${
-                kind === "cancelled" ? styles.activityCancelled
-                  : kind === "new" ? styles.activityNew
-                    : styles.activityUpdated
-              }`}
-            >
-              <span className={styles.activityIcon}><AlertIcon /></span>
-              <div className={styles.activityBody}>
-                <p className={styles.activityTitle}>
-                  {kind === "cancelled" ? "Cancelled Reservation"
-                    : kind === "new" ? "New Reservation"
-                      : "Updated Reservation"}
-                </p>
-                <p className={styles.activityMeta}>
-                  {reservation.name} · {fmtLongDate(reservation.date).replace(/, \d{4}$/, "")} · {fmt12h(reservation.time)}
-                </p>
-              </div>
-              <button type="button" className={styles.activityView} onClick={() => setFocused(reservation)}>View</button>
-              <button
-                type="button"
-                className={styles.activityClear}
-                onClick={() => clearActivity(`${kind}-${reservation.id}`)}
-                aria-label="Dismiss"
-              >
-                Clear
-              </button>
-            </li>
-          ))}
-        </ul>
       )}
 
       <div className={styles.serviceToggle} role="tablist" aria-label="Service">

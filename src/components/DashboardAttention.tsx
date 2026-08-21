@@ -22,20 +22,15 @@ import styles from "./DashboardAttention.module.css";
 /**
  * Owner Dashboard — top-of-screen attention card. Surfaces today's new
  * items (catering, sold-out, HR notes, cash) and ongoing items (onboarding,
- * notice given, ready to terminate). "Noted" hides a row until:
- *   - today-scoped kinds: the next calendar day (fresh daily inbox), or
- *   - ongoing kinds: the count rises above what was noted (new activity).
+ * notice given, ready to terminate).
+ *
+ * "Noted" is permanent: a dismissed row never comes back on its own, and
+ * only reappears once the count climbs past what was dismissed — i.e. when
+ * something genuinely new has arrived.
  */
 
 const SYDNEY_TZ = "Australia/Sydney";
 const STORAGE_KEY = "y.dashboardAttentionNoted";
-
-/** Counts that reflect open backlog, not just today's creations. */
-const PERSISTENT_KINDS = new Set<AttentionKind>([
-  "newEmployee",
-  "noticeGiven",
-  "readyToTerminate",
-]);
 
 type AttentionKind =
   | "catering"
@@ -126,16 +121,14 @@ function normalizeNotedMap(raw: unknown): NotedMap {
 }
 
 function mergeNotedEntry(
-  kind: AttentionKind,
   a: NotedEntry | undefined,
   b: NotedEntry | undefined,
 ): NotedEntry | undefined {
   if (!a) return b;
   if (!b) return a;
-  if (PERSISTENT_KINDS.has(kind)) {
-    // Higher count = dismissed more backlog — never downgrade on sync.
-    return a.count >= b.count ? a : b;
-  }
+  // `date` is when the mark was last written, so the newer write is the more
+  // recent observation of the backlog — including one that revised the count
+  // downwards.
   return a.date >= b.date ? a : b;
 }
 
@@ -144,19 +137,15 @@ function mergeNotedMaps(a: NotedMap, b: NotedMap): NotedMap {
   const out: NotedMap = {};
   for (const key of keys) {
     const kind = key as AttentionKind;
-    const merged = mergeNotedEntry(kind, a[kind], b[kind]);
+    const merged = mergeNotedEntry(a[kind], b[kind]);
     if (merged) out[kind] = merged;
   }
   return out;
 }
 
-function isRowNoted(kind: AttentionKind, count: number, noted: NotedMap, todayKey: string): boolean {
+function isRowNoted(kind: AttentionKind, count: number, noted: NotedMap): boolean {
   const entry = noted[kind];
-  if (!entry) return false;
-  if (PERSISTENT_KINDS.has(kind)) {
-    return count <= entry.count;
-  }
-  return entry.date === todayKey;
+  return entry ? count <= entry.count : false;
 }
 
 function notedStorageKey(uid: string): string {
@@ -434,6 +423,31 @@ export default function DashboardAttention() {
     };
   }, [todayKey, fetchEnabled]);
 
+  // A dismissal is a high-water mark, and today-scoped counts drop back to
+  // zero overnight. Without following them down, a mark set at yesterday's
+  // count would swallow the next genuinely new item instead of surfacing it.
+  useEffect(() => {
+    if (!user || !counts) return;
+    const day = todayKey || sydneyTodayKey();
+    const next: NotedMap = { ...noted };
+    let changed = false;
+    for (const [key, entry] of Object.entries(next) as [AttentionKind, NotedEntry][]) {
+      const live = counts[key] ?? 0;
+      if (live < entry.count) {
+        next[key] = { date: day, count: live };
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    setNoted(next);
+    writeNoted(user.uid, next);
+    setDoc(
+      doc(getDb(), "dashboard_attention_noted", user.uid),
+      { noted: next, updatedAt: serverTimestamp() },
+      { merge: true },
+    ).catch(() => {/* best-effort */});
+  }, [counts, noted, todayKey, user]);
+
   const rows: AttentionRow[] = useMemo(() => {
     if (!counts) return [];
     const build: AttentionRow[] = [
@@ -494,8 +508,8 @@ export default function DashboardAttention() {
         icon: <DollarIcon />,
       },
     ];
-    return build.filter((r) => r.count > 0 && !isRowNoted(r.kind, r.count, noted, todayKey));
-  }, [counts, noted, todayKey]);
+    return build.filter((r) => r.count > 0 && !isRowNoted(r.kind, r.count, noted));
+  }, [counts, noted]);
 
   if (!counts || rows.length === 0) return null;
 

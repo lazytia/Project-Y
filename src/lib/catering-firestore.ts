@@ -59,13 +59,14 @@ export async function syncOrderToFirestore(
     const ref = db.collection(COLLECTION).doc(order.id);
     const doc = toDoc(order);
 
-    // Upsert the main document — set createdAt only on first write.
+    // merge:true still overwrites any field present in the payload, so
+    // createdAt has to be left out once the doc has one or every sync
+    // re-dates the order to "now".
+    const [snap] = await db.getAll(ref, { fieldMask: ["createdAt"] });
     await ref.set(
-      { ...doc, createdAt: FieldValue.serverTimestamp() },
+      snap?.get("createdAt") ? doc : { ...doc, createdAt: FieldValue.serverTimestamp() },
       { merge: true },
     );
-    // Overwrite updatedAt every time (merge keeps createdAt from first write).
-    await ref.update({ updatedAt: FieldValue.serverTimestamp() });
 
     // Append to the history sub-collection so we have a full audit trail.
     await ref.collection("history").add({
@@ -264,16 +265,20 @@ export async function fetchScheduleOverrides(): Promise<Map<string, CateringSche
  */
 export async function syncOrdersToFirestore(orders: CateringOrder[]) {
   try {
+    if (orders.length === 0) return;
     const db = adminDb();
+    const refs = orders.map((o) => db.collection(COLLECTION).doc(o.id));
+    // See syncOrderToFirestore: createdAt must survive later syncs untouched.
+    const snaps = await db.getAll(...refs, { fieldMask: ["createdAt"] });
     const batch = db.batch();
-    for (const order of orders) {
-      const ref = db.collection(COLLECTION).doc(order.id);
+    orders.forEach((order, i) => {
+      const doc = toDoc(order);
       batch.set(
-        ref,
-        { ...toDoc(order), createdAt: FieldValue.serverTimestamp() },
+        refs[i],
+        snaps[i]?.get("createdAt") ? doc : { ...doc, createdAt: FieldValue.serverTimestamp() },
         { merge: true },
       );
-    }
+    });
     await batch.commit();
   } catch (err) {
     console.error("[catering-firestore] batch sync failed:", err);
