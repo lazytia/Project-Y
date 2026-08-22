@@ -41,6 +41,9 @@ const FAR_FUTURE = "2030-12-31";
 /** Earliest selectable Start Date — owner needs to back-fill hires as far
  *  back as 2022. */
 const START_DATE_MIN = "2022-01-01";
+/** Earliest selectable Date of Birth. Wide enough that the year grid never
+ *  runs out from under a hire, without scrolling to the 1900s. */
+const DOB_MIN = "1940-01-01";
 const NOTES_MAX = 500;
 
 function todayIso(): string {
@@ -85,6 +88,7 @@ export default function NewEmployeePage() {
   const [mobileNumber, setMobileNumber] = useState("");
   const [position, setPosition] = useState<Position>("Hall Staff");
   const [visaType, setVisaType] = useState<VisaType>("Student");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [startDate, setStartDate] = useState("");
   const [visaExpiry, setVisaExpiry] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
@@ -95,7 +99,7 @@ export default function NewEmployeePage() {
 
   const [rateFocused, setRateFocused] = useState(false);
   const [satRateFocused, setSatRateFocused] = useState(false);
-  const [calOpen, setCalOpen] = useState<"start" | "visa" | null>(null);
+  const [calOpen, setCalOpen] = useState<"start" | "visa" | "dob" | null>(null);
   const [periodSheetOpen, setPeriodSheetOpen] = useState(false);
   const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>("First 2 Weeks");
 
@@ -128,6 +132,7 @@ export default function NewEmployeePage() {
         mobileNumber: mobileNumber.trim(),
         position,
         visaType,
+        dateOfBirth: dateOfBirth || null,
         startDate,
         // Residents have no visa expiry — always null it regardless of any
         // stale value left in state from a previous visa-type choice.
@@ -283,6 +288,23 @@ export default function NewEmployeePage() {
           </select>
           <ChevronDown className={styles.selectChev} />
         </div>
+      </div>
+
+      {/* Date of birth — drives the "Birthday Coming Up" countdown on the
+          Active Employees page, so it is worth capturing at hire time. */}
+      <div className={styles.field}>
+        <label className={styles.fieldLabel}>DATE OF BIRTH</label>
+        <button
+          type="button"
+          className={styles.pickerBtn}
+          onClick={() => setCalOpen("dob")}
+        >
+          <CalendarIcon className={styles.pickerLeadIcon} />
+          <span className={`${styles.pickerValue} ${!dateOfBirth ? styles.pickerPlaceholder : ""}`}>
+            {dateOfBirth ? fmtIsoShort(dateOfBirth) : "Select date"}
+          </span>
+          <ChevronDown className={styles.selectChev} />
+        </button>
       </div>
 
       {/* Start date + Visa expiry (Visa expiry hidden for Residents) */}
@@ -458,12 +480,19 @@ export default function NewEmployeePage() {
         <div className={styles.calOverlay} onClick={() => setCalOpen(null)}>
           <div className={styles.calSheet} onClick={(e) => e.stopPropagation()}>
             <CalendarPicker
-              value={(calOpen === "visa" ? visaExpiry : startDate) || todayIso()}
-              minDate={calOpen === "start" ? START_DATE_MIN : undefined}
-              maxDate={FAR_FUTURE}
+              value={
+                (calOpen === "visa" ? visaExpiry : calOpen === "dob" ? dateOfBirth : startDate) ||
+                todayIso()
+              }
+              minDate={
+                calOpen === "start" ? START_DATE_MIN : calOpen === "dob" ? DOB_MIN : undefined
+              }
+              // Nobody is born tomorrow — cap the birthday picker at today.
+              maxDate={calOpen === "dob" ? todayIso() : FAR_FUTURE}
               singleOnly
               onChange={(dateKey) => {
                 if (calOpen === "visa") setVisaExpiry(dateKey);
+                else if (calOpen === "dob") setDateOfBirth(dateKey);
                 else setStartDate(dateKey);
                 setCalOpen(null);
               }}

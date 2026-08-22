@@ -16,6 +16,7 @@ import { emailToUsername } from "@/lib/username";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import { isActiveEmployee } from "@/lib/staff-active";
+import { VISA_WINDOW_DAYS, BIRTHDAY_WINDOW_DAYS } from "@/lib/hr-windows";
 import { readStaffRates, type StaffRates } from "@/lib/staff-rates";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -46,9 +47,6 @@ type Notice = {
 };
 
 type TabKey = "all" | "hall" | "kitchen" | "visa" | "birthday" | "notice" | "ready";
-
-const VISA_WINDOW_DAYS = 30;
-const BIRTHDAY_WINDOW_DAYS = 14;
 
 /* ── Firestore shape ── */
 
@@ -372,23 +370,14 @@ export default function ActiveEmployeesPage() {
             title="Visa Expiring"
             onReview={() => setTab("visa")}
           />
+          {/* Notice Given / Ready to Terminate used to sit here too. They now
+              surface as change badges on the People menu instead, so this card
+              stays focused on the two dates nobody else is tracking. */}
           <AttentionRow
             icon={<CakeIcon />}
             count={attention.birthday.length}
             title="Birthday Coming Up"
             onReview={() => setTab("birthday")}
-          />
-          <AttentionRow
-            icon={<NoteIcon />}
-            count={attention.noticeGiven.length}
-            title="Notice Given"
-            onReview={() => setTab("notice")}
-          />
-          <AttentionRow
-            icon={<StopSmallIcon />}
-            count={attention.readyToTerminate.length}
-            title="Ready to Terminate"
-            onReview={() => setTab("ready")}
             last
           />
         </ul>
@@ -627,26 +616,6 @@ function CakeSmallIcon() {
       <path d="M4 16s1.5 2 4 2 4-2 4-2 1.5 2 4 2 4-2 4-2" />
       <path d="M2 21h20" />
       <path d="M12 8v3" />
-    </svg>
-  );
-}
-
-function StopSmallIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="8" y1="8" x2="16" y2="16" />
-    </svg>
-  );
-}
-
-function NoteIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
     </svg>
   );
 }

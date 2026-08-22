@@ -16,6 +16,15 @@ import {
 } from "@/lib/owner-money-prefetch";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
+import {
+  NAV_BADGE_HREFS,
+  loadNavBadgeCounts,
+  navBadgeDelta,
+  readNavSeen,
+  reconcileNavSeen,
+  writeNavSeen,
+  type NavCountMap,
+} from "@/lib/nav-change-badges";
 import styles from "./Sidebar.module.css";
 
 type Props = {
@@ -48,16 +57,21 @@ function NavChildList({
   items,
   pathname,
   onNavigate,
+  badges,
   nested = false,
 }: {
   items: NavItem[];
   pathname: string;
   onNavigate?: () => void;
+  /** How many new rows each href has gained since the user last opened it. */
+  badges?: NavCountMap;
   nested?: boolean;
 }) {
   return (
     <ul className={nested ? styles.grandChildren : styles.children}>
-      {items.map((item) => (
+      {items.map((item) => {
+        const badge = badges?.[item.href] ?? 0;
+        return (
         <li key={item.href}>
           <Link
             href={item.href}
@@ -66,20 +80,92 @@ function NavChildList({
             }`}
             onClick={onNavigate}
           >
-            {item.label}
+            <span className={styles.childLabel}>{item.label}</span>
+            {badge > 0 && (
+              <span
+                className={styles.childBadge}
+                aria-label={`${badge} new since you last looked`}
+              >
+                +{badge}
+              </span>
+            )}
           </Link>
           {item.children && (
             <NavChildList
               items={item.children}
               pathname={pathname}
               onNavigate={onNavigate}
+              badges={badges}
               nested
             />
           )}
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
+}
+
+/** Does this menu contain anything a change badge is tracked for? */
+function navHasBadgedHref(nav: NavGroup[]): boolean {
+  const tracked = new Set<string>(Object.values(NAV_BADGE_HREFS));
+  const scan = (items: NavItem[]): boolean =>
+    items.some((i) => tracked.has(i.href) || (i.children ? scan(i.children) : false));
+  return nav.some((g) => (g.children ? scan(g.children) : false));
+}
+
+/**
+ * "+N" beside the People menu entries whose lists have grown.
+ *
+ * Counts are read once per mount and deliberately behind runWhenIdle — the
+ * badge is decoration and must never compete with the page it sits next to.
+ */
+function useNavChangeBadges(uid: string | undefined, enabled: boolean, pathname: string) {
+  const [counts, setCounts] = useState<NavCountMap | null>(null);
+  const [seen, setSeen] = useState<NavCountMap>({});
+
+  useEffect(() => {
+    setSeen(uid ? readNavSeen(uid) : {});
+  }, [uid]);
+
+  useEffect(() => {
+    if (!uid || !enabled) return;
+    let alive = true;
+    const cancel = runWhenIdle(() => {
+      loadNavBadgeCounts()
+        .then((next) => {
+          if (alive) setCounts(next);
+        })
+        .catch(() => {
+          /* offline or rules — just render no badges */
+        });
+    }, 0);
+    return () => {
+      alive = false;
+      cancel();
+    };
+  }, [uid, enabled]);
+
+  useEffect(() => {
+    if (!uid || !counts) return;
+    const visited = Object.values(NAV_BADGE_HREFS).find((href) =>
+      isNavChildActive(pathname, href),
+    );
+    const next = reconcileNavSeen(counts, seen, visited);
+    if (!next) return;
+    setSeen(next);
+    writeNavSeen(uid, next);
+  }, [uid, counts, seen, pathname]);
+
+  return useMemo(() => {
+    if (!counts) return undefined;
+    const out: NavCountMap = {};
+    for (const [href, count] of Object.entries(counts)) {
+      const delta = navBadgeDelta(count, seen[href]);
+      if (delta > 0) out[href] = delta;
+    }
+    return out;
+  }, [counts, seen]);
 }
 
 export default function Sidebar({ open, onClose, initialDashboard = null }: Props) {
@@ -168,6 +254,11 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
 
   /** The tree actually rendered below, so the effect and the markup agree. */
   const activeNav: NavGroup[] = !userIsOwner && !userIsChef ? staffNav : visibleNav;
+
+  // Only pay for the counts when the menu on screen can actually show them —
+  // staff never see the People group, and their Firestore rules would reject
+  // the read anyway.
+  const badges = useNavChangeBadges(user?.uid, navHasBadgedHref(activeNav), pathname);
 
   /**
    * Keep the group containing the current page open.
@@ -308,6 +399,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
                     items={group.children}
                     pathname={pathname}
                     onNavigate={onClose}
+                    badges={badges}
                   />
                 </div>
               )}

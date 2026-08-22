@@ -197,13 +197,38 @@
 }
 
 .childLink {
-  display: block;
+  /* flex rather than block so a change badge can sit at the trailing edge;
+     with no badge this lays out identically to the old block link. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   color: #6E6E73;
   font-size: var(--font-size-sm);
   transition: background 0.15s ease, color 0.15s ease;
   -webkit-tap-highlight-color: transparent;
+}
+
+.childLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "+2" — how much this list grew since the user last opened it. */
+.childBadge {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #FF6A13;
+  color: #FFFFFF;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 
 .childLink:hover {

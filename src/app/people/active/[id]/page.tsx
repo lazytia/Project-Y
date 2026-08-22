@@ -24,6 +24,7 @@ import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import { readStaffRates } from "@/lib/staff-rates";
 import { todayIso } from "@/lib/staff-display";
+import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
 import CalendarPicker from "@/components/CalendarPicker";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -100,8 +101,6 @@ type Staff = {
     terminatedAt: string;
   } | null;
 };
-
-const VISA_WINDOW_DAYS = 30;
 
 /** Firestore field written for each half of the rate card. */
 const RATE_FIELDS = { weekday: "weekdayRate", saturday: "saturdayRate" } as const;

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { collection, getDocs, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { VISA_WINDOW_DAYS, VISA_EXPIRED_GRACE_DAYS } from "@/lib/hr-windows";
 import { useAuth } from "@/components/AuthProvider";
 import {
   decideHolidayRequest,
@@ -216,12 +217,10 @@ function groupAvailability(
   return out;
 }
 
-const VISA_EXPIRING_WINDOW_DAYS = 60;
-
 function isVisaExpiringSoon(exp: Date | null): boolean {
   if (!exp) return false;
   const diff = (exp.getTime() - Date.now()) / 86400000;
-  return diff <= VISA_EXPIRING_WINDOW_DAYS && diff >= -3;
+  return diff <= VISA_WINDOW_DAYS && diff >= -VISA_EXPIRED_GRACE_DAYS;
 }
 
 type Filter = "all" | "holiday" | "availability" | "onboarding" | "compliance";
