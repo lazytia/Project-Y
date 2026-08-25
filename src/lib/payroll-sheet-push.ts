@@ -30,6 +30,18 @@ const COLUMN = {
 } as const;
 
 /**
+ * The cash/banking split, G..J, which the owner fills in by hand.
+ *
+ * How a week's hours divide between cash and bank is an arrangement per
+ * person — one of them is on a fixed twenty banked hours with the rest in
+ * cash — and nothing in the app models it. Carried across by the block copy
+ * it would be last week's split sitting under this week's hours, looking
+ * every bit as authoritative. Cleared instead, so the blanks ask to be
+ * filled rather than quietly answering wrong.
+ */
+const MANUAL_SPLIT_COLUMNS = { first: "G", last: "J" } as const;
+
+/**
  * Width of a Pay History block: A (Employee) through S (Notes).
  *
  * The copy has to span the whole block or the tail simply does not exist in
@@ -318,6 +330,14 @@ export async function pushPayHistoryToSheet(
         },
       ],
     },
+  });
+
+  // Leave the split blank for the owner. The Total row keeps its SUMs, so
+  // the column adds itself up again as soon as they start filling it in.
+  const lastEmpRow = firstEmpRow + employeesToWrite.length - 1;
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: `'${tab}'!${MANUAL_SPLIT_COLUMNS.first}${firstEmpRow}:${MANUAL_SPLIT_COLUMNS.last}${lastEmpRow}`,
   });
 
   const hourUpdates: sheets_v4.Schema$ValueRange[] = [
