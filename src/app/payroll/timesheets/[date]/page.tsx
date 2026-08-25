@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
 import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
-import { sortShiftsByStaffThenStart } from "@/lib/timesheet-sort";
+import { serviceHeadingAt, sortShiftsByServiceThenStart } from "@/lib/timesheet-sort";
 import { ROUNDING_STEP_SECONDS } from "@/lib/timesheet-rounding";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
@@ -223,7 +223,7 @@ export default function DayDetailsPage() {
   }
 
   const effectiveShifts = useMemo(
-    () => sortShiftsByStaffThenStart(visibleShifts.map(withEdit), teamMembers),
+    () => sortShiftsByServiceThenStart(visibleShifts.map(withEdit), teamMembers),
     [visibleShifts, edits, teamMembers],
   );
   const totalHours = useMemo(
@@ -446,7 +446,11 @@ export default function DayDetailsPage() {
         {effectiveShifts.length === 0 && !busy ? (
           <li className={styles.emptyRow}>No shifts recorded for this day.</li>
         ) : (
-          effectiveShifts.map((s) => {
+          effectiveShifts.map((s, i) => {
+            // Marks where the day changes over from one service to the next, so
+            // the two blocks read as two shifts of staffing rather than one long
+            // list that happens to be in time order.
+            const heading = serviceHeadingAt(effectiveShifts, i);
             const original = visibleShifts.find((v) => v.id === s.id);
             const name = nameOfTeamMember(s.teamMemberId, teamMembers[s.teamMemberId]);
             const start = fmtClockTime(s.startAt);
@@ -458,7 +462,13 @@ export default function DayDetailsPage() {
             const editingEnd = editingField?.shiftId === s.id && editingField.field === "end";
 
             return (
-              <li key={s.id} className={styles.shiftCard}>
+              <Fragment key={s.id}>
+              {heading && (
+                <li className={styles.serviceHeading} role="presentation">
+                  {heading}
+                </li>
+              )}
+              <li className={styles.shiftCard}>
                 <span className={styles.avatar} aria-hidden="true">{initials(name)}</span>
                 <div className={styles.shiftBody}>
                   <p className={styles.shiftName}>{name}</p>
@@ -553,6 +563,7 @@ export default function DayDetailsPage() {
                   </svg>
                 </button>
               </li>
+              </Fragment>
             );
           })
         )}

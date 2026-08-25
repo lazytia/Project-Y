@@ -789,6 +789,34 @@
   padding: 8px 12px 14px;
 }
 
+/* ── lunch / dinner divider ──
+   A day is staffed as two services, so the list is cut in two. Kept as a
+   quiet rule rather than a heavy header: it only needs to mark where one
+   block ends, not compete with the names, which are what gets scanned. */
+.serviceHeading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+.serviceHeading::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* The first block opens the panel, so it needs no gap above it. */
+.serviceHeading:first-child {
+  margin-top: 0;
+}
+
 .shiftCard {
   display: grid;
   grid-template-columns: auto 1fr auto auto;

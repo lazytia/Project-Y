@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, where, deleteDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
-import { sortShiftsByStaffThenStart } from "@/lib/timesheet-sort";
+import { serviceHeadingAt, sortShiftsByServiceThenStart } from "@/lib/timesheet-sort";
 import { ROUNDING_STEP_SECONDS } from "@/lib/timesheet-rounding";
 import styles from "./page.module.css";
 
@@ -194,7 +194,7 @@ export function DayExpandedPanel({
     const filtered = [...byId.values()]
       .filter((s) => s.dateISO === dateISO && !dismissed.has(s.id))
       .map(withEdit);
-    return sortShiftsByStaffThenStart(filtered, teamMembers);
+    return sortShiftsByServiceThenStart(filtered, teamMembers);
   }, [entries, extras, dismissed, dateISO, edits, teamMembers]);
 
   async function saveTimeEdit(shift: ShiftFromApi, field: "start" | "end", newHHMM: string) {
@@ -270,7 +270,11 @@ export function DayExpandedPanel({
   return (
     <div className={styles.expandedPanel}>
       {editError && <p className={styles.errorBanner}>{editError}</p>}
-      {visibleShifts.map((s) => {
+      {visibleShifts.map((s, i) => {
+        // Marks where the day changes over from one service to the next, so
+        // the two blocks read as two shifts of staffing rather than one long
+        // list that happens to be in time order.
+        const heading = serviceHeadingAt(visibleShifts, i);
         const original = [...entries, ...extras].find((v) => v.id === s.id);
         const name = nameOfTeamMember(s.teamMemberId, teamMembers[s.teamMemberId]);
         const start = fmtClockTime(s.startAt);
@@ -286,7 +290,9 @@ export function DayExpandedPanel({
         const editingEnd = editingField?.shiftId === s.id && editingField.field === "end";
 
         return (
-          <div key={s.id} className={styles.shiftCard}>
+          <Fragment key={s.id}>
+          {heading && <p className={styles.serviceHeading}>{heading}</p>}
+          <div className={styles.shiftCard}>
             <span
               className={styles.avatarColor}
               style={{ background: colorForMemberId(s.teamMemberId) }}
@@ -382,6 +388,7 @@ export function DayExpandedPanel({
               </svg>
             </button>
           </div>
+          </Fragment>
         );
       })}
     </div>

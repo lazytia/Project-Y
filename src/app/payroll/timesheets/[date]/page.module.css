@@ -86,6 +86,21 @@
   border-radius: 14px;
   overflow: hidden;
 }
+/* ── lunch / dinner divider ──
+   A day is staffed as two services, so the list is cut in two. Sits inside
+   the bordered list as a quiet band rather than a floating heading, so the
+   card still reads as one table. */
+.serviceHeading {
+  padding: 9px 14px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
 .shiftCard {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
