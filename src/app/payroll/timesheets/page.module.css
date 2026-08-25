@@ -772,6 +772,16 @@
   cursor: not-allowed;
 }
 
+/* Which week the push will write. Sits right above the button because the
+   date range at the top of the page need not be that week. */
+.pushHint {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  color: var(--color-fg-muted);
+}
+
 .pushBanner {
   margin: 0;
   padding: var(--space-3);

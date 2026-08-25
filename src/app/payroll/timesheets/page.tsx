@@ -1038,12 +1038,21 @@ export default function TimesheetsPage() {
 
       {pushMessage && <p className={styles.pushBanner}>{pushMessage}</p>}
 
+      {/* The sheet keeps one block per pay week, so say which week is going
+          across. The range above is free to be anything — the default is a
+          rolling last 7 days — and silently writing that under a pay-week
+          heading is how a Wednesday-to-Tuesday block ended up in the sheet. */}
+      <p className={styles.pushHint}>
+        Writes the pay week {fmtPayPeriod(payWeekStartISO, payWeekEndISO)} — set it on the
+        payslip card above.
+      </p>
+
       <button
         type="button"
         className={styles.pushBtn}
-        disabled={pushBusy || busy || !startISO || !endISO || totalShifts === 0}
+        disabled={pushBusy || busy || !payWeekStartISO || !payWeekEndISO || totalShifts === 0}
         onClick={async () => {
-          if (!user || !startISO || !endISO) return;
+          if (!user || !payWeekStartISO || !payWeekEndISO) return;
           setPushBusy(true);
           setPushMessage(null);
           try {
@@ -1054,7 +1063,7 @@ export default function TimesheetsPage() {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${idToken}`,
               },
-              body: JSON.stringify({ startDate: startISO, endDate: endISO }),
+              body: JSON.stringify({ startDate: payWeekStartISO, endDate: payWeekEndISO }),
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data?.error ?? `Push failed (${res.status})`);

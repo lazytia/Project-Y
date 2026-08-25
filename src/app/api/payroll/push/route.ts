@@ -9,6 +9,7 @@ import {
   teamMemberDisplayName,
 } from "@/lib/timesheet-shifts-server";
 import {
+  BLOCK_READ_RANGE,
   DEFAULT_SHEET_ID,
   DEFAULT_TAB_NAME,
   lastBlockPremiumDay,
@@ -44,6 +45,26 @@ async function verifyOwner(
   }
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * A Pay History block is a pay week, not any seven days.
+ *
+ * The page used to send whatever range was on screen, and its default is a
+ * rolling last-7 — so a Wednesday-to-Tuesday window got written under a title
+ * claiming to be a week's pay. Tax on this sheet is the weekly PAYG figure,
+ * which makes hours drawn from two different weeks wrong twice over.
+ */
+function payWeekError(startDate: string, endDate: string): string | null {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  if (start.getUTCDay() !== 1) return "A pay week has to start on a Monday.";
+  if (Math.round((end.getTime() - start.getTime()) / DAY_MS) !== 6) {
+    return "A pay week has to run seven days, Monday to Sunday.";
+  }
+  return null;
+}
+
 async function readSheetRows(): Promise<unknown[][]> {
   const inline = (process.env.PAYROLL_SHEET_SA_JSON ?? process.env.FIREBASE_SERVICE_ACCOUNT_JSON)?.trim();
   if (!inline) throw new Error("Payroll sheet credentials not configured.");
@@ -57,7 +78,7 @@ async function readSheetRows(): Promise<unknown[][]> {
   const tab = process.env.PAYROLL_SHEET_NAME ?? DEFAULT_TAB_NAME;
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.PAYROLL_SHEET_ID ?? DEFAULT_SHEET_ID,
-    range: `'${tab}'!A:O`,
+    range: `'${tab}'!${BLOCK_READ_RANGE}`,
   });
   return (res.data.values ?? []) as unknown[][];
 }
@@ -78,6 +99,8 @@ export async function POST(req: NextRequest) {
   if (startDate > endDate) {
     return NextResponse.json({ error: "startDate must be on or before endDate." }, { status: 400 });
   }
+  const weekError = payWeekError(startDate, endDate);
+  if (weekError) return NextResponse.json({ error: weekError }, { status: 400 });
 
   try {
     const sheetRows = await readSheetRows();
