@@ -353,16 +353,10 @@ export default function ActiveEmployeesPage() {
 
       {/* Needs attention */}
       <section className={styles.attentionCard}>
-        <div className={styles.attentionHeader}>
-          <p className={styles.attentionTitle}>NEEDS ATTENTION</p>
-          <button
-            type="button"
-            className={styles.viewAllLink}
-            onClick={() => router.push("/attention-required")}
-          >
-            View all <span aria-hidden="true">›</span>
-          </button>
-        </div>
+        {/* No "View all" here. The card already shows both rows it tracks, so
+            the link only led somewhere carrying the same two counts — and
+            Attention Required is still on the sidebar and behind the bell. */}
+        <p className={styles.attentionTitle}>NEEDS ATTENTION</p>
         <ul className={styles.attentionList}>
           <AttentionRow
             icon={<TriangleAlertIcon />}
