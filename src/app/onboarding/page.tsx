@@ -6,20 +6,38 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
+import { addDaysISO, dowOfDateKey, sydneyTodayKey } from "@/lib/sydney-date";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
-/** Returns the Friday of the calendar week AFTER the given date. */
-function getPayrollCutoff(startDate: Date): Date {
-  const d = new Date(startDate);
-  const dow = d.getDay(); // 0=Sun … 6=Sat
-  // Days from d until the next Monday
-  const daysToNextMonday = dow === 0 ? 1 : 8 - dow;
-  // Friday of that next week = next Monday + 4 days
-  d.setDate(d.getDate() + daysToNextMonday + 4);
-  return d;
+/** Friday, as a JS day-of-week. */
+const FRIDAY = 5;
+
+/**
+ * The payroll cut-off: this coming Friday.
+ *
+ * It used to be derived from the employee's start date — the Friday of the
+ * week after they joined — so it was a fixed date that went stale the moment
+ * that week passed, and someone still finishing their paperwork a fortnight
+ * in was being shown a deadline that had already gone. The cut-off is a
+ * weekly deadline, not a fact about when someone started, so it rolls: on a
+ * Friday it is today, and from Saturday it moves to the Friday after.
+ *
+ * Sydney's date rather than the device's, so someone filling this in from
+ * overseas — or just before midnight — sees the deadline the restaurant
+ * actually runs on.
+ */
+function upcomingFridayKey(): string {
+  const today = sydneyTodayKey();
+  return addDaysISO(today, (FRIDAY - dowOfDateKey(today) + 7) % 7);
+}
+
+/** Midday, so formatting can never tip a date over a day boundary. */
+function dateFromKey(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d, 12);
 }
 
 function fmtDate(d: Date): string {
@@ -122,7 +140,7 @@ export default function OnboardingPage() {
   const continueStep = ALL_STEPS[inProgressStep] ?? nextStep;
   const remainingSteps = ALL_STEPS.slice(nextStepIndex + 1);
 
-  const payrollCutoff = startDate ? getPayrollCutoff(startDate) : null;
+  const payrollCutoff = dateFromKey(upcomingFridayKey());
 
   // Keep the splash visible for completed staff so the overview UI never
   // flashes before the router.replace above lands on /onboarding/complete.
@@ -155,7 +173,7 @@ export default function OnboardingPage() {
               <span className={styles.dateIcon}>🕐</span>
               <div>
                 <p className={styles.dateLabel}>{t("onb.payrollCutoff")}</p>
-                <p className={styles.dateValue}>{payrollCutoff ? fmtDate(payrollCutoff) : "—"}</p>
+                <p className={styles.dateValue}>{fmtDate(payrollCutoff)}</p>
                 <p className={styles.dateSub}>{t("onb.payrollCutoffHelp")}</p>
               </div>
             </div>
