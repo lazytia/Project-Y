@@ -1,52 +1,66 @@
+/* ── First-run notifications prompt ──
+   This screen has one job: get the permission prompt accepted. Everything
+   that matters — the five reasons, the language toggle, the button — has to
+   be on screen at once, because a staff member who has to scroll to find the
+   button is a staff member who might not.
+
+   So the layout is sized against the viewport rather than in fixed pixels.
+   Every vertical measurement is a clamp whose middle term is in vh: the
+   design keeps its intended proportions on a big phone and gives them up,
+   in step, on a small one. The maxima are set so the tallest version still
+   fits a standard phone with the fifth row (Payslip available) added.
+
+   The single `gap` on .page owns all the vertical rhythm — the children
+   deliberately carry no vertical margins of their own, so there is one
+   number to turn rather than nine that have to agree. */
+
 .page {
+  --notif-gap: clamp(4px, 0.9vh, 10px);
+
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--space-5) var(--space-4) var(--space-7);
-  gap: var(--space-3);
+  padding: 0 var(--space-4) clamp(4px, 1.5vh, 20px);
+  gap: var(--notif-gap);
   max-width: 480px;
   margin: 0 auto;
-  min-height: 100vh;
+  /* Deliberately no min-height. AppShell's .main already reserves a full
+     viewport and pads the fixed mobile header out of the way, so claiming
+     100dvh here stacked a second viewport under a 52px bar and guaranteed
+     the scroll this screen is not supposed to have. Content height only. */
 }
-
-.header {
-  padding: var(--space-3) 0 var(--space-5);
-}
-.brand {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  color: var(--color-fg);
-}
-.brandAccent { color: var(--color-warm); }
 
 .bellWrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4) 0;
+  padding: 0;
 }
 .bellHalo {
+  /* One measurement drives the halo, the bell and the check, so they shrink
+     together instead of drifting apart. Ratios are the original 160px
+     design: bell 88/160, check 40/160, inset 8/160. */
+  --bell-halo: clamp(64px, 13vh, 128px);
+
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: var(--bell-halo);
+  height: var(--bell-halo);
   border-radius: 999px;
   background: var(--color-warm-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 88px;
+  font-size: calc(var(--bell-halo) * 0.55);
 }
 .bell {
   filter: drop-shadow(0 8px 12px rgba(255, 106, 19, 0.35));
 }
 .bellCheck {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 40px;
-  height: 40px;
+  right: calc(var(--bell-halo) * 0.05);
+  bottom: calc(var(--bell-halo) * 0.05);
+  width: calc(var(--bell-halo) * 0.25);
+  height: calc(var(--bell-halo) * 0.25);
   border-radius: 999px;
   background: #fff;
   color: var(--color-warm);
@@ -59,25 +73,27 @@
 
 .title {
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: clamp(21px, 4vh, 28px);
+  line-height: 1.15;
   font-weight: 800;
   color: var(--color-fg);
-  margin: var(--space-2) 0 0;
+  margin: 0;
   text-align: center;
   letter-spacing: -0.01em;
 }
 .subtitle {
-  font-size: 15px;
+  font-size: clamp(12.5px, 2vh, 15px);
+  line-height: 1.45;
   color: var(--color-fg-muted);
   text-align: center;
-  margin: 0 0 var(--space-3);
+  margin: 0;
   max-width: 320px;
 }
 
 .reasons {
   list-style: none;
   padding: 0;
-  margin: var(--space-3) 0;
+  margin: 0;
   width: 100%;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -87,44 +103,56 @@
 .reason {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
+  gap: clamp(9px, 1.6vh, 14px);
+  /* Horizontal padding gives way on narrow phones too: at 18px the longest
+     label ("Important company announcements") wrapped to a second line and
+     took the whole card past the fold. */
+  padding: clamp(6px, 1.15vh, 14px) clamp(12px, 4vw, 18px);
   border-bottom: 1px solid var(--color-border);
-  font-size: 15px;
+  font-size: clamp(12.5px, 2vh, 15px);
+  line-height: 1.2;
   font-weight: 600;
   color: var(--color-fg);
 }
 .reason:last-child { border-bottom: none; }
 .reasonIcon {
+  --reason-icon: clamp(28px, 4.6vh, 40px);
+
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--reason-icon);
+  height: var(--reason-icon);
   border-radius: 999px;
   background: var(--color-warm-bg);
   color: var(--color-warm);
   flex-shrink: 0;
 }
+/* The glyphs are drawn at a fixed 18px, which starts to crowd the pill once
+   it drops below about 32px. Scaling the whole SVG keeps the padding. */
+.reasonIcon svg {
+  width: calc(var(--reason-icon) * 0.45);
+  height: calc(var(--reason-icon) * 0.45);
+}
 
 .langRow {
   display: flex;
   justify-content: center;
-  margin: var(--space-3) 0 0;
+  margin: 0;
 }
 
 .trustLine {
-  font-size: 12px;
+  font-size: clamp(11px, 1.7vh, 12px);
   color: var(--color-fg-muted);
   text-align: center;
-  margin: var(--space-2) 0 var(--space-3);
+  margin: 0;
   max-width: 340px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .deniedBanner {
-  margin: 0 0 var(--space-3);
-  padding: 12px 14px;
+  margin: 0;
+  padding: 10px 14px;
   background: #fee2e2;
   color: #b91c1c;
   border-radius: 12px;
@@ -134,13 +162,13 @@
 
 .enableBtn {
   width: 100%;
-  padding: 16px 18px;
+  padding: clamp(11px, 2vh, 15px) 18px;
   background: var(--color-warm);
   color: #fff;
   border: none;
   border-radius: 999px;
   font-family: inherit;
-  font-size: 16px;
+  font-size: clamp(14px, 2.2vh, 16px);
   font-weight: 800;
   cursor: pointer;
   display: inline-flex;
