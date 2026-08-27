@@ -51,7 +51,13 @@ export async function refreshAuthSession(user: User): Promise<boolean> {
       // Too late to skip the POST — the cookies are already in the browser,
       // and they belong to a session the user has since left. Take them back
       // out rather than leaving a resurrected `y_sess` behind.
-      await clearAuthSession();
+      //
+      // Note this deletes without bumping the epoch. Going through
+      // clearAuthSession() here would advance the generation as a side effect
+      // of cleaning up an old one, and a sign-in that had already captured the
+      // current epoch would then mistake itself for stale and undo its own
+      // cookies. Only a real teardown gets to move the counter.
+      await deleteSessionCookies();
       return false;
     }
     const data = (await res.json()) as { dashboard?: string };
@@ -63,13 +69,17 @@ export async function refreshAuthSession(user: User): Promise<boolean> {
   }
 }
 
-export async function clearAuthSession(): Promise<void> {
-  beginAuthSessionTeardown();
+async function deleteSessionCookies(): Promise<void> {
   try {
     await fetch("/api/auth/session", { method: "DELETE" });
   } catch {
     /* ignore */
   }
+}
+
+export async function clearAuthSession(): Promise<void> {
+  beginAuthSessionTeardown();
+  await deleteSessionCookies();
 }
 
 export type SessionHint = {
