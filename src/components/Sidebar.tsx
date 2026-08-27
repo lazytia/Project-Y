@@ -225,7 +225,14 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
         children: [
           { label: t("nav.onboardingOverview"), href: "/onboarding" },
           { label: t("nav.staffHandbook"), href: "/staff/handbook" },
-          { label: t("nav.beerGuide"), href: "/staff/beer-guide" },
+          // Mirrors TRAINING_MANUAL in sidebar-nav.ts — same shape, but the
+          // labels have to come from the language toggle, which that module
+          // can't reach. Keep the two in step.
+          {
+            label: t("nav.trainingManual"),
+            href: "/staff/training-manual",
+            children: [{ label: t("nav.beerGuide"), href: "/staff/beer-guide" }],
+          },
         ],
       },
       {

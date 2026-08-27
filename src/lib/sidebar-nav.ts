@@ -15,6 +15,23 @@ export type NavGroup = {
   ownerOnly?: boolean;
 };
 
+/**
+ * The training material, as one entry with the beer guide underneath it.
+ *
+ * Written once rather than three times: the owner, shift-lead and staff
+ * menus all carry it, and three copies would only invite one of them to
+ * keep the beer guide as a sibling after the other two had moved on.
+ *
+ * This is a menu shape and nothing more. The dashboard still raises
+ * "Beer Guide not signed" as its own alert — that signature is chased
+ * separately, and lives in SIGNABLE_DOCS in ManagerDashboard.
+ */
+const TRAINING_MANUAL: NavItem = {
+  label: "Training Manual",
+  href: "/staff/training-manual",
+  children: [{ label: "Beer Guide", href: "/staff/beer-guide" }],
+};
+
 export const OWNER_NAV: NavGroup[] = [
   { icon: "🏠", label: "Dashboard", href: "/" },
   {
@@ -62,11 +79,11 @@ export const OWNER_NAV: NavGroup[] = [
     label: "HR Records",
     children: [
       { label: "HR Notes", href: "/people/hr-notes" },
-      {
-        label: "Training Guide",
-        href: "/staff/training-manual",
-        children: [{ label: "Beer Guide", href: "/staff/beer-guide" }],
-      },
+      // The owner has always called this "Training Guide" and wants to keep
+      // it. Only the label differs — the href and the Beer Guide underneath
+      // it still come from TRAINING_MANUAL, so the nesting can't drift out
+      // of step with the shift-lead and staff menus.
+      { ...TRAINING_MANUAL, label: "Training Guide" },
       { label: "Employee Handbook", href: "/staff/handbook" },
       { label: "Employment Contract", href: "/hr-records/employment-contract" },
     ],
@@ -101,10 +118,10 @@ const TEAM_ADMIN_LINKS: NavItem[] = [
 // same menu: Dashboard, Operations, Team, Training, Scheduling, Payslip,
 // in that order. Spec approved by owner.
 //
-// Reference material (Staff Handbook / Beer Guide / Training Manual) sits
-// in its own Training group rather than under Team, which is purely people
-// admin. Payslip is a single page, so it is a plain link rather than a
-// group wrapping one child.
+// Reference material (Staff Handbook, and the Training Manual with the Beer
+// Guide under it) sits in its own Training group rather than under Team,
+// which is purely people admin. Payslip is a single page, so it is a plain
+// link rather than a group wrapping one child.
 //
 // Built by a factory rather than written twice: the two menus differ by
 // exactly one Team link (Attention Required, manager only), and two 45-line
@@ -134,8 +151,7 @@ function shiftLeadNav(teamChildren: NavItem[]): NavGroup[] {
       label: "Training",
       children: [
         { label: "Staff Handbook", href: "/staff/handbook" },
-        { label: "Beer Guide", href: "/staff/beer-guide" },
-        { label: "Training Manual", href: "/staff/training-manual" },
+        TRAINING_MANUAL,
       ],
     },
     {
@@ -167,7 +183,7 @@ export const STAFF_NAV: NavGroup[] = [
     children: [
       { label: "Overview", href: "/onboarding" },
       { label: "Staff Handbook", href: "/staff/handbook" },
-      { label: "Beer Guide", href: "/staff/beer-guide" },
+      TRAINING_MANUAL,
     ],
   },
   {
