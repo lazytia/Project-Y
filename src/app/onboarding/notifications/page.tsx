@@ -135,11 +135,23 @@ export default function NotificationsPromptPage() {
         },
         { merge: true },
       ).catch((err) => console.warn("[notifications-prompt] save failed:", err));
-      if (token) {
+      // Judge this on the permission, not on the token. A granted permission
+      // is the whole of what this screen asks for; the token can still come
+      // back null because the VAPID key is missing or getToken lost a race
+      // with the service worker, and none of that is something the employee
+      // can act on. Blocking them on it stranded people who had already
+      // tapped Allow behind a banner telling them to tap Allow. The token is
+      // retried on every sign-in anyway.
+      const granted =
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted";
+
+      if (token || granted) {
         router.replace(ROUTES.staffOnboarding);
       } else {
-        // Either they denied the prompt or the browser doesn't support
-        // push. Keep them on this page — the copy tells them why.
+        // They denied the prompt, or the browser has no push support at all.
+        // Keep them on this page — the copy tells them why.
         setDenied(true);
       }
     } finally {

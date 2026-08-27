@@ -250,9 +250,16 @@ export function AuthProvider({
             const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
             writeStaffStepCache(user.uid, completed);
             setStaffCompletedStep(completed);
-            setNotificationsPromptSeen(data.notificationsPromptSeen === true);
 
+            // Only a server snapshot may answer this one. A cached snapshot
+            // reports `false` for a field it hasn't synced yet, and the 800ms
+            // confirm fallback below un-gates the routing effect whether or
+            // not the server copy has landed — so on a slow start a staff
+            // member who enabled notifications months ago was told to enable
+            // them again. Leaving it `null` means "not known yet", and the
+            // routing effect only redirects on an explicit `false`.
             if (!snap.metadata.fromCache) {
+              setNotificationsPromptSeen(data.notificationsPromptSeen === true);
               setStaffProfileConfirmed(true);
               if (confirmFallback) clearTimeout(confirmFallback);
             }
@@ -397,26 +404,44 @@ export function AuthProvider({
     if (signOutStarted.current) return;
     signOutStarted.current = true;
 
-    const [{ signOut: fbSignOut }, { getAuth }] = await Promise.all([
-      import("firebase/auth"),
-      import("@/lib/firebase"),
-    ]);
-    await fbSignOut(getAuth()).catch(() => {/* revoke the UI regardless */});
+    // try/finally, because the latch above is what makes the button single-
+    // press. Without it, one rejection anywhere below — a chunk that fails to
+    // load on a flaky connection is the realistic one — left the ref stuck at
+    // `true` and every later press returned at the guard, so sign-out was
+    // dead for the rest of the session with no way back but a reload.
+    try {
+      const [{ signOut: fbSignOut }, { getAuth }] = await Promise.all([
+        import("firebase/auth"),
+        import("@/lib/firebase"),
+      ]);
+      await fbSignOut(getAuth()).catch(() => {/* revoke the UI regardless */});
 
-    clearStaffStepCache();
-    clearClientSessionHint();
-    document.documentElement.classList.remove("y-has-session");
-    hideServerAppShell();
-    document.getElementById("static-chrome-fallback")?.setAttribute("hidden", "");
-    setUser(null);
-    setLoading(false);
-    router.replace(ROUTES.login);
+      clearStaffStepCache();
+      clearClientSessionHint();
+      document.documentElement.classList.remove("y-has-session");
+      hideServerAppShell();
+      document.getElementById("static-chrome-fallback")?.setAttribute("hidden", "");
+      setUser(null);
+      setLoading(false);
+      router.replace(ROUTES.login);
 
-    // The login page is server-rendered from the `uid` cookie, so it can only
-    // be trusted once the DELETE has landed — refresh after, not before.
-    await clearAuthSession();
-    router.refresh();
-    signOutStarted.current = false;
+      // The login page is server-rendered from the `uid` cookie, so it can only
+      // be trusted once the DELETE has landed — refresh after, not before.
+      await clearAuthSession();
+
+      // Clear the hint a second time, after the DELETE. Every request made
+      // while `uid` was still alive — including the /login navigation above —
+      // passes through middleware that mints a fresh `y_sess=1` from it, so
+      // one of those responses can land after the teardown and re-arm the
+      // very cookie this sign-out cleared. The shell trusts `y_sess` over
+      // Firebase, so a leftover one paints signed-in chrome over a signed-out
+      // user: the press looks ignored, and the splash waits for a session
+      // that is never coming.
+      clearClientSessionHint();
+      router.refresh();
+    } finally {
+      signOutStarted.current = false;
+    }
   };
 
   return (
