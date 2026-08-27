@@ -46,13 +46,18 @@ export async function GET(request: NextRequest) {
     const user = await adminAuth().getUser(uid);
     const role = roleFromEmail(user.email);
     const dashboard = dashboardKindFromEmail(user.email);
-    const res = NextResponse.json(
+    // Read-only on purpose. This used to re-issue all four cookies on the way
+    // out, `y_sess` among them. AppShell calls it on route changes whenever it
+    // has no session hint, so a GET that overlapped a sign-out handed the
+    // browser a brand new `y_sess=1` after the teardown had already cleared
+    // it — and the shell trusts `y_sess` over Firebase, so the user was left
+    // looking at signed-in chrome they had just signed out of. Minting a
+    // session is POST's job: it is the only caller that proves who is asking.
+    // A GET proves nothing beyond possession of the cookie it would refresh.
+    return NextResponse.json(
       { authenticated: true, uid, role, dashboard },
       { status: 200 },
     );
-    const secure = request.nextUrl.protocol === "https:";
-    setSessionCookies(res, secure, uid, role, dashboard);
-    return res;
   } catch {
     const res = NextResponse.json({ authenticated: false }, { status: 200 });
     const secure = request.nextUrl.protocol === "https:";

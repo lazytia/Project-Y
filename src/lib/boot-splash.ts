@@ -41,9 +41,22 @@ export function ssrShellVisible(): boolean {
   return !!ssr && !ssr.hasAttribute("hidden");
 }
 
+/**
+ * Is a page-level splash actually on screen?
+ *
+ * `:not([hidden])` matters. Splash renders a hidden marker when it decides
+ * *not* to draw — including the branch it takes precisely because the boot
+ * splash is still up. Counting that as "still loading" closed a loop:
+ * BootSplashDismiss waited for the marker to go, the marker was only there
+ * because the boot splash hadn't gone, and neither moved. A hidden marker is
+ * the statement that nothing is covering the page, which is the opposite of
+ * what this asks.
+ */
 export function hasPageLoadingMarker(): boolean {
   if (typeof document === "undefined") return false;
-  return !!document.querySelector("[data-page-loading='true'], [data-splash='true']");
+  return !!document.querySelector(
+    "[data-page-loading='true']:not([hidden]), [data-splash='true']:not([hidden])",
+  );
 }
 
 export function hideBootSplashWhenSafe(maxAttempts = 30) {

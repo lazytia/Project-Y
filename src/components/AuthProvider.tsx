@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
-import { clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
+import { beginAuthSessionTeardown, clearAuthSession, refreshAuthSession } from "@/lib/auth-session-client";
 import { AUTH_READY_EVENT } from "@/lib/app-ready";
 import { hideServerAppShell } from "@/lib/boot-splash";
 import { clearClientSessionHint, hasClientSessionHint, setClientSessionHint, setClientDashboardHint } from "@/lib/client-session-hint";
@@ -403,6 +403,14 @@ export function AuthProvider({
   const signOut = async () => {
     if (signOutStarted.current) return;
     signOutStarted.current = true;
+
+    // First thing, before even Firebase: void any session write already in
+    // flight. `refreshAuthSession` runs from four places and takes a token
+    // round trip before it POSTs, so one is often still in the air when the
+    // button is pressed — and the POST re-mints `uid` and `y_sess` on the way
+    // back. Bumping the epoch here rather than inside clearAuthSession() below
+    // covers the whole press, not just the part after the DELETE goes out.
+    beginAuthSessionTeardown();
 
     // try/finally, because the latch above is what makes the button single-
     // press. Without it, one rejection anywhere below — a chunk that fails to
