@@ -23,6 +23,13 @@ import {
   ROUNDING_STEP_SECONDS,
   snapClockWindow,
 } from "@/lib/timesheet-rounding";
+import {
+  dayOfIso,
+  endsNextDay,
+  hhmmOfIso,
+  hoursOfWindow,
+  paidWindow,
+} from "@/lib/timesheet-window";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -98,9 +105,6 @@ function fmtClock(iso: string | null): { hhmm: string; ampm: string } {
   if (h === 0) h = 12;
   return { hhmm: `${h}:${mStr}`, ampm };
 }
-function hhmmFromIso(iso: string | null): string {
-  return iso ? iso.slice(11, 16) : "";
-}
 function fmtHoursShort(h: number): string {
   return `${h.toFixed(2)}h`;
 }
@@ -118,13 +122,20 @@ function nameOfMember(id: string, tm: TeamMemberFromApi | undefined): string {
   const l = (tm?.lastName ?? "").trim();
   return f || l ? `${f}${l ? " " + l : ""}` : id.slice(0, 6);
 }
-function replaceHHMM(iso: string, hhmm: string): string {
-  return iso.slice(0, 11) + hhmm + iso.slice(16);
-}
-function hoursFromIso(startAt: string, endAt: string | null): number {
-  if (!endAt) return 0;
-  const h = Math.round(((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100) / 100;
-  return h > 0 ? h : 0;
+/**
+ * The window a shift's two draft times describe.
+ *
+ * Anchored to the day the shift started, so a retyped finish time lands on
+ * that day — or, if it reads earlier than the start, on the morning after.
+ * The end used to keep whatever date it already had, which is how correcting
+ * a shift whose clock-out Square had auto-closed a day late produced 27.75
+ * paid hours out of 5:00 PM – 8:45 PM.
+ */
+function draftWindow(
+  shift: ShiftFromApi,
+  draft: ShiftDraft,
+): { startAt: string; endAt: string } {
+  return paidWindow(dayOfIso(shift.startAt), draft.startHHMM, draft.endHHMM);
 }
 /*
  * Every paid window is the end of a short chain: the employee clocked, the
@@ -219,7 +230,7 @@ function applyEditToShift(s: ShiftFromApi, edit: EditDoc | undefined): ShiftFrom
     ...s,
     startAt: edit.startAt,
     endAt: edit.endAt,
-    hours: hoursFromIso(edit.startAt, edit.endAt),
+    hours: hoursOfWindow(edit.startAt, edit.endAt),
   };
 }
 function memberRates(shifts: ShiftFromApi[]): { weekday: number | null; saturday: number | null } {
@@ -387,7 +398,7 @@ export default function StaffDetailPage() {
         if (dirtyRef.current.has(s.id) && prev[s.id]) {
           next[s.id] = prev[s.id];
         } else {
-          next[s.id] = { startHHMM: hhmmFromIso(s.startAt), endHHMM: hhmmFromIso(s.endAt) };
+          next[s.id] = { startHHMM: hhmmOfIso(s.startAt), endHHMM: hhmmOfIso(s.endAt) };
         }
       }
       return next;
@@ -405,9 +416,8 @@ export default function StaffDetailPage() {
   function draftHours(shift: ShiftFromApi): number {
     const d = drafts[shift.id];
     if (!d?.startHHMM || !d.endHHMM) return shift.hours;
-    const startAt = replaceHHMM(shift.startAt, d.startHHMM);
-    const endAt = replaceHHMM(shift.endAt ?? shift.startAt, d.endHHMM);
-    return hoursFromIso(startAt, endAt);
+    const w = draftWindow(shift, d);
+    return hoursOfWindow(w.startAt, w.endAt);
   }
 
   async function saveShift(shift: ShiftFromApi) {
@@ -417,8 +427,13 @@ export default function StaffDetailPage() {
 
     const existing = edits[shift.id];
     const base = shifts.find((x) => x.id === shift.id) ?? shift;
-    const newStart = replaceHHMM(existing?.startAt ?? base.startAt, d.startHHMM);
-    const newEnd = replaceHHMM(existing?.endAt ?? base.endAt ?? base.startAt, d.endHHMM);
+    // Anchored on `shift`, not `base`: `shift` carries any correction already
+    // saved, and the day the window hangs off has to be the one on screen.
+    const { startAt: newStart, endAt: newEnd } = draftWindow(shift, d);
+    if (hoursOfWindow(newStart, newEnd) <= 0) {
+      setEditError("End time must be after start time.");
+      return;
+    }
     const patch: EditDoc = {
       shiftId: shift.id,
       dateISO: shift.dateISO,
@@ -446,7 +461,7 @@ export default function StaffDetailPage() {
                 ...s,
                 startAt: patch.startAt,
                 endAt: patch.endAt,
-                hours: hoursFromIso(patch.startAt, patch.endAt),
+                hours: hoursOfWindow(patch.startAt, patch.endAt),
               }
             : s,
         ),
@@ -512,8 +527,8 @@ export default function StaffDetailPage() {
           )}
           {staffShifts.map((s) => {
             const draft = drafts[s.id] ?? {
-              startHHMM: hhmmFromIso(s.startAt),
-              endHHMM: hhmmFromIso(s.endAt),
+              startHHMM: hhmmOfIso(s.startAt),
+              endHHMM: hhmmOfIso(s.endAt),
             };
             const editRec = edits[s.id];
             const { clocked, adjustments } = clockTrailFor(s, editRec);
@@ -525,12 +540,19 @@ export default function StaffDetailPage() {
             const editingStart = editingField?.shiftId === s.id && editingField.field === "start";
             const editingEnd = editingField?.shiftId === s.id && editingField.field === "end";
 
-            const displayStart = replaceHHMM(s.startAt, draft.startHHMM || hhmmFromIso(s.startAt));
-            const displayEnd = s.endAt
-              ? replaceHHMM(s.endAt, draft.endHHMM || hhmmFromIso(s.endAt))
-              : null;
-            const start = fmtClock(displayStart);
-            const end = fmtClock(displayEnd);
+            const shown = draftWindow(s, {
+              startHHMM: draft.startHHMM || hhmmOfIso(s.startAt),
+              endHHMM: draft.endHHMM || hhmmOfIso(s.endAt),
+            });
+            const hasEnd = !!(s.endAt || draft.endHHMM);
+            const start = fmtClock(shown.startAt);
+            const end = fmtClock(hasEnd ? shown.endAt : null);
+            // A finish time after midnight is a real thing — a late close runs
+            // into the next morning — but "5:00 PM – 1:00 AM" gives no hint
+            // that the second time is on another day, and the hours then look
+            // like a typo. Say so, and there is nowhere left for a stray day
+            // to hide inside a paid figure.
+            const overnight = hasEnd && endsNextDay(shown.startAt, shown.endAt);
 
             return (
               <li key={s.id} className={styles.shiftCard}>
@@ -578,6 +600,11 @@ export default function StaffDetailPage() {
                       <span className={styles.timeMain}>{end.hhmm}</span>
                       <span className={styles.timeAmpm}>{end.ampm}</span>
                     </button>
+                  )}
+                  {overnight && (
+                    <span className={styles.nextDayTag} title="Finishes the following day">
+                      +1 day
+                    </span>
                   )}
                 </div>
                 {isEdited && <span className={styles.editedBadge}>EDITED</span>}
@@ -854,12 +881,17 @@ export default function StaffDetailPage() {
                     setAddError("Enter times in HH:MM format.");
                     return;
                   }
-                  const dayShift = shifts.find((x) => x.dateISO === addForm.dateISO);
-                  const offMatch = dayShift ? /([+-]\d{2}:\d{2})$/.exec(dayShift.startAt) : null;
-                  const offset = offMatch ? offMatch[1] : "+10:00";
-                  const startAt = `${addForm.dateISO}T${addForm.startHHMM}:00${offset}`;
-                  const endAt = `${addForm.dateISO}T${addForm.endHHMM}:00${offset}`;
-                  const hours = hoursFromIso(startAt, endAt);
+                  // The store's own offset for that date, rather than one
+                  // borrowed from a neighbouring shift or assumed to be
+                  // standard time — Sydney is an hour ahead of +10:00 for half
+                  // the year, and a backfill typed in summer would be filed an
+                  // hour out.
+                  const { startAt, endAt } = paidWindow(
+                    addForm.dateISO,
+                    addForm.startHHMM,
+                    addForm.endHHMM,
+                  );
+                  const hours = hoursOfWindow(startAt, endAt);
                   if (hours <= 0) { setAddError("End time must be after start time."); return; }
                   setSavingAdd(true);
                   setAddError(null);

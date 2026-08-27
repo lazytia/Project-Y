@@ -9,6 +9,11 @@ import { isOwner } from "@/lib/permissions";
 import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
 import { serviceHeadingAt, sortShiftsByServiceThenStart } from "@/lib/timesheet-sort";
 import { ROUNDING_STEP_SECONDS } from "@/lib/timesheet-rounding";
+import {
+  hoursOfWindow,
+  paidWindow,
+  paidWindowAfterEdit,
+} from "@/lib/timesheet-window";
 import Splash from "@/components/Splash";
 import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
@@ -214,11 +219,7 @@ export default function DayDetailsPage() {
     // Recompute hours from the edited start/end. We drop break subtraction
     // when times are overridden — otherwise the two numbers stop matching
     // what the owner just typed.
-    let hours = s.hours;
-    if (startAt && endAt) {
-      hours = Math.round(((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100) / 100;
-      if (hours < 0) hours = 0;
-    }
+    const hours = startAt && endAt ? hoursOfWindow(startAt, endAt) : s.hours;
     return { ...s, startAt, endAt, hours };
   }
 
@@ -231,27 +232,6 @@ export default function DayDetailsPage() {
     [effectiveShifts],
   );
 
-  /**
-   * Replace the HH:MM portion of a Square-returned ISO like
-   * "2026-06-29T10:01:00+10:00" with a new "HH:MM" from an <input type="time">.
-   * Preserves date and TZ offset so the resulting instant is unambiguous.
-   */
-  function replaceHHMM(iso: string, hhmm: string): string {
-    return iso.slice(0, 11) + hhmm + iso.slice(16);
-  }
-
-  /** Grab the +HH:MM offset off an existing Square shift for this day so
-   *  new backfill entries share the same local-time semantics. Falls back
-   *  to Sydney standard time (+10:00) when there are none. */
-  function localOffsetOfDay(): string {
-    const first = shifts[0];
-    if (first?.startAt) {
-      const match = /([+-]\d{2}:\d{2})$/.exec(first.startAt);
-      if (match) return match[1];
-    }
-    return "+10:00";
-  }
-
   async function submitAddShift() {
     if (!user) return;
     if (!addForm.teamMemberId) { setAddError("Pick a staff member."); return; }
@@ -259,12 +239,12 @@ export default function DayDetailsPage() {
       setAddError("Enter times in HH:MM format.");
       return;
     }
-    const offset = localOffsetOfDay();
-    const startAt = `${dateISO}T${addForm.startHHMM}:00${offset}`;
-    const endAt = `${dateISO}T${addForm.endHHMM}:00${offset}`;
-    const hours = Math.round(
-      ((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100,
-    ) / 100;
+    // The store's real offset for this date, rather than one copied off a
+    // neighbouring shift or assumed to be standard time. Sydney sits at +11:00
+    // for half the year, and a backfill typed in summer used to be filed an
+    // hour out whenever the day had no Square shift to borrow from.
+    const { startAt, endAt } = paidWindow(dateISO, addForm.startHHMM, addForm.endHHMM);
+    const hours = hoursOfWindow(startAt, endAt);
     if (hours <= 0) {
       setAddError("End time must be after start time.");
       return;
@@ -312,9 +292,19 @@ export default function DayDetailsPage() {
     const existing = edits[shift.id];
     const currentStart = existing?.startAt ?? shift.startAt;
     const currentEnd = existing?.endAt ?? shift.endAt;
-    const newStart = field === "start" ? replaceHHMM(currentStart, newHHMM) : currentStart;
-    const newEnd =
-      field === "end" && currentEnd ? replaceHHMM(currentEnd, newHHMM) : currentEnd;
+    // Rebuilt against the day the shift started, so a retyped finish time can
+    // never keep a date the shift no longer has. Patching the HH:MM into the
+    // end's own string left a Square auto-close sitting a day out and paid it.
+    const { startAt: newStart, endAt: newEnd } = paidWindowAfterEdit(
+      currentStart,
+      currentEnd,
+      field,
+      newHHMM,
+    );
+    if (hoursOfWindow(newStart, newEnd) <= 0) {
+      setEditError("End time must be after start time.");
+      return;
+    }
 
     const patch: EditDoc = {
       shiftId: shift.id,

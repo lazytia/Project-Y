@@ -6,6 +6,7 @@ import { squareClient, squareEnv } from "@/lib/square";
 import { adminDb } from "@/lib/firebase-admin";
 import { rateForDateISO, readStaffRates, type StaffRates } from "@/lib/staff-rates";
 import { snapClockWindow } from "@/lib/timesheet-rounding";
+import { hoursOfWindow, isImplausibleClockWindow } from "@/lib/timesheet-window";
 
 export type TimesheetShift = {
   id: string;
@@ -127,7 +128,14 @@ async function fetchSquareShifts(
       // Keep the shift on the day the employee turned up, even if snapping a
       // late clock-in rolls the paid start past midnight.
       const dateISO = startIso.slice(0, 10);
-      const paid = snapClockWindow(startIso, endIso);
+      // A clock-out nobody pressed is not a shift that ended. Square closes a
+      // forgotten one for the employee at exactly 24 hours, and taking that at
+      // face value pays a full day for an evening's work. Drop the end and
+      // leave the row unpaid, the same as a shift still running: it stays on
+      // the timesheet with the clock-in showing, and the owner types the
+      // finish time they actually left at.
+      const abandoned = isImplausibleClockWindow(startIso, endIso);
+      const paid = snapClockWindow(startIso, abandoned ? null : endIso);
       const startMs = new Date(paid.startAt).getTime();
       const endMs = paid.endAt ? new Date(paid.endAt).getTime() : null;
       let breakMs = 0;
@@ -148,7 +156,11 @@ async function fetchSquareShifts(
         hours: round2(paidMs / 3_600_000),
         hourlyRateCents,
         clockedStartAt: startIso,
-        clockedEndAt: endIso,
+        // The auto-close stamp is Square's bookkeeping, not something the
+        // employee pressed, so it is not shown as their clock record. Keeping
+        // it would put "4:59 PM – 4:59 PM" under the shift, which reads as a
+        // clock-out at the same minute rather than as one that never came.
+        clockedEndAt: abandoned ? null : endIso,
       };
     })
     .filter((s) => s.dateISO >= startDate && s.dateISO <= endDate);
@@ -162,14 +174,11 @@ type EditDoc = { startAt?: string; endAt?: string; dateISO?: string };
  *  re-snapped — while the clocked times underneath stay for the audit trail. */
 function applyEdit(shift: TimesheetShift, edit: EditDoc | undefined): TimesheetShift {
   if (!edit?.startAt || !edit.endAt) return shift;
-  const hours = round2(
-    (new Date(edit.endAt).getTime() - new Date(edit.startAt).getTime()) / 3_600_000,
-  );
   return {
     ...shift,
     startAt: edit.startAt,
     endAt: edit.endAt,
-    hours: hours > 0 ? hours : 0,
+    hours: hoursOfWindow(edit.startAt, edit.endAt),
   };
 }
 

@@ -898,6 +898,20 @@
   color: var(--color-fg-muted);
 }
 
+/* Marks a finish time that falls on the following morning, so the hours badge
+   on the right can be read straight off the two times beside it. */
+.nextDayTag {
+  align-self: center;
+  padding: 2px 6px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
 .editedNote {
   font-size: 11px;
   color: var(--color-fg-muted);

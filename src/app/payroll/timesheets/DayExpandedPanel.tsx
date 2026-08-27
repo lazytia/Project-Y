@@ -6,6 +6,11 @@ import { getDb } from "@/lib/firebase";
 import { dismissSquareShift, loadDismissedShiftIdsForDay } from "@/lib/timesheet-dismiss-client";
 import { serviceHeadingAt, sortShiftsByServiceThenStart } from "@/lib/timesheet-sort";
 import { ROUNDING_STEP_SECONDS } from "@/lib/timesheet-rounding";
+import {
+  endsNextDay,
+  hoursOfWindow,
+  paidWindowAfterEdit,
+} from "@/lib/timesheet-window";
 import styles from "./page.module.css";
 
 type ShiftFromApi = {
@@ -62,16 +67,6 @@ function fmtClockedRange(startAt: string | null, endAt: string | null): string |
   return `${head} – ${`${e.hhmm} ${e.ampm}`.trim()}`;
 }
 
-/** Paid hours for a corrected window. An owner's times stand exactly as typed,
- *  so this is a plain difference — the quarter-hour grid only ever applies to
- *  raw clock records, upstream on the server. */
-function hoursBetween(startAt: string, endAt: string | null): number {
-  if (!endAt) return 0;
-  const h =
-    Math.round(((new Date(endAt).getTime() - new Date(startAt).getTime()) / 3_600_000) * 100) / 100;
-  return h > 0 ? h : 0;
-}
-
 function nameOfTeamMember(id: string, tm: TeamMemberFromApi | undefined): string {
   const first = (tm?.firstName ?? "").trim();
   const last = (tm?.lastName ?? "").trim();
@@ -94,10 +89,6 @@ function colorForMemberId(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return STAFF_COLORS[h % STAFF_COLORS.length];
-}
-
-function replaceHHMM(iso: string, hhmm: string): string {
-  return iso.slice(0, 11) + hhmm + iso.slice(16);
 }
 
 type Props = {
@@ -179,7 +170,7 @@ export function DayExpandedPanel({
   function withEdit(s: ShiftFromApi): ShiftFromApi {
     const e = edits[s.id];
     if (!e) return s;
-    const hours = e.startAt && e.endAt ? hoursBetween(e.startAt, e.endAt) : s.hours;
+    const hours = e.startAt && e.endAt ? hoursOfWindow(e.startAt, e.endAt) : s.hours;
     return { ...s, startAt: e.startAt, endAt: e.endAt, hours };
   }
 
@@ -202,8 +193,21 @@ export function DayExpandedPanel({
     const existing = edits[shift.id];
     const currentStart = existing?.startAt ?? shift.startAt;
     const currentEnd = existing?.endAt ?? shift.endAt;
-    const newStart = field === "start" ? replaceHHMM(currentStart, newHHMM) : currentStart;
-    const newEnd = field === "end" && currentEnd ? replaceHHMM(currentEnd, newHHMM) : currentEnd;
+    // Rebuilt against the day the shift started rather than patched into the
+    // string it came from. The old way kept the end's own date, so correcting
+    // a shift Square had auto-closed the next afternoon left the extra day in
+    // place and paid it — 5:00 PM – 8:45 PM billed as 27.75 hours. It also
+    // means an end typed on a shift with no clock-out finally lands somewhere.
+    const { startAt: newStart, endAt: newEnd } = paidWindowAfterEdit(
+      currentStart,
+      currentEnd,
+      field,
+      newHHMM,
+    );
+    if (hoursOfWindow(newStart, newEnd) <= 0) {
+      setEditError("End time must be after start time.");
+      return;
+    }
 
     const patch: EditDoc = {
       shiftId: shift.id,
@@ -227,7 +231,7 @@ export function DayExpandedPanel({
       onShiftEdited?.(shift.id, {
         startAt: newStart,
         endAt: newEnd,
-        hours: hoursBetween(newStart, newEnd),
+        hours: hoursOfWindow(newStart, newEnd),
       });
     } catch (err) {
       console.error("[timesheet_edits] save failed:", err);
@@ -285,6 +289,10 @@ export function DayExpandedPanel({
         // none, and the pre-edit time on an edit doc is a paid figure someone
         // typed — labelling that "clocked by staff" would invent evidence.
         const clockedRange = fmtClockedRange(s.clockedStartAt ?? null, s.clockedEndAt ?? null);
+        // A late close can genuinely run past midnight, and two bare clock
+        // times give no sign of it — which leaves the hours badge looking
+        // wrong. Say which shifts end the next morning.
+        const overnight = endsNextDay(s.startAt, s.endAt);
         const isSaving = savingEditId === s.id;
         const editingStart = editingField?.shiftId === s.id && editingField.field === "start";
         const editingEnd = editingField?.shiftId === s.id && editingField.field === "end";
@@ -351,6 +359,11 @@ export function DayExpandedPanel({
                     <span className={styles.timeChipMain}>{end.hhmm}</span>
                     <span className={styles.timeChipAmpm}>{end.ampm}</span>
                   </button>
+                )}
+                {overnight && (
+                  <span className={styles.nextDayTag} title="Finishes the following day">
+                    +1 day
+                  </span>
                 )}
               </div>
               {isEdited && original && editRec ? (
