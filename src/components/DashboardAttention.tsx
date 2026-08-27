@@ -13,8 +13,11 @@ import {
   setDoc,
   type Timestamp,
 } from "firebase/firestore";
+import type { User } from "firebase/auth";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { canViewStaffRequest } from "@/lib/permissions";
+import { isOnboardingListEmployee } from "@/lib/staff-active";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { isNoticeGivenActive, isReadyToTerminate, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import styles from "./DashboardAttention.module.css";
@@ -201,18 +204,36 @@ async function loadSoldOutCount(todayKey: string): Promise<number> {
   return ids.length;
 }
 
-async function loadNewEmployeeCount(): Promise<number> {
-  // Submitted onboarding still waiting on owner approval. Mirror the
-  // /people/onboarding page's isApproved rule so the counts match.
+async function loadNewEmployeeCount(viewer: User | null): Promise<number> {
+  // Count the rows /people/onboarding would actually list, by calling that
+  // page's own predicates rather than a second rule that merely resembles
+  // them. The old rule skipped `role === "owner"` and then counted anyone
+  // unapproved who had reached step 7 — which caught the chef, whose doc is
+  // stamped completedStep 7 / status "complete" on every sign-in and is
+  // never "approved" because he was never a new-hire request. So the card
+  // advertised a request that the list, quite correctly, refused to show.
+  //
+  // Visibility is part of the count for the same reason: a manager only sees
+  // manager-submitted requests, so counting one they cannot open would put
+  // back the same dead end in a different place.
   const snap = await getDocs(collection(getDb(), "staff_onboarding"));
   return snap.docs.reduce((acc, d) => {
-    const raw = d.data();
-    if (raw.role === "owner") return acc;
-    const status = String(raw.status ?? "").toLowerCase();
-    const isApproved = status === "approved" || status === "active" || !!raw.approvedAt;
-    if (isApproved) return acc;
-    const completed = typeof raw.completedStep === "number" ? raw.completedStep : 0;
-    return completed >= 7 ? acc + 1 : acc;
+    const raw = d.data() as Record<string, unknown>;
+    const listed = isOnboardingListEmployee({
+      status: raw.status as string | undefined,
+      role: raw.role as string | undefined,
+      accountCreated: raw.accountCreated as boolean | undefined,
+      addedToScheduling: raw.addedToScheduling as boolean | undefined,
+      approvedAt: raw.approvedAt,
+      username: raw.username as string | undefined,
+      email: raw.email as string | undefined,
+    });
+    if (!listed) return acc;
+    const visible = canViewStaffRequest(viewer, {
+      requestedByRole: raw.requestedByRole as string | undefined,
+      requestedByName: raw.requestedByName as string | undefined,
+    });
+    return visible ? acc + 1 : acc;
   }, 0);
 }
 
@@ -401,7 +422,7 @@ export default function DashboardAttention() {
       const [catering, soldOut, newEmp, notice, ready, hr, cash] = await Promise.all([
         loadCateringCount(sinceUtc, todayKey).catch(() => 0),
         loadSoldOutCount(todayKey).catch(() => 0),
-        loadNewEmployeeCount().catch(() => 0),
+        loadNewEmployeeCount(user).catch(() => 0),
         loadNoticeGivenCount().catch(() => 0),
         loadReadyToTerminateCount().catch(() => 0),
         loadHrNotesCount(sinceUtc).catch(() => 0),
@@ -421,7 +442,9 @@ export default function DashboardAttention() {
     return () => {
       cancelled = true;
     };
-  }, [todayKey, fetchEnabled]);
+    // `user` is a dependency because the new-employee count is scoped to who
+    // is looking — a manager sees only manager-submitted requests.
+  }, [todayKey, fetchEnabled, user]);
 
   // A dismissal is a high-water mark, and today-scoped counts drop back to
   // zero overnight. Without following them down, a mark set at yesterday's
