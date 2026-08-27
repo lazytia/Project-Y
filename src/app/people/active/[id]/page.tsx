@@ -29,7 +29,21 @@ import CalendarPicker from "@/components/CalendarPicker";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
-type DocKey = "documents" | "tfn" | "bank" | "contract" | "handbook" | "hrNotes";
+/** The five sections of the onboarding form, in the order staff meet them. */
+type SectionKey = "personal" | "tfn" | "bank" | "documents" | "policies";
+
+/** Everything the review sheet can show — the five sections plus HR notes,
+ *  which is not part of onboarding and so is never rejected. */
+type DocKey = SectionKey | "hrNotes";
+
+type Personal = {
+  firstName: string;
+  lastName: string;
+  preferredName: string;
+  dateOfBirth: string;
+  gender: string;
+  email: string;
+};
 
 type BankSuper = {
   bsb?: string;
@@ -80,6 +94,10 @@ type Staff = {
   visaExpiry: Date | null;
   visaType: string;
   phone: string;
+  /** How far through onboarding they have got, or null on rows written
+   *  before the field existed. */
+  completedStep: number | null;
+  personal: Personal;
   taxFileNumber: string;
   signatureDataUrl: string;
   bank: BankSuper;
@@ -156,6 +174,24 @@ function fmtDateWithDay(iso: string): string {
   return `${main} (${dow})`;
 }
 
+/**
+ * "12 / 03 / 1994" from the stored "1994-03-12".
+ *
+ * Kept as plain string surgery rather than a Date: a date of birth is a
+ * calendar fact with no time zone, and parsing it into a Date would let the
+ * Sydney/UTC boundary shift it by a day. Mirrors the display format the
+ * employee typed it in on the onboarding form.
+ *
+ * Returns "" rather than a dash for a missing value — DefRow already
+ * renders the dash, and doing it here too would print it twice.
+ */
+function fmtDobDisplay(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d} / ${m} / ${y}`;
+}
+
 function daysBetween(fromISO: string): number | null {
   if (!fromISO) return null;
   const [y, m, d] = fromISO.split("-").map(Number);
@@ -222,24 +258,110 @@ function fullNameOf(raw: Record<string, unknown>): string {
   return user ? user.charAt(0).toUpperCase() + user.slice(1) : "Unknown";
 }
 
+/**
+ * The onboarding form as the owner reviews it: one row per section the
+ * employee fills in, in the order they meet them.
+ *
+ * `step` does double duty. Rejecting a section rolls `completedStep` back to
+ * `step - 1`, which is what puts the employee back on exactly that screen —
+ * so the rollback target can't drift away from the row it belongs to.
+ *
+ * `hasData` is the fallback for telling a submitted section from an empty
+ * one — see isSectionSubmitted below.
+ *
+ * Kept as one table because every fact in a row has to agree with the others
+ * — label, rollback target, what to clear, how to tell it is filled in — and
+ * they only stay in agreement while they are written next to each other.
+ */
+const ONBOARDING_SECTIONS: readonly {
+  key: SectionKey;
+  step: number;
+  label: string;
+  clearPaths: string[];
+  hasData: (s: Staff) => boolean;
+}[] = [
+  {
+    key: "personal",
+    step: 1,
+    label: "Personal Information",
+    // Deliberately clears nothing. The employee's name, DOB and mobile are
+    // what the rest of the app identifies them by — rosters, HR notes and
+    // the people lists all read them — so wiping the section would turn a
+    // "please fix this" into an employee who reads as Unknown everywhere
+    // until they re-type it. The step rollback alone sends them back, and
+    // the form pre-fills, so they correct rather than start over.
+    clearPaths: [],
+    hasData: (s) => Boolean(s.personal.firstName || s.personal.lastName),
+  },
+  {
+    key: "tfn",
+    step: 2,
+    label: "TFN Declaration",
+    clearPaths: ["tfn"],
+    hasData: (s) => Boolean(s.taxFileNumber),
+  },
+  {
+    key: "bank",
+    step: 3,
+    label: "Bank & Super Details",
+    // `bankSuper`, not `bank` — the onboarding step writes the former, and
+    // clearing the latter deleted a field that has never existed, so a
+    // rejected section came back with the old account still in it.
+    clearPaths: ["bankSuper"],
+    hasData: (s) => Boolean(s.bank.bsb || s.bank.accountNumber || s.bank.superFundName),
+  },
+  {
+    key: "documents",
+    step: 4,
+    label: "Documents (Photo ID, Visa, RSA)",
+    // Named upload fields rather than the whole `documents` map: older rows
+    // keep `documents.visaExpiry` in there, and that date is what the
+    // dashboard and Attention Required count visa warnings from.
+    clearPaths: [
+      "documents.passportUrl", "documents.passportUrls",
+      "documents.visaUrl",     "documents.visaUrls",
+      "documents.rsaUrl",      "documents.rsaUrls",
+    ],
+    hasData: (s) => s.documents.length > 0,
+  },
+  {
+    key: "policies",
+    step: 5,
+    label: "Policies (Staff Handbook, Privacy Policy, Employee Agreement)",
+    clearPaths: [
+      "policies.handbookSignedAt",
+      "policies.privacySignedAt",
+      "policies.agreementSignedAt",
+    ],
+    hasData: (s) =>
+      Boolean(s.handbookSignedAt || s.privacySignedAt || s.agreementSignedAt),
+  },
+];
+
+/**
+ * Has the employee submitted this section?
+ *
+ * `completedStep` is their own progress marker and the very thing Reject
+ * moves, so it is the answer whenever the document carries one — that is
+ * what makes a rejected row fall back to Pending straight away instead of
+ * sitting there still offering a View button.
+ *
+ * Rows written before that field existed have no marker, and reading a
+ * missing one as 0 would show a fully onboarded employee as five Pending
+ * rows with nothing to open. Those fall back to asking whether the section
+ * actually holds anything.
+ */
+function isSectionSubmitted(
+  section: (typeof ONBOARDING_SECTIONS)[number],
+  staff: Staff,
+): boolean {
+  return staff.completedStep === null
+    ? section.hasData(staff)
+    : staff.completedStep >= section.step;
+}
+
 /** Best effort — the visa type isn't captured explicitly today, so infer
  *  it from a `visaType` field if present and otherwise leave blank. */
-/**
- * When an owner rejects an already-submitted onboarding section we roll
- * `completedStep` back and null out that section's persisted answers so
- * the employee lands on the same step and has to complete it again.
- * Steps: 1 Personal, 2 TFN, 3 Bank, 4 Documents, 5 Policies, 6 Review&Sign.
- */
-const REJECT_CONFIG: Record<
-  Exclude<DocKey, "hrNotes">,
-  { label: string; prevStep: number; clearPaths: string[] }
-> = {
-  tfn:       { label: "TFN",                        prevStep: 1, clearPaths: ["tfn"] },
-  bank:      { label: "Bank & Super Details",       prevStep: 2, clearPaths: ["bank"] },
-  documents: { label: "Documents",                  prevStep: 3, clearPaths: ["documents"] },
-  contract:  { label: "Signed Contract",            prevStep: 4, clearPaths: ["policies.agreementSignedAt", "policies.privacySignedAt"] },
-  handbook:  { label: "Employee Handbook (Signed)", prevStep: 4, clearPaths: ["policies.handbookSignedAt"] },
-};
 
 function visaTypeOf(raw: Record<string, unknown>): string {
   if (typeof raw.visaType === "string" && raw.visaType.trim()) return raw.visaType.trim();
@@ -371,6 +493,15 @@ export default function EmployeeDetailPage() {
           visaExpiry: tsToDate(documents.visaExpiry ?? raw.visaExpiry ?? null),
           visaType: visaTypeOf(raw),
           phone: typeof raw.mobileNumber === "string" ? raw.mobileNumber : "",
+          completedStep: typeof raw.completedStep === "number" ? raw.completedStep : null,
+          personal: {
+            firstName: strField(raw, "firstName"),
+            lastName: strField(raw, "lastName"),
+            preferredName: strField(raw, "preferredName"),
+            dateOfBirth: strField(raw, "dateOfBirth"),
+            gender: strField(raw, "gender"),
+            email: strField(raw, "email"),
+          },
           taxFileNumber: tfnValue,
           signatureDataUrl,
           bank,
@@ -536,34 +667,43 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  async function handleReject(key: DocKey) {
-    if (!staff || key === "hrNotes") return;
-    const cfg = REJECT_CONFIG[key];
+  /**
+   * Send one section back to the employee: roll `completedStep` to just
+   * before it so they land on that screen again, and drop the answers it
+   * holds so the section reads as unsubmitted here too.
+   */
+  async function handleReject(section: (typeof ONBOARDING_SECTIONS)[number]) {
+    if (!staff) return;
     const ok = window.confirm(
-      `Reject "${cfg.label}"?\n\nThe employee will have to complete this section again.`,
+      `Reject "${section.label}"?\n\nThe employee will have to complete this section again.`,
     );
     if (!ok) return;
+    const prevStep = section.step - 1;
     try {
       const update: Record<string, unknown> = {
-        completedStep: cfg.prevStep,
-        step: cfg.prevStep + 1,
+        completedStep: prevStep,
+        step: section.step,
         status: "in_progress",
         updatedAt: serverTimestamp(),
       };
-      for (const path of cfg.clearPaths) update[path] = deleteField();
+      for (const path of section.clearPaths) update[path] = deleteField();
       await updateDoc(doc(getDb(), "staff_onboarding", staff.uid), update);
       setOpenDoc(null);
+      // Mirror the write locally so the row flips to Pending without a
+      // reload. Only the fields clearPaths actually removed — Personal
+      // Information clears nothing, so its row keeps its data and the
+      // rollback is the whole effect.
       setStaff((s) => {
         if (!s) return s;
-        const next = { ...s };
-        if (key === "tfn") next.taxFileNumber = "";
-        if (key === "bank") next.bank = {};
-        if (key === "documents") next.documents = [];
-        if (key === "contract") {
-          next.agreementSignedAt = null;
+        const next = { ...s, completedStep: prevStep };
+        if (section.key === "tfn") next.taxFileNumber = "";
+        if (section.key === "bank") next.bank = {};
+        if (section.key === "documents") next.documents = [];
+        if (section.key === "policies") {
+          next.handbookSignedAt = null;
           next.privacySignedAt = null;
+          next.agreementSignedAt = null;
         }
-        if (key === "handbook") next.handbookSignedAt = null;
         return next;
       });
     } catch (err) {
@@ -1121,21 +1261,41 @@ export default function EmployeeDetailPage() {
         </>
       )}
 
-      {/* Documents */}
-      <p className={styles.sectionLabel}>DOCUMENTS</p>
+      {/* Onboarding documents — the five sections of the employee's own
+          onboarding form, each either waiting on them or ready to review.
+          "Active Employees" includes people still part-way through, so the
+          per-section state is the point of this card rather than decoration. */}
+      <p className={styles.sectionLabel}>ONBOARDING DOCUMENTS</p>
       <section className={styles.docsCard}>
-        <DocRow icon={<DocIcon />} label="Documents" onClick={() => setOpenDoc("documents")} onReject={() => handleReject("documents")} chev />
-        <DocRow icon={<DocIcon />} label="TFN" onClick={() => setOpenDoc("tfn")} onReject={() => handleReject("tfn")} view />
-        <DocRow icon={<DocIcon />} label="Bank & Super Details" onClick={() => setOpenDoc("bank")} onReject={() => handleReject("bank")} view />
-        <DocRow icon={<DocIcon />} label="Signed Contract" onClick={() => setOpenDoc("contract")} onReject={() => handleReject("contract")} view />
-        <DocRow icon={<DocIcon />} label="Employee Handbook (Signed)" onClick={() => setOpenDoc("handbook")} onReject={() => handleReject("handbook")} view />
+        {ONBOARDING_SECTIONS.map((section, i) => {
+          const submitted = isSectionSubmitted(section, staff);
+          return (
+            <DocRow
+              key={section.key}
+              icon={<DocIcon />}
+              label={section.label}
+              submitted={submitted}
+              onClick={submitted ? () => setOpenDoc(section.key) : undefined}
+              onReject={submitted ? () => handleReject(section) : undefined}
+              last={i === ONBOARDING_SECTIONS.length - 1}
+            />
+          );
+        })}
+      </section>
+
+      {/* HR notes are not an onboarding document, so they sit outside that
+          card rather than under a heading that would misdescribe them. Kept
+          because this is the one place the notes come pre-filtered to the
+          employee whose page you are already on. */}
+      <p className={styles.sectionLabel}>HR RECORDS</p>
+      <section className={styles.docsCard}>
         <DocRow
           icon={<DocIcon />}
           label="HR Notes"
+          submitted
           onClick={() =>
             router.push(`/people/hr-notes?search=${encodeURIComponent(staff.name)}`)
           }
-          view
           last
         />
       </section>
@@ -1307,53 +1467,71 @@ function StatCell({
   );
 }
 
+/**
+ * One row of the onboarding card.
+ *
+ * A submitted section gets the pair of actions — View to read what was sent,
+ * Reject to send it back. One that hasn't arrived yet gets the word Pending
+ * and nothing to press: there is no document to open and nothing to reject,
+ * and a live-looking button that did neither would only invite the tap.
+ */
 function DocRow({
   icon,
   label,
+  submitted,
   onClick,
   onReject,
-  view = false,
-  chev = false,
   last = false,
 }: {
   icon: React.ReactNode;
   label: string;
-  onClick: () => void;
+  submitted: boolean;
+  onClick?: () => void;
   onReject?: () => void;
-  view?: boolean;
-  chev?: boolean;
   last?: boolean;
 }) {
+  const interactive = submitted && Boolean(onClick);
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      className={`${styles.docRow} ${last ? styles.docRowLast : ""}`}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={interactive ? onClick : undefined}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      className={`${styles.docRow} ${last ? styles.docRowLast : ""} ${
+        submitted ? "" : styles.docRowPending
+      }`}
     >
       <span className={styles.docRowIcon} aria-hidden="true">{icon}</span>
       <span className={styles.docRowLabel}>{label}</span>
       <span className={styles.docRowActions}>
-        {view && <span className={styles.docRowView}>View</span>}
-        {onReject && (
-          <button
-            type="button"
-            className={styles.docRowReject}
-            onClick={(e) => {
-              e.stopPropagation();
-              onReject();
-            }}
-          >
-            Reject
-          </button>
+        {submitted ? (
+          <>
+            <span className={styles.docRowView}>View</span>
+            {onReject && (
+              <button
+                type="button"
+                className={styles.docRowReject}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReject();
+                }}
+              >
+                Reject
+              </button>
+            )}
+          </>
+        ) : (
+          <span className={styles.docRowPendingLabel}>Pending</span>
         )}
-        {chev && <span className={styles.chev} aria-hidden="true">›</span>}
       </span>
     </div>
   );
@@ -1399,9 +1577,24 @@ function renderModalBody(
   hrNotes: HrNote[],
 ): { title: string; body: React.ReactNode } {
   switch (docKey) {
+    case "personal":
+      return {
+        title: "Personal Information",
+        body: (
+          <dl className={styles.modalDefs}>
+            <DefRow label="Legal First Name" value={staff.personal.firstName} />
+            <DefRow label="Legal Last Name" value={staff.personal.lastName} />
+            <DefRow label="Preferred Name" value={staff.personal.preferredName} />
+            <DefRow label="Date of Birth" value={fmtDobDisplay(staff.personal.dateOfBirth)} />
+            <DefRow label="Gender" value={staff.personal.gender} />
+            <DefRow label="Mobile Number" value={staff.phone} />
+            <DefRow label="Email" value={staff.personal.email} />
+          </dl>
+        ),
+      };
     case "documents":
       return {
-        title: "Documents",
+        title: "Documents (Photo ID, Visa, RSA)",
         body:
           staff.documents.length === 0 ? (
             <p className={styles.modalHint}>No documents uploaded yet.</p>
@@ -1457,16 +1650,20 @@ function renderModalBody(
           </dl>
         ),
       };
-    case "contract":
+    // One sheet for all three signatures. They are collected together on the
+    // single onboarding "Policies" step and rolled back together on reject,
+    // so splitting them across two sheets only made the owner open both to
+    // answer one question: has this person signed everything?
+    case "policies":
       return {
-        title: "Signed Contract",
+        title: "Policies",
         body: (
           <>
             <dl className={styles.modalDefs}>
               <div className={styles.modalDefRow}>
-                <dt className={styles.modalDefLabel}>Employment Agreement</dt>
+                <dt className={styles.modalDefLabel}>Staff Handbook</dt>
                 <dd className={styles.modalDefValue}>
-                  {staff.agreementSignedAt ? `Signed ${fmtDate(staff.agreementSignedAt)}` : "Not signed"}
+                  {staff.handbookSignedAt ? `Signed ${fmtDate(staff.handbookSignedAt)}` : "Not signed"}
                 </dd>
               </div>
               <div className={styles.modalDefRow}>
@@ -1475,33 +1672,15 @@ function renderModalBody(
                   {staff.privacySignedAt ? `Signed ${fmtDate(staff.privacySignedAt)}` : "Not signed"}
                 </dd>
               </div>
-            </dl>
-            {staff.signatureDataUrl && (
-              <SignatureBlock label="Signed by" name={staff.name} src={staff.signatureDataUrl} />
-            )}
-          </>
-        ),
-      };
-    case "handbook":
-      return {
-        title: "Employee Handbook (Signed)",
-        body: (
-          <>
-            <dl className={styles.modalDefs}>
               <div className={styles.modalDefRow}>
-                <dt className={styles.modalDefLabel}>Acknowledged On</dt>
+                <dt className={styles.modalDefLabel}>Employee Agreement</dt>
                 <dd className={styles.modalDefValue}>
-                  {staff.handbookSignedAt ? fmtDate(staff.handbookSignedAt) : "Not signed"}
+                  {staff.agreementSignedAt ? `Signed ${fmtDate(staff.agreementSignedAt)}` : "Not signed"}
                 </dd>
               </div>
             </dl>
             {staff.signatureDataUrl && (
               <SignatureBlock label="Signed by" name={staff.name} src={staff.signatureDataUrl} />
-            )}
-            {staff.handbookSignedAt && (
-              <p className={styles.modalHint}>
-                {staff.name} confirmed they have read and understood the Yurica staff handbook.
-              </p>
             )}
           </>
         ),

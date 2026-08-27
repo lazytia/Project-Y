@@ -680,6 +680,24 @@
   border-color: #fca5a5;
 }
 
+/* A section the employee has not submitted yet. There is nothing to open, so
+   the row drops the pointer and the hover tint that would otherwise promise
+   one — it has to read as a status line, not a dead button. Declared after
+   .docRow:hover so it wins on source order at equal specificity. */
+.docRowPending {
+  cursor: default;
+}
+
+.docRowPending:hover {
+  background: var(--color-bg);
+}
+
+.docRowPendingLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+}
+
 /* ── Change status grid ── */
 .statusGrid {
   display: grid;
