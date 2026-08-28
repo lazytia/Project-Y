@@ -227,23 +227,6 @@
   font-weight: 600;
 }
 
-.statusLine {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-fg-muted);
-}
-
-.statusPill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  background: var(--color-surface);
-  color: var(--color-fg);
-  border-radius: 99px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
 /* ── Search input ── */
 .searchInput {
   margin-left: auto;

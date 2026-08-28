@@ -12,11 +12,15 @@
  * down when rows disappear so the next addition still reads as new.
  */
 
+import type { User } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
 import { getDb } from "./firebase";
+import { canViewStaffRequest } from "./permissions";
+import { isOnboardingListEmployee } from "./staff-active";
 
 /** Menu entries that carry a change badge, keyed by their nav href. */
 export const NAV_BADGE_HREFS = {
+  newEmployees: "/people/onboarding",
   noticeGiven: "/people/notice-given",
   terminated: "/people/terminated",
 } as const;
@@ -99,14 +103,32 @@ export function reconcileNavSeen(
 type StaffStatusDoc = { status?: string };
 type NoticeDoc = { employeeUid?: string };
 
+/** The fields the New Employees list filters on, as stored. */
+type OnboardingListDoc = {
+  status?: string;
+  role?: string;
+  accountCreated?: boolean;
+  addedToScheduling?: boolean;
+  approvedAt?: unknown;
+  username?: string;
+  email?: string;
+  requestedByRole?: string;
+  requestedByName?: string;
+};
+
 /**
  * Current size of each tracked list.
  *
- * Deliberately mirrors what /people/notice-given and /people/terminated
- * themselves show — a badge that counts differently to the page it points at
- * would never clear.
+ * Deliberately mirrors what /people/onboarding, /people/notice-given and
+ * /people/terminated themselves show — a badge that counts differently to the
+ * page it points at would never clear.
+ *
+ * `viewer` is needed because New Employees is not the same list for everyone:
+ * the chef sees only his own requests and the manager only hers, so a count
+ * taken over the whole collection would leave a badge nobody could clear by
+ * opening the page.
  */
-export async function loadNavBadgeCounts(): Promise<NavCountMap> {
+export async function loadNavBadgeCounts(viewer: User | null | undefined): Promise<NavCountMap> {
   const db = getDb();
   const [noticeSnap, staffSnap] = await Promise.all([
     getDocs(collection(db, "notice_given")),
@@ -119,6 +141,11 @@ export async function loadNavBadgeCounts(): Promise<NavCountMap> {
       .map((d) => d.id),
   );
 
+  const newEmployees = staffSnap.docs.filter((d) => {
+    const raw = d.data() as OnboardingListDoc;
+    return isOnboardingListEmployee(raw) && canViewStaffRequest(viewer, raw);
+  }).length;
+
   // Notices for someone already terminated drop off that page, so they must
   // not count here either.
   const noticeGiven = noticeSnap.docs.filter((d) => {
@@ -127,6 +154,7 @@ export async function loadNavBadgeCounts(): Promise<NavCountMap> {
   }).length;
 
   return {
+    [NAV_BADGE_HREFS.newEmployees]: newEmployees,
     [NAV_BADGE_HREFS.noticeGiven]: noticeGiven,
     [NAV_BADGE_HREFS.terminated]: terminatedUids.size,
   };

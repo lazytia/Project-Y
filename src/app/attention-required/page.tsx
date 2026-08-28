@@ -78,16 +78,6 @@ type ReqItemAvail = {
   createdAt: Date | null;
 };
 
-type OnboardingItem = {
-  id: string;
-  staffUid: string;
-  firstName: string;
-  lastName: string;
-  startDate: Date | null;
-  state: "Submitted" | "In Progress";
-  createdAt: Date | null;
-};
-
 type ComplianceItem = {
   id: string;
   staffUid: string;
@@ -223,20 +213,22 @@ function isVisaExpiringSoon(exp: Date | null): boolean {
   return diff <= VISA_WINDOW_DAYS && diff >= -VISA_EXPIRED_GRACE_DAYS;
 }
 
-type Filter = "all" | "holiday" | "availability" | "onboarding" | "compliance";
+type Filter = "all" | "holiday" | "availability" | "compliance";
 
 const FILTER_LABEL: Record<Filter, string> = {
   all: "All",
   holiday: "Holiday Requests",
   availability: "Availability Change",
-  onboarding: "New Onboarding",
   compliance: "Visa Expiring Soon",
 };
 
 function parseFilter(v: string | null): Filter {
-  if (v === "holiday" || v === "availability" || v === "onboarding" || v === "compliance") {
+  if (v === "holiday" || v === "availability" || v === "compliance") {
     return v;
   }
+  // Covers ?filter=onboarding, which used to select a section this page no
+  // longer has. Falling through to "all" beats rendering an empty screen for
+  // anyone holding an old link or bookmark.
   return "all";
 }
 
@@ -272,9 +264,8 @@ export default function AttentionRequiredPage() {
     })();
   }, [load]);
 
-  const { requests, onboarding, compliance } = useMemo(() => {
+  const { requests, compliance } = useMemo(() => {
     const requests: (ReqItemHoliday | ReqItemAvail)[] = [];
-    const onboarding: OnboardingItem[] = [];
     const compliance: ComplianceItem[] = [];
 
     for (const d of staffDocs) {
@@ -310,21 +301,6 @@ export default function AttentionRequiredPage() {
         });
       }
 
-      // Onboarding: staff who have submitted (completedStep >= 7) but
-      // status hasn't been moved past "complete" yet, or who are still in
-      // progress. We surface "Submitted" specifically.
-      const completed = typeof d.completedStep === "number" ? d.completedStep : 0;
-      if (completed >= 7 && d.status === "complete") {
-        onboarding.push({
-          id: `ob_${d.uid}`,
-          staffUid: d.uid,
-          firstName, lastName,
-          startDate: tsDate(d.startDate),
-          state: "Submitted",
-          createdAt: tsDate(d.startDate),
-        });
-      }
-
       // Compliance: visa expiring within the window.
       const visaExp = tsDate(d.documents?.visaExpiry);
       if (visaExp && isVisaExpiringSoon(visaExp)) {
@@ -341,18 +317,16 @@ export default function AttentionRequiredPage() {
 
     // Newest first.
     requests.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
-    onboarding.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
 
-    return { requests, onboarding, compliance };
+    return { requests, compliance };
   }, [staffDocs]);
 
-  const total = requests.length + onboarding.length + compliance.length;
+  const total = requests.length + compliance.length;
 
   // Filter-derived visibility flags. The "requests" section is split into
   // two virtual filters (holiday / availability) by the chip row.
   const showHoliday = filter === "all" || filter === "holiday";
   const showAvailability = filter === "all" || filter === "availability";
-  const showOnboarding = filter === "all" || filter === "onboarding";
   const showCompliance = filter === "all" || filter === "compliance";
   const filteredRequests = requests.filter(
     (r) => (r.kind === "holiday" && showHoliday) || (r.kind === "availability" && showAvailability),
@@ -365,7 +339,6 @@ export default function AttentionRequiredPage() {
         return r.firstName.toLowerCase().includes(q) || r.lastName.toLowerCase().includes(q);
       })
     : historyRequestsAll;
-  const visibleOnboarding = showOnboarding ? onboarding : [];
   const visibleCompliance = showCompliance ? compliance : [];
 
   async function decide(
@@ -407,7 +380,7 @@ export default function AttentionRequiredPage() {
 
       <header className={styles.heading}>
         <h1 className={styles.title}>
-          Attention Required <span className={styles.totalBadge}>{total}</span>
+          Action Required <span className={styles.totalBadge}>{total}</span>
         </h1>
         <p className={styles.subtitle}>Review and take action on pending items</p>
       </header>
@@ -602,58 +575,10 @@ export default function AttentionRequiredPage() {
       </section>
       )}
 
-      {/* ONBOARDING */}
-      {showOnboarding && (
-      <section>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionIcon} aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <line x1="20" y1="8" x2="20" y2="14" />
-              <line x1="23" y1="11" x2="17" y2="11" />
-            </svg>
-          </span>
-          <p className={styles.sectionLabel}>ONBOARDING</p>
-          <span className={styles.sectionCount}>{visibleOnboarding.length}</span>
-          
-        </div>
-
-        {visibleOnboarding.length === 0 ? (
-          <p className={styles.empty}>No onboarding submissions waiting.</p>
-        ) : (
-          <ul className={styles.list}>
-            {visibleOnboarding.map((o) => (
-              <li key={o.id} className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <div className={styles.avatar} aria-hidden="true">
-                    {initials(o.firstName, o.lastName)}
-                  </div>
-                  <div className={styles.headBody}>
-                    <p className={styles.name}>{o.firstName} {o.lastName}</p>
-                    <p className={styles.kind}>New Onboarding</p>
-                    <p className={styles.meta}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" />
-                        <line x1="16" y1="2" x2="16" y2="6" />
-                        <line x1="8" y1="2" x2="8" y2="6" />
-                        <line x1="3" y1="10" x2="21" y2="10" />
-                      </svg>
-                      Start date: {o.startDate ? fmtShort(o.startDate) : "—"}
-                    </p>
-                  </div>
-                  <span className={styles.ago}>{fmtRelative(o.createdAt)}</span>
-                </div>
-                <p className={styles.statusLine}>
-                  <span className={styles.noteLabel}>Status:</span>{" "}
-                  <span className={styles.statusPill}>{o.state}</span>
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      )}
+      {/* Onboarding submissions are not reviewed here. They have their own
+          page — New Employees — where the whole application can be read and
+          approved; listing them here as well split the same job across two
+          screens and gave this page a section with no action on it. */}
 
       {/* COMPLIANCE */}
       {showCompliance && (

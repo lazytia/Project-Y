@@ -6,6 +6,12 @@ import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/f
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
+import {
+  fetchDocumentSignatures,
+  SIGNABLE_DOCUMENTS,
+  TRAINING_DOCUMENT_KEYS,
+  type SignableDocumentKey,
+} from "@/lib/document-signatures";
 import styles from "./page.module.css";
 
 /* ── types ── */
@@ -201,14 +207,38 @@ export default function StaffDashboardPage() {
     void loadData();
   }, [user, loadData]);
 
-  // Re-fetch data when the app becomes visible (e.g. after tapping a push notification)
+  // Training this account still owes a signature for. Read from the same
+  // record the document itself writes to, so signing the beer guide is what
+  // removes the card — nothing has to be dismissed by hand.
+  const [unsignedTraining, setUnsignedTraining] = useState<SignableDocumentKey[]>([]);
+  const loadTraining = useCallback(async () => {
+    if (!user) return;
+    try {
+      const signatures = await fetchDocumentSignatures(user);
+      setUnsignedTraining(TRAINING_DOCUMENT_KEYS.filter((key) => !signatures[key]));
+    } catch {
+      // Stay silent on a read failure. A "not signed" card that signing
+      // cannot clear is worse than showing no card at all.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    void loadTraining();
+  }, [user, loadTraining]);
+
+  // Re-fetch data when the app becomes visible (e.g. after tapping a push
+  // notification, or on returning from the beer guide in a standalone PWA
+  // where the dashboard is resumed rather than re-mounted).
   useEffect(() => {
     function onVisible() {
-      if (document.visibilityState === "visible") loadData();
+      if (document.visibilityState !== "visible") return;
+      loadData();
+      void loadTraining();
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [loadData]);
+  }, [loadData, loadTraining]);
 
   // Lock body scroll while the modal is open.
   useEffect(() => {
@@ -244,6 +274,47 @@ export default function StaffDashboardPage() {
 
   return (
     <div className={styles.page}>
+      {/* Training still owed. Above the shift card because it is the one
+          thing on this screen the employee has to go and do; it disappears
+          on its own once the document is signed. */}
+      {unsignedTraining.length > 0 && (
+        <section className={styles.trainingCard}>
+          <p className={styles.trainingTitle}>{t("staff.training.title")}</p>
+          <ul className={styles.trainingList}>
+            {unsignedTraining.map((key) => {
+              // Not `doc` — that name is Firestore's on this page — and not
+              // `document`, which is the global the effects above listen on.
+              const material = SIGNABLE_DOCUMENTS[key];
+              return (
+                <li key={key}>
+                  <Link href={material.href} className={styles.trainingRow}>
+                    <span className={styles.trainingIcon} aria-hidden="true">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                    </span>
+                    <span className={styles.trainingBody}>
+                      <span className={styles.trainingDoc}>
+                        {t(material.labelKey, material.label)}
+                      </span>
+                      <span className={styles.trainingStatus}>
+                        {t("staff.training.notSigned")}
+                      </span>
+                    </span>
+                    <span className={styles.trainingCta}>
+                      {t(`staff.training.start.${key}`, `Start ${material.label}`)}{" "}
+                      <span aria-hidden="true">›</span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       {/* Next Shift */}
       <Link href="/staff/schedule/roster" className={styles.shiftCard}>
         <div className={styles.shiftIcon} aria-hidden="true">

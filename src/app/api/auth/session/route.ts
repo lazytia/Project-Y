@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
+import { isFreshSignIn } from "@/lib/first-login";
+import { recordFirstLogin } from "@/lib/first-login-server";
 import { CHEF_USERNAMES, OWNER_USERNAMES } from "@/lib/permissions";
 import { dashboardKindFromEmail } from "@/lib/session-dashboard";
 import { emailToUsername } from "@/lib/username";
@@ -78,6 +80,17 @@ export async function POST(request: NextRequest) {
     const uid = decoded.uid;
     const role = roleFromEmail(decoded.email);
     const dashboard = dashboardKindFromEmail(decoded.email);
+
+    // A new employee reaching this point has signed in successfully — the
+    // token is verified and the cookies are about to be minted — so this is
+    // the honest place to record it and tell the owner. Awaited rather than
+    // left running: a serverless instance can be frozen the moment the
+    // response is written, and a dropped promise means a missed alert.
+    // `auth_time` keeps it off the refresh path, so it costs a read only in
+    // the few minutes after somebody actually types their password.
+    if (role === "staff" && isFreshSignIn(decoded.auth_time)) {
+      await recordFirstLogin(uid);
+    }
 
     const res = NextResponse.json({ ok: true, uid, role, dashboard }, { status: 200 });
     const secure = request.nextUrl.protocol === "https:";

@@ -321,7 +321,7 @@ const ONBOARDING_SECTIONS: readonly {
     label: "Documents (Photo ID, Visa, RSA)",
     // Named upload fields rather than the whole `documents` map: older rows
     // keep `documents.visaExpiry` in there, and that date is what the
-    // dashboard and Attention Required count visa warnings from.
+    // dashboard and Action Required count visa warnings from.
     clearPaths: [
       "documents.passportUrl", "documents.passportUrls",
       "documents.visaUrl",     "documents.visaUrls",

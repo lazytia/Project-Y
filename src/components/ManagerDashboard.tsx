@@ -21,14 +21,17 @@ import { sydneyTodayKey } from "@/lib/sydney-date";
 import {
   fetchDocumentSignatures,
   SIGNABLE_DOCUMENT_KEYS,
+  SIGNABLE_DOCUMENTS,
   type SignableDocumentKey,
 } from "@/lib/document-signatures";
 import DashboardReadyMarker from "@/components/DashboardReadyMarker";
 import styles from "./ManagerDashboard.module.css";
 
-const SIGNABLE_DOCS: Record<SignableDocumentKey, { label: string; href: string; cta: string }> = {
-  handbook: { label: "Staff Handbook", href: "/staff/handbook", cta: "Go to Handbook" },
-  beerGuide: { label: "Beer Guide", href: "/staff/beer-guide", cta: "Go to Beer Guide" },
+/** Only the wording of the button is this screen's own; the label and the
+ *  link come from the shared map so they match the staff dashboard. */
+const SIGN_BANNER_CTA: Record<SignableDocumentKey, string> = {
+  handbook: "Go to Handbook",
+  beerGuide: "Go to Beer Guide",
 };
 
 type AttentionCounts = {
@@ -446,7 +449,7 @@ export default function ManagerDashboard({
       {unsignedDocs.length > 0 && (
         <section className={styles.signBanners}>
           {unsignedDocs.map((key) => (
-            <Link key={key} href={SIGNABLE_DOCS[key].href} className={styles.signBanner}>
+            <Link key={key} href={SIGNABLE_DOCUMENTS[key].href} className={styles.signBanner}>
               <span className={styles.signBannerIcon} aria-hidden="true">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
@@ -455,11 +458,11 @@ export default function ManagerDashboard({
                 </svg>
               </span>
               <span className={styles.signBannerBody}>
-                <span className={styles.signBannerTitle}>{SIGNABLE_DOCS[key].label} not signed</span>
+                <span className={styles.signBannerTitle}>{SIGNABLE_DOCUMENTS[key].label} not signed</span>
                 <span className={styles.signBannerSub}>Please review and sign</span>
               </span>
               <span className={styles.signBannerCta}>
-                {SIGNABLE_DOCS[key].cta} <span aria-hidden="true">›</span>
+                {SIGN_BANNER_CTA[key]} <span aria-hidden="true">›</span>
               </span>
             </Link>
           ))}
@@ -469,7 +472,7 @@ export default function ManagerDashboard({
       {!hideAttention && (
         <section>
           <div className={styles.sectionHead}>
-            <p className={styles.sectionLabel}>ATTENTION REQUIRED FOR SCHEDULING</p>
+            <p className={styles.sectionLabel}>ACTION REQUIRED FOR SCHEDULING</p>
             <span className={styles.attentionBadge}>{attentionTotal}</span>
             <Link href="/attention-required" className={styles.sectionChev} aria-label="View all">›</Link>
           </div>

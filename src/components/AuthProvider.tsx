@@ -11,9 +11,9 @@ import { runWhenIdle } from "@/lib/run-when-idle";
 import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath, postLoginRoute } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 import { dashboardKindFromEmail } from "@/lib/session-dashboard";
+import { TOTAL_ONBOARDING_STEPS } from "@/lib/onboarding-steps";
 import { emailToUsername } from "@/lib/username";
 
-const TOTAL_ONBOARDING_STEPS = 7;
 const STAFF_STEP_CACHE_KEY = "y.staffStep";
 
 type StaffStepCache = { uid: string; step: number };

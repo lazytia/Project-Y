@@ -10,6 +10,8 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { FIRST_LOGIN_FIELD, isFirstLoginRecent } from "@/lib/first-login";
+import { TOTAL_ONBOARDING_STEPS } from "@/lib/onboarding-steps";
 import { isOwner } from "@/lib/permissions";
 
 const VISA_EXPIRING_WINDOW_DAYS = 60;
@@ -167,8 +169,23 @@ export function useBellInbox(options?: { enabled?: boolean }): {
               });
             }
 
+            // The account the owner set up has been used for the first time.
+            // News rather than a task — nothing here has to be approved — so
+            // it expires by age instead of waiting to be cleared.
+            const firstLogin = tsDate(data[FIRST_LOGIN_FIELD]);
+            if (isFirstLoginRecent(firstLogin)) {
+              out.push({
+                id: `fl_${d.id}`,
+                title: `${who} — First Sign-In`,
+                detail: "Signed in to their account for the first time",
+                ago: fmtRelative(firstLogin),
+                href: "/people/onboarding",
+                occurredAt: firstLogin,
+              });
+            }
+
             const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
-            if (completed >= 7 && data.status === "complete") {
+            if (completed >= TOTAL_ONBOARDING_STEPS && data.status === "complete") {
               const at =
                 tsDate((data as { completedAt?: Timestamp }).completedAt) ??
                 tsDate((data as { updatedAt?: Timestamp }).updatedAt);
@@ -178,7 +195,11 @@ export function useBellInbox(options?: { enabled?: boolean }): {
                 title: `${who} — Onboarding Submitted`,
                 detail: start ? `Start date: ${fmtShort(start)}` : undefined,
                 ago: fmtRelative(at),
-                href: "/attention-required",
+                // New Employees, not Action Required. The submitted
+                // application is read and approved there; Action Required no
+                // longer lists onboarding at all, so sending the owner there
+                // would land them on a page with nothing to act on.
+                href: "/people/onboarding",
                 occurredAt: at,
               });
             }

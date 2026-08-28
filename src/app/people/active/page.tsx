@@ -355,7 +355,7 @@ export default function ActiveEmployeesPage() {
       <section className={styles.attentionCard}>
         {/* No "View all" here. The card already shows both rows it tracks, so
             the link only led somewhere carrying the same two counts — and
-            Attention Required is still on the sidebar and behind the bell. */}
+            Action Required is still on the sidebar and behind the bell. */}
         <p className={styles.attentionTitle}>NEEDS ATTENTION</p>
         <ul className={styles.attentionList}>
           <AttentionRow

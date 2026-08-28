@@ -22,9 +22,9 @@ export type NavGroup = {
  * menus all carry it, and three copies would only invite one of them to
  * keep the beer guide as a sibling after the other two had moved on.
  *
- * This is a menu shape and nothing more. The dashboard still raises
- * "Beer Guide not signed" as its own alert — that signature is chased
- * separately, and lives in SIGNABLE_DOCS in ManagerDashboard.
+ * This is a menu shape and nothing more. The dashboards still raise the
+ * unsigned beer guide as their own alert — that signature is chased
+ * separately, from SIGNABLE_DOCUMENTS in lib/document-signatures.
  */
 const TRAINING_MANUAL: NavItem = {
   label: "Training Manual",
@@ -69,9 +69,10 @@ export const OWNER_NAV: NavGroup[] = [
       { label: "Notice Given", href: "/people/notice-given" },
       { label: "Terminated", href: "/people/terminated" },
       // The queue of things waiting on someone: pending holiday and
-      // availability requests, visas about to expire, onboarding forms
-      // submitted but not approved. Last, below the lists it draws from.
-      { label: "Attention Required", href: "/attention-required" },
+      // availability requests, and visas about to expire. Last, below the
+      // lists it draws from. Submitted onboarding forms are not here — those
+      // are read and approved on New Employees, at the top of this group.
+      { label: "Action Required", href: "/attention-required" },
     ],
   },
   {
@@ -124,7 +125,7 @@ const TEAM_ADMIN_LINKS: NavItem[] = [
 // link rather than a group wrapping one child.
 //
 // Built by a factory rather than written twice: the two menus differ by
-// exactly one Team link (Attention Required, manager only), and two 45-line
+// exactly one Team link (Action Required, manager only), and two 45-line
 // copies would only invite one of them to be edited alone. The difference
 // is passed in, so it stays visible at each call site instead of turning
 // into a role flag buried in the tree — flags are what made the earlier
@@ -169,7 +170,7 @@ function shiftLeadNav(teamChildren: NavItem[]): NavGroup[] {
 // The manager triages the request queue; the chef doesn't, so his Team group
 // is the plain admin list.
 export const MANAGER_NAV: NavGroup[] = shiftLeadNav([
-  { label: "Attention Required", href: "/attention-required" },
+  { label: "Action Required", href: "/attention-required" },
   ...TEAM_ADMIN_LINKS,
 ]);
 

@@ -2,7 +2,7 @@
  * How far ahead HR surfaces upcoming staff dates.
  *
  * These were duplicated per page and had drifted apart (Active Employees
- * warned at 30 days while Attention Required used 60), so a visa could be
+ * warned at 30 days while Action Required used 60), so a visa could be
  * flagged on one screen and silent on another. Single source of truth.
  */
 

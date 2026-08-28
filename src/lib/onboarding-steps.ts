@@ -16,6 +16,12 @@
 /** Steps 1–5 are the sections the owner reviews; 6 and 7 close out the form. */
 export type OnboardingStepNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+/**
+ * `completedStep` at this value means the form is finished. Several screens
+ * compare against it to tell a new hire from an established employee.
+ */
+export const TOTAL_ONBOARDING_STEPS = 7;
+
 export const ONBOARDING_STEP_ICONS: Record<OnboardingStepNumber, string> = {
   1: "👤", // Personal Information
   2: "📄", // TFN Declaration

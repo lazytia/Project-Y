@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { User } from "firebase/auth";
 import { useAuth } from "./AuthProvider";
 import { useLang } from "./LanguageProvider";
 import LanguageToggle from "./LanguageToggle";
@@ -120,7 +121,8 @@ function navHasBadgedHref(nav: NavGroup[]): boolean {
  * Counts are read once per mount and deliberately behind runWhenIdle — the
  * badge is decoration and must never compete with the page it sits next to.
  */
-function useNavChangeBadges(uid: string | undefined, enabled: boolean, pathname: string) {
+function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pathname: string) {
+  const uid = user?.uid;
   const [counts, setCounts] = useState<NavCountMap | null>(null);
   const [seen, setSeen] = useState<NavCountMap>({});
 
@@ -129,10 +131,10 @@ function useNavChangeBadges(uid: string | undefined, enabled: boolean, pathname:
   }, [uid]);
 
   useEffect(() => {
-    if (!uid || !enabled) return;
+    if (!user || !enabled) return;
     let alive = true;
     const cancel = runWhenIdle(() => {
-      loadNavBadgeCounts()
+      loadNavBadgeCounts(user)
         .then((next) => {
           if (alive) setCounts(next);
         })
@@ -144,7 +146,7 @@ function useNavChangeBadges(uid: string | undefined, enabled: boolean, pathname:
       alive = false;
       cancel();
     };
-  }, [uid, enabled]);
+  }, [user, enabled]);
 
   useEffect(() => {
     if (!uid || !counts) return;
@@ -252,7 +254,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
   );
 
   // Chef and manager run the same menu apart from one Team link — the
-  // manager triages Attention Required, the chef doesn't — so the two trees
+  // manager triages Action Required, the chef doesn't — so the two trees
   // are separate exports and this branch picks between them.
   // Owners use ownerNav computed above.
   const managerNav: NavGroup[] = userIsChef ? CHEF_NAV : MANAGER_NAV;
@@ -265,7 +267,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
   // Only pay for the counts when the menu on screen can actually show them —
   // staff never see the People group, and their Firestore rules would reject
   // the read anyway.
-  const badges = useNavChangeBadges(user?.uid, navHasBadgedHref(activeNav), pathname);
+  const badges = useNavChangeBadges(user, navHasBadgedHref(activeNav), pathname);
 
   /**
    * Keep the group containing the current page open.

@@ -329,6 +329,13 @@ const EN: Dict = {
   "staff.nextShift": "Next Shift",
   "staff.loading": "Loading…",
   "staff.noUpcoming": "No upcoming shifts",
+  "staff.training.title": "Required Training",
+  "staff.training.notSigned": "Not signed",
+  // One key per document rather than "Start" + the name: Japanese puts the
+  // verb last, so gluing the two together reads backwards in one language or
+  // the other.
+  "staff.training.start.beerGuide": "Start Beer Guide",
+  "staff.training.start.handbook": "Start Staff Handbook",
   "staff.notif.title": "Notifications",
   "staff.notif.viewAll": "View all",
   "staff.notif.empty": "No notifications yet.",
@@ -798,6 +805,10 @@ const JA: Dict = {
   "staff.nextShift": "次のシフト",
   "staff.loading": "読み込み中…",
   "staff.noUpcoming": "予定されているシフトはありません",
+  "staff.training.title": "必須トレーニング",
+  "staff.training.notSigned": "未署名",
+  "staff.training.start.beerGuide": "ビールガイドを開始",
+  "staff.training.start.handbook": "スタッフハンドブックを開始",
   "staff.notif.title": "お知らせ",
   "staff.notif.viewAll": "すべて見る",
   "staff.notif.empty": "お知らせはまだありません。",
