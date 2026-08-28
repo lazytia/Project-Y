@@ -8,7 +8,7 @@
   gap: var(--space-4);
 }
 
-/* ?€?€ Page header ?€?€ */
+/* â”€â”€ Page header â”€â”€ */
 .pageHeader {
   display: flex;
   flex-direction: column;
@@ -35,7 +35,7 @@
   background: var(--color-border);
 }
 
-/* ?€?€ Section bar ?€?€ */
+/* â”€â”€ Section bar â”€â”€ */
 .sectionBar {
   display: flex;
   align-items: center;
@@ -62,10 +62,10 @@
   color: var(--color-fg);
 }
 
-/* ?€?€ Tab bar ?€?€ */
+/* â”€â”€ Tab bar â”€â”€ */
 .tabBar {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -98,7 +98,7 @@
   font-weight: 700;
 }
 
-/* ?€?€ States ?€?€ */
+/* â”€â”€ States â”€â”€ */
 .loading {
   margin: 0;
   padding: var(--space-6);
@@ -117,7 +117,7 @@
   color: var(--color-negative);
 }
 
-/* ?€?€ Empty state ?€?€ */
+/* â”€â”€ Empty state â”€â”€ */
 .emptyWrap {
   display: flex;
   flex-direction: column;
@@ -175,7 +175,7 @@
   color: var(--color-fg-muted);
 }
 
-/* ?€?€ Card list ?€?€ */
+/* â”€â”€ Card list â”€â”€ */
 .list {
   list-style: none;
   margin: 0;
@@ -185,7 +185,11 @@
   gap: var(--space-3);
 }
 
+/* The card is a positioned <li> so the overflow menu can hang off it; the
+   tappable body is .cardMain inside, which keeps the Ready-for-Review action
+   buttons out of the card's own click target. */
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -197,15 +201,21 @@
   font-family: var(--font-sans);
   text-align: left;
   color: inherit;
-  cursor: pointer;
   transition: background 0.15s;
+}
+
+.cardMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  cursor: pointer;
 }
 
 .card:hover {
   background: var(--color-surface);
 }
 
-/* ?€?€ Card top row: avatar + name + status ?€?€ */
+/* â”€â”€ Card top row: avatar + name + status â”€â”€ */
 .cardTop {
   display: flex;
   align-items: center;
@@ -257,28 +267,29 @@
   flex-shrink: 0;
 }
 
-.pillSubmitted {
-  display: inline-block;
+/* Warm means the owner is holding it up, blue means the employee is â€” see
+   STATUS_PILLS. The icon repeats the same fact for anyone who cannot pick
+   the two colours apart. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 10px;
   border-radius: 99px;
-  border: 1px solid var(--color-warm);
   background: transparent;
-  color: var(--color-warm);
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.pillApproved {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 99px;
-  border: 1px solid #16a34a;
-  background: transparent;
-  color: #16a34a;
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
+.pillWarm {
+  border: 1px solid var(--color-warm);
+  color: var(--color-warm);
+}
+
+.pillInfo {
+  border: 1px solid #2563eb;
+  color: #2563eb;
 }
 
 .dateSmall {
@@ -287,7 +298,60 @@
   white-space: nowrap;
 }
 
-/* ?€?€ Card info row: 4 columns ?€?€ */
+.moreBtn {
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.moreBtn:hover {
+  background: var(--color-border);
+  color: var(--color-fg);
+}
+
+.menu {
+  position: absolute;
+  top: 52px;
+  right: var(--space-4);
+  z-index: 20;
+  min-width: 172px;
+  padding: 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+}
+
+.menuItem {
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--color-surface);
+}
+
+/* â”€â”€ Card info row: 4 columns â”€â”€ */
 .infoRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -333,31 +397,55 @@
   color: var(--color-fg);
 }
 
-/* ?€?€ Approved checkmarks ?€?€ */
-.checksRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding-top: var(--space-2);
+/* â”€â”€ Ready-for-Review card actions â”€â”€ */
+.cardActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
 }
 
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
+.btnOutline,
+.btnPrimary {
+  height: 44px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
 }
 
-.checkDone {
-  color: #16a34a;
+.btnOutline {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-fg);
 }
 
-.checkPending {
+.btnOutline:hover { background: var(--color-surface); }
+
+.btnPrimary {
+  background: var(--color-warm);
+  border: none;
+  color: #fff;
+}
+
+.btnPrimary:hover { opacity: 0.92; }
+
+/* â”€â”€ Footer note â”€â”€ */
+.footerNote {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--color-fg-muted);
+  text-align: center;
 }
 
-/* ?€?€ Bottom bar ?€?€ */
+/* â”€â”€ Bottom bar â”€â”€ */
 .bottomBar {
   position: fixed;
   bottom: 0;

@@ -17,7 +17,7 @@ import type { User } from "firebase/auth";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { canViewStaffRequest } from "@/lib/permissions";
-import { isOnboardingListEmployee } from "@/lib/staff-active";
+import { isOnboardingListEmployee, staffOnboardingFlags } from "@/lib/staff-active";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { isNoticeGivenActive, isReadyToTerminate, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import styles from "./DashboardAttention.module.css";
@@ -219,15 +219,7 @@ async function loadNewEmployeeCount(viewer: User | null): Promise<number> {
   const snap = await getDocs(collection(getDb(), "staff_onboarding"));
   return snap.docs.reduce((acc, d) => {
     const raw = d.data() as Record<string, unknown>;
-    const listed = isOnboardingListEmployee({
-      status: raw.status as string | undefined,
-      role: raw.role as string | undefined,
-      accountCreated: raw.accountCreated as boolean | undefined,
-      addedToScheduling: raw.addedToScheduling as boolean | undefined,
-      approvedAt: raw.approvedAt,
-      username: raw.username as string | undefined,
-      email: raw.email as string | undefined,
-    });
+    const listed = isOnboardingListEmployee(staffOnboardingFlags(raw));
     if (!listed) return acc;
     const visible = canViewStaffRequest(viewer, {
       requestedByRole: raw.requestedByRole as string | undefined,

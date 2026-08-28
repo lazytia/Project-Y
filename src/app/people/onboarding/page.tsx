@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * New Employees — everyone hired but not yet signed off.
+ *
+ * Two tabs, because there are only two things the owner does here. "New" is
+ * the people still working through the form, where the only question is who
+ * is holding it up; "Ready for Review" is the ones who have finished and are
+ * waiting on the owner, where there is a decision to make. Mixing them into
+ * one list buried the second kind, which is the half with a deadline — the
+ * employee cannot start until someone presses Activate.
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, type Timestamp } from "firebase/firestore";
@@ -7,9 +18,15 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef, canViewStaffRequest } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
-import { isOnboardingListEmployee } from "@/lib/staff-active";
+import {
+  isOnboardingListEmployee,
+  onboardingListStatus,
+  staffOnboardingFlags,
+  type OnboardingListStatus,
+} from "@/lib/staff-active";
 import { registerFcmToken } from "@/lib/fcm";
 import Splash from "@/components/Splash";
+import ActivateEmployeeSheet from "@/components/ActivateEmployeeSheet";
 import styles from "./page.module.css";
 
 type StaffOnboarding = {
@@ -28,25 +45,32 @@ type StaffOnboarding = {
   afterTrainingRate?: number;
   trainingPeriod?: string;
   completedStep?: number;
-  step?: number;
-  documents?: {
-    passportUrl?: string | null;
-    visaUrl?: string | null;
-    rsaUrl?: string | null;
-  };
-  taxFileNumber?: string;
-  bankSuper?: { bsb?: string };
   createdAt?: Date | null;
   approvedAt?: Date | null;
+  updatedAt?: Date | null;
   addedToScheduling?: boolean;
   accountCreated?: boolean;
   requestedByRole?: string;
   requestedByName?: string;
+  /** Which half of the list this row sits in, and which pill it wears. */
+  listStatus: OnboardingListStatus;
 };
 
-type TabKey = "all" | "submitted" | "approved";
+type TabKey = "new" | "ready";
 
-const TOTAL_STEPS = 7;
+/**
+ * The pill each state wears.
+ *
+ * Colour carries the same meaning throughout: warm means it is the owner's
+ * move, blue means it is someone else's. So a request waiting to be approved
+ * and one waiting on the employee do not look alike.
+ */
+const STATUS_PILLS: Record<OnboardingListStatus, { label: string; tone: "warm" | "info" }> = {
+  submitted: { label: "Submitted", tone: "info" },
+  started: { label: "Onboarding Started", tone: "warm" },
+  in_progress: { label: "In Progress", tone: "info" },
+  ready: { label: "Ready for Review", tone: "warm" },
+};
 
 /** Username derived from the synthetic auth email, or the stored field. */
 function usernameOf(row: StaffOnboarding): string {
@@ -85,9 +109,10 @@ function fmtDate(d: Date | null | undefined): string {
   });
 }
 
-function fmtRate(n: number | undefined): string | null {
-  if (typeof n !== "number" || Number.isNaN(n)) return null;
-  return `$${n.toFixed(2)}`;
+/** "$25.50/hr" — the unit is part of the number here, not a column heading. */
+function fmtRate(n: number | undefined): string {
+  if (typeof n !== "number" || Number.isNaN(n)) return "—";
+  return `$${n.toFixed(2)}/hr`;
 }
 
 function fullName(row: StaffOnboarding): string {
@@ -121,15 +146,32 @@ function initialsOf(row: StaffOnboarding): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-/** Is this row considered "approved" by the manager? */
-function isApproved(row: StaffOnboarding): boolean {
-  const s = (row.status ?? "").toLowerCase();
-  return s === "approved" || s === "active" || !!row.approvedAt;
+/**
+ * The date line under the pill: when the row last moved, in its own words.
+ *
+ * A finished form is dated by `updatedAt` — the last step they saved is the
+ * moment they completed it — while an unapproved request is dated by when it
+ * was submitted. Showing one date labelled two ways would be worse than
+ * showing nothing: "Completed 3 Aug" on a row nobody has touched since it was
+ * created is a lie the owner would act on.
+ */
+function dateLine(row: StaffOnboarding): string {
+  if (row.listStatus === "ready") return `Completed ${fmtDate(row.updatedAt ?? row.approvedAt)}`;
+  if (row.listStatus === "submitted") return `Submitted ${fmtDate(row.createdAt)}`;
+  return `Started ${fmtDate(row.approvedAt ?? row.createdAt)}`;
 }
 
-/** "Submitted" or "Approved" — the only two pill labels. */
-function statusLabel(row: StaffOnboarding): string {
-  return isApproved(row) ? "Approved" : "Submitted";
+/**
+ * Where tapping the card goes.
+ *
+ * Whichever screen has the action that row is waiting on: an unapproved
+ * request opens the approval screen, and anyone who has begun the form opens
+ * the review of it. The overflow menu offers the other one.
+ */
+function primaryHref(row: StaffOnboarding): string {
+  return row.listStatus === "submitted"
+    ? `/people/onboarding/${row.uid}`
+    : `/people/onboarding/${row.uid}/review`;
 }
 
 export default function ManagerOnboardingPage() {
@@ -139,7 +181,9 @@ export default function ManagerOnboardingPage() {
 
   const [rows, setRows] = useState<StaffOnboarding[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("all");
+  const [tab, setTab] = useState<TabKey>("new");
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [activating, setActivating] = useState<StaffOnboarding | null>(null);
 
   // Owner-only page: redirect anyone else back to the dashboard.
   useEffect(() => {
@@ -161,8 +205,9 @@ export default function ManagerOnboardingPage() {
     (async () => {
       try {
         const snap = await getDocs(collection(getDb(), "staff_onboarding"));
-        const data: StaffOnboarding[] = snap.docs.map((d) => {
+        const data: (StaffOnboarding & { listed: boolean })[] = snap.docs.map((d) => {
           const raw = d.data() as Record<string, unknown>;
+          const flags = staffOnboardingFlags(raw);
           return {
             uid: d.id,
             fullName: raw.fullName as string | undefined,
@@ -179,35 +224,25 @@ export default function ManagerOnboardingPage() {
             afterTrainingRate: raw.afterTrainingRate as number | undefined,
             trainingPeriod: raw.trainingPeriod as string | undefined,
             completedStep: raw.completedStep as number | undefined,
-            step: raw.step as number | undefined,
-            documents: raw.documents as StaffOnboarding["documents"],
-            taxFileNumber: raw.taxFileNumber as string | undefined,
-            bankSuper: raw.bankSuper as StaffOnboarding["bankSuper"],
             createdAt: toDate(raw.createdAt),
             approvedAt: toDate(raw.approvedAt),
+            updatedAt: toDate(raw.updatedAt),
             addedToScheduling: raw.addedToScheduling as boolean | undefined,
             accountCreated: raw.accountCreated as boolean | undefined,
             requestedByRole: raw.requestedByRole as string | undefined,
             requestedByName: raw.requestedByName as string | undefined,
+            listStatus: onboardingListStatus(flags),
+            listed: isOnboardingListEmployee(flags),
           };
         });
         if (cancelled) return;
-        const staffOnly = data.filter((r) =>
-          isOnboardingListEmployee({
-            status: r.status,
-            role: r.role,
-            accountCreated: r.accountCreated,
-            addedToScheduling: r.addedToScheduling,
-            approvedAt: r.approvedAt,
-            username: r.username,
-            email: r.email,
-          }),
-        );
-        const visible = staffOnly.filter((r) =>
-          canViewStaffRequest(user, {
-            requestedByRole: r.requestedByRole,
-            requestedByName: r.requestedByName,
-          }),
+        const visible = data.filter(
+          (r) =>
+            r.listed &&
+            canViewStaffRequest(user, {
+              requestedByRole: r.requestedByRole,
+              requestedByName: r.requestedByName,
+            }),
         );
         visible.sort((a, b) => {
           const at = a.startDate?.getTime() ?? Infinity;
@@ -226,15 +261,22 @@ export default function ManagerOnboardingPage() {
     };
   }, [allowed, user]);
 
-  const { total, submitted, approved, filtered } = useMemo(() => {
-    if (!rows) return { total: 0, submitted: 0, approved: 0, filtered: [] };
-    const sub = rows.filter((r) => !isApproved(r));
-    const app = rows.filter((r) => isApproved(r));
-    let list = rows;
-    if (tab === "submitted") list = sub;
-    if (tab === "approved") list = app;
-    return { total: rows.length, submitted: sub.length, approved: app.length, filtered: list };
-  }, [rows, tab]);
+  const { total, newRows, readyRows } = useMemo(() => {
+    if (!rows) return { total: 0, newRows: [], readyRows: [] };
+    return {
+      total: rows.length,
+      newRows: rows.filter((r) => r.listStatus !== "ready"),
+      readyRows: rows.filter((r) => r.listStatus === "ready"),
+    };
+  }, [rows]);
+
+  const filtered = tab === "ready" ? readyRows : newRows;
+
+  /** Drop an activated row without a refetch — it has left this list. */
+  function handleActivated(uid: string) {
+    setRows((prev) => (prev ? prev.filter((r) => r.uid !== uid) : prev));
+    setActivating(null);
+  }
 
   if (authLoading || !allowed) {
     return <Splash />;
@@ -244,7 +286,7 @@ export default function ManagerOnboardingPage() {
   const isEmpty = !loading && total === 0;
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} onClick={() => setMenuFor(null)}>
       {error && <p className={styles.error}>{error}</p>}
 
       {loading && <p className={styles.loading}>Loading…</p>}
@@ -270,14 +312,10 @@ export default function ManagerOnboardingPage() {
         <>
           {/* Header */}
           <div className={styles.pageHeader}>
-            <h1 className={styles.pageTitle}>New Staff Request</h1>
+            <h1 className={styles.pageTitle}>New Employees</h1>
             <p className={styles.pageDesc}>
-              Submit new staff details for owner approval.
-            </p>
-            <p className={styles.pageDesc}>
-              Once approved, the employee will be added to Scheduling,
-              and their Clock In ID and Project Y account will be
-              created automatically.
+              Everyone hired but not yet activated. They stay here until their
+              onboarding has been reviewed and signed off.
             </p>
           </div>
 
@@ -297,53 +335,68 @@ export default function ManagerOnboardingPage() {
           <div className={styles.tabBar}>
             <button
               type="button"
-              className={`${styles.tab} ${tab === "all" ? styles.tabActive : ""}`}
-              onClick={() => setTab("all")}
+              className={`${styles.tab} ${tab === "new" ? styles.tabActive : ""}`}
+              onClick={() => setTab("new")}
             >
-              All ({total})
+              New ({newRows.length})
             </button>
             <button
               type="button"
-              className={`${styles.tab} ${tab === "submitted" ? styles.tabActive : ""}`}
-              onClick={() => setTab("submitted")}
+              className={`${styles.tab} ${tab === "ready" ? styles.tabActive : ""}`}
+              onClick={() => setTab("ready")}
             >
-              Submitted ({submitted})
-            </button>
-            <button
-              type="button"
-              className={`${styles.tab} ${tab === "approved" ? styles.tabActive : ""}`}
-              onClick={() => setTab("approved")}
-            >
-              Approved ({approved})
+              Ready for Review ({readyRows.length})
             </button>
           </div>
 
           {/* Card list */}
           <ul className={styles.list}>
             {filtered.map((row) => {
-              const rowApproved = isApproved(row);
-              const label = statusLabel(row);
+              const pill = STATUS_PILLS[row.listStatus];
+              const ready = row.listStatus === "ready";
               return (
-                <li key={row.uid}>
-                  <button
-                    type="button"
-                    className={styles.card}
-                    onClick={() => router.push(`/people/onboarding/${row.uid}`)}
+                <li key={row.uid} className={styles.card}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={styles.cardMain}
+                    onClick={() => router.push(primaryHref(row))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(primaryHref(row));
+                      }
+                    }}
                   >
-                    {/* Top: name + status */}
+                    {/* Top: avatar + name + status */}
                     <div className={styles.cardTop}>
+                      <span className={styles.avatar} aria-hidden="true">{initialsOf(row)}</span>
                       <span className={styles.cardWho}>
                         <span className={styles.name}>{fullName(row)}</span>
                         <span className={styles.position}>{positionLabel(row)}</span>
                       </span>
                       <span className={styles.cardRight}>
-                        <span className={label === "Approved" ? styles.pillApproved : styles.pillSubmitted}>
-                          {label}
+                        <span
+                          className={`${styles.pill} ${
+                            pill.tone === "warm" ? styles.pillWarm : styles.pillInfo
+                          }`}
+                        >
+                          <StatusIcon status={row.listStatus} />
+                          {pill.label}
                         </span>
-                        <span className={styles.dateSmall}>
-                          {rowApproved ? "Approved" : "Submitted"} {fmtDate(rowApproved ? (row.approvedAt ?? row.createdAt) : row.createdAt)}
-                        </span>
+                        <span className={styles.dateSmall}>{dateLine(row)}</span>
                       </span>
+                      <button
+                        type="button"
+                        className={styles.moreBtn}
+                        aria-label="More actions"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMenuFor(menuFor === row.uid ? null : row.uid);
+                        }}
+                      >
+                        <DotsIcon />
+                      </button>
                     </div>
 
                     {/* Info row: 4 columns */}
@@ -354,36 +407,84 @@ export default function ManagerOnboardingPage() {
                       </div>
                       <div className={styles.infoCell}>
                         <dt className={styles.infoLabel}>TRAINING RATE</dt>
-                        <dd className={styles.infoValue}>{fmtRate(row.trainingRate) ?? "—"}</dd>
+                        <dd className={styles.infoValue}>{fmtRate(row.trainingRate)}</dd>
                       </div>
                       <div className={styles.infoCell}>
                         <dt className={styles.infoLabel}>AFTER TRAINING RATE</dt>
-                        <dd className={styles.infoValue}>{fmtRate(row.afterTrainingRate) ?? "—"}</dd>
+                        <dd className={styles.infoValue}>{fmtRate(row.afterTrainingRate)}</dd>
                       </div>
                       <div className={styles.infoCell}>
                         <dt className={styles.infoLabel}>TRAINING PERIOD</dt>
                         <dd className={styles.infoValue}>{row.trainingPeriod ?? "—"}</dd>
                       </div>
                     </dl>
+                  </div>
 
-                    {/* Approved checkmarks */}
-                    {rowApproved && (
-                      <div className={styles.checksRow}>
-                        <span className={`${styles.check} ${row.addedToScheduling ? styles.checkDone : styles.checkPending}`}>
-                          {row.addedToScheduling ? <CheckIcon /> : <CircleIcon />}
-                          Added to Scheduling
-                        </span>
-                        <span className={`${styles.check} ${row.accountCreated ? styles.checkDone : styles.checkPending}`}>
-                          {row.accountCreated ? <CheckIcon /> : <CircleIcon />}
-                          Account Created
-                        </span>
-                      </div>
-                    )}
-                  </button>
+                  {/* Ready rows carry the verdict itself: read what was sent,
+                      or sign it off. Both are the owner's, so they sit on the
+                      card rather than a screen further in. */}
+                  {ready && (
+                    <div className={styles.cardActions}>
+                      <button
+                        type="button"
+                        className={styles.btnOutline}
+                        onClick={() => router.push(`/people/onboarding/${row.uid}/review`)}
+                      >
+                        View Details
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.btnPrimary}
+                        onClick={() => setActivating(row)}
+                      >
+                        Activate Employee
+                      </button>
+                    </div>
+                  )}
+
+                  {menuFor === row.uid && (
+                    <div className={styles.menu} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className={styles.menuItem}
+                        onClick={() => router.push(`/people/onboarding/${row.uid}`)}
+                      >
+                        Open Request
+                      </button>
+                      {row.listStatus !== "submitted" && (
+                        <button
+                          type="button"
+                          className={styles.menuItem}
+                          onClick={() => router.push(`/people/onboarding/${row.uid}/review`)}
+                        >
+                          Review Onboarding
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ul>
+
+          {/* What happens next, so an empty-looking tab is not read as a
+              stuck one. The two tabs are waiting on different people, so
+              they say different things. */}
+          {filtered.length > 0 && (
+            <p className={styles.footerNote}>
+              {tab === "ready"
+                ? "All required onboarding items have been submitted."
+                : "Once onboarding is complete, the request will move to Ready for Review automatically."}
+            </p>
+          )}
+
+          {filtered.length === 0 && (
+            <p className={styles.footerNote}>
+              {tab === "ready"
+                ? "Nobody is waiting on a review right now."
+                : "Everyone here has finished their onboarding."}
+            </p>
+          )}
         </>
       )}
 
@@ -399,25 +500,54 @@ export default function ManagerOnboardingPage() {
           </button>
         </div>
       )}
+
+      {activating && (
+        <ActivateEmployeeSheet
+          uid={activating.uid}
+          name={fullName(activating)}
+          positionLabel={positionLabel(activating)}
+          startDate={fmtDate(activating.startDate)}
+          onClose={() => setActivating(null)}
+          onActivated={() => handleActivated(activating.uid)}
+        />
+      )}
     </div>
   );
 }
 
 /* ── Icon components ── */
 
-function CheckIcon() {
+function StatusIcon({ status }: { status: OnboardingListStatus }) {
+  if (status === "submitted") {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="2" y="4" width="20" height="16" rx="2" />
+        <path d="m22 7-10 6L2 7" />
+      </svg>
+    );
+  }
+  if (status === "ready") {
+    return (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    );
+  }
+  // Started and In Progress both mean "the employee is mid-form", so they
+  // share the play mark and are told apart by the words and the colour.
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" fill="#16a34a" />
-      <path d="M8 12l2.5 3L16 9" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5v14l11-7z" />
     </svg>
   );
 }
 
-function CircleIcon() {
+function DotsIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" stroke="#d1d5db" strokeWidth="1.5" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
     </svg>
   );
 }

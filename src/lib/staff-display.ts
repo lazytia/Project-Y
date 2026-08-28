@@ -61,6 +61,11 @@ export function fullNameOf(raw: Record<string, unknown>): string {
 
 export function positionLabelOf(raw: Record<string, unknown>): string {
   const custom = String(raw.position ?? "").trim();
+  // The New Staff Request form stores the machine value ("hall", "kitchen"),
+  // so a stored position is not always something to print as-is.
+  const p = custom.toLowerCase().replace(/[_\s]+/g, " ");
+  if (p === "hall" || p === "hall staff") return "Hall Staff";
+  if (p === "kitchen" || p === "kitchen staff") return "Kitchen Staff";
   if (custom) return custom;
   const role = String(raw.role ?? "").toLowerCase();
   if (role === "chef") return "Kitchen Staff";

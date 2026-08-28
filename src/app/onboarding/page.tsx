@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
@@ -8,6 +8,12 @@ import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import { addDaysISO, dowOfDateKey, sydneyTodayKey } from "@/lib/sydney-date";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
+import {
+  readRejections,
+  sectionForStep,
+  type SectionKey,
+  type SectionRejection,
+} from "@/lib/onboarding-review";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import { useLang } from "@/components/LanguageProvider";
@@ -80,6 +86,7 @@ export default function OnboardingPage() {
   const [inProgressStep, setInProgressStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState<Date | null>(null);
+  const [rejections, setRejections] = useState<Partial<Record<SectionKey, SectionRejection>>>({});
 
   useEffect(() => {
     if (!user) return;
@@ -93,6 +100,7 @@ export default function OnboardingPage() {
           const inProgress = typeof data.step === "number" ? data.step : 0;
           setCompletedStep(completed);
           setInProgressStep(Math.max(completed, inProgress - 1));
+          setRejections(readRejections(data as Record<string, unknown>));
           // Use saved startDate or fall back to today
           if (data.startDate?.toDate) {
             setStartDate(data.startDate.toDate());
@@ -143,6 +151,23 @@ export default function OnboardingPage() {
 
   const payrollCutoff = dateFromKey(upcomingFridayKey());
 
+  /**
+   * The step the owner has sent back, if the employee is sitting on one.
+   *
+   * Rejecting a section rolls `completedStep` to just before it, so the
+   * section the employee is next asked for *is* the rejected one — no second
+   * marker is needed, and resubmitting clears the notice on its own by moving
+   * `completedStep` past it. Without this the form simply reopens on a screen
+   * they had already finished, which reads as lost work rather than a request
+   * to change something.
+   */
+  const sentBack = useMemo(() => {
+    const section = sectionForStep(completedStep);
+    if (!section) return null;
+    const entry = rejections[section.key];
+    return entry ? { section, entry } : null;
+  }, [completedStep, rejections]);
+
   // Keep the splash visible for completed staff so the overview UI never
   // flashes before the router.replace above lands on /onboarding/complete.
   if (loading || isCompleted) {
@@ -156,6 +181,34 @@ export default function OnboardingPage() {
         <h1 className={styles.greetingTitle}>{t("onb.welcome")}, {displayName} 👋</h1>
         <p className={styles.greetingSubtitle}>{t("onb.subGreeting")}</p>
       </div>
+
+      {/* Sent back for a change — above the overview because it is the reason
+          the progress ring went backwards, and the Continue button below
+          resumes on exactly this step. */}
+      {sentBack && (
+        <section className={styles.sentBackCard}>
+          <p className={styles.sentBackHeader}>{t("onb.sentBack.header")}</p>
+          <p className={styles.sentBackStep}>
+            {ALL_STEPS[sentBack.section.step - 1].icon}{" "}
+            {t(ALL_STEPS[sentBack.section.step - 1].labelKey)}
+          </p>
+          <p className={styles.sentBackIntro}>{t("onb.sentBack.intro")}</p>
+          {sentBack.entry.reason && (
+            <p className={styles.sentBackReason}>
+              <span className={styles.sentBackReasonLabel}>{t("onb.sentBack.reason")}</span>
+              {sentBack.entry.reason}
+            </p>
+          )}
+          {(sentBack.entry.byName || sentBack.entry.at) && (
+            <p className={styles.sentBackMeta}>
+              {[sentBack.entry.byName, sentBack.entry.at ? fmtDate(sentBack.entry.at) : ""]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
+          <p className={styles.sentBackHelp}>{t("onb.sentBack.help")}</p>
+        </section>
+      )}
 
       {/* Onboarding Overview */}
       <section className={styles.card}>

@@ -89,6 +89,12 @@ const EN: Dict = {
   "onb.steps.review": "Review & Sign",
   "onb.steps.complete": "Complete",
 
+  // Onboarding — a step the owner sent back for a change
+  "onb.sentBack.header": "NEEDS A CHANGE",
+  "onb.sentBack.intro": "This step was sent back so you can update it.",
+  "onb.sentBack.reason": "Reason: ",
+  "onb.sentBack.help": "Continue your onboarding below to fix it and submit again.",
+
   // Onboarding — personal information
   "onb.personal.title": "Personal Information",
   "onb.personal.subtitle": "Tell us a bit about yourself.",
@@ -562,6 +568,12 @@ const JA: Dict = {
   "onb.steps.policies": "各種ポリシー",
   "onb.steps.review": "確認・署名",
   "onb.steps.complete": "完了",
+
+  // Onboarding — a step the owner sent back for a change
+  "onb.sentBack.header": "修正が必要です",
+  "onb.sentBack.intro": "このステップは修正のため差し戻されました。",
+  "onb.sentBack.reason": "理由：",
+  "onb.sentBack.help": "下のボタンからオンボーディングを再開して、修正のうえ再提出してください。",
 
   // Onboarding — personal information
   "onb.personal.title": "個人情報",

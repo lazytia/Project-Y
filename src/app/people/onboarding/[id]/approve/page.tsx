@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isStrictOwner } from "@/lib/permissions";
+import { actorNameOf, isStrictOwner } from "@/lib/permissions";
 import { shouldActivatePayrollReminder } from "@/lib/payroll-attention";
 import { onboardingProgressPatch } from "@/lib/staff-active";
 import { ROUTES } from "@/lib/routes";
@@ -76,15 +76,6 @@ function fmtMobileDisplay(local: string): string {
     return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`.trim();
   }
   return local;
-}
-
-function requesterName(email: string | null | undefined): string {
-  const u = emailToUsername(email).toLowerCase();
-  if (u === "yurina") return "Yurina";
-  if (u === "yurica") return "Yurica";
-  if (u === "tia") return "Tia";
-  if (!u) return "Owner";
-  return u.charAt(0).toUpperCase() + u.slice(1);
 }
 
 function isApproved(raw: Record<string, unknown>): boolean {
@@ -221,7 +212,7 @@ export default function CreateLoginDetailsPage() {
           status: progress.status,
           approvedAt: serverTimestamp(),
           approvedByUid: user?.uid ?? null,
-          approvedByName: requesterName(user?.email),
+          approvedByName: actorNameOf(user),
           accountCreated: progress.accountCreated,
           payrollRateReminderActive: shouldActivatePayrollReminder(rawRequest),
           addedToScheduling: progress.addedToScheduling,

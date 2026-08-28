@@ -16,7 +16,7 @@ import type { User } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
 import { getDb } from "./firebase";
 import { canViewStaffRequest } from "./permissions";
-import { isOnboardingListEmployee } from "./staff-active";
+import { isOnboardingListEmployee, staffOnboardingFlags } from "./staff-active";
 
 /** Menu entries that carry a change badge, keyed by their nav href. */
 export const NAV_BADGE_HREFS = {
@@ -103,15 +103,8 @@ export function reconcileNavSeen(
 type StaffStatusDoc = { status?: string };
 type NoticeDoc = { employeeUid?: string };
 
-/** The fields the New Employees list filters on, as stored. */
-type OnboardingListDoc = {
-  status?: string;
-  role?: string;
-  accountCreated?: boolean;
-  addedToScheduling?: boolean;
-  approvedAt?: unknown;
-  username?: string;
-  email?: string;
+/** The visibility fields; the list ones come from staffOnboardingFlags. */
+type RequesterDoc = {
   requestedByRole?: string;
   requestedByName?: string;
 };
@@ -142,8 +135,11 @@ export async function loadNavBadgeCounts(viewer: User | null | undefined): Promi
   );
 
   const newEmployees = staffSnap.docs.filter((d) => {
-    const raw = d.data() as OnboardingListDoc;
-    return isOnboardingListEmployee(raw) && canViewStaffRequest(viewer, raw);
+    const raw = d.data() as Record<string, unknown>;
+    return (
+      isOnboardingListEmployee(staffOnboardingFlags(raw)) &&
+      canViewStaffRequest(viewer, raw as RequesterDoc)
+    );
   }).length;
 
   // Notices for someone already terminated drop off that page, so they must

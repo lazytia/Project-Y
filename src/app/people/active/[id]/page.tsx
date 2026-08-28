@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   collection,
   deleteDoc,
-  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -25,20 +24,17 @@ import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@
 import { readStaffRates } from "@/lib/staff-rates";
 import { todayIso } from "@/lib/staff-display";
 import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
+import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
 import {
-  ONBOARDING_STEP_ICONS,
-  type OnboardingStepNumber,
-} from "@/lib/onboarding-steps";
+  ONBOARDING_SECTIONS,
+  collectDocuments,
+  isSectionSubmitted,
+  type SectionKey,
+} from "@/lib/onboarding-review";
 import CalendarPicker from "@/components/CalendarPicker";
+import { OnboardingSectionModal } from "@/components/OnboardingSectionModal";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
-
-/** The five sections of the onboarding form, in the order staff meet them. */
-type SectionKey = "personal" | "tfn" | "bank" | "documents" | "policies";
-
-/** Everything the review sheet can show — the five sections plus HR notes,
- *  which is not part of onboarding and so is never rejected. */
-type DocKey = SectionKey | "hrNotes";
 
 type Personal = {
   firstName: string;
@@ -56,26 +52,6 @@ type BankSuper = {
   superFundName?: string;
   usi?: string;
   memberNumber?: string;
-};
-
-type StoredHrNote = {
-  employeeUid?: string;
-  category?: string;
-  kind?: string;
-  date?: string;
-  fields?: Record<string, string>;
-  checkboxes?: { label: string; checked: boolean }[];
-  addedByName?: string;
-  createdAt?: Timestamp;
-};
-
-type HrNote = {
-  id: string;
-  kind: string;
-  category: string;
-  date: string;
-  body: string;
-  addedBy: string;
 };
 
 type ActiveNotice = {
@@ -178,24 +154,6 @@ function fmtDateWithDay(iso: string): string {
   return `${main} (${dow})`;
 }
 
-/**
- * "12 / 03 / 1994" from the stored "1994-03-12".
- *
- * Kept as plain string surgery rather than a Date: a date of birth is a
- * calendar fact with no time zone, and parsing it into a Date would let the
- * Sydney/UTC boundary shift it by a day. Mirrors the display format the
- * employee typed it in on the onboarding form.
- *
- * Returns "" rather than a dash for a missing value — DefRow already
- * renders the dash, and doing it here too would print it twice.
- */
-function fmtDobDisplay(iso: string): string {
-  if (!iso) return "";
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
-  return `${d} / ${m} / ${y}`;
-}
-
 function daysBetween(fromISO: string): number | null {
   if (!fromISO) return null;
   const [y, m, d] = fromISO.split("-").map(Number);
@@ -262,109 +220,6 @@ function fullNameOf(raw: Record<string, unknown>): string {
   return user ? user.charAt(0).toUpperCase() + user.slice(1) : "Unknown";
 }
 
-/**
- * The onboarding form as the owner reviews it: one row per section the
- * employee fills in, in the order they meet them.
- *
- * `step` does double duty. Rejecting a section rolls `completedStep` back to
- * `step - 1`, which is what puts the employee back on exactly that screen —
- * so the rollback target can't drift away from the row it belongs to.
- *
- * `hasData` is the fallback for telling a submitted section from an empty
- * one — see isSectionSubmitted below.
- *
- * Kept as one table because every fact in a row has to agree with the others
- * — label, rollback target, what to clear, how to tell it is filled in — and
- * they only stay in agreement while they are written next to each other.
- */
-const ONBOARDING_SECTIONS: readonly {
-  key: SectionKey;
-  /** Also picks the row's icon, so it matches the screen the employee saw. */
-  step: OnboardingStepNumber;
-  label: string;
-  clearPaths: string[];
-  hasData: (s: Staff) => boolean;
-}[] = [
-  {
-    key: "personal",
-    step: 1,
-    label: "Personal Information",
-    // Deliberately clears nothing. The employee's name, DOB and mobile are
-    // what the rest of the app identifies them by — rosters, HR notes and
-    // the people lists all read them — so wiping the section would turn a
-    // "please fix this" into an employee who reads as Unknown everywhere
-    // until they re-type it. The step rollback alone sends them back, and
-    // the form pre-fills, so they correct rather than start over.
-    clearPaths: [],
-    hasData: (s) => Boolean(s.personal.firstName || s.personal.lastName),
-  },
-  {
-    key: "tfn",
-    step: 2,
-    label: "TFN Declaration",
-    clearPaths: ["tfn"],
-    hasData: (s) => Boolean(s.taxFileNumber),
-  },
-  {
-    key: "bank",
-    step: 3,
-    label: "Bank & Super Details",
-    // `bankSuper`, not `bank` — the onboarding step writes the former, and
-    // clearing the latter deleted a field that has never existed, so a
-    // rejected section came back with the old account still in it.
-    clearPaths: ["bankSuper"],
-    hasData: (s) => Boolean(s.bank.bsb || s.bank.accountNumber || s.bank.superFundName),
-  },
-  {
-    key: "documents",
-    step: 4,
-    label: "Documents (Photo ID, Visa, RSA)",
-    // Named upload fields rather than the whole `documents` map: older rows
-    // keep `documents.visaExpiry` in there, and that date is what the
-    // dashboard and Action Required count visa warnings from.
-    clearPaths: [
-      "documents.passportUrl", "documents.passportUrls",
-      "documents.visaUrl",     "documents.visaUrls",
-      "documents.rsaUrl",      "documents.rsaUrls",
-    ],
-    hasData: (s) => s.documents.length > 0,
-  },
-  {
-    key: "policies",
-    step: 5,
-    label: "Policies (Staff Handbook, Privacy Policy, Employee Agreement)",
-    clearPaths: [
-      "policies.handbookSignedAt",
-      "policies.privacySignedAt",
-      "policies.agreementSignedAt",
-    ],
-    hasData: (s) =>
-      Boolean(s.handbookSignedAt || s.privacySignedAt || s.agreementSignedAt),
-  },
-];
-
-/**
- * Has the employee submitted this section?
- *
- * `completedStep` is their own progress marker and the very thing Reject
- * moves, so it is the answer whenever the document carries one — that is
- * what makes a rejected row fall back to Pending straight away instead of
- * sitting there still offering a View button.
- *
- * Rows written before that field existed have no marker, and reading a
- * missing one as 0 would show a fully onboarded employee as five Pending
- * rows with nothing to open. Those fall back to asking whether the section
- * actually holds anything.
- */
-function isSectionSubmitted(
-  section: (typeof ONBOARDING_SECTIONS)[number],
-  staff: Staff,
-): boolean {
-  return staff.completedStep === null
-    ? section.hasData(staff)
-    : staff.completedStep >= section.step;
-}
-
 /** Best effort — the visa type isn't captured explicitly today, so infer
  *  it from a `visaType` field if present and otherwise leave blank. */
 
@@ -372,36 +227,6 @@ function visaTypeOf(raw: Record<string, unknown>): string {
   if (typeof raw.visaType === "string" && raw.visaType.trim()) return raw.visaType.trim();
   if (typeof raw.visa === "string" && raw.visa.trim()) return raw.visa.trim();
   return "—";
-}
-
-/**
- * Read every uploaded document URL. Employees can attach multiple photos
- * per section (plural `*Urls` arrays); older docs may only carry the
- * legacy singular `*Url` string, so fall back to it when the array is
- * missing.
- */
-function collectDocuments(raw: Record<string, unknown>): { label: string; url: string }[] {
-  const docs = (raw.documents ?? {}) as Record<string, unknown>;
-  const known: { singular: string; plural: string; label: string }[] = [
-    { singular: "passportUrl", plural: "passportUrls", label: "Passport" },
-    { singular: "visaUrl",     plural: "visaUrls",     label: "Visa" },
-    { singular: "rsaUrl",      plural: "rsaUrls",      label: "RSA Certificate" },
-  ];
-  const out: { label: string; url: string }[] = [];
-  for (const { singular, plural, label } of known) {
-    const arr = docs[plural];
-    if (Array.isArray(arr) && arr.length > 0) {
-      arr.forEach((v, i) => {
-        if (typeof v === "string" && v) {
-          out.push({ label: arr.length > 1 ? `${label} (${i + 1})` : label, url: v });
-        }
-      });
-      continue;
-    }
-    const v = docs[singular];
-    if (typeof v === "string" && v) out.push({ label, url: v });
-  }
-  return out;
 }
 
 export default function EmployeeDetailPage() {
@@ -412,10 +237,9 @@ export default function EmployeeDetailPage() {
 
   const [staff, setStaff] = useState<Staff | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [hrNotes, setHrNotes] = useState<HrNote[]>([]);
   const [notice, setNotice] = useState<ActiveNotice | null>(null);
   const [cancellingNotice, setCancellingNotice] = useState(false);
-  const [openDoc, setOpenDoc] = useState<DocKey | null>(null);
+  const [openDoc, setOpenDoc] = useState<SectionKey | null>(null);
   const [terminateOpen, setTerminateOpen] = useState(false);
   const [terminating, setTerminating] = useState(false);
   const [termDetailsOpen, setTermDetailsOpen] = useState(false);
@@ -557,30 +381,6 @@ export default function EmployeeDetailPage() {
         } catch {
           /* leave notice null */
         }
-
-        // HR notes are stored top-level, keyed by employeeUid.
-        try {
-          const notesSnap = await getDocs(
-            query(collection(getDb(), "hr_notes"), where("employeeUid", "==", id)),
-          );
-          const notes: HrNote[] = notesSnap.docs.map((d) => {
-            const data = d.data() as StoredHrNote;
-            const fields = data.fields ?? {};
-            const body = fields.summary ?? fields.details ?? fields.note ?? Object.values(fields).join(" · ");
-            return {
-              id: d.id,
-              kind: data.kind ?? "Note",
-              category: data.category ?? "",
-              date: data.date ?? "",
-              body: body ?? "",
-              addedBy: data.addedByName ?? "",
-            };
-          });
-          notes.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-          if (!cancelled) setHrNotes(notes);
-        } catch {
-          /* leave notes empty */
-        }
       } catch {
         if (!cancelled) setNotFound(true);
       }
@@ -669,51 +469,6 @@ export default function EmployeeDetailPage() {
       console.error("[terminate] failed:", err);
       alert("Failed to terminate. Please try again.");
       setTerminating(false);
-    }
-  }
-
-  /**
-   * Send one section back to the employee: roll `completedStep` to just
-   * before it so they land on that screen again, and drop the answers it
-   * holds so the section reads as unsubmitted here too.
-   */
-  async function handleReject(section: (typeof ONBOARDING_SECTIONS)[number]) {
-    if (!staff) return;
-    const ok = window.confirm(
-      `Reject "${section.label}"?\n\nThe employee will have to complete this section again.`,
-    );
-    if (!ok) return;
-    const prevStep = section.step - 1;
-    try {
-      const update: Record<string, unknown> = {
-        completedStep: prevStep,
-        step: section.step,
-        status: "in_progress",
-        updatedAt: serverTimestamp(),
-      };
-      for (const path of section.clearPaths) update[path] = deleteField();
-      await updateDoc(doc(getDb(), "staff_onboarding", staff.uid), update);
-      setOpenDoc(null);
-      // Mirror the write locally so the row flips to Pending without a
-      // reload. Only the fields clearPaths actually removed — Personal
-      // Information clears nothing, so its row keeps its data and the
-      // rollback is the whole effect.
-      setStaff((s) => {
-        if (!s) return s;
-        const next = { ...s, completedStep: prevStep };
-        if (section.key === "tfn") next.taxFileNumber = "";
-        if (section.key === "bank") next.bank = {};
-        if (section.key === "documents") next.documents = [];
-        if (section.key === "policies") {
-          next.handbookSignedAt = null;
-          next.privacySignedAt = null;
-          next.agreementSignedAt = null;
-        }
-        return next;
-      });
-    } catch (err) {
-      console.error("[reject] failed:", err);
-      alert("Failed to reject. Please try again.");
     }
   }
 
@@ -1269,7 +1024,14 @@ export default function EmployeeDetailPage() {
       {/* Onboarding documents — the five sections of the employee's own
           onboarding form, each either waiting on them or ready to review.
           "Active Employees" includes people still part-way through, so the
-          per-section state is the point of this card rather than decoration. */}
+          per-section state is the point of this card rather than decoration.
+
+          Read-only on purpose. Sending a section back belongs to the Employee
+          Review page, which is reached from New Employees and only exists
+          while an onboarding is unsigned-off; anyone being read here is
+          already active, so a Reject button would offer to reopen a decision
+          that has been made. The View sheets stay — this is where the
+          documents live once the review is over. */}
       <p className={styles.sectionLabel}>ONBOARDING DOCUMENTS</p>
       <section className={styles.docsCard}>
         {ONBOARDING_SECTIONS.map((section, i) => {
@@ -1285,7 +1047,6 @@ export default function EmployeeDetailPage() {
               label={section.label}
               submitted={submitted}
               onClick={submitted ? () => setOpenDoc(section.key) : undefined}
-              onReject={submitted ? () => handleReject(section) : undefined}
               last={i === ONBOARDING_SECTIONS.length - 1}
             />
           );
@@ -1359,11 +1120,13 @@ export default function EmployeeDetailPage() {
       </div>
       )}
 
+      {/* `staff` is accepted as an OnboardingSubmission because it carries the
+          same field names — the two were written from one shape on purpose, so
+          the owner's review sheet and this page read the same document. */}
       {openDoc && (
-        <DocModal
-          docKey={openDoc}
-          staff={staff}
-          hrNotes={hrNotes}
+        <OnboardingSectionModal
+          sectionKey={openDoc}
+          submission={staff}
           onClose={() => setOpenDoc(null)}
         />
       )}
@@ -1479,24 +1242,21 @@ function StatCell({
 /**
  * One row of the onboarding card.
  *
- * A submitted section gets the pair of actions — View to read what was sent,
- * Reject to send it back. One that hasn't arrived yet gets the word Pending
- * and nothing to press: there is no document to open and nothing to reject,
- * and a live-looking button that did neither would only invite the tap.
+ * A submitted section opens; one that hasn't arrived yet gets the word Pending
+ * and nothing to press. There is no document to open, and a live-looking row
+ * that opened an empty sheet would only invite the tap.
  */
 function DocRow({
   icon,
   label,
   submitted,
   onClick,
-  onReject,
   last = false,
 }: {
   icon: React.ReactNode;
   label: string;
   submitted: boolean;
   onClick?: () => void;
-  onReject?: () => void;
   last?: boolean;
 }) {
   const interactive = submitted && Boolean(onClick);
@@ -1523,199 +1283,13 @@ function DocRow({
       <span className={styles.docRowLabel}>{label}</span>
       <span className={styles.docRowActions}>
         {submitted ? (
-          <>
-            <span className={styles.docRowView}>View</span>
-            {onReject && (
-              <button
-                type="button"
-                className={styles.docRowReject}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReject();
-                }}
-              >
-                Reject
-              </button>
-            )}
-          </>
+          <span className={styles.docRowView}>View</span>
         ) : (
           <span className={styles.docRowPendingLabel}>Pending</span>
         )}
       </span>
     </div>
   );
-}
-
-function DocModal({
-  docKey,
-  staff,
-  hrNotes,
-  onClose,
-}: {
-  docKey: DocKey;
-  staff: Staff;
-  hrNotes: HrNote[];
-  onClose: () => void;
-}) {
-  const { title, body } = renderModalBody(docKey, staff, hrNotes);
-  return (
-    <div
-      className={styles.modalBackdrop}
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className={styles.modal}>
-        <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>{title}</h3>
-          <button type="button" className={styles.iconBtn} onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <div className={styles.modalBody}>{body}</div>
-      </div>
-    </div>
-  );
-}
-
-function renderModalBody(
-  docKey: DocKey,
-  staff: Staff,
-  hrNotes: HrNote[],
-): { title: string; body: React.ReactNode } {
-  switch (docKey) {
-    case "personal":
-      return {
-        title: "Personal Information",
-        body: (
-          <dl className={styles.modalDefs}>
-            <DefRow label="Legal First Name" value={staff.personal.firstName} />
-            <DefRow label="Legal Last Name" value={staff.personal.lastName} />
-            <DefRow label="Preferred Name" value={staff.personal.preferredName} />
-            <DefRow label="Date of Birth" value={fmtDobDisplay(staff.personal.dateOfBirth)} />
-            <DefRow label="Gender" value={staff.personal.gender} />
-            <DefRow label="Mobile Number" value={staff.phone} />
-            <DefRow label="Email" value={staff.personal.email} />
-          </dl>
-        ),
-      };
-    case "documents":
-      return {
-        title: "Documents (Photo ID, Visa, RSA)",
-        body:
-          staff.documents.length === 0 ? (
-            <p className={styles.modalHint}>No documents uploaded yet.</p>
-          ) : (
-            <ul className={styles.modalList}>
-              {staff.documents.map((d) => (
-                <li key={d.url} className={styles.modalListRow}>
-                  <span className={styles.modalListName}>{d.label}</span>
-                  <a
-                    className={styles.modalListLink}
-                    href={d.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open ↗
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ),
-      };
-    case "tfn":
-      return {
-        title: "Tax File Number",
-        body: (
-          <>
-            <dl className={styles.modalDefs}>
-              <div className={styles.modalDefRow}>
-                <dt className={styles.modalDefLabel}>TFN</dt>
-                <dd className={styles.modalDefValue}>{staff.taxFileNumber || "—"}</dd>
-              </div>
-            </dl>
-            {staff.signatureDataUrl && (
-              <SignatureBlock label="Signed by" name={staff.name} src={staff.signatureDataUrl} />
-            )}
-            <p className={styles.modalHint}>
-              Submitted during onboarding. Visible to owner and manager only.
-            </p>
-          </>
-        ),
-      };
-    case "bank":
-      return {
-        title: "Bank & Super Details",
-        body: (
-          <dl className={styles.modalDefs}>
-            <DefRow label="BSB" value={staff.bank.bsb} />
-            <DefRow label="Account Number" value={staff.bank.accountNumber} />
-            <DefRow label="Account Name" value={staff.bank.accountName} />
-            <DefRow label="Super Fund" value={staff.bank.superFundName} />
-            <DefRow label="USI" value={staff.bank.usi} />
-            <DefRow label="Member Number" value={staff.bank.memberNumber} />
-          </dl>
-        ),
-      };
-    // One sheet for all three signatures. They are collected together on the
-    // single onboarding "Policies" step and rolled back together on reject,
-    // so splitting them across two sheets only made the owner open both to
-    // answer one question: has this person signed everything?
-    case "policies":
-      return {
-        title: "Policies",
-        body: (
-          <>
-            <dl className={styles.modalDefs}>
-              <div className={styles.modalDefRow}>
-                <dt className={styles.modalDefLabel}>Staff Handbook</dt>
-                <dd className={styles.modalDefValue}>
-                  {staff.handbookSignedAt ? `Signed ${fmtDate(staff.handbookSignedAt)}` : "Not signed"}
-                </dd>
-              </div>
-              <div className={styles.modalDefRow}>
-                <dt className={styles.modalDefLabel}>Privacy Policy</dt>
-                <dd className={styles.modalDefValue}>
-                  {staff.privacySignedAt ? `Signed ${fmtDate(staff.privacySignedAt)}` : "Not signed"}
-                </dd>
-              </div>
-              <div className={styles.modalDefRow}>
-                <dt className={styles.modalDefLabel}>Employee Agreement</dt>
-                <dd className={styles.modalDefValue}>
-                  {staff.agreementSignedAt ? `Signed ${fmtDate(staff.agreementSignedAt)}` : "Not signed"}
-                </dd>
-              </div>
-            </dl>
-            {staff.signatureDataUrl && (
-              <SignatureBlock label="Signed by" name={staff.name} src={staff.signatureDataUrl} />
-            )}
-          </>
-        ),
-      };
-    case "hrNotes":
-      return {
-        title: "HR Notes",
-        body:
-          hrNotes.length === 0 ? (
-            <p className={styles.modalHint}>No HR notes recorded for this employee.</p>
-          ) : (
-            <ul className={styles.modalList}>
-              {hrNotes.map((n) => (
-                <li key={n.id} className={styles.modalNoteRow}>
-                  <div className={styles.modalNoteHead}>
-                    <span className={styles.modalNoteAuthor}>{n.kind}</span>
-                    <span className={styles.modalNoteDate}>{n.date || "—"}</span>
-                  </div>
-                  {n.body && <p className={styles.modalNoteBody}>{n.body}</p>}
-                  {n.addedBy && <p className={styles.modalNoteMeta}>Added by {n.addedBy}</p>}
-                </li>
-              ))}
-            </ul>
-          ),
-      };
-  }
 }
 
 function EmploymentRow({
@@ -1987,26 +1561,6 @@ function TerminateModal({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function DefRow({ label, value }: { label: string; value: string | undefined }) {
-  return (
-    <div className={styles.modalDefRow}>
-      <dt className={styles.modalDefLabel}>{label}</dt>
-      <dd className={styles.modalDefValue}>{value?.trim() ? value : "—"}</dd>
-    </div>
-  );
-}
-
-function SignatureBlock({ label, name, src }: { label: string; name: string; src: string }) {
-  return (
-    <div className={styles.signatureBlock}>
-      <p className={styles.signatureLabel}>{label}</p>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={`${name} signature`} className={styles.signatureImg} />
-      <p className={styles.signatureName}>{name}</p>
     </div>
   );
 }

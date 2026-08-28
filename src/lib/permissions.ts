@@ -58,6 +58,23 @@ export function isManager(user: User | null | undefined): boolean {
   return isOwner(user) && !isStrictOwner(user) && !isChef(user);
 }
 
+/**
+ * The name to record against something this user did.
+ *
+ * Logins are usernames rather than real names, so every "approved by" /
+ * "rejected by" / "activated by" line in Firestore is stamped from here. It
+ * is the same person on all of them, and a second copy of this mapping would
+ * eventually spell one of them differently in the audit trail.
+ *
+ * Falls back to capitalising the username, so a new account reads sensibly
+ * without having to be added here first.
+ */
+export function actorNameOf(user: User | null | undefined): string {
+  const u = emailToUsername(user?.email).toLowerCase();
+  if (!u) return "Owner";
+  return u.charAt(0).toUpperCase() + u.slice(1);
+}
+
 export type RequestSubmitterRole = "chef" | "manager" | "owner";
 
 /** Role stamped on a New Staff Request when it is created. */
