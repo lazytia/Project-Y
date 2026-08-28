@@ -25,6 +25,10 @@ import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@
 import { readStaffRates } from "@/lib/staff-rates";
 import { todayIso } from "@/lib/staff-display";
 import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
+import {
+  ONBOARDING_STEP_ICONS,
+  type OnboardingStepNumber,
+} from "@/lib/onboarding-steps";
 import CalendarPicker from "@/components/CalendarPicker";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -275,7 +279,8 @@ function fullNameOf(raw: Record<string, unknown>): string {
  */
 const ONBOARDING_SECTIONS: readonly {
   key: SectionKey;
-  step: number;
+  /** Also picks the row's icon, so it matches the screen the employee saw. */
+  step: OnboardingStepNumber;
   label: string;
   clearPaths: string[];
   hasData: (s: Staff) => boolean;
@@ -1272,7 +1277,11 @@ export default function EmployeeDetailPage() {
           return (
             <DocRow
               key={section.key}
-              icon={<DocIcon />}
+              // The picture the employee met this step under, rather than a
+              // filing-cabinet icon repeated five times: the rows are read by
+              // someone checking off sections, and five identical icons make
+              // the list something to read word by word instead of scan.
+              icon={ONBOARDING_STEP_ICONS[section.step]}
               label={section.label}
               submitted={submitted}
               onClick={submitted ? () => setOpenDoc(section.key) : undefined}

@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
 import { addDaysISO, dowOfDateKey, sydneyTodayKey } from "@/lib/sydney-date";
+import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import { useLang } from "@/components/LanguageProvider";
@@ -54,13 +55,13 @@ const TOTAL_STEPS = 7;
 /** Each step keeps a translation KEY instead of a hardcoded English
  *  label so the page can render EN or JA based on the language toggle. */
 const ALL_STEPS = [
-  { num: 1, labelKey: "onb.steps.personal",  path: "/onboarding/personal-information", icon: "👤" },
-  { num: 2, labelKey: "onb.steps.tfn",       path: "/onboarding/tfn-declaration",      icon: "📄" },
-  { num: 3, labelKey: "onb.steps.bank",      path: "/onboarding/bank-super-details",   icon: "🏦" },
-  { num: 4, labelKey: "onb.steps.documents", path: "/onboarding/documents",            icon: "🪪" },
-  { num: 5, labelKey: "onb.steps.policies",  path: "/onboarding/policies",             icon: "📖" },
-  { num: 6, labelKey: "onb.steps.review",    path: "/onboarding/review-sign",          icon: "✍️" },
-  { num: 7, labelKey: "onb.steps.complete",  path: "/onboarding/complete",             icon: "🎉" },
+  { num: 1, labelKey: "onb.steps.personal",  path: "/onboarding/personal-information", icon: ONBOARDING_STEP_ICONS[1] },
+  { num: 2, labelKey: "onb.steps.tfn",       path: "/onboarding/tfn-declaration",      icon: ONBOARDING_STEP_ICONS[2] },
+  { num: 3, labelKey: "onb.steps.bank",      path: "/onboarding/bank-super-details",   icon: ONBOARDING_STEP_ICONS[3] },
+  { num: 4, labelKey: "onb.steps.documents", path: "/onboarding/documents",            icon: ONBOARDING_STEP_ICONS[4] },
+  { num: 5, labelKey: "onb.steps.policies",  path: "/onboarding/policies",             icon: ONBOARDING_STEP_ICONS[5] },
+  { num: 6, labelKey: "onb.steps.review",    path: "/onboarding/review-sign",          icon: ONBOARDING_STEP_ICONS[6] },
+  { num: 7, labelKey: "onb.steps.complete",  path: "/onboarding/complete",             icon: ONBOARDING_STEP_ICONS[7] },
 ];
 
 // Circular progress SVG constants
