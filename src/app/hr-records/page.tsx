@@ -37,12 +37,12 @@ const ACKNOWLEDGEMENTS_HREF = "/hr-records/acknowledgements";
  * given, then what they sign, then what they signed on the way in.
  *
  * Labels, links and versions all still come from the catalogue — only the
- * order and the nesting are decided here. The Beer Guide sits under the
- * Training Guide rather than beside it: it is one of the guides, and listing
- * it as a peer made the training material look like two separate things.
+ * order is decided here. The Beer Guide has no row of its own: it is part of
+ * the training material rather than a fourth document, so the Training Guide
+ * row says so and Acknowledgements below still counts it separately.
  */
-const DOCUMENT_ROWS: { key: HrDocumentKey; sub?: string; children?: HrDocumentKey[] }[] = [
-  { key: "trainingGuide", sub: "Includes Beer Guide", children: ["beerGuide"] },
+const DOCUMENT_ROWS: { key: HrDocumentKey; sub?: string }[] = [
+  { key: "trainingGuide", sub: "Includes Beer Guide" },
   { key: "handbook" },
   { key: "employmentContract" },
 ];
@@ -62,7 +62,6 @@ function DocRow({
   sub,
   chip,
   feature = false,
-  nested = false,
 }: {
   href: string;
   title: string;
@@ -70,13 +69,9 @@ function DocRow({
   chip?: Chip;
   /** The row this page exists to be clicked through to. */
   feature?: boolean;
-  nested?: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      className={`${styles.row} ${feature ? styles.rowFeature : ""} ${nested ? styles.subRow : ""}`}
-    >
+    <Link href={href} className={`${styles.row} ${feature ? styles.rowFeature : ""}`}>
       <span className={styles.rowMain}>
         <span className={styles.rowTitle}>{title}</span>
         {sub && <span className={styles.rowSub}>{sub}</span>}
@@ -133,15 +128,15 @@ export default function HrRecordsPage() {
         </div>
         <div className={styles.statDivider} aria-hidden="true" />
         <div className={styles.statCol}>
-          <p className={styles.statNumber}>{stat(summary?.needsReview)}</p>
-          <p className={styles.statLabel}>Needs Review</p>
+          <p className={styles.statNumber}>{stat(summary?.updatedDocuments)}</p>
+          <p className={styles.statLabel}>Updated Documents</p>
         </div>
       </section>
 
       {error && <p className={`${styles.status} ${styles.error}`}>{error}</p>}
 
       <ul className={styles.list}>
-        {DOCUMENT_ROWS.map(({ key, sub, children }) => {
+        {DOCUMENT_ROWS.map(({ key, sub }) => {
           const doc = hrDocument(key);
           if (!doc) return null;
           return (
@@ -152,25 +147,6 @@ export default function HrRecordsPage() {
                 sub={sub ?? hrDocumentVersionLabel(doc)}
                 chip={chipFor(byKey.get(key))}
               />
-              {children && children.length > 0 && (
-                <ul className={styles.subList}>
-                  {children.map((childKey) => {
-                    const child = hrDocument(childKey);
-                    if (!child) return null;
-                    return (
-                      <li key={childKey}>
-                        <DocRow
-                          href={child.href}
-                          title={child.label}
-                          sub={hrDocumentVersionLabel(child)}
-                          chip={chipFor(byKey.get(childKey))}
-                          nested
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
             </li>
           );
         })}

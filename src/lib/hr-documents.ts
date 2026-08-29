@@ -51,8 +51,12 @@ export type HrDocument = {
 
 export const HR_DOCUMENTS: readonly HrDocument[] = [
   {
+    // "Employee Handbook" here, "Staff Handbook" in `document-signatures`:
+    // these are the owner's words for the document and the employee's, and the
+    // two audiences never share a screen. The document itself is titled for
+    // the employee, so the staff-facing label is the one that matches it.
     key: "handbook",
-    label: "Staff Handbook",
+    label: "Employee Handbook",
     href: "/staff/handbook",
     version: HANDBOOK_VERSION,
     updated: HANDBOOK_UPDATED,
@@ -83,9 +87,14 @@ export const HR_DOCUMENTS: readonly HrDocument[] = [
   {
     // Signed once, inside the onboarding form. There is no second version to
     // re-sign — a changed contract is a new contract, not a new revision.
+    //
+    // Alone among these, it has no page of its own to open: the contract is
+    // agreed inside the onboarding form rather than published as a document,
+    // so the only thing there is to read about it is who has one on file. That
+    // is the acknowledgement page, which is where this points.
     key: "employmentContract",
     label: "Employment Contract",
-    href: "/hr-records/employment-contract",
+    href: "/hr-records/acknowledgements/employmentContract",
     version: null,
     updated: null,
     unversionedLabel: "Current template",

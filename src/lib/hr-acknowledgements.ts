@@ -105,6 +105,11 @@ export type AckSummary = {
   needsReview: number;
   /** People × documents still owed, which is what "3 Pending" counts. */
   pendingSignatures: number;
+  /** Documents that have actually been issued — a version was cut and dated.
+   *  The other two are a guide nobody has declared finished and a contract
+   *  agreed inside the onboarding form, neither of which has an edition to
+   *  point at. */
+  updatedDocuments: number;
 };
 
 export function summarise(statuses: AckDocumentStatus[]): AckSummary {
@@ -114,6 +119,7 @@ export function summarise(statuses: AckDocumentStatus[]): AckSummary {
     upToDate: tracked.filter((s) => s.complete).length,
     needsReview: tracked.filter((s) => !s.complete).length,
     pendingSignatures: tracked.reduce((sum, s) => sum + s.pending, 0),
+    updatedDocuments: statuses.filter((s) => s.doc.version !== null).length,
   };
 }
 
