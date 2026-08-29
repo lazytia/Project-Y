@@ -37,14 +37,17 @@ const ACKNOWLEDGEMENTS_HREF = "/hr-records/acknowledgements";
  * given, then what they sign, then what they signed on the way in.
  *
  * Labels, links and versions all still come from the catalogue — only the
- * order is decided here. The Beer Guide has no row of its own: it is part of
- * the training material rather than a fourth document, so the Training Guide
- * row says so and Acknowledgements below still counts it separately.
+ * order is decided here. The Beer Guide follows the Training Guide as a row
+ * of its own rather than an indented one: it is training material and belongs
+ * next to it, but it carries its own version and its own signatures, and
+ * setting it in from the margin made it look like a footnote to a document
+ * instead of one the roster has to sign.
  */
-const DOCUMENT_ROWS: { key: HrDocumentKey; sub?: string }[] = [
-  { key: "trainingGuide", sub: "Includes Beer Guide" },
-  { key: "handbook" },
-  { key: "employmentContract" },
+const DOCUMENT_ROWS: HrDocumentKey[] = [
+  "trainingGuide",
+  "beerGuide",
+  "handbook",
+  "employmentContract",
 ];
 
 type Chip = { text: string; tone: "warm" | "good" } | null;
@@ -136,7 +139,7 @@ export default function HrRecordsPage() {
       {error && <p className={`${styles.status} ${styles.error}`}>{error}</p>}
 
       <ul className={styles.list}>
-        {DOCUMENT_ROWS.map(({ key, sub }) => {
+        {DOCUMENT_ROWS.map((key) => {
           const doc = hrDocument(key);
           if (!doc) return null;
           return (
@@ -144,7 +147,7 @@ export default function HrRecordsPage() {
               <DocRow
                 href={doc.href}
                 title={doc.label}
-                sub={sub ?? hrDocumentVersionLabel(doc)}
+                sub={hrDocumentVersionLabel(doc)}
                 chip={chipFor(byKey.get(key))}
               />
             </li>
