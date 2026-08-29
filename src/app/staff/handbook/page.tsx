@@ -3,10 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useLang } from "@/components/LanguageProvider";
 import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
-import StaffHandbookDocument, {
-  HANDBOOK_UPDATED,
-  HANDBOOK_VERSION,
-} from "@/components/StaffHandbookDocument";
+import StaffHandbookDocument from "@/components/StaffHandbookDocument";
+import { HANDBOOK_UPDATED, HANDBOOK_VERSION } from "@/lib/hr-documents";
 import handbookStyles from "@/app/onboarding/policies/staff-handbook/page.module.css";
 import styles from "./page.module.css";
 

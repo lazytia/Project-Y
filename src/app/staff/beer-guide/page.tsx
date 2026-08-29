@@ -3,11 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useLang } from "@/components/LanguageProvider";
 import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
-import {
-  BEER_GUIDE_UPDATED,
-  BEER_GUIDE_VERSION,
-  BEER_GUIDE_VIDEOS,
-} from "@/lib/beer-guide-videos";
+import { BEER_GUIDE_VIDEOS } from "@/lib/beer-guide-videos";
+import { BEER_GUIDE_UPDATED, BEER_GUIDE_VERSION } from "@/lib/hr-documents";
 import styles from "./page.module.css";
 
 export default function BeerGuidePage() {

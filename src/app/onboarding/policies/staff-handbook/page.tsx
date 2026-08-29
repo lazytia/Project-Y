@@ -7,10 +7,8 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import SignaturePad from "@/components/SignaturePad";
 import { useLang } from "@/components/LanguageProvider";
-import StaffHandbookDocument, {
-  HANDBOOK_UPDATED,
-  HANDBOOK_VERSION,
-} from "@/components/StaffHandbookDocument";
+import StaffHandbookDocument from "@/components/StaffHandbookDocument";
+import { HANDBOOK_UPDATED, HANDBOOK_VERSION } from "@/lib/hr-documents";
 import styles from "./page.module.css";
 
 export default function StaffHandbookSignPage() {

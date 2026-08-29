@@ -1,9 +1,7 @@
-/** YURICA Beer Guide training videos (Firebase Storage). */
-
-/** Recorded alongside a staff member's signature so a future re-cut of the
- *  videos can be told apart from the set they actually acknowledged. */
-export const BEER_GUIDE_VERSION = "1.0";
-export const BEER_GUIDE_UPDATED = "June 2026";
+/** YURICA Beer Guide training videos (Firebase Storage).
+ *
+ *  The guide's version lives in `hr-documents.ts` with the other three HR
+ *  documents, because the acknowledgement pages have to compare all four. */
 
 export const BEER_GUIDE_VIDEOS = [
   {

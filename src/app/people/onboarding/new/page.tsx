@@ -8,6 +8,11 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwnerOrChef, submitterRoleForUser } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { emailToUsername } from "@/lib/username";
+import {
+  DEFAULT_TRAINING_PERIOD,
+  TRAINING_PERIODS,
+  type TrainingPeriod,
+} from "@/lib/staff-training";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
 import CalendarPicker from "@/components/CalendarPicker";
@@ -25,16 +30,6 @@ type Position = (typeof POSITIONS)[number];
 
 const VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
 type VisaType = (typeof VISA_TYPES)[number];
-
-const TRAINING_PERIODS = [
-  { value: "First 2 Weeks", subtitle: "" },
-  { value: "First 3 Weeks", subtitle: "" },
-  {
-    value: "Until Fully Trained",
-    subtitle: "Until the person can perform their duties in full capacity",
-  },
-] as const;
-type TrainingPeriod = (typeof TRAINING_PERIODS)[number]["value"];
 
 const DEFAULT_STATUS = "Waiting for Documents";
 const FAR_FUTURE = "2030-12-31";
@@ -92,7 +87,7 @@ export default function NewEmployeePage() {
   const [startDate, setStartDate] = useState("");
   const [visaExpiry, setVisaExpiry] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
-  const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>("First 2 Weeks");
+  const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>(DEFAULT_TRAINING_PERIOD);
   const [afterTrainingRate, setAfterTrainingRate] = useState("");
   const [saturdayRate, setSaturdayRate] = useState("");
   const [notes, setNotes] = useState("");
@@ -101,7 +96,7 @@ export default function NewEmployeePage() {
   const [satRateFocused, setSatRateFocused] = useState(false);
   const [calOpen, setCalOpen] = useState<"start" | "visa" | "dob" | null>(null);
   const [periodSheetOpen, setPeriodSheetOpen] = useState(false);
-  const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>("First 2 Weeks");
+  const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>(DEFAULT_TRAINING_PERIOD);
 
   const [saving, setSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);

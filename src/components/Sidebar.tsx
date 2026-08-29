@@ -45,13 +45,24 @@ function isNavChildActive(pathname: string, href: string): boolean {
  * Label of the group that contains the current page, or null. Searched
  * through the rendered tree — including grandchildren — so the answer is
  * always whatever the menu actually looks like for this role.
+ *
+ * A group's own href counts as well as its children's: HR Records is a
+ * section with a page of its own, and landing on that page should leave the
+ * list under it open rather than collapsed. Groups with nothing under them
+ * are skipped — there is no accordion to open.
  */
 function groupOwningPath(nav: NavGroup[], pathname: string): string | null {
   const owns = (items: NavItem[]): boolean =>
     items.some(
       (i) => isNavChildActive(pathname, i.href) || (i.children ? owns(i.children) : false),
     );
-  return nav.find((g) => g.children && owns(g.children))?.label ?? null;
+  return (
+    nav.find(
+      (g) =>
+        !!g.children &&
+        (owns(g.children) || (!!g.href && isNavChildActive(pathname, g.href))),
+    )?.label ?? null
+  );
 }
 
 function NavChildList({
@@ -104,6 +115,90 @@ function NavChildList({
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * One top-level menu entry: the header, and the list underneath it.
+ *
+ * A group is a plain link, or an accordion, or — for HR Records — both: a
+ * section with a page of its own and a short list under it. When it is both,
+ * the label navigates and a separate chevron expands, because one header
+ * doing both on a single click would either swallow the navigation or leave
+ * the list unreachable.
+ *
+ * Shared by the staff and owner menus. They rendered this markup twice and
+ * differed only in whether change badges were passed down, so the href +
+ * children case would otherwise have had to be got right in both copies.
+ */
+function NavGroupBlock({
+  group,
+  pathname,
+  expanded,
+  onToggle,
+  onNavigate,
+  badges,
+}: {
+  group: NavGroup;
+  pathname: string;
+  expanded: boolean;
+  onToggle: () => void;
+  onNavigate?: () => void;
+  badges?: NavCountMap;
+}) {
+  const chevron = (
+    <span className={`${styles.chevron} ${expanded ? styles.chevronOpen : ""}`} aria-hidden="true">
+      ›
+    </span>
+  );
+
+  return (
+    <div className={styles.group}>
+      {group.href ? (
+        <div className={styles.groupHeaderRow}>
+          <Link
+            href={group.href}
+            className={`${styles.groupHeader} ${pathname === group.href ? styles.active : ""}`}
+            onClick={onNavigate}
+          >
+            <span className={styles.icon}>{group.icon}</span>
+            <span className={styles.groupLabel}>{group.label}</span>
+          </Link>
+          {group.children && (
+            <button
+              type="button"
+              className={styles.chevronBtn}
+              onClick={onToggle}
+              aria-expanded={expanded}
+              aria-label={`${expanded ? "Collapse" : "Expand"} ${group.label}`}
+            >
+              {chevron}
+            </button>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.groupHeader}
+          onClick={onToggle}
+          aria-expanded={expanded}
+        >
+          <span className={styles.icon}>{group.icon}</span>
+          <span className={styles.groupLabel}>{group.label}</span>
+          {chevron}
+        </button>
+      )}
+      {group.children && (
+        <div className={`${styles.collapseWrap} ${expanded ? styles.collapseOpen : ""}`}>
+          <NavChildList
+            items={group.children}
+            pathname={pathname}
+            onNavigate={onNavigate}
+            badges={badges}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -323,44 +418,16 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
         <div className={styles.brand}>YURICA</div>
         <nav className={styles.nav}>
-          {staffNav.map((group) => {
-            const isExpanded = !group.children || openGroup === group.label;
-            return (
-              <div key={group.label} className={styles.group}>
-                {group.href ? (
-                  <Link
-                    href={group.href}
-                    className={`${styles.groupHeader} ${pathname === group.href ? styles.active : ""}`}
-                    onClick={onClose}
-                  >
-                    <span className={styles.icon}>{group.icon}</span>
-                    <span>{group.label}</span>
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.groupHeader}
-                    onClick={() => toggleGroup(group.label)}
-                  >
-                    <span className={styles.icon}>{group.icon}</span>
-                    <span className={styles.groupLabel}>{group.label}</span>
-                    <span className={`${styles.chevron} ${isExpanded ? styles.chevronOpen : ""}`}>
-                      ›
-                    </span>
-                  </button>
-                )}
-                {group.children && (
-                  <div className={`${styles.collapseWrap} ${isExpanded ? styles.collapseOpen : ""}`}>
-                    <NavChildList
-                      items={group.children}
-                      pathname={pathname}
-                      onNavigate={onClose}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {staffNav.map((group) => (
+            <NavGroupBlock
+              key={group.label}
+              group={group}
+              pathname={pathname}
+              expanded={openGroup === group.label}
+              onToggle={() => toggleGroup(group.label)}
+              onNavigate={onClose}
+            />
+          ))}
         </nav>
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
@@ -376,45 +443,17 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
       <div className={styles.brand}>YURICA</div>
       <nav className={styles.nav}>
-        {visibleNav.map((group) => {
-          const isExpanded = !group.children || openGroup === group.label;
-          return (
-            <div key={group.label} className={styles.group}>
-              {group.href ? (
-                <Link
-                  href={group.href}
-                  className={`${styles.groupHeader} ${pathname === group.href ? styles.active : ""}`}
-                  onClick={onClose}
-                >
-                  <span className={styles.icon}>{group.icon}</span>
-                  <span>{group.label}</span>
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  className={styles.groupHeader}
-                  onClick={() => toggleGroup(group.label)}
-                >
-                  <span className={styles.icon}>{group.icon}</span>
-                  <span className={styles.groupLabel}>{group.label}</span>
-                  <span className={`${styles.chevron} ${isExpanded ? styles.chevronOpen : ""}`}>
-                    ›
-                  </span>
-                </button>
-              )}
-              {group.children && (
-                <div className={`${styles.collapseWrap} ${isExpanded ? styles.collapseOpen : ""}`}>
-                  <NavChildList
-                    items={group.children}
-                    pathname={pathname}
-                    onNavigate={onClose}
-                    badges={badges}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {visibleNav.map((group) => (
+          <NavGroupBlock
+            key={group.label}
+            group={group}
+            pathname={pathname}
+            expanded={openGroup === group.label}
+            onToggle={() => toggleGroup(group.label)}
+            onNavigate={onClose}
+            badges={badges}
+          />
+        ))}
       </nav>
       <div className={styles.footer}>
         <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>

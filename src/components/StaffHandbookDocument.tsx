@@ -187,6 +187,3 @@ export default function StaffHandbookDocument() {
     </article>
   );
 }
-
-export const HANDBOOK_VERSION = "1.0";
-export const HANDBOOK_UPDATED = "June 2026";

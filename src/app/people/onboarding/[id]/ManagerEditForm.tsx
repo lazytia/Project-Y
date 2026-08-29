@@ -14,6 +14,12 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import {
+  DEFAULT_TRAINING_PERIOD,
+  TRAINING_PERIODS,
+  normaliseTrainingPeriod,
+  type TrainingPeriod,
+} from "@/lib/staff-training";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
 import CalendarPicker from "@/components/CalendarPicker";
@@ -27,16 +33,6 @@ import styles from "./ManagerEditForm.module.css";
 
 const POSITIONS = ["Hall Staff", "Kitchen Staff"] as const;
 type Position = (typeof POSITIONS)[number];
-
-const TRAINING_PERIODS = [
-  { value: "First 2 Weeks", subtitle: "" },
-  { value: "First 3 Weeks", subtitle: "" },
-  {
-    value: "Until Fully Trained",
-    subtitle: "Until the person can perform their duties in full capacity",
-  },
-] as const;
-type TrainingPeriod = (typeof TRAINING_PERIODS)[number]["value"];
 
 const FAR_FUTURE = "2030-12-31";
 const NOTES_MAX = 500;
@@ -87,13 +83,6 @@ function normalisePosition(raw: unknown): Position {
   return "Hall Staff";
 }
 
-function normaliseTrainingPeriod(raw: unknown): TrainingPeriod {
-  const s = String(raw ?? "").trim();
-  if (s === "First 3 Weeks") return "First 3 Weeks";
-  if (s === "Until Fully Trained") return "Until Fully Trained";
-  return "First 2 Weeks";
-}
-
 export default function ManagerEditForm() {
   const router = useRouter();
   const params = useParams();
@@ -116,14 +105,14 @@ export default function ManagerEditForm() {
   const [startDate, setStartDate] = useState("");
   const [visaExpiry, setVisaExpiry] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
-  const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>("First 2 Weeks");
+  const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>(DEFAULT_TRAINING_PERIOD);
   const [afterTrainingRate, setAfterTrainingRate] = useState("");
   const [notes, setNotes] = useState("");
 
   const [rateFocused, setRateFocused] = useState(false);
   const [calOpen, setCalOpen] = useState<"start" | "visa" | null>(null);
   const [periodSheetOpen, setPeriodSheetOpen] = useState(false);
-  const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>("First 2 Weeks");
+  const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>(DEFAULT_TRAINING_PERIOD);
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);

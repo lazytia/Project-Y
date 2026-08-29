@@ -22,6 +22,11 @@ import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import { readStaffRates } from "@/lib/staff-rates";
+import {
+  fmtTrainingEndLong,
+  readTrainingStatus,
+  type TrainingStatus,
+} from "@/lib/staff-training";
 import { todayIso } from "@/lib/staff-display";
 import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
@@ -70,6 +75,9 @@ type Staff = {
   positionLabel: string;
   weekdayRate: number | null;
   saturdayRate: number | null;
+  /** Training rate, period and end date — the roster showed everyone on
+   *  their full rate from day one until this was surfaced. */
+  training: TrainingStatus;
   startDate: Date | null;
   visaExpiry: Date | null;
   visaType: string;
@@ -100,9 +108,16 @@ type Staff = {
   } | null;
 };
 
-/** Firestore field written for each half of the rate card. */
-const RATE_FIELDS = { weekday: "weekdayRate", saturday: "saturdayRate" } as const;
+/** Firestore field written for each cell of the rate card. */
+const RATE_FIELDS = {
+  weekday: "weekdayRate",
+  saturday: "saturdayRate",
+  training: "trainingRate",
+} as const;
 type RateKind = keyof typeof RATE_FIELDS;
+type RateDrafts = Record<RateKind, string>;
+
+const EMPTY_RATE_DRAFTS: RateDrafts = { weekday: "", saturday: "", training: "" };
 
 const EMPLOYMENT_POSITIONS = ["Hall Staff", "Kitchen Staff", "Hall Manager", "Chef"] as const;
 const EMPLOYMENT_VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
@@ -252,8 +267,8 @@ export default function EmployeeDetailPage() {
   const [editEmploymentType, setEditEmploymentType] = useState("");
   const [editRate, setEditRate] = useState("");
   const [editReportsTo, setEditReportsTo] = useState("");
-  const [editingRateKind, setEditingRateKind] = useState<RateKind | null>(null);
-  const [rateDraft, setRateDraft] = useState("");
+  const [ratesEditing, setRatesEditing] = useState(false);
+  const [rateDrafts, setRateDrafts] = useState<RateDrafts>(EMPTY_RATE_DRAFTS);
   const [savingRate, setSavingRate] = useState(false);
   const [calRehireOpen, setCalRehireOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -318,6 +333,7 @@ export default function EmployeeDetailPage() {
           positionLabel: positionLabelOf(raw),
           weekdayRate: rates.weekday,
           saturdayRate: rates.saturday,
+          training: readTrainingStatus(raw),
           startDate: tsToDate(raw.startDate),
           visaExpiry: tsToDate(documents.visaExpiry ?? raw.visaExpiry ?? null),
           visaType: visaTypeOf(raw),
@@ -503,36 +519,75 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  function startRateEdit(kind: RateKind) {
+  function startRatesEdit() {
     if (!staff) return;
-    const current = kind === "weekday" ? staff.weekdayRate : staff.saturdayRate;
-    setRateDraft(current != null ? String(current) : "");
-    setEditingRateKind(kind);
+    setRateDrafts({
+      weekday: staff.weekdayRate != null ? String(staff.weekdayRate) : "",
+      saturday: staff.saturdayRate != null ? String(staff.saturdayRate) : "",
+      training: staff.training.rate != null ? String(staff.training.rate) : "",
+    });
+    setRatesEditing(true);
   }
 
-  async function handleSaveRate(kind: RateKind) {
+  function setRateDraft(kind: RateKind, value: string) {
+    setRateDrafts((prev) => ({ ...prev, [kind]: value }));
+  }
+
+  /**
+   * All three rates save together — they are read together, and one of them
+   * only makes sense next to the others (a training rate above the weekday
+   * rate is a typo, not a pay rise).
+   *
+   * A blank Saturday or training rate clears it rather than failing: not
+   * everyone is hired on one, and the card has to be able to say so.
+   */
+  async function handleSaveRates() {
     if (!staff || savingRate) return;
-    const parsed = parseFloat(rateDraft);
-    if (Number.isNaN(parsed) || parsed <= 0) {
-      alert("Please enter a valid hourly rate.");
-      return;
+
+    const parsed: Record<RateKind, number | null> = {
+      weekday: null,
+      saturday: null,
+      training: null,
+    };
+    for (const kind of Object.keys(RATE_FIELDS) as RateKind[]) {
+      const draft = rateDrafts[kind].trim();
+      if (!draft) {
+        if (kind === "weekday") {
+          alert("A weekday rate is required — it is what timesheets are paid at.");
+          return;
+        }
+        continue;
+      }
+      const n = parseFloat(draft);
+      if (Number.isNaN(n) || n <= 0) {
+        alert("Please enter a valid hourly rate.");
+        return;
+      }
+      parsed[kind] = Math.round(n * 100) / 100;
     }
-    const value = Math.round(parsed * 100) / 100;
+
     setSavingRate(true);
     try {
       await setDoc(
         doc(getDb(), "staff_onboarding", staff.uid),
-        { [RATE_FIELDS[kind]]: value, updatedAt: serverTimestamp() },
+        {
+          [RATE_FIELDS.weekday]: parsed.weekday,
+          [RATE_FIELDS.saturday]: parsed.saturday,
+          [RATE_FIELDS.training]: parsed.training,
+          updatedAt: serverTimestamp(),
+        },
         { merge: true },
       );
       setStaff({
         ...staff,
-        ...(kind === "weekday" ? { weekdayRate: value } : { saturdayRate: value }),
+        weekdayRate: parsed.weekday,
+        saturdayRate: parsed.saturday,
+        training: { ...staff.training, rate: parsed.training },
       });
-      setEditingRateKind(null);
+      setRatesEditing(false);
     } catch (err) {
       console.error("[rate] save failed:", err);
-      alert("Failed to save the rate. Please try again.");
+      alert("Failed to save the rates. Please try again.");
     } finally {
       setSavingRate(false);
     }
@@ -584,10 +639,13 @@ export default function EmployeeDetailPage() {
           workLocation: editWorkLocation,
           employmentType: editEmploymentType,
           // Same field the RATE card writes — otherwise editing here would
-          // leave the timesheets still paying the old rate.
+          // leave the timesheets still paying the old rate. `trainingRate`
+          // is deliberately not written: this field is the ongoing rate, and
+          // overwriting the training rate with it used to wipe out what the
+          // person was actually hired on and silence the wage-increase
+          // reminder that compares the two.
           weekdayRate: parsedRate,
           afterTrainingRate: parsedRate,
-          trainingRate: parsedRate,
           reportsTo: editReportsTo.trim(),
           updatedAt: serverTimestamp(),
         },
@@ -660,34 +718,88 @@ export default function EmployeeDetailPage() {
     ? fmtDateWithDay(prevTerm.terminatedAt)
     : "—";
 
+  // The training half of the card is only drawn for people who were actually
+  // hired on a training rate. `trainingPeriod` defaults to "First 2 Weeks"
+  // when it was never set, so showing it unconditionally would put a training
+  // period — and an end date — on employees who never had one.
+  const showTraining = staff.training.rate != null || ratesEditing;
+
+  const rateActions = ratesEditing ? (
+    <div className={styles.rateEditActions}>
+      <button
+        type="button"
+        className={styles.rateSaveBtn}
+        onClick={() => void handleSaveRates()}
+        disabled={savingRate}
+      >
+        {savingRate ? "Saving…" : "Save"}
+      </button>
+      <button
+        type="button"
+        className={styles.rateCancelBtn}
+        onClick={() => setRatesEditing(false)}
+        disabled={savingRate}
+      >
+        Cancel
+      </button>
+    </div>
+  ) : (
+    <button type="button" className={styles.rateEditBtn} onClick={startRatesEdit}>
+      <EditIcon />
+      Edit Rates
+    </button>
+  );
+
   // Drives the pay shown on /payroll/timesheets for this employee.
   const rateCard = (
     <>
       <p className={styles.sectionLabel}>RATE</p>
       <section className={styles.rateCard}>
-        <RateRow
-          label="Weekdays (Sun – Fri)"
-          value={staff.weekdayRate}
-          editing={editingRateKind === "weekday"}
-          draft={rateDraft}
-          saving={savingRate}
-          onDraft={setRateDraft}
-          onEdit={() => startRateEdit("weekday")}
-          onSave={() => void handleSaveRate("weekday")}
-          onCancel={() => setEditingRateKind(null)}
-        />
-        <div className={styles.rateDivider} aria-hidden="true" />
-        <RateRow
-          label="Saturday"
-          value={staff.saturdayRate}
-          editing={editingRateKind === "saturday"}
-          draft={rateDraft}
-          saving={savingRate}
-          onDraft={setRateDraft}
-          onEdit={() => startRateEdit("saturday")}
-          onSave={() => void handleSaveRate("saturday")}
-          onCancel={() => setEditingRateKind(null)}
-        />
+        <div className={styles.rateGrid}>
+          <RateCell
+            label="Weekdays Rate"
+            value={staff.weekdayRate}
+            editing={ratesEditing}
+            draft={rateDrafts.weekday}
+            onDraft={(v) => setRateDraft("weekday", v)}
+          />
+          <RateCell
+            label="Saturday Rate"
+            value={staff.saturdayRate}
+            editing={ratesEditing}
+            draft={rateDrafts.saturday}
+            onDraft={(v) => setRateDraft("saturday", v)}
+          />
+          {showTraining && (
+            <RateCell
+              label="Training Rate"
+              value={staff.training.rate}
+              editing={ratesEditing}
+              draft={rateDrafts.training}
+              onDraft={(v) => setRateDraft("training", v)}
+            />
+          )}
+        </div>
+
+        {showTraining ? (
+          <>
+            <div className={styles.rateDivider} aria-hidden="true" />
+            <div className={styles.rateMetaGrid}>
+              <RateMetaCell label="Training Period" value={staff.training.period} />
+              <RateMetaCell
+                label="Training Ends"
+                value={fmtTrainingEndLong(staff.training.endISO)}
+              />
+              {rateActions}
+            </div>
+            <p className={styles.rateHint}>
+              Training rate applies during the training period only.
+            </p>
+          </>
+        ) : (
+          <div className={styles.rateActionsRow}>{rateActions}</div>
+        )}
+
         <p className={styles.rateFootnote}>
           <InfoCircleIcon />
           Rates are applied before penalties and allowances.
@@ -1330,82 +1442,56 @@ function EmploymentEditRow({
   );
 }
 
-function RateRow({
+/** One money cell of the rate card — a label over a dollar figure, or over
+ *  an input while the card is being edited. */
+function RateCell({
   label,
   value,
   editing,
   draft,
-  saving,
   onDraft,
-  onEdit,
-  onSave,
-  onCancel,
 }: {
   label: string;
   value: number | null;
   editing: boolean;
   draft: string;
-  saving: boolean;
   onDraft: (v: string) => void;
-  onEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
 }) {
   return (
-    <div className={styles.rateRow}>
-      <span className={styles.rateIcon} aria-hidden="true">
-        <CalendarMiniIcon />
-      </span>
-      <div className={styles.rateInfo}>
-        <p className={styles.rateLabel}>{label}</p>
-        {editing ? (
-          <div className={styles.rateEditFields}>
-            <span className={styles.rateValueUnit}>$</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              className={styles.rateInput}
-              value={draft}
-              onChange={(e) => onDraft(e.target.value)}
-              min="0"
-              step="0.01"
-              aria-label={`${label} hourly rate`}
-              autoFocus
-            />
-            <span className={styles.rateValueUnit}>/hr</span>
-          </div>
-        ) : (
-          <p className={styles.rateValue}>
-            {value != null ? `$${value.toFixed(2)}` : "—"}
-            <span className={styles.rateValueUnit}>/hr</span>
-          </p>
-        )}
-      </div>
+    <div className={styles.rateCell}>
+      <p className={styles.rateCellLabel}>{label}</p>
       {editing ? (
-        <div className={styles.rateEditActions}>
-          <button
-            type="button"
-            className={styles.rateSaveBtn}
-            onClick={onSave}
-            disabled={saving}
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
-          <button
-            type="button"
-            className={styles.rateCancelBtn}
-            onClick={onCancel}
-            disabled={saving}
-          >
-            Cancel
-          </button>
+        <div className={styles.rateInputRow}>
+          <span className={styles.rateValueUnit}>$</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            className={styles.rateInput}
+            value={draft}
+            onChange={(e) => onDraft(e.target.value)}
+            min="0"
+            step="0.01"
+            aria-label={`${label} per hour`}
+          />
         </div>
       ) : (
-        <button type="button" className={styles.rateEditBtn} onClick={onEdit}>
-          <EditIcon />
-          Edit
-        </button>
+        <p className={styles.rateCellValue}>
+          {value != null ? `$${value.toFixed(2)}` : "—"}
+          <span className={styles.rateValueUnit}>/hr</span>
+        </p>
       )}
+    </div>
+  );
+}
+
+/** The training period and its end date. Read-only: the period is chosen when
+ *  the hire is requested, and it is the start date and that choice — not this
+ *  card — that decide when training is over. */
+function RateMetaCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.rateCell}>
+      <p className={styles.rateCellLabel}>{label}</p>
+      <p className={styles.rateMetaValue}>{value}</p>
     </div>
   );
 }

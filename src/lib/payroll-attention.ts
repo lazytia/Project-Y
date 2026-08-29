@@ -1,5 +1,15 @@
 /** Helpers for timesheet payroll attention (training end / wage increase). */
 
+import {
+  OPEN_ENDED_TRAINING_PERIOD,
+  fmtTrainingEndLong,
+  trainingEndDateISO,
+} from "./staff-training";
+
+// Re-exported because this module was the training period's only home for a
+// long time and the timesheet imports it from here.
+export { trainingEndDateISO };
+
 export type PayrollStaffRecord = {
   uid: string;
   name: string;
@@ -23,25 +33,9 @@ export type PayrollAttentionItem = {
   newRate: number;
 };
 
-function addDaysISO(iso: string, n: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + n);
-  return dt.toISOString().slice(0, 10);
-}
-
 function isApprovedStatus(status: string): boolean {
   const s = status.toLowerCase();
   return s === "approved" || s === "active";
-}
-
-/** Last day of the training period (inclusive), based on start date + period length. */
-export function trainingEndDateISO(startISO: string, period: string): string | null {
-  if (!startISO || period === "Until Fully Trained") return null;
-  const extraDays =
-    period === "First 3 Weeks" ? 20 : period === "First 2 Weeks" ? 13 : null;
-  if (extraDays === null) return null;
-  return addDaysISO(startISO, extraDays);
 }
 
 export function isPayrollReminderEligible(row: PayrollStaffRecord): boolean {
@@ -49,7 +43,7 @@ export function isPayrollReminderEligible(row: PayrollStaffRecord): boolean {
   if (row.payrollRateReminderActive === false) return false;
   if (row.trainingRate == null || row.afterTrainingRate == null) return false;
   if (row.afterTrainingRate <= row.trainingRate) return false;
-  if (row.trainingPeriod === "Until Fully Trained") return false;
+  if (row.trainingPeriod === OPEN_ENDED_TRAINING_PERIOD) return false;
   return true;
 }
 
@@ -100,13 +94,9 @@ export function trainingEndStatusLabel(iso: string, todayISO: string): string {
   return `${prefix}: ${fmtTrainingEndLabel(iso)}`;
 }
 
+/** Alias kept for the timesheet, which has always called it this. */
 export function fmtTrainingEndLabel(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return fmtTrainingEndLong(iso);
 }
 
 export function shouldActivatePayrollReminder(raw: {
@@ -122,6 +112,6 @@ export function shouldActivatePayrollReminder(raw: {
     typeof raw.trainingPeriod === "string" ? raw.trainingPeriod : "";
   if (trainingRate == null || afterTrainingRate == null) return false;
   if (afterTrainingRate <= trainingRate) return false;
-  if (trainingPeriod === "Until Fully Trained") return false;
+  if (trainingPeriod === OPEN_ENDED_TRAINING_PERIOD) return false;
   return true;
 }

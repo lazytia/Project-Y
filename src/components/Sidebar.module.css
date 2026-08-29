@@ -118,6 +118,35 @@
   background: var(--color-surface);
 }
 
+/* A group that is both a link and an accordion — the label navigates, the
+   chevron beside it expands. Two targets on one row, so the row itself is
+   the flex container and the link keeps the whole width it had before. */
+.groupHeaderRow {
+  display: flex;
+  align-items: center;
+}
+
+.chevronBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Wider than the chevron it holds: on a phone this is the only way to open
+     the list, and a 16px tap target would be missed as often as hit. */
+  width: 34px;
+  height: 34px;
+  margin-right: var(--space-1);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chevronBtn:hover {
+  background: var(--color-surface);
+}
+
 .icon {
   font-size: 16px;
   width: 22px;

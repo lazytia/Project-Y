@@ -423,42 +423,49 @@
   gap: var(--space-3);
 }
 
-.rateRow {
+/* Side by side rather than stacked: the three rates are read against each
+   other — a training rate only means something next to the rate it leads to. */
+.rateGrid {
   display: grid;
-  grid-template-columns: 40px 1fr auto;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--space-3);
+}
+
+/* The two dates take equal halves and the button only what it needs, so
+   "Edit Rates" never wraps on a phone. */
+.rateMetaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
   align-items: center;
   gap: var(--space-3);
 }
 
-.rateIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: var(--color-warm-bg);
-  color: var(--color-warm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.rateInfo {
+.rateCell {
   min-width: 0;
 }
 
-.rateLabel {
+.rateCellLabel {
   margin: 0;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: 500;
-  color: var(--color-fg);
+  color: var(--color-fg-muted);
 }
 
-.rateValue {
+.rateCellValue {
   margin: 2px 0 0;
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--color-warm);
   letter-spacing: -0.01em;
+}
+
+.rateMetaValue {
+  margin: 2px 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-fg);
 }
 
 .rateValueUnit {
@@ -488,10 +495,10 @@
   cursor: not-allowed;
 }
 
-.rateEditFields {
+.rateInputRow {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   margin-top: 4px;
 }
 
@@ -501,8 +508,14 @@
   gap: 6px;
 }
 
+.rateActionsRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .rateInput {
-  width: 96px;
+  min-width: 0;
+  flex: 1;
   padding: 8px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -550,6 +563,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+}
+
+/* Sits directly under the training row it explains, so it reads as a note on
+   the training rate rather than on the card as a whole. */
+.rateHint {
+  margin: 0;
   font-size: var(--font-size-xs);
   color: var(--color-fg-muted);
 }

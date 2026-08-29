@@ -76,18 +76,17 @@ export const OWNER_NAV: NavGroup[] = [
     ],
   },
   {
+    // The documents used to hang here as four siblings, which said nothing
+    // about which of them anyone still owed a signature on — the one thing
+    // the owner opens this section to find out. They now live on the
+    // /hr-records page, listed with their version and what is outstanding,
+    // and the menu entry is the way in to it. HR Notes stays: it is a
+    // running record rather than a document, and is reached often enough to
+    // be worth one click.
     icon: "📋",
     label: "HR Records",
-    children: [
-      { label: "HR Notes", href: "/people/hr-notes" },
-      // The owner has always called this "Training Guide" and wants to keep
-      // it. Only the label differs — the href and the Beer Guide underneath
-      // it still come from TRAINING_MANUAL, so the nesting can't drift out
-      // of step with the shift-lead and staff menus.
-      { ...TRAINING_MANUAL, label: "Training Guide" },
-      { label: "Employee Handbook", href: "/staff/handbook" },
-      { label: "Employment Contract", href: "/hr-records/employment-contract" },
-    ],
+    href: "/hr-records",
+    children: [{ label: "HR Notes", href: "/people/hr-notes" }],
   },
   {
     icon: "📦",

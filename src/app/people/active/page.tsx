@@ -11,13 +11,17 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner, isChef, STRICT_OWNER_USERNAMES } from "@/lib/permissions";
-import { emailToUsername } from "@/lib/username";
+import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
-import { isActiveEmployee } from "@/lib/staff-active";
+import { isActiveEmployee, isTeamMember } from "@/lib/staff-active";
 import { VISA_WINDOW_DAYS, BIRTHDAY_WINDOW_DAYS } from "@/lib/hr-windows";
 import { readStaffRates, type StaffRates } from "@/lib/staff-rates";
+import {
+  fmtTrainingEndShort,
+  readTrainingStatus,
+  type TrainingStatus,
+} from "@/lib/staff-training";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -35,6 +39,10 @@ type Staff = {
   /** Both rates, because Saturday is paid at its own. Showing only the
    *  weekday one made the list look like a single-rate roster. */
   rates: StaffRates;
+  /** Where they are in their training period today. New hires spend their
+   *  first weeks on a training rate, and the list showed them as if they were
+   *  already on the full one. */
+  training: TrainingStatus;
   visaExpiry: Date | null;
   dob: Date | null;
 };
@@ -67,19 +75,6 @@ type StoredStaff = {
   visaExpiry?: Timestamp | string | null;
   approvedAt?: Timestamp | null;
 };
-
-/** Everyone on the roster except the real business owners (Tia, Yurica)
- *  and anyone who has been terminated. Managers (yurina), chefs, staff
- *  mid-onboarding, and staff who haven't started yet all show up so this
- *  screen is a single home for the whole team. AuthProvider stamps every
- *  account with role="owner" whenever it has owner-level UI access, so
- *  filtering on role alone would also hide managers — we key on the
- *  username instead. */
-function isTeamMember(raw: StoredStaff): boolean {
-  if ((raw.status ?? "").toLowerCase() === "terminated") return false;
-  const username = (raw.username ?? emailToUsername(raw.email ?? "")).toLowerCase();
-  return !STRICT_OWNER_USERNAMES.has(username);
-}
 
 type StoredNotice = {
   employeeUid?: string;
@@ -215,6 +210,7 @@ export default function ActiveEmployeesPage() {
               positionKind: kind,
               positionLabel: label,
               rates: readStaffRates(raw as Record<string, unknown>),
+              training: readTrainingStatus(raw as Record<string, unknown>),
               visaExpiry: toDate(raw.documents?.visaExpiry ?? raw.visaExpiry ?? null),
               dob: toDate(raw.dateOfBirth ?? null),
             };
@@ -423,7 +419,10 @@ export default function ActiveEmployeesPage() {
             const readyToTerminate =
               !!rowNotice && isReadyToTerminate(rowNotice.lastWorkingDay);
             const noticeMode = !!rowNotice;
-            const showBadge = visaSoon || bdaySoon || noticeMode;
+            // A notice outranks training: someone on their way out is the more
+            // urgent fact about the row, even if they never finished training.
+            const trainingMode = !noticeMode && row.training.active;
+            const showBadge = visaSoon || bdaySoon || noticeMode || trainingMode;
             return (
               <li key={row.uid}>
                 <button
@@ -444,12 +443,17 @@ export default function ActiveEmployeesPage() {
                         <span className={styles.statusPillDot} aria-hidden="true" />
                         Notice Given
                       </span>
+                    ) : trainingMode ? (
+                      <span className={styles.statusPillTraining}>
+                        <span className={styles.statusPillDotWarm} aria-hidden="true" />
+                        Training Period
+                      </span>
                     ) : (
                       <span className={styles.statusPillActive}>Active</span>
                     )}
                   </span>
                   <span className={styles.rowRate}>
-                    {!noticeMode && (
+                    {!noticeMode && !trainingMode && (
                       <>
                         <span className={styles.rowRateWeekday}>
                           {fmtRate(row.rates.weekday)}
@@ -485,6 +489,22 @@ export default function ActiveEmployeesPage() {
                         )}
                         {noticeDays !== null && noticeDays >= 0 && (
                           <span className={styles.sideWarm}>{noticeDays} days remaining</span>
+                        )}
+                      </>
+                    ) : trainingMode ? (
+                      <>
+                        {/* Deliberately the same shape as the "Last day" rows
+                            above: both are the date this row is counting down
+                            to, and the word in front says which way it runs —
+                            a training day for someone arriving, a last day for
+                            someone leaving. */}
+                        <span className={styles.sideLabel}>
+                          Training day {fmtTrainingEndShort(row.training.endISO)}
+                        </span>
+                        {row.training.daysRemaining !== null && (
+                          <span className={styles.sideWarm}>
+                            {row.training.daysRemaining} days remaining
+                          </span>
                         )}
                       </>
                     ) : visaSoon ? (

@@ -1,6 +1,8 @@
 /** When an employee leaves onboarding and appears on /people/active. */
 
 import { TOTAL_ONBOARDING_STEPS } from "./onboarding-steps";
+import { STRICT_OWNER_USERNAMES } from "./permissions";
+import { emailToUsername } from "./username";
 
 export type StaffOnboardingFlags = {
   status?: string;
@@ -15,6 +17,27 @@ export type StaffOnboardingFlags = {
   /** How far through the onboarding form the employee has got. */
   completedStep?: number;
 };
+
+/**
+ * The staff_onboarding fields `staffOnboardingFlags` reads.
+ *
+ * Exported so a server query can project just these and still get an honest
+ * answer. A staff document carries signature PNGs and document URLs, and a
+ * page that only needs to know who is on the roster should not be paying to
+ * download them. Add a field above and it has to be added here too, or the
+ * projected read will quietly answer as though it were absent.
+ */
+export const STAFF_FLAG_FIELDS = [
+  "status",
+  "role",
+  "accountCreated",
+  "addedToScheduling",
+  "approvedAt",
+  "username",
+  "email",
+  "activatedAt",
+  "completedStep",
+] as const;
 
 /**
  * Pull the flags out of a raw staff_onboarding document.
@@ -36,6 +59,25 @@ export function staffOnboardingFlags(raw: Record<string, unknown>): StaffOnboard
     activatedAt: raw.activatedAt,
     completedStep: typeof raw.completedStep === "number" ? raw.completedStep : undefined,
   };
+}
+
+/**
+ * Everyone on the roster except the real business owners (Tia, Yurica, Eddie)
+ * and anyone who has been terminated.
+ *
+ * Managers, chefs, staff mid-onboarding and staff who have not started yet all
+ * count — this is "the team", the population a roster or a document chase is
+ * measured against. AuthProvider stamps every account with role="owner" when
+ * it has owner-level UI access, so filtering on the role would also drop the
+ * managers; the username is what tells the two apart.
+ *
+ * Pair it with `isActiveEmployee` for the list of people who actually have a
+ * login today.
+ */
+export function isTeamMember(raw: StaffOnboardingFlags): boolean {
+  if ((raw.status ?? "").toLowerCase() === "terminated") return false;
+  const username = (raw.username ?? emailToUsername(raw.email ?? "")).toLowerCase();
+  return !STRICT_OWNER_USERNAMES.has(username);
 }
 
 /** Matches the owner-approval rule used on /people/onboarding. */

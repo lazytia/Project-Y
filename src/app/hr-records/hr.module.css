@@ -1,0 +1,340 @@
+/*
+ * Shared by the three HR Records screens — the hub, the acknowledgements
+ * list, and a single document's status.
+ *
+ * One stylesheet rather than three: they are the same page furniture with
+ * different rows in the middle (a stat strip, a card list, an info note at
+ * the foot), and three copies would drift apart the first time a padding
+ * was nudged on one of them.
+ */
+
+/* ── Layout ── */
+.page {
+  font-family: var(--font-sans);
+  max-width: 520px;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) 0 0;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.pageSub {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+/* Back to the page above. These sit two and three levels deep, and the
+   sidebar only reaches the top of the section. */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 8px 4px 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: var(--color-fg);
+}
+
+/* ── Stat strip ── */
+.statsCard {
+  display: flex;
+  align-items: stretch;
+  padding: var(--space-4) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+.statCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--space-2);
+  text-align: center;
+}
+
+.statDivider {
+  background: var(--color-border);
+  width: 1px;
+  margin: var(--space-2) 0;
+}
+
+.statNumber {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.statNumberWarm {
+  color: var(--color-warm);
+}
+
+.statNumberGood {
+  color: var(--color-positive);
+}
+
+.statLabel {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+
+/* The version a page is reporting on, under its stat strip. */
+.metaLine {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+/* ── Section heading ── */
+.sectionLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-subtle);
+}
+
+/* ── Rows ── */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+/* Only the rows that lead somewhere react to a pointer — a document nobody
+   signs is still listed, and a hover state on it would promise a page. */
+a.row:hover {
+  background: var(--color-surface);
+}
+
+/* The one row the page exists to be clicked through to. */
+.rowFeature {
+  border-color: rgba(255, 106, 19, 0.35);
+  background: var(--color-warm-bg);
+}
+
+a.rowFeature:hover {
+  background: rgba(255, 106, 19, 0.14);
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rowTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.rowSub {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+}
+
+.rowRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.rowCount {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.chevron {
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+/* Beer Guide under Training Guide: indented and hairline-joined, so the
+   nesting is visible without a second card. */
+.subList {
+  list-style: none;
+  margin: var(--space-2) 0 0 var(--space-4);
+  padding: 0 0 0 var(--space-3);
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.subRow {
+  padding: var(--space-2) var(--space-3);
+}
+
+.subRow .rowTitle {
+  font-size: var(--font-size-sm);
+}
+
+/* ── Chips ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.chipWarm {
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+.chipGood {
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--color-positive);
+}
+
+.chipMuted {
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+}
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-fg-muted);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tabActive {
+  border-color: var(--color-warm);
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+/* ── People ── */
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.personWhen {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+}
+
+/* ── Foot note ── */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+}
+
+.noteIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--color-fg-subtle);
+}
+
+/* ── States ── */
+.status {
+  margin: 0;
+  padding: var(--space-4) 0;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.error {
+  color: var(--color-negative);
+}
