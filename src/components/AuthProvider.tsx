@@ -16,24 +16,31 @@ import { emailToUsername } from "@/lib/username";
 
 const STAFF_STEP_CACHE_KEY = "y.staffStep";
 
-type StaffStepCache = { uid: string; step: number };
+type StaffStepCache = { uid: string; step: number; activated?: boolean };
 
-function readStaffStepCache(uid: string): number | null {
+/** `activated: null` for a record written before it was cached — unknown, not
+ *  "not activated", which is the answer that shuts the staff app. */
+type StaffProfile = { step: number; activated: boolean | null };
+
+function readStaffStepCache(uid: string): StaffProfile | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(STAFF_STEP_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StaffStepCache;
     if (parsed.uid !== uid || typeof parsed.step !== "number") return null;
-    return parsed.step;
+    return {
+      step: parsed.step,
+      activated: typeof parsed.activated === "boolean" ? parsed.activated : null,
+    };
   } catch {
     return null;
   }
 }
 
-function writeStaffStepCache(uid: string, step: number) {
+function writeStaffStepCache(uid: string, step: number, activated: boolean) {
   try {
-    sessionStorage.setItem(STAFF_STEP_CACHE_KEY, JSON.stringify({ uid, step }));
+    sessionStorage.setItem(STAFF_STEP_CACHE_KEY, JSON.stringify({ uid, step, activated }));
   } catch {
     /* ignore quota / private mode */
   }
@@ -62,6 +69,12 @@ type AuthContextValue = {
    * onboarding. Used by the shell to lock down nav.
    */
   staffNeedsOnboarding: boolean;
+  /**
+   * True for a non-owner who has finished the form but whom no owner has
+   * activated yet. They are still an applicant, so the staff app stays shut
+   * and they are held on the submitted screen.
+   */
+  staffAwaitingActivation: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue>({
@@ -70,6 +83,7 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
   staffCompletedStep: null,
   staffNeedsOnboarding: false,
+  staffAwaitingActivation: false,
 });
 
 export function AuthProvider({
@@ -87,6 +101,9 @@ export function AuthProvider({
   const [loading, setLoading] = useState(true);
   const [authRestored, setAuthRestored] = useState(false);
   const [staffCompletedStep, setStaffCompletedStep] = useState<number | null>(null);
+  // `null` until the server doc says one way or the other. Only an explicit
+  // `false` shuts the staff app — see staffAwaitingActivation below.
+  const [staffActivated, setStaffActivated] = useState<boolean | null>(null);
   // Gate onboarding redirects until Firestore has confirmed the profile —
   // offline/cache snapshots briefly sent completed staff to the notifications
   // prompt ("alarm screen") before the server doc arrived.
@@ -147,13 +164,16 @@ export function AuthProvider({
           emitAuthReady();
           if (isOwner(u)) {
             setStaffCompletedStep(null);
+            setStaffActivated(null);
           } else if (isChef(u)) {
             setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
+            setStaffActivated(true);
             setStaffProfileConfirmed(true);
           } else {
             const cached = readStaffStepCache(u.uid);
-            setStaffCompletedStep(cached);
-            if (cached !== null && cached >= TOTAL_ONBOARDING_STEPS) {
+            setStaffCompletedStep(cached?.step ?? null);
+            setStaffActivated(cached?.activated ?? null);
+            if (cached && cached.step >= TOTAL_ONBOARDING_STEPS) {
               setStaffProfileConfirmed(true);
               setNotificationsPromptSeen(true);
             } else {
@@ -165,6 +185,7 @@ export function AuthProvider({
         }
         if (authReady) {
           setStaffCompletedStep(null);
+          setStaffActivated(null);
           setNotificationsPromptSeen(null);
           setStaffProfileConfirmed(false);
           clearStaffStepCache();
@@ -180,6 +201,7 @@ export function AuthProvider({
       emitAuthReady();
       if (!auth.currentUser) {
         setStaffCompletedStep(null);
+        setStaffActivated(null);
         setNotificationsPromptSeen(null);
         setStaffProfileConfirmed(false);
         clearStaffStepCache();
@@ -238,6 +260,7 @@ export function AuthProvider({
         if (isOwner(user)) return;
         if (isChef(user)) {
           setStaffCompletedStep(TOTAL_ONBOARDING_STEPS);
+          setStaffActivated(true);
           setNotificationsPromptSeen(true);
           setStaffProfileConfirmed(true);
           return;
@@ -248,25 +271,32 @@ export function AuthProvider({
           (snap) => {
             const data = snap.data() ?? {};
             const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
-            writeStaffStepCache(user.uid, completed);
             setStaffCompletedStep(completed);
 
-            // Only a server snapshot may answer this one. A cached snapshot
+            // Only a server snapshot may answer these. A cached snapshot
             // reports `false` for a field it hasn't synced yet, and the 800ms
             // confirm fallback below un-gates the routing effect whether or
             // not the server copy has landed — so on a slow start a staff
             // member who enabled notifications months ago was told to enable
-            // them again. Leaving it `null` means "not known yet", and the
-            // routing effect only redirects on an explicit `false`.
+            // them again, and one activated weeks ago would be sent back to
+            // the submitted screen. Leaving them `null` means "not known
+            // yet", and the routing effect only redirects on an explicit
+            // `false`. The cache is written from here for the same reason:
+            // it primes both fields on the next load, so it must never carry
+            // an activation a cached snapshot only appeared to deny.
             if (!snap.metadata.fromCache) {
+              const activated = !!data.activatedAt;
+              writeStaffStepCache(user.uid, completed, activated);
+              setStaffActivated(activated);
               setNotificationsPromptSeen(data.notificationsPromptSeen === true);
               setStaffProfileConfirmed(true);
               if (confirmFallback) clearTimeout(confirmFallback);
             }
           },
           () => {
-            const fallback = readStaffStepCache(user.uid) ?? 0;
-            setStaffCompletedStep(fallback);
+            const fallback = readStaffStepCache(user.uid);
+            setStaffCompletedStep(fallback?.step ?? 0);
+            setStaffActivated(fallback?.activated ?? null);
             setNotificationsPromptSeen(true);
             setStaffProfileConfirmed(true);
           },
@@ -294,6 +324,26 @@ export function AuthProvider({
     staffCompletedStep !== null &&
     staffCompletedStep < TOTAL_ONBOARDING_STEPS;
 
+  /**
+   * Submitted, but nobody has activated them.
+   *
+   * Finishing the form used to open the whole staff app, which meant the
+   * roster, payslips and documents appeared before anyone had read what was
+   * submitted. Until an owner presses Activate Employee they are an
+   * applicant, so they stay on the submitted screen.
+   *
+   * `staffActivated === false` and not `!staffActivated`: `null` means the
+   * server doc hasn't answered yet, and treating silence as a refusal would
+   * bounce every activated employee to the submitted screen on a slow start.
+   */
+  const staffAwaitingActivation =
+    !!user &&
+    !userIsOwner &&
+    !userIsChef &&
+    staffCompletedStep !== null &&
+    staffCompletedStep >= TOTAL_ONBOARDING_STEPS &&
+    staffActivated === false;
+
   useEffect(() => {
     const isPublic = PUBLIC_ROUTES.has(pathname);
 
@@ -315,6 +365,8 @@ export function AuthProvider({
             notificationsPromptSeen === false
               ? ROUTES.staffNotificationsPrompt
               : ROUTES.staffOnboarding;
+        } else if (staffAwaitingActivation) {
+          dest = ROUTES.staffOnboardingComplete;
         }
         window.location.replace(dest);
       })();
@@ -371,6 +423,19 @@ export function AuthProvider({
       return;
     }
 
+    // Submitted and waiting on the owner — held on the submitted screen, with
+    // the same /staff/settings escape hatch as staff still mid-form so they
+    // can still flip the language toggle.
+    if (
+      user &&
+      staffAwaitingActivation &&
+      pathname !== ROUTES.staffOnboardingComplete &&
+      !inSettings
+    ) {
+      router.replace(ROUTES.staffOnboardingComplete);
+      return;
+    }
+
     // Chefs skip onboarding wizard steps — overview + handbook/beer guide stay reachable.
     if (
       user &&
@@ -387,7 +452,7 @@ export function AuthProvider({
     if (user && !userIsOwnerNow && !userIsChefNow && !isStaffAllowedPath(pathname)) {
       router.replace(ROUTES.staffHome);
     }
-  }, [user, authRestored, pathname, router, staffCompletedStep, staffNeedsOnboarding, notificationsPromptSeen, staffProfileConfirmed]);
+  }, [user, authRestored, pathname, router, staffCompletedStep, staffNeedsOnboarding, staffAwaitingActivation, notificationsPromptSeen, staffProfileConfirmed]);
 
   /**
    * Sign out on the first press.
@@ -460,6 +525,7 @@ export function AuthProvider({
         signOut,
         staffCompletedStep,
         staffNeedsOnboarding,
+        staffAwaitingActivation,
       }}
     >
       {children}

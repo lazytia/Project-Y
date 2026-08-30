@@ -20,7 +20,8 @@ import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@
 import {
   NAV_BADGE_HREFS,
   loadNavBadgeCounts,
-  navBadgeDelta,
+  navBadgeLabel,
+  navBadgeValue,
   readNavSeen,
   reconcileNavSeen,
   writeNavSeen,
@@ -96,7 +97,7 @@ function NavChildList({
             {badge > 0 && (
               <span
                 className={styles.childBadge}
-                aria-label={`${badge} new since you last looked`}
+                aria-label={navBadgeLabel(item.href, badge)}
               >
                 +{badge}
               </span>
@@ -211,7 +212,9 @@ function navHasBadgedHref(nav: NavGroup[]): boolean {
 }
 
 /**
- * "+N" beside the People menu entries whose lists have grown.
+ * "+N" beside the People menu entries with something outstanding on them —
+ * requests waiting to be approved, or rows that have arrived since this user
+ * last looked. Which of the two an entry counts is decided next door.
  *
  * Counts are read once per mount and deliberately behind runWhenIdle — the
  * badge is decoration and must never compete with the page it sits next to.
@@ -258,8 +261,8 @@ function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pat
     if (!counts) return undefined;
     const out: NavCountMap = {};
     for (const [href, count] of Object.entries(counts)) {
-      const delta = navBadgeDelta(count, seen[href]);
-      if (delta > 0) out[href] = delta;
+      const value = navBadgeValue(href, count, seen[href]);
+      if (value > 0) out[href] = value;
     }
     return out;
   }, [counts, seen]);
@@ -267,7 +270,7 @@ function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pat
 
 export default function Sidebar({ open, onClose, initialDashboard = null }: Props) {
   const pathname = usePathname();
-  const { user, signOut, staffNeedsOnboarding } = useAuth();
+  const { user, signOut, staffNeedsOnboarding, staffAwaitingActivation } = useAuth();
   const { t } = useLang();
   // Firebase Auth hydrates a second or two after paint, and until it does
   // every isOwner/isChef check reads false — which sent owners and chefs
@@ -310,28 +313,18 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     [userIsStrictOwner],
   );
 
-  // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
+  // Staff sidebar — the day-to-day rows first, then the reference material.
   // Built here rather than inside the staff branch below so the open-group
   // effect can see the same tree the staff member is looking at.
+  //
+  // The three documents used to hang off an "Onboarding" group, with the beer
+  // guide indented under the training manual. Onboarding is over by the time
+  // this menu appears, so the group was named for something the reader had
+  // already finished, and the nesting buried the beer guide two taps deep —
+  // it is the one they are asked to come back and sign.
   const staffNav: NavGroup[] = useMemo(
     () => [
       { icon: "🏠", label: t("nav.home"), href: "/staff" },
-      {
-        icon: "📋",
-        label: t("nav.onboarding"),
-        children: [
-          { label: t("nav.onboardingOverview"), href: "/onboarding" },
-          { label: t("nav.staffHandbook"), href: "/staff/handbook" },
-          // Mirrors TRAINING_MANUAL in sidebar-nav.ts — same shape, but the
-          // labels have to come from the language toggle, which that module
-          // can't reach. Keep the two in step.
-          {
-            label: t("nav.trainingManual"),
-            href: "/staff/training-manual",
-            children: [{ label: t("nav.beerGuide"), href: "/staff/beer-guide" }],
-          },
-        ],
-      },
       {
         icon: "📅",
         label: t("nav.schedule"),
@@ -342,6 +335,15 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
         ],
       },
       { icon: "💰", label: t("nav.payslips"), href: "/staff/payslips" },
+      {
+        icon: "📚",
+        label: t("nav.handbookTraining"),
+        children: [
+          { label: t("nav.staffHandbook"), href: "/staff/handbook" },
+          { label: t("nav.trainingManual"), href: "/staff/training-manual" },
+          { label: t("nav.beerGuide"), href: "/staff/beer-guide" },
+        ],
+      },
       { icon: "📄", label: t("nav.myDocuments"), href: "/staff/documents" },
       { icon: "⚙️", label: t("nav.settings"), href: "/staff/settings" },
     ],
@@ -382,11 +384,11 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     if (owner) setOpenGroup(owner);
   }, [pathname, activeNav]);
 
-  // Staff who haven't completed onboarding get a stripped sidebar — no nav
-  // links, just brand + sign out. AuthProvider keeps them locked to
-  // /onboarding/*, so destinations they aren't allowed to reach yet would
-  // just look broken.
-  if (!userIsOwner && staffNeedsOnboarding) {
+  // Staff who haven't completed onboarding — and staff who have but whom no
+  // owner has activated yet — get a stripped sidebar: no nav links, just
+  // brand + sign out. AuthProvider keeps both locked to a single screen, so
+  // destinations they aren't allowed to reach yet would just look broken.
+  if (!userIsOwner && (staffNeedsOnboarding || staffAwaitingActivation)) {
     // Mid-onboarding staff can only reach /onboarding/*, so we don't
     // show any nav links — but we DO drop the EN/JA toggle straight
     // into the sidebar. Owner asked for this so the staff can flip
@@ -411,8 +413,10 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     );
   }
 
-  // Staff sidebar — Home / Schedule (with children) / Payslips + sign out.
-  // staffNav is built above, next to the other trees.
+  // Staff sidebar — staffNav is built above, next to the other trees. The
+  // EN/JA toggle sits at the bottom of it for the same reason it sits in the
+  // stripped sidebar above: the crew is largely Japanese, and reaching it
+  // through Settings meant leaving whatever page they were reading.
   if (!userIsOwner && !userIsChef) {
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
@@ -428,6 +432,10 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
               onNavigate={onClose}
             />
           ))}
+          <div className={styles.sidebarLangBlock}>
+            <p className={styles.sidebarLangLabel}>{t("common.language")}</p>
+            <LanguageToggle />
+          </div>
         </nav>
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>

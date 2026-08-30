@@ -92,6 +92,28 @@ function mealLabelKey(m: "lunch" | "dinner"): string {
   return m === "lunch" ? "staff.lunch" : "staff.dinner";
 }
 
+/**
+ * "1h 29m" — how long until the shift starts.
+ *
+ * Coarsens as it gets further out: minutes matter when you are about to
+ * leave, days are all anyone reads a week ahead.
+ */
+function fmtCountdown(fromMs: number, toMs: number): string {
+  const mins = Math.floor((toMs - fromMs) / 60000);
+  if (mins <= 0) return "";
+  const days = Math.floor(mins / 1440);
+  const hours = Math.floor((mins % 1440) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins % 60}m`;
+  return `${mins}m`;
+}
+
+function greetingKey(hour: number): string {
+  if (hour < 12) return "staff.greeting.morning";
+  if (hour < 18) return "staff.greeting.afternoon";
+  return "staff.greeting.evening";
+}
+
 function tsToDate(v: unknown): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
@@ -149,6 +171,9 @@ export default function StaffDashboardPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [nextShift, setNextShift] = useState<NextShiftInfo | null>(null);
   const [shiftLoaded, setShiftLoaded] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [position, setPosition] = useState("");
+  const [weekShiftCount, setWeekShiftCount] = useState<number | null>(null);
 
   const [today, setTodayDate] = useState<Date>(() => {
     const d = new Date(0);
@@ -162,6 +187,17 @@ export default function StaffDashboardPage() {
     setTodayDate(d);
   }, []);
 
+  // `null` until mounted, so the server and the first client render agree —
+  // the wall clock is the one thing the server cannot know. Everything keyed
+  // off it (the greeting, the countdown) has a neutral form for that frame.
+  const [nowMs, setNowMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   const thisWeekISO = useMemo(() => isoDate(startOfWeek(today)), [today]);
   const nextWeekISO = useMemo(() => isoDate(addDays(startOfWeek(today), 7)), [today]);
 
@@ -173,10 +209,16 @@ export default function StaffDashboardPage() {
       const snap = await getDoc(ref);
       const data = snap.data() ?? {};
 
+      const given = typeof data.firstName === "string" ? data.firstName.trim() : "";
+      const full = typeof data.fullName === "string" ? data.fullName.trim() : "";
+      setFirstName(given || full.split(" ")[0] || "");
+      setPosition(typeof data.position === "string" ? data.position : "");
+
       // Roster — check this week + next week
       const thisRoster = (data.roster?.[thisWeekISO] ?? null) as RosterDoc | null;
       const nextRoster = (data.roster?.[nextWeekISO] ?? null) as RosterDoc | null;
       setNextShift(findNextShift(thisRoster, nextRoster));
+      setWeekShiftCount(thisRoster?.shifts?.length ?? 0);
       setShiftLoaded(true);
 
       // Notifications
@@ -269,127 +311,125 @@ export default function StaffDashboardPage() {
     setNextPayDate(fri);
   }, []);
 
-  // Show only the top 2 on the dashboard card; the rest live in the modal.
-  const preview = notifications.slice(0, 2);
+  const greeting =
+    nowMs === null ? t("staff.greeting.hello") : t(greetingKey(new Date(nowMs).getHours()));
+  const countdown =
+    nowMs !== null && nextShift ? fmtCountdown(nowMs, nextShift.startDate.getTime()) : "";
+
+  // Everything the employee is being asked to do, newest first. Unsigned
+  // training leads: it is the only entry that is owed rather than announced,
+  // and it clears itself when the document is signed.
+  const attention = [
+    ...unsignedTraining.map((key) => ({
+      id: `training:${key}`,
+      href: SIGNABLE_DOCUMENTS[key].href,
+      title: t(SIGNABLE_DOCUMENTS[key].labelKey, SIGNABLE_DOCUMENTS[key].label),
+      detail: t("staff.attention.reviewAndSign"),
+      ago: "",
+    })),
+    ...notifications.map((n) => ({
+      id: `notif:${n.id}`,
+      href: `/staff/notifications/${n.id}`,
+      title: n.label,
+      detail: n.detail,
+      ago: n.ago,
+    })),
+  ];
+  const attentionPreview = attention.slice(0, 3);
 
   return (
     <div className={styles.page}>
-      {/* Training still owed. Above the shift card because it is the one
-          thing on this screen the employee has to go and do; it disappears
-          on its own once the document is signed. */}
-      {unsignedTraining.length > 0 && (
-        <section className={styles.trainingCard}>
-          <p className={styles.trainingTitle}>{t("staff.training.title")}</p>
-          <ul className={styles.trainingList}>
-            {unsignedTraining.map((key) => {
-              // Not `doc` — that name is Firestore's on this page — and not
-              // `document`, which is the global the effects above listen on.
-              const material = SIGNABLE_DOCUMENTS[key];
-              return (
-                <li key={key}>
-                  <Link href={material.href} className={styles.trainingRow}>
-                    <span className={styles.trainingIcon} aria-hidden="true">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-                        <line x1="12" y1="9" x2="12" y2="13" />
-                        <line x1="12" y1="17" x2="12.01" y2="17" />
-                      </svg>
-                    </span>
-                    <span className={styles.trainingBody}>
-                      <span className={styles.trainingDoc}>
-                        {t(material.labelKey, material.label)}
-                      </span>
-                      <span className={styles.trainingStatus}>
-                        {t("staff.training.notSigned")}
-                      </span>
-                    </span>
-                    <span className={styles.trainingCta}>
-                      {t(`staff.training.start.${key}`, `Start ${material.label}`)}{" "}
-                      <span aria-hidden="true">›</span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      <header className={styles.greetBlock}>
+        <h1 className={styles.greetTitle}>
+          {greeting}
+          {firstName ? `, ${firstName}` : ""} <span aria-hidden="true">👋</span>
+        </h1>
+        <p className={styles.greetSub}>{t("staff.greeting.sub")}</p>
+      </header>
 
       {/* Next Shift */}
       <Link href="/staff/schedule/roster" className={styles.shiftCard}>
-        <div className={styles.shiftIcon} aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
+        <div className={styles.shiftTop}>
+          <span className={styles.shiftLabel}>{t("staff.nextShift")}</span>
+          {countdown && <span className={styles.shiftCountdown}>
+            {t("staff.shiftIn.prefix")}{countdown}{t("staff.shiftIn.suffix")}
+          </span>}
         </div>
-        <div className={styles.shiftBody}>
-          <p className={styles.shiftLabel}>{t("staff.nextShift")}</p>
-          {!shiftLoaded ? (
-            <p className={styles.shiftDate}>{t("staff.loading")}</p>
-          ) : nextShift ? (
-            <>
-              <p className={styles.shiftDate}>{fmtShiftDate(nextShift.date)}</p>
-              <p className={styles.shiftTime}>
-                {fmtTime12h(nextShift.startTime)} - {t(mealLabelKey(nextShift.meal))}
-              </p>
-            </>
-          ) : (
-            <p className={styles.shiftDate}>{t("staff.noUpcoming")}</p>
-          )}
-        </div>
-        <span className={styles.chevron} aria-hidden="true">›</span>
+        {!shiftLoaded ? (
+          <p className={styles.shiftDate}>{t("staff.loading")}</p>
+        ) : nextShift ? (
+          <>
+            <p className={styles.shiftDate}>{fmtShiftDate(nextShift.date)}</p>
+            <p className={styles.shiftTime}>
+              {fmtTime12h(nextShift.startTime)} · {t(mealLabelKey(nextShift.meal))}
+            </p>
+            {position && <p className={styles.shiftPosition}>{position}</p>}
+          </>
+        ) : (
+          <p className={styles.shiftDate}>{t("staff.noUpcoming")}</p>
+        )}
       </Link>
 
-      {/* Notifications */}
-      <section className={styles.notifCard}>
-        <div className={styles.notifHeader}>
-          <p className={styles.notifTitle}>{t("staff.notif.title")}</p>
-          {notifications.length > 0 && (
-            <button
-              type="button"
-              className={styles.notifLink}
-              onClick={() => setNotifOpen(true)}
-            >
-              {t("staff.notif.viewAll")} <span aria-hidden="true">›</span>
-            </button>
-          )}
-        </div>
-        {notifications.length === 0 ? (
-          <p className={styles.notifEmpty}>{t("staff.notif.empty")}</p>
-        ) : (
+      {/* At-a-glance tiles */}
+      <div className={styles.tileRow}>
+        <Link href="/staff/schedule/roster" className={styles.tile}>
+          <span className={styles.tileLabel}>{t("staff.tile.schedule")}</span>
+          <span className={styles.tileValue}>
+            {weekShiftCount === null ? "—" : weekShiftCount}
+          </span>
+          <span className={styles.tileSub}>{t("staff.tile.thisWeek")}</span>
+        </Link>
+
+        <Link href="/staff/payslips" className={styles.tile}>
+          <span className={styles.tileLabel}>{t("staff.tile.payslip")}</span>
+          <span className={styles.tileValueSmall}>
+            {nextPayDate ? fmtShiftDate(nextPayDate) : "—"}
+          </span>
+          <span className={styles.tileSub}>{t("staff.nextPay")}</span>
+        </Link>
+
+        <Link href="/staff/documents" className={styles.tile}>
+          <span className={styles.tileLabel}>{t("staff.tile.documents")}</span>
+          <span className={styles.tileValueSmall}>
+            {unsignedTraining.length > 0
+              ? `${unsignedTraining.length} ${t("staff.tile.toSign")}`
+              : t("staff.tile.allSigned")}
+          </span>
+          <span className={styles.tileSub}>
+            {unsignedTraining.length > 0 ? t("staff.tile.actionNeeded") : t("staff.tile.upToDate")}
+          </span>
+        </Link>
+      </div>
+
+      {/* Needs Your Attention */}
+      {attention.length > 0 && (
+        <section className={styles.notifCard}>
+          <div className={styles.notifHeader}>
+            <p className={styles.notifTitle}>{t("staff.attention.title")}</p>
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                className={styles.notifLink}
+                onClick={() => setNotifOpen(true)}
+              >
+                {t("staff.notif.viewAll")} <span aria-hidden="true">›</span>
+              </button>
+            )}
+          </div>
           <ul className={styles.notifList}>
-            {preview.map((n) => (
-              <li key={n.id} className={styles.notifItem}>
+            {attentionPreview.map((item) => (
+              <li key={item.id} className={styles.notifItem}>
                 <span className={styles.notifDot} aria-hidden="true" />
-                <Link href={`/staff/notifications/${n.id}`} className={styles.notifText}>
-                  {n.label}
+                <Link href={item.href} className={styles.notifBody}>
+                  <span className={styles.notifText}>{item.title}</span>
+                  {item.detail && <span className={styles.notifDetail}>{item.detail}</span>}
                 </Link>
-                <span className={styles.notifAgo}>{n.ago}</span>
+                {item.ago && <span className={styles.notifAgo}>{item.ago}</span>}
               </li>
             ))}
           </ul>
-        )}
-      </section>
-
-      {/* Next Pay Date */}
-      <Link href="/staff/payslips" className={styles.payCard}>
-        <div className={styles.payIcon} aria-hidden="true">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8" />
-            <line x1="12" y1="6" x2="12" y2="8" />
-            <line x1="12" y1="16" x2="12" y2="18" />
-          </svg>
-        </div>
-        <div className={styles.payBody}>
-          <p className={styles.payLabel}>{t("staff.nextPay")}</p>
-          <p className={styles.payDate}>{nextPayDate ? fmtShiftDate(nextPayDate) : "—"}</p>
-        </div>
-        <span className={styles.chevron} aria-hidden="true">›</span>
-      </Link>
+        </section>
+      )}
 
       {/* Quick Actions */}
       <section className={styles.quickSection}>

@@ -8,104 +8,67 @@
   gap: var(--space-5);
 }
 
-/* ── Brand row (YURICA + bell) ── */
-.brandRow {
+/* ── Greeting ── */
+.greetBlock {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
-.brand {
+.greetTitle {
   margin: 0;
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: 0.35em;
+  font-size: 24px;
+  font-weight: 800;
   color: var(--color-fg);
+  letter-spacing: -0.01em;
 }
 
-.bellBtn {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
+.greetSub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Next shift ── */
+.shiftCard {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  color: var(--color-fg);
-}
-
-.bellBtn:hover { background: var(--color-surface); }
-
-.bellDot {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 9px;
-  height: 9px;
-  background: var(--color-warm);
-  border: 2px solid var(--color-bg);
-  border-radius: 50%;
-}
-
-/* ── Generic card row (shift + pay) ── */
-.shiftCard,
-.payCard {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-1);
   padding: var(--space-4);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  background: var(--color-warm-bg);
   border-radius: var(--radius-lg);
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.15s;
 }
 
-.shiftCard:hover,
-.payCard:hover { border-color: var(--color-warm); }
-
-.shiftIcon,
-.payIcon {
+.shiftTop {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: rgba(234, 88, 12, 0.10);
-  color: var(--color-warm);
-  flex-shrink: 0;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
-.shiftBody,
-.payBody {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.shiftLabel,
-.payLabel {
-  margin: 0;
-  font-size: 13px;
+.shiftLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-fg-muted);
-  font-weight: 500;
 }
 
-.shiftDate,
-.payDate {
+/* The one number on this screen that changes while you look at it. */
+.shiftCountdown {
+  padding: 4px 10px;
+  background: var(--color-warm);
+  color: #fff;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.shiftDate {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
@@ -120,81 +83,61 @@
   color: var(--color-warm);
 }
 
-.chevron {
-  font-size: 22px;
-  color: var(--color-fg-muted);
-  flex-shrink: 0;
-}
-
-/* ── Required training ── */
-.trainingCard {
-  padding: var(--space-4);
-  background: var(--color-warm-bg);
-  border-radius: var(--radius-lg);
-}
-
-.trainingTitle {
-  margin: 0 0 var(--space-3);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-fg-muted);
-}
-
-.trainingList {
-  list-style: none;
+.shiftPosition {
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
+  font-size: 13px;
+  color: var(--color-fg-muted);
+}
+
+/* ── At-a-glance tiles ── */
+.tileRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-2);
 }
 
-.trainingRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  text-decoration: none;
-  color: inherit;
-}
-
-.trainingRow:hover .trainingCta { text-decoration: underline; }
-
-.trainingIcon {
-  display: inline-flex;
-  color: var(--color-warm);
-  flex-shrink: 0;
-}
-
-.trainingBody {
-  flex: 1;
-  min-width: 0;
+.tile {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
 }
 
-.trainingDoc {
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--color-fg);
-}
+.tile:hover { border-color: var(--color-warm); }
 
-.trainingStatus {
-  font-size: 12px;
+.tileLabel {
+  font-size: 11px;
+  font-weight: 600;
   color: var(--color-fg-muted);
 }
 
-.trainingCta {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-warm);
-  white-space: nowrap;
-  flex-shrink: 0;
+.tileValue {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-fg);
+  line-height: 1.2;
 }
 
-/* ── Notifications card ── */
+/* Dates and "All signed" need the room a bare count doesn't. */
+.tileValueSmall {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-fg);
+  line-height: 1.3;
+}
+
+.tileSub {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+/* ── Needs your attention ── */
 .notifCard {
   padding: var(--space-4);
   background: var(--color-bg);
@@ -243,7 +186,7 @@
 
 .notifItem {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--color-border);
@@ -258,13 +201,27 @@
   background: var(--color-warm);
   border-radius: 50%;
   flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.notifBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
 }
 
 .notifText {
-  flex: 1;
   font-size: 14px;
   color: var(--color-fg);
-  font-weight: 500;
+  font-weight: 600;
+}
+
+.notifDetail {
+  font-size: 13px;
+  color: var(--color-fg-muted);
 }
 
 .notifAgo {
@@ -317,6 +274,12 @@
   flex: 1;
   font-size: 15px;
   font-weight: 600;
+}
+
+.chevron {
+  font-size: 22px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
 }
 
 /* ── Notifications modal ── */
@@ -451,11 +414,4 @@
   font-size: 13px;
   color: var(--color-fg-muted);
   line-height: 1.5;
-}
-
-.notifEmpty {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-fg-muted);
-  padding: var(--space-2) 0;
 }

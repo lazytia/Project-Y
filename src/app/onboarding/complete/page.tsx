@@ -61,7 +61,7 @@ export default function OnboardingCompletePage() {
           <span className={styles.sparkleE} />
           <span className={styles.sparkleF} />
           <div className={styles.iconCircle}>
-            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="52" height="52" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="14" y="10" width="32" height="44" rx="3" />
               <path d="M22 6h16a2 2 0 0 1 2 2v4H20V8a2 2 0 0 1 2-2z" />
               <circle cx="42" cy="36" r="11" fill="#fff" />

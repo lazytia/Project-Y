@@ -1,11 +1,15 @@
+/* Sized to sit inside a phone viewport without scrolling: this screen is the
+   whole of what a new hire sees until the owner activates them, and a page
+   that has to be scrolled to reach "Under Review" hides the one line that
+   says what happens next. */
 .page {
   font-family: var(--font-sans);
   max-width: 480px;
   margin: 0;
-  padding: var(--space-6) var(--space-5) var(--space-7);
+  padding: var(--space-4) var(--space-5) var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 /* ── Hero (icon + title + subtitle) ── */
@@ -14,22 +18,22 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: var(--space-3);
-  padding: var(--space-5) 0 var(--space-2);
+  gap: var(--space-2);
+  padding: 0 0 var(--space-2);
 }
 
 .iconWrap {
   position: relative;
-  width: 156px;
-  height: 156px;
+  width: 112px;
+  height: 112px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .iconCircle {
-  width: 156px;
-  height: 156px;
+  width: 112px;
+  height: 112px;
   border-radius: 50%;
   background: rgba(234, 88, 12, 0.10);
   display: flex;
@@ -54,16 +58,16 @@
   opacity: 0.85;
 }
 
-.sparkleA { top: 12px;  left: 28px; }
-.sparkleB { top: 2px;   right: 38px; }
-.sparkleC { top: 56px;  left: 0;     opacity: 0.45; width: 6px; height: 6px; }
-.sparkleD { bottom: 38px; right: 2px; opacity: 0.45; width: 6px; height: 6px; }
-.sparkleE { bottom: 8px;  left: 36px; width: 6px; height: 6px; }
-.sparkleF { top: 36px; right: 6px; width: 6px; height: 6px; opacity: 0.6; }
+.sparkleA { top: 9px;   left: 20px; }
+.sparkleB { top: 1px;   right: 27px; }
+.sparkleC { top: 40px;  left: 0;     opacity: 0.45; width: 6px; height: 6px; }
+.sparkleD { bottom: 27px; right: 1px; opacity: 0.45; width: 6px; height: 6px; }
+.sparkleE { bottom: 6px;  left: 26px; width: 6px; height: 6px; }
+.sparkleF { top: 26px; right: 4px; width: 6px; height: 6px; opacity: 0.6; }
 
 .title {
-  margin: var(--space-3) 0 0;
-  font-size: 28px;
+  margin: var(--space-2) 0 0;
+  font-size: 24px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
@@ -72,7 +76,7 @@
 .subtitle {
   margin: 0;
   max-width: 360px;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--color-fg-muted);
   line-height: 1.6;
 }
@@ -82,7 +86,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-3);
   background: var(--color-surface);
   border-radius: var(--radius-lg);
 }
@@ -116,8 +120,8 @@
 .statCard {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-3);
   background: var(--color-surface);
   border-radius: var(--radius-lg);
 }
