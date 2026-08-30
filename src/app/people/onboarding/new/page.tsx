@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwnerOrChef, submitterRoleForUser } from "@/lib/permissions";
+import { isManager, isOwnerOrChef, submitterRoleForUser } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { emailToUsername } from "@/lib/username";
 import {
@@ -27,6 +27,17 @@ import styles from "./page.module.css";
 
 const POSITIONS = ["Hall Staff", "Kitchen Staff", "Manager", "Head Chef"] as const;
 type Position = (typeof POSITIONS)[number];
+
+/**
+ * Titles a manager cannot hire into.
+ *
+ * Yurina raises most of the requests on this form, and the two she is left
+ * with are the two she is actually filling — a floor hire. Manager and Head
+ * Chef are appointments the business owner makes, and offering them in the
+ * same list made them look like a choice the person filling the form gets to
+ * take. The owner and the chef still see all four.
+ */
+const OWNER_ONLY_POSITIONS: ReadonlySet<Position> = new Set(["Manager", "Head Chef"]);
 
 const VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
 type VisaType = (typeof VISA_TYPES)[number];
@@ -72,6 +83,10 @@ export default function NewEmployeePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwnerOrChef(user);
+  const positionOptions = useMemo<readonly Position[]>(
+    () => (isManager(user) ? POSITIONS.filter((p) => !OWNER_ONLY_POSITIONS.has(p)) : POSITIONS),
+    [user],
+  );
 
   useEffect(() => {
     if (authLoading) return;
@@ -253,7 +268,7 @@ export default function NewEmployeePage() {
             value={position}
             onChange={(e) => setPosition(e.target.value as Position)}
           >
-            {POSITIONS.map((p) => (
+            {positionOptions.map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>

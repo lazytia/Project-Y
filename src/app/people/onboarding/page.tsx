@@ -59,17 +59,19 @@ type StaffOnboarding = {
 type TabKey = "new" | "ready";
 
 /**
- * The pill each state wears.
+ * The pill each state wears — for the two states that wear one.
  *
- * Colour carries the same meaning throughout: warm means it is the owner's
- * move, blue means it is someone else's. So a request waiting to be approved
- * and one waiting on the employee do not look alike.
+ * A request nobody has approved and an account nobody has used both go
+ * without. Neither is a stage the new hire has reached: one is waiting on the
+ * owner and the other on the hire to open the app, and the date line beside
+ * them already says which ("Submitted 28 Aug", "Invited 28 Aug"). A pill
+ * repeating that word was labelling the absence of progress as progress. The
+ * two that remain are both things the hire has actually done: started their
+ * form, or finished it.
  */
-const STATUS_PILLS: Record<OnboardingListStatus, { label: string; tone: "warm" | "info" }> = {
-  submitted: { label: "Submitted", tone: "info" },
-  started: { label: "Onboarding Started", tone: "warm" },
-  in_progress: { label: "In Progress", tone: "info" },
-  ready: { label: "Ready for Review", tone: "warm" },
+const STATUS_PILLS: Partial<Record<OnboardingListStatus, string>> = {
+  started: "Onboarding Started",
+  ready: "Ready for Review",
 };
 
 /** Username derived from the synthetic auth email, or the stored field. */
@@ -153,11 +155,14 @@ function initialsOf(row: StaffOnboarding): string {
  * moment they completed it — while an unapproved request is dated by when it
  * was submitted. Showing one date labelled two ways would be worse than
  * showing nothing: "Completed 3 Aug" on a row nobody has touched since it was
- * created is a lie the owner would act on.
+ * created is a lie the owner would act on. Which is why an unused account
+ * reads "Invited" and not "Started": `approvedAt` is when the login was made,
+ * not when it was first used, and only the row below it has been.
  */
 function dateLine(row: StaffOnboarding): string {
   if (row.listStatus === "ready") return `Completed ${fmtDate(row.updatedAt ?? row.approvedAt)}`;
   if (row.listStatus === "submitted") return `Submitted ${fmtDate(row.createdAt)}`;
+  if (row.listStatus === "invited") return `Invited ${fmtDate(row.approvedAt ?? row.createdAt)}`;
   return `Started ${fmtDate(row.approvedAt ?? row.createdAt)}`;
 }
 
@@ -376,14 +381,12 @@ export default function ManagerOnboardingPage() {
                         <span className={styles.position}>{positionLabel(row)}</span>
                       </span>
                       <span className={styles.cardRight}>
-                        <span
-                          className={`${styles.pill} ${
-                            pill.tone === "warm" ? styles.pillWarm : styles.pillInfo
-                          }`}
-                        >
-                          <StatusIcon status={row.listStatus} />
-                          {pill.label}
-                        </span>
+                        {pill && (
+                          <span className={`${styles.pill} ${styles.pillWarm}`}>
+                            <StatusIcon status={row.listStatus} />
+                            {pill}
+                          </span>
+                        )}
                         <span className={styles.dateSmall}>{dateLine(row)}</span>
                       </span>
                       <button
@@ -518,14 +521,6 @@ export default function ManagerOnboardingPage() {
 /* ── Icon components ── */
 
 function StatusIcon({ status }: { status: OnboardingListStatus }) {
-  if (status === "submitted") {
-    return (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="2" y="4" width="20" height="16" rx="2" />
-        <path d="m22 7-10 6L2 7" />
-      </svg>
-    );
-  }
   if (status === "ready") {
     return (
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -533,8 +528,7 @@ function StatusIcon({ status }: { status: OnboardingListStatus }) {
       </svg>
     );
   }
-  // Started and In Progress both mean "the employee is mid-form", so they
-  // share the play mark and are told apart by the words and the colour.
+  // Onboarding Started — the form is open and moving.
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M8 5v14l11-7z" />

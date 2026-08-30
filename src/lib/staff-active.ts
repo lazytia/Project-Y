@@ -1,5 +1,6 @@
 /** When an employee leaves onboarding and appears on /people/active. */
 
+import { FIRST_LOGIN_FIELD } from "./first-login";
 import { TOTAL_ONBOARDING_STEPS } from "./onboarding-steps";
 import { STRICT_OWNER_USERNAMES } from "./permissions";
 import { emailToUsername } from "./username";
@@ -16,6 +17,8 @@ export type StaffOnboardingFlags = {
   activatedAt?: unknown;
   /** How far through the onboarding form the employee has got. */
   completedStep?: number;
+  /** Stamped by the session route the first time this account signs in. */
+  firstLoginAt?: unknown;
 };
 
 /**
@@ -37,6 +40,7 @@ export const STAFF_FLAG_FIELDS = [
   "email",
   "activatedAt",
   "completedStep",
+  FIRST_LOGIN_FIELD,
 ] as const;
 
 /**
@@ -58,6 +62,7 @@ export function staffOnboardingFlags(raw: Record<string, unknown>): StaffOnboard
     email: typeof raw.email === "string" ? raw.email : undefined,
     activatedAt: raw.activatedAt,
     completedStep: typeof raw.completedStep === "number" ? raw.completedStep : undefined,
+    firstLoginAt: raw[FIRST_LOGIN_FIELD],
   };
 }
 
@@ -141,27 +146,47 @@ export function isReadyForReview(raw: StaffOnboardingFlags): boolean {
 }
 
 /** How far along a New Employees row is, for its status pill. */
-export type OnboardingListStatus = "submitted" | "started" | "in_progress" | "ready";
+export type OnboardingListStatus = "submitted" | "invited" | "started" | "ready";
+
+/**
+ * Has this person actually signed in and begun the form?
+ *
+ * `firstLoginAt` is the honest answer: the session route stamps it once, from
+ * a verified ID token, so it records a sign-in that happened rather than an
+ * account that was created. A saved step is accepted as the same proof — the
+ * form is only reachable behind the login, so a step that exists is a sign-in
+ * that happened — and it is the only proof there is for anyone who started
+ * before the stamp was being written.
+ */
+export function hasStartedOnboarding(raw: StaffOnboardingFlags): boolean {
+  return !!raw.firstLoginAt || (raw.completedStep ?? 0) > 0;
+}
 
 /**
  * Where this row stands, in the four states the list can show.
  *
- * The three "New" states are not decoration — they say who is holding things
- * up, which is the question the list is opened to answer. `submitted` is
- * waiting on the owner to approve the request; `started` and `in_progress`
- * are waiting on the employee; `ready` is waiting on the owner again.
+ * `submitted` is a request nobody has approved yet. `invited` is an account
+ * that has been created and texted out but never used. `started` is the new
+ * hire having signed in and begun the form, and `ready` is that form finished
+ * and waiting on the owner to sign it off.
  *
- * `started` and `in_progress` are told apart by `completedStep`, which
- * `createStaffAccount` seeds at 0 the moment the login is issued — so a row
- * sitting at 0 has been given the form and not opened it, rather than being
- * a row from before the form existed. Those legacy rows carry no marker at
- * all and are kept off this list entirely by isOnboardingListEmployee.
+ * `invited` and `started` used to be one state, on the reasoning that issuing
+ * a login is what puts somebody on the hook. It isn't: the owner creates the
+ * account days before the person touches it, so the list said "Onboarding
+ * Started" about people who had never opened the app, and the one thing the
+ * owner comes here to find out — whether the new hire has got going — was the
+ * one thing it could not tell her.
+ *
+ * `started` used to split in two the other way, with "In Progress" taking
+ * over once the first step was saved. That split named a difference that
+ * changed nothing: both halves are waiting on the same person to carry on. How
+ * far in somebody is belongs on the review screen, which shows the steps
+ * themselves rather than a word standing in for them.
  */
 export function onboardingListStatus(raw: StaffOnboardingFlags): OnboardingListStatus {
   if (!isActiveEmployee(raw)) return "submitted";
-  const step = raw.completedStep ?? 0;
-  if (step >= TOTAL_ONBOARDING_STEPS) return "ready";
-  return step > 0 ? "in_progress" : "started";
+  if ((raw.completedStep ?? 0) >= TOTAL_ONBOARDING_STEPS) return "ready";
+  return hasStartedOnboarding(raw) ? "started" : "invited";
 }
 
 export function staffStatusAfterOnboardingSteps(accountCreated: boolean): "active" | "approved" {
