@@ -96,10 +96,13 @@ export async function GET(req: NextRequest) {
           "firstName",
           "lastName",
           "position",
-          // The handbook and the employment contract were both signed inside
-          // the onboarding form long before `document_signatures` existed.
+          // The handbook, the privacy policy and the employment contract are
+          // all signed inside the onboarding form — the handbook long before
+          // `document_signatures` existed, the other two only ever there.
           new FieldPath("policies", "handbookSignedAt"),
           new FieldPath("policies", "handbookVersion"),
+          new FieldPath("policies", "privacySignedAt"),
+          new FieldPath("policies", "privacyVersion"),
           new FieldPath("policies", "agreementSignedAt"),
         )
         .get(),
@@ -114,7 +117,7 @@ export async function GET(req: NextRequest) {
         .get(),
     ]);
 
-    const signed: AckSignatureIndex = { employmentContract: {} };
+    const signed: AckSignatureIndex = { privacyPolicy: {}, employmentContract: {} };
     for (const key of SIGNABLE_DOCUMENT_KEYS) signed[key] = {};
 
     for (const docSnap of signatureSnap.docs) {
@@ -149,6 +152,14 @@ export async function GET(req: NextRequest) {
             version: str(policies.handbookVersion),
           };
         }
+      }
+
+      const privacyISO = toISO(policies.privacySignedAt);
+      if (privacyISO) {
+        signed.privacyPolicy![docSnap.id] = {
+          signedAtISO: privacyISO,
+          version: str(policies.privacyVersion),
+        };
       }
 
       const agreementISO = toISO(policies.agreementSignedAt);

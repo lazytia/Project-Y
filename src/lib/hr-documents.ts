@@ -7,11 +7,11 @@
  * well as from the page that renders the document — so it lives here rather
  * than beside the document body, which is a client component.
  *
- * Four documents, but only three are signed and only two of those are signed
- * through `document_signatures`; the employment contract is agreed inside the
- * onboarding form and the training guide asks for nothing at all. Rather than
- * three lists that have to be kept in step, each row says where its own
- * signature comes from.
+ * Five documents, but only four are signed and only two of those are signed
+ * through `document_signatures`; the privacy policy and the employment
+ * contract are both agreed inside the onboarding form and the training guide
+ * asks for nothing at all. Rather than three lists that have to be kept in
+ * step, each row says where its own signature comes from.
  */
 
 import type { SignableDocumentKey } from "./document-signatures";
@@ -24,9 +24,18 @@ export const HANDBOOK_UPDATED = "June 2026";
 export const BEER_GUIDE_VERSION = "1.0";
 export const BEER_GUIDE_UPDATED = "June 2026";
 
+/** The version the onboarding form signs against. It lives here rather than
+ *  beside the policy text so the server can tell a current signature from one
+ *  taken against an earlier wording. */
+export const PRIVACY_POLICY_VERSION = "1.0";
+
 /** Superset of SignableDocumentKey — the two signable keys are reused verbatim
  *  so a signature can be looked up by document key with no translation. */
-export type HrDocumentKey = SignableDocumentKey | "trainingGuide" | "employmentContract";
+export type HrDocumentKey =
+  | SignableDocumentKey
+  | "trainingGuide"
+  | "privacyPolicy"
+  | "employmentContract";
 
 /**
  * Where a signature for a document is kept.
@@ -85,13 +94,26 @@ export const HR_DOCUMENTS: readonly HrDocument[] = [
     signedVia: null,
   },
   {
+    // Signed inside the onboarding form, on the first of its three policy
+    // pages. Versioned like the handbook because it is the kind of document
+    // that gets reworded: when it is, everyone who signed the old wording has
+    // to sign again, and only a version recorded alongside the signature can
+    // tell us who that is.
+    key: "privacyPolicy",
+    label: "Privacy Policy",
+    href: "/hr-records/acknowledgements/privacyPolicy",
+    version: PRIVACY_POLICY_VERSION,
+    updated: null,
+    unversionedLabel: "",
+    signedVia: "onboarding",
+  },
+  {
     // Signed once, inside the onboarding form. There is no second version to
     // re-sign — a changed contract is a new contract, not a new revision.
     //
-    // Alone among these, it has no page of its own to open: the contract is
-    // agreed inside the onboarding form rather than published as a document,
-    // so the only thing there is to read about it is who has one on file. That
-    // is the acknowledgement page, which is where this points.
+    // Alone among these it has no published document of its own, so — like
+    // the privacy policy above it — the row opens who has signed it rather
+    // than a copy of what they signed.
     key: "employmentContract",
     label: "Employment Contract",
     href: "/hr-records/acknowledgements/employmentContract",

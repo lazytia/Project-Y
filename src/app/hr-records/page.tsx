@@ -47,6 +47,7 @@ const DOCUMENT_ROWS: HrDocumentKey[] = [
   "trainingGuide",
   "beerGuide",
   "handbook",
+  "privacyPolicy",
   "employmentContract",
 ];
 

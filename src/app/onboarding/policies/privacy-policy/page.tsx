@@ -7,9 +7,8 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import SignaturePad from "@/components/SignaturePad";
 import { useLang } from "@/components/LanguageProvider";
+import { PRIVACY_POLICY_VERSION } from "@/lib/hr-documents";
 import styles from "./page.module.css";
-
-const POLICY_VERSION = "1.0";
 
 export default function PrivacyPolicyPage() {
   const router = useRouter();
@@ -30,7 +29,7 @@ export default function PrivacyPolicyPage() {
         {
           policies: {
             privacySignedAt: serverTimestamp(),
-            privacyVersion: POLICY_VERSION,
+            privacyVersion: PRIVACY_POLICY_VERSION,
             privacyAcknowledged: true,
             privacySignature: signatureDataUrl,
           },
