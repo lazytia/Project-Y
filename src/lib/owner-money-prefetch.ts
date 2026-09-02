@@ -6,10 +6,6 @@ export function sydneyTodayKey(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: SYDNEY_TZ });
 }
 
-export function sydneyMonthKey(): string {
-  return sydneyTodayKey().slice(0, 7);
-}
-
 function isoMondayOf(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));

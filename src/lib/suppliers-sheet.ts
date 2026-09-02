@@ -449,19 +449,3 @@ export async function fetchSupplierMonth(monthISO: string): Promise<MonthlySuppl
   const rows = await reader.rowsForTab(match);
   return parseTabRows(rows, monthISO, match);
 }
-
-/** Load several months from one workbook download. */
-export async function fetchSupplierMonths(
-  monthISOs: string[],
-): Promise<Map<string, MonthlySuppliers | null>> {
-  const reader = await openTabReader();
-  const pairs = await Promise.all(
-    monthISOs.map(async (monthISO) => {
-      const match = reader.titles.find((t) => tabMatchesMonth(t, monthISO));
-      if (!match) return [monthISO, null] as const;
-      const rows = await reader.rowsForTab(match);
-      return [monthISO, parseTabRows(rows, monthISO, match)] as const;
-    }),
-  );
-  return new Map(pairs);
-}
