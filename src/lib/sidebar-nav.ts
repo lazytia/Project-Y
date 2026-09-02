@@ -89,14 +89,6 @@ export const OWNER_NAV: NavGroup[] = [
     children: [{ label: "HR Notes", href: "/people/hr-notes" }],
   },
   {
-    icon: "📦",
-    label: "Inventory",
-    children: [
-      { label: "Stock Levels", href: "/inventory/inventory" },
-      { label: "Suppliers", href: "/inventory/suppliers" },
-    ],
-  },
-  {
     icon: "⚙️",
     label: "System",
     children: [

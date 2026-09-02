@@ -11,10 +11,7 @@ import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import { readClientDashboardHint } from "@/lib/client-session-hint";
 import type { DashboardKind } from "@/lib/session-dashboard";
-import {
-  prefetchOwnerInventorySummaries,
-  prefetchOwnerMoneySummaries,
-} from "@/lib/owner-money-prefetch";
+import { prefetchOwnerMoneySummaries } from "@/lib/owner-money-prefetch";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import {
@@ -297,7 +294,6 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     setOpenGroup((prev) => (prev === label ? null : label));
     if (!userIsStrictOwner) return;
     if (label === "Money") runWhenIdle(() => prefetchOwnerMoneySummaries(), 0);
-    else if (label === "Inventory") runWhenIdle(() => prefetchOwnerInventorySummaries(), 0);
   };
 
   // Managers (yurina) get a curated nav — narrower than the owner nav and
