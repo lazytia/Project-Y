@@ -282,6 +282,26 @@
   margin-top: var(--space-2);
 }
 
+/*
+ * Sits immediately above the two buttons because its whole job is to explain
+ * why they are greyed out — put it up beside the offending field instead and
+ * the owner, who is looking at the dead button, never sees it.
+ */
+.blockerNote {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+  color: var(--color-warm);
+}
+
+.blockerNote svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 
 .inviteBtn {
   display: flex;

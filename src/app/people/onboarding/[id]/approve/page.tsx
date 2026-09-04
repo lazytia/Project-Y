@@ -156,14 +156,28 @@ export default function CreateLoginDetailsPage() {
     };
   }, [allowed, requestId, router]);
 
-  const canSubmit = useMemo(() => {
-    return (
-      loginId.trim().length >= 3 &&
-      password.length >= 6 &&
-      mobileLocal.trim().length >= 9 &&
-      !validateUsername(loginId)
-    );
+  /**
+   * Why both buttons are dead, in words, or null when they are not.
+   *
+   * The password normally fills itself — typing a four-digit Square Staff ID
+   * sets it — so an owner who has no Staff ID to hand scrolls past a field
+   * that looks optional, reaches the bottom, and finds a greyed-out button
+   * that will not say what it wants. The form looks finished and nothing
+   * happens on tap, which reads as the SMS being broken rather than as a
+   * missing field. Naming the field is the whole difference.
+   */
+  const blocker = useMemo<string | null>(() => {
+    if (loginId.trim().length < 3) return "Login ID needs at least 3 characters.";
+    const loginIdError = validateUsername(loginId);
+    if (loginIdError) return loginIdError;
+    if (password.length < 6) {
+      return "Password needs at least 6 characters. Entering the Square Staff ID above fills one in for you.";
+    }
+    if (mobileLocal.trim().length < 9) return "Enter the employee's mobile number.";
+    return null;
   }, [loginId, password, mobileLocal]);
+
+  const canSubmit = blocker === null;
 
   async function persist(invite: boolean) {
     if (!request || !rawRequest || !canSubmit || busy) return;
@@ -447,6 +461,12 @@ export default function CreateLoginDetailsPage() {
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.actions}>
+        {blocker && !busy && (
+          <p className={styles.blockerNote}>
+            <InfoIcon />
+            {blocker}
+          </p>
+        )}
         <button
           type="button"
           className={styles.inviteBtn}
