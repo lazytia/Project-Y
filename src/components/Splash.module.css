@@ -31,7 +31,13 @@
   letter-spacing: -0.02em;
 }
 
+/* Stacked one word per line — see .bootSplashWordmark in globals.css, which
+   this has to be pixel-identical to or the handover between the two flickers. */
 .wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
   font-family: var(--font-display, var(--font-sans));
   font-size: var(--font-size-lg);
   font-weight: 600;

@@ -31,3 +31,18 @@ export const APP_NAME = "Project YURICA";
  * is worse than no instruction.
  */
 export const HOME_SCREEN_NAME = "YURICA";
+
+/**
+ * APP_NAME broken into the lines the splash stacks it on.
+ *
+ * Set one word per line rather than in a single row: the splash sits under a
+ * square logo mark, and a wordmark wider than the mark it belongs to reads as
+ * a caption instead of a name. Stacked, the two together make a block.
+ *
+ * Derived from APP_NAME instead of spelled out because the launch-screen PNGs
+ * in public/splash carry the same two lines as pixels. Those are regenerated
+ * by hand, so the one thing that must not happen is the name changing here and
+ * the split staying behind — the boot splash would then disagree with the
+ * launch image it is drawn on top of.
+ */
+export const APP_NAME_LINES = APP_NAME.split(" ");

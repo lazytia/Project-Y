@@ -33,7 +33,8 @@ self.addEventListener("push", (event) => {
     payload = {};
   }
   const data = payload.data || payload.notification || payload || {};
-  const title = data.title || "Project Y";
+  // Not importable from @/lib/brand — see the note in firebase-messaging-sw.js.
+  const title = data.title || "Project YURICA";
   const body = data.body || "";
   const url = data.url || DEFAULT_LANDING;
 

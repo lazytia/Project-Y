@@ -1,4 +1,4 @@
-/* Firebase Cloud Messaging service worker for Project Y. */
+/* Firebase Cloud Messaging service worker for Project YURICA. */
 /* eslint-disable no-undef */
 
 importScripts(
@@ -53,7 +53,11 @@ self.addEventListener("push", (event) => {
   // FCM data-only messages arrive as { data: { ... } }; be tolerant of either
   // shape in case a notification-style payload sneaks through.
   const data = payload.data || payload.notification || payload || {};
-  const title = data.title || "Project Y";
+  // Spelled out rather than imported: this file is served straight from
+  // public/ and never passes through the bundler, so @/lib/brand is out of
+  // reach. That constant is still the source of truth — change it and this
+  // string, and its twin in fcm-push-handlers.js, have to follow by hand.
+  const title = data.title || "Project YURICA";
   const body = data.body || "";
   const url = data.url || DEFAULT_LANDING;
 

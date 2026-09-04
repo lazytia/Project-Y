@@ -138,7 +138,18 @@ button {
   letter-spacing: -0.02em;
 }
 
+/*
+ * One word per line, matching the launch-screen PNG this is painted over.
+ * A column rather than a line break so the words centre on each other however
+ * long they are, and so the block stays about as wide as the logo above it —
+ * set in a row, the name is wider than the mark it names and reads as a
+ * caption rather than as part of it.
+ */
 .bootSplashWordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
   font-family: var(--font-display, var(--font-sans));
   font-size: var(--font-size-lg);
   font-weight: 600;

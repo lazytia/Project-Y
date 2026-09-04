@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- Matches the boot-splash design in RootLayout: black rounded square
-       with a bold white "Y" mark, and the "Project Y" wordmark below.
-       pwa-asset-generator centers this on the splash-background colour
-       (white in our manifest) so the native iOS launch screen looks
-       identical to our React splash. -->
+       with a bold white "Y" mark, and the wordmark stacked below it —
+       "Project" over "YURICA", so the name reads as a block under the icon
+       instead of a long thin line that has to shrink to fit.
+
+       Source of truth for public/splash/*.png. Those are flat images, so a
+       change here is invisible until scripts/generate-splash.mjs regenerates
+       them; leave the two out of step and the app opens on the old artwork
+       and swaps to the new one a beat later. -->
   <rect x="176" y="120" width="160" height="160" rx="40" fill="#111111"/>
   <text x="256" y="240"
         text-anchor="middle"
@@ -12,11 +16,18 @@
         font-weight="900"
         font-size="96"
         fill="#ffffff">Y</text>
-  <text x="256" y="330"
+  <text x="256" y="326"
         text-anchor="middle"
         font-family="Arial, sans-serif"
         font-weight="600"
         font-size="34"
         letter-spacing="1.5"
-        fill="#111111">Project Y</text>
+        fill="#111111">Project</text>
+  <text x="256" y="366"
+        text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-weight="600"
+        font-size="34"
+        letter-spacing="1.5"
+        fill="#111111">YURICA</text>
 </svg>

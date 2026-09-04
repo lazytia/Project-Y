@@ -1,10 +1,14 @@
-import { APP_NAME } from "./brand";
+import { APP_NAME_LINES } from "./brand";
 
 const BOOT_SPLASH_ID = "boot-splash";
 const BOOT_SPLASH_HIDDEN = "bootSplashHidden";
 
+// One span per line, stacked by .bootSplashWordmark, so this matches both the
+// launch-screen PNG underneath it and the Splash component that may replace it.
+const wordmark = APP_NAME_LINES.map((line) => `<span>${line}</span>`).join("");
+
 /** Injected via dangerouslySetInnerHTML so React never reconciles inner nodes. */
-export const BOOT_SPLASH_MARKUP = `<div id="boot-splash" class="bootSplash" aria-hidden="true"><div class="bootSplashLogo"><span class="bootSplashMark">Y</span></div><div class="bootSplashWordmark">${APP_NAME}</div><div class="bootSplashStatus">Loading…</div><div class="bootSplashDots" aria-hidden="true"><span></span><span></span><span></span></div></div>`;
+export const BOOT_SPLASH_MARKUP = `<div id="boot-splash" class="bootSplash" aria-hidden="true"><div class="bootSplashLogo"><span class="bootSplashMark">Y</span></div><div class="bootSplashWordmark">${wordmark}</div><div class="bootSplashStatus">Loading…</div><div class="bootSplashDots" aria-hidden="true"><span></span><span></span><span></span></div></div>`;
 
 export function isBootSplashVisible(): boolean {
   if (typeof document === "undefined") return false;
