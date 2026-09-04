@@ -2,6 +2,8 @@
  * SSR dashboard placeholder — inline styles so first HTML paint matches
  * system-yurica's "Preparing your dashboard…" card (no CSS bundle needed).
  */
+import { APP_NAME } from "@/lib/brand";
+
 export default function ServerDashboardPreparing() {
   return (
     <div
@@ -52,7 +54,7 @@ export default function ServerDashboardPreparing() {
             color: "#111",
           }}
         >
-          Project Y
+          {APP_NAME}
         </p>
         <p
           style={{

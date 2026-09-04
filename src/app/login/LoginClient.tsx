@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
 import { usernameToEmail } from "@/lib/username";
+import { APP_NAME } from "@/lib/brand";
 import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
 import { refreshAuthSession } from "@/lib/auth-session-client";
@@ -59,11 +60,11 @@ export default function LoginClient({ initialHasSession }: LoginClientProps) {
         await signOut(getAuth()).catch(() => {});
         if (notifPermission === "denied") {
           setError(
-            "Notifications are blocked. Open iPhone Settings → Notifications → Project Y, turn on \"Allow Notifications\", then sign in again.",
+            `Notifications are blocked. Open iPhone Settings → Notifications → ${APP_NAME}, turn on "Allow Notifications", then sign in again.`,
           );
         } else if (notifPermission === "unsupported") {
           setError(
-            "This device can't receive notifications. Install the Project Y app on your iPhone or Android, open it from the home screen, and sign in there.",
+            `This device can't receive notifications. Install the ${APP_NAME} app on your iPhone or Android, open it from the home screen, and sign in there.`,
           );
         } else {
           setError(
@@ -93,7 +94,7 @@ export default function LoginClient({ initialHasSession }: LoginClientProps) {
 
   return (
     <div className={styles.card}>
-      <h1 className={styles.title}>Project Y</h1>
+      <h1 className={styles.title}>{APP_NAME}</h1>
       <p className={styles.subtitle}>Sign in to continue</p>
 
       <form className={styles.form} onSubmit={handleSubmit}>

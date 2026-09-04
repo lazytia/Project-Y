@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pushToUid } from "@/lib/push-notify";
+import { APP_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await pushToUid(uid, {
-    title: (body.title ?? "").trim() || "Project Y",
+    title: (body.title ?? "").trim() || APP_NAME,
     body: (body.body ?? "").trim(),
     url: (body.url ?? "").trim() || "/staff",
   });

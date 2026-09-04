@@ -1,8 +1,10 @@
+import { APP_NAME } from "./brand";
+
 const BOOT_SPLASH_ID = "boot-splash";
 const BOOT_SPLASH_HIDDEN = "bootSplashHidden";
 
 /** Injected via dangerouslySetInnerHTML so React never reconciles inner nodes. */
-export const BOOT_SPLASH_MARKUP = `<div id="boot-splash" class="bootSplash" aria-hidden="true"><div class="bootSplashLogo"><span class="bootSplashMark">Y</span></div><div class="bootSplashWordmark">Project Y</div><div class="bootSplashStatus">Loading…</div><div class="bootSplashDots" aria-hidden="true"><span></span><span></span><span></span></div></div>`;
+export const BOOT_SPLASH_MARKUP = `<div id="boot-splash" class="bootSplash" aria-hidden="true"><div class="bootSplashLogo"><span class="bootSplashMark">Y</span></div><div class="bootSplashWordmark">${APP_NAME}</div><div class="bootSplashStatus">Loading…</div><div class="bootSplashDots" aria-hidden="true"><span></span><span></span><span></span></div></div>`;
 
 export function isBootSplashVisible(): boolean {
   if (typeof document === "undefined") return false;

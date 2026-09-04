@@ -11,6 +11,7 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
+import { APP_NAME } from "@/lib/brand";
 import { useAuth } from "@/components/AuthProvider";
 import { actorNameOf, isStrictOwner } from "@/lib/permissions";
 import { shouldActivatePayrollReminder } from "@/lib/payroll-attention";
@@ -246,7 +247,7 @@ export default function CreateLoginDetailsPage() {
         // the owner but doesn't roll back the account creation — the
         // login is already usable; they can retry the SMS manually.
         const firstName = request.fullName.split(" ")[0];
-        const projectYLink = "https://project.yurica.com.au";
+        const appLink = "https://project.yurica.com.au";
         const trimmedStaffId = squareStaffId.trim();
         // Every character below is in the GSM 03.38 alphabet, deliberately.
         // send-sms will encode as UCS-2 the moment one is not, and UCS-2 fits
@@ -255,28 +256,25 @@ export default function CreateLoginDetailsPage() {
         // three, on every invite. Prettier punctuation is not worth double the
         // bill, so keep additions to plain ASCII; hyphens, not dashes.
         const smsText = [
-          `Hi ${firstName}, welcome to YURICA`,
-          // A blank Clock In ID is not required to approve a request, and a
-          // heading over an empty line is worse than no heading.
-          ...(trimmedStaffId ? ["", "Clock In ID", trimmedStaffId] : []),
+          `Hi ${firstName}, welcome to YURICA.`,
           "",
-          "Project Y - Required",
-          projectYLink,
+          `Please set up ${APP_NAME} before your first shift.`,
+          "",
+          APP_NAME,
+          appLink,
           `Username: ${finalUsername}`,
           `Password: ${password}`,
           "",
-          "Use Project Y to:",
-          "- Check your shifts",
-          "- View payslips",
-          "- Receive important updates",
+          "Use it to check shifts, view payslips and receive updates.",
           "",
-          "Please set up now:",
+          "Setup",
           "",
-          "1. Add Project Y to your Home Screen",
+          "1. Add to Home Screen",
           "2. Allow Notifications",
-          "3. Log in & complete onboarding",
-          "",
-          "Please complete before your first shift.",
+          "3. Log in and complete onboarding",
+          // A blank Clock In ID is not required to approve a request, so the
+          // whole line goes rather than arriving with nothing after the colon.
+          ...(trimmedStaffId ? ["", `Clock In ID: ${trimmedStaffId}`] : []),
         ].join("\n");
         try {
           const idToken = await user?.getIdToken();
@@ -384,7 +382,7 @@ export default function CreateLoginDetailsPage() {
           onChange={(e) => {
             const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
             setSquareStaffId(digits);
-            // Business rule: the Project Y password is the Square 4-digit
+            // Business rule: the Project YURICA password is the Square 4-digit
             // passcode with "00" tacked on the end, so we auto-populate
             // the password field once the owner has typed the full PIN.
             if (digits.length === 4) setPassword(`${digits}00`);
@@ -394,10 +392,10 @@ export default function CreateLoginDetailsPage() {
       </section>
 
       <section className={styles.card}>
-        <h2 className={styles.cardTitle}>PROJECT Y LOGIN</h2>
+        <h2 className={styles.cardTitle}>PROJECT YURICA LOGIN</h2>
         <p className={styles.hintRow}>
           <YMark />
-          Employee will use this to log in to Project Y.
+          Employee will use this to log in to Project YURICA.
         </p>
         <div>
           <p className={styles.fieldLabel}>LOGIN ID</p>
@@ -486,7 +484,7 @@ export default function CreateLoginDetailsPage() {
         </button>
         <p className={styles.footerNote}>
           <InfoIcon />
-          The employee will receive their Staff ID and Project Y login details via SMS.
+          The employee will receive their Staff ID and Project YURICA login details via SMS.
         </p>
         <button
           type="button"

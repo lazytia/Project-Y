@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { isBootSplashVisible, ssrShellVisible } from "@/lib/boot-splash";
+import { APP_NAME } from "@/lib/brand";
 import { hasClientSessionHint } from "@/lib/client-session-hint";
 import styles from "./Splash.module.css";
 
@@ -53,7 +54,7 @@ export default function Splash({ label, forceVisible = false }: Props) {
       <div className={styles.logo} aria-hidden="true">
         <span className={styles.mark}>Y</span>
       </div>
-      <div className={styles.wordmark}>Project Y</div>
+      <div className={styles.wordmark}>{APP_NAME}</div>
       <div className={styles.dots} aria-hidden="true">
         <span />
         <span />

@@ -47,7 +47,7 @@ export default function PrivacyPolicyPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.brand}>PROJECT Y</header>
+      <header className={styles.brand}>PROJECT YURICA</header>
 
       <div className={styles.progressTrack}>
         <div className={styles.progressFill} />

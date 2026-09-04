@@ -9,6 +9,7 @@ import ServerAppShell from "@/components/ServerAppShell";
 import { readServerSession } from "@/lib/dashboard-session";
 import { BOOT_SPLASH_HEAD_HINT_SCRIPT, bootSplashEarlyDismissScript } from "@/lib/client-session-hint";
 import { BOOT_SPLASH_MARKUP } from "@/lib/boot-splash";
+import { APP_NAME } from "@/lib/brand";
 import "./globals.css";
 
 const LanguageProvider = dynamic(
@@ -23,8 +24,8 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Project Y",
-  description: "Project Y operations app",
+  title: APP_NAME,
+  description: `${APP_NAME} operations app`,
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -98,9 +99,9 @@ export default async function RootLayout({
             true standalone (no URL bar / bottom Safari toolbar). Next.js
             metadata.appleWebApp.capable only emits the Android name. */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Project Y" />
+        <meta name="apple-mobile-web-app-title" content={APP_NAME} />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="application-name" content="Project Y" />
+        <meta name="application-name" content={APP_NAME} />
         <link rel="manifest" href="/manifest.webmanifest" />
         {/* iOS PWA launch splash — common iPhone/iPad sizes only (reduces HTML parse). */}
         <link rel="apple-touch-startup-image" href="/splash/apple-splash-1170-2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />

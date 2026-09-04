@@ -166,7 +166,7 @@ export default function NotificationsPromptPage() {
   return (
     <div className={styles.page}>
       {/* No second wordmark. The app bar directly above this already says
-          YURICA, so "PROJECT Y" was branding the same screen twice — and it
+          YURICA, so "PROJECT YURICA" was branding the same screen twice — and it
           cost a line of height on the one screen that has to fit whole. */}
       <div className={styles.bellWrap} aria-hidden="true">
         <div className={styles.bellHalo}>

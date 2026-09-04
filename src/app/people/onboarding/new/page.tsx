@@ -252,7 +252,7 @@ export default function NewEmployeePage() {
         <InfoIcon className={styles.infoIcon} />
         <p className={styles.infoText}>
           Mobile number is required. We will send the employee their Clock In ID
-          and Project Y login details via SMS.
+          and Project YURICA login details via SMS.
         </p>
       </div>
 

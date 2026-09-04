@@ -73,7 +73,7 @@ export default function ActivateEmployeeSheet({
         <h2 className={styles.title}>Activate Employee?</h2>
         <p className={styles.body}>
           This will activate the employee and give them access to Scheduling,
-          Clock In, and their Project Y account.
+          Clock In, and their Project YURICA account.
         </p>
 
         <div className={styles.summary}>

@@ -57,11 +57,11 @@ export default function EmploymentAgreementDocument({ children }: { children?: R
         <h2 className={styles.sectionH}>2. ROSTERS &amp; AVAILABILITY</h2>
         <p className={styles.paragraph}>
           Work schedules and roster communications will be provided through
-          the Project Y Employee Portal.
+          the Project YURICA Employee Portal.
         </p>
         <p className={styles.paragraph}>
           Availability changes and holiday requests must be submitted through
-          the Project Y Employee Portal at least{" "}
+          the Project YURICA Employee Portal at least{" "}
           <strong>3 weeks in advance</strong>.
         </p>
         <p className={styles.paragraph}>
