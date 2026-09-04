@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
 
 function requestOrigin(headerStore: Awaited<ReturnType<typeof headers>>): string {
   const host =
@@ -19,7 +19,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     id: `${origin}/`,
     name: APP_NAME,
-    short_name: APP_NAME,
+    short_name: HOME_SCREEN_NAME,
     description: `${APP_NAME} operations app`,
     start_url: `${origin}/`,
     scope: `${origin}/`,

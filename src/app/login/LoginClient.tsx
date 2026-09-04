@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getAuth } from "@/lib/firebase";
 import { usernameToEmail } from "@/lib/username";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
 import { isOwner } from "@/lib/permissions";
 import { registerFcmToken } from "@/lib/fcm";
 import { refreshAuthSession } from "@/lib/auth-session-client";
@@ -60,7 +60,7 @@ export default function LoginClient({ initialHasSession }: LoginClientProps) {
         await signOut(getAuth()).catch(() => {});
         if (notifPermission === "denied") {
           setError(
-            `Notifications are blocked. Open iPhone Settings → Notifications → ${APP_NAME}, turn on "Allow Notifications", then sign in again.`,
+            `Notifications are blocked. Open iPhone Settings → Notifications → ${HOME_SCREEN_NAME}, turn on "Allow Notifications", then sign in again.`,
           );
         } else if (notifPermission === "unsupported") {
           setError(

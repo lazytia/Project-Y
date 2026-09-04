@@ -9,7 +9,7 @@ import ServerAppShell from "@/components/ServerAppShell";
 import { readServerSession } from "@/lib/dashboard-session";
 import { BOOT_SPLASH_HEAD_HINT_SCRIPT, bootSplashEarlyDismissScript } from "@/lib/client-session-hint";
 import { BOOT_SPLASH_MARKUP } from "@/lib/boot-splash";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
 import "./globals.css";
 
 const LanguageProvider = dynamic(
@@ -99,7 +99,7 @@ export default async function RootLayout({
             true standalone (no URL bar / bottom Safari toolbar). Next.js
             metadata.appleWebApp.capable only emits the Android name. */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content={APP_NAME} />
+        <meta name="apple-mobile-web-app-title" content={HOME_SCREEN_NAME} />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="application-name" content={APP_NAME} />
         <link rel="manifest" href="/manifest.webmanifest" />
