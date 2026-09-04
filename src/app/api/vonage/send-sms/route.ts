@@ -36,13 +36,17 @@ const GSM_ALPHABET = new Set(
  * Whether this message has to travel as UCS-2.
  *
  * Vonage defaults to `type=text`, which is GSM-7, and silently replaces
- * anything outside that alphabet with "?" — so the welcome text's ticks and
- * em-dashes arrived mangled and were once removed rather than encoded. Asking
- * for unicode fixes that at a cost worth knowing about: a UCS-2 message fits
- * 70 characters where GSM-7 fits 160, and 67 against 153 once it is long
- * enough to be split. One stray character therefore roughly doubles what a
- * long message costs to send, which is why this is decided per message rather
- * than set to unicode across the board.
+ * anything outside that alphabet with "?". Asking for unicode fixes that at a
+ * cost worth knowing about: a UCS-2 message fits 70 characters where GSM-7
+ * fits 160, and 67 against 153 once it is long enough to be split. One stray
+ * character therefore roughly doubles what a long message costs to send.
+ *
+ * Hence per message rather than unicode across the board — and hence a
+ * safety net rather than a licence. The welcome text is written in plain
+ * ASCII precisely so it never lands here; a caller that trips this is buying
+ * twice the segments, which is fine for a one-off but not for anything sent
+ * on every hire. Callers stay silently correct either way: mangled text is
+ * the one outcome this rules out.
  */
 function smsNeedsUnicode(text: string): boolean {
   for (const ch of text) {

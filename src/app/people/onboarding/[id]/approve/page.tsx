@@ -234,28 +234,27 @@ export default function CreateLoginDetailsPage() {
         const firstName = request.fullName.split(" ")[0];
         const projectYLink = "https://project.yurica.com.au";
         const trimmedStaffId = squareStaffId.trim();
-        // The ticks and the em-dashes below are the reason send-sms picks its
-        // encoding rather than taking Vonage's GSM-7 default: sent as GSM-7
-        // they arrive as "?", which is what an earlier version of this text
-        // did and why it was cut back to plain ASCII. Sending them properly
-        // costs segments — UCS-2 fits 67 characters to a part against 153 —
-        // so the wording below is kept to what the new hire has to be told
-        // before their first shift, and nothing else.
+        // Every character below is in the GSM 03.38 alphabet, deliberately.
+        // send-sms will encode as UCS-2 the moment one is not, and UCS-2 fits
+        // 67 characters to a segment against GSM-7's 153 — the tick and
+        // em-dash version of this text cost six segments where this one costs
+        // three, on every invite. Prettier punctuation is not worth double the
+        // bill, so keep additions to plain ASCII; hyphens, not dashes.
         const smsText = [
           `Hi ${firstName}, welcome to YURICA`,
           // A blank Clock In ID is not required to approve a request, and a
           // heading over an empty line is worse than no heading.
           ...(trimmedStaffId ? ["", "Clock In ID", trimmedStaffId] : []),
           "",
-          "Project Y — Required",
+          "Project Y - Required",
           projectYLink,
           `Username: ${finalUsername}`,
           `Password: ${password}`,
           "",
           "Use Project Y to:",
-          "✓ Check your shifts",
-          "✓ View payslips",
-          "✓ Receive important updates",
+          "- Check your shifts",
+          "- View payslips",
+          "- Receive important updates",
           "",
           "Please set up now:",
           "",
