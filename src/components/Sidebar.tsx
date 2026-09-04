@@ -16,13 +16,19 @@ import { runWhenIdle } from "@/lib/run-when-idle";
 import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import {
   NAV_BADGE_HREFS,
-  loadNavBadgeCounts,
+  loadNavBadgeSnapshot,
+  navBadgeDelta,
   navBadgeLabel,
-  navBadgeValue,
+  onboardingBadgeDelta,
   readNavSeen,
+  readOnboardingSeen,
   reconcileNavSeen,
+  reconcileOnboardingSeen,
   writeNavSeen,
+  writeOnboardingSeen,
+  type NavBadgeSnapshot,
   type NavCountMap,
+  type OnboardingStageMap,
 } from "@/lib/nav-change-badges";
 import styles from "./Sidebar.module.css";
 
@@ -209,29 +215,32 @@ function navHasBadgedHref(nav: NavGroup[]): boolean {
 }
 
 /**
- * "+N" beside the People menu entries with something outstanding on them —
- * requests waiting to be approved, or rows that have arrived since this user
- * last looked. Which of the two an entry counts is decided next door.
+ * "+N" beside the People menu entries with something new on them — rows that
+ * have arrived since this user last looked, or, for New Employees, new hires
+ * who have moved on a stage. What each entry measures is decided next door.
  *
- * Counts are read once per mount and deliberately behind runWhenIdle — the
- * badge is decoration and must never compete with the page it sits next to.
+ * The snapshot is read once per mount and deliberately behind runWhenIdle —
+ * the badge is decoration and must never compete with the page it sits next
+ * to.
  */
 function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pathname: string) {
   const uid = user?.uid;
-  const [counts, setCounts] = useState<NavCountMap | null>(null);
+  const [snapshot, setSnapshot] = useState<NavBadgeSnapshot | null>(null);
   const [seen, setSeen] = useState<NavCountMap>({});
+  const [stagesSeen, setStagesSeen] = useState<OnboardingStageMap | undefined>(undefined);
 
   useEffect(() => {
     setSeen(uid ? readNavSeen(uid) : {});
+    setStagesSeen(uid ? readOnboardingSeen(uid) : undefined);
   }, [uid]);
 
   useEffect(() => {
     if (!user || !enabled) return;
     let alive = true;
     const cancel = runWhenIdle(() => {
-      loadNavBadgeCounts(user)
+      loadNavBadgeSnapshot(user)
         .then((next) => {
-          if (alive) setCounts(next);
+          if (alive) setSnapshot(next);
         })
         .catch(() => {
           /* offline or rules — just render no badges */
@@ -244,25 +253,37 @@ function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pat
   }, [user, enabled]);
 
   useEffect(() => {
-    if (!uid || !counts) return;
+    if (!uid || !snapshot) return;
     const visited = Object.values(NAV_BADGE_HREFS).find((href) =>
       isNavChildActive(pathname, href),
     );
-    const next = reconcileNavSeen(counts, seen, visited);
-    if (!next) return;
-    setSeen(next);
-    writeNavSeen(uid, next);
-  }, [uid, counts, seen, pathname]);
+    const next = reconcileNavSeen(snapshot.counts, seen, visited);
+    if (next) {
+      setSeen(next);
+      writeNavSeen(uid, next);
+    }
+    const nextStages = reconcileOnboardingSeen(
+      snapshot.onboarding,
+      stagesSeen,
+      visited === NAV_BADGE_HREFS.newEmployees,
+    );
+    if (nextStages) {
+      setStagesSeen(nextStages);
+      writeOnboardingSeen(uid, nextStages);
+    }
+  }, [uid, snapshot, seen, stagesSeen, pathname]);
 
   return useMemo(() => {
-    if (!counts) return undefined;
+    if (!snapshot) return undefined;
     const out: NavCountMap = {};
-    for (const [href, count] of Object.entries(counts)) {
-      const value = navBadgeValue(href, count, seen[href]);
+    for (const [href, count] of Object.entries(snapshot.counts)) {
+      const value = navBadgeDelta(count, seen[href]);
       if (value > 0) out[href] = value;
     }
+    const moved = onboardingBadgeDelta(snapshot.onboarding, stagesSeen);
+    if (moved > 0) out[NAV_BADGE_HREFS.newEmployees] = moved;
     return out;
-  }, [counts, seen]);
+  }, [snapshot, seen, stagesSeen]);
 }
 
 export default function Sidebar({ open, onClose, initialDashboard = null }: Props) {

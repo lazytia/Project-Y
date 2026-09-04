@@ -216,6 +216,13 @@ async function loadNewEmployeeCount(viewer: User | null): Promise<number> {
   // Visibility is part of the count for the same reason: a manager only sees
   // manager-submitted requests, so counting one they cannot open would put
   // back the same dead end in a different place.
+  //
+  // Deliberately the size of the list and nothing finer. The sidebar badge
+  // watches each row's stage and lights up again every time one moves, which
+  // suits a menu you pass on the way somewhere else; this card is the first
+  // thing the owner sees each morning and only wants to say it once, when the
+  // hire arrives. Counting stages here would put the same new employee back
+  // at the top of her screen three times over.
   const snap = await getDocs(collection(getDb(), "staff_onboarding"));
   return snap.docs.reduce((acc, d) => {
     const raw = d.data() as Record<string, unknown>;

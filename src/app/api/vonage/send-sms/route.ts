@@ -18,6 +18,39 @@ const VONAGE_ENDPOINT = "https://rest.nexmo.com/sms/json";
 
 type VonageMsg = { status?: string; "message-id"?: string; "error-text"?: string };
 
+/**
+ * GSM 03.38 — everything an SMS can carry in seven bits, including the
+ * characters reachable through the escape table (the last handful).
+ *
+ * Written out rather than approximated with a regex range because the set is
+ * genuinely arbitrary: it holds `£`, `Ø` and `Ξ` but not `"` curly quotes,
+ * `—` or any emoji.
+ */
+const GSM_ALPHABET = new Set(
+  "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?" +
+    "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà" +
+    "\f^{}\\[~]|€",
+);
+
+/**
+ * Whether this message has to travel as UCS-2.
+ *
+ * Vonage defaults to `type=text`, which is GSM-7, and silently replaces
+ * anything outside that alphabet with "?" — so the welcome text's emoji and
+ * em-dash arrived mangled and were once removed rather than encoded. Asking
+ * for unicode fixes that at a cost worth knowing about: a UCS-2 message fits
+ * 70 characters where GSM-7 fits 160, and 67 against 153 once it is long
+ * enough to be split. One stray character therefore roughly doubles what a
+ * long message costs to send, which is why this is decided per message rather
+ * than set to unicode across the board.
+ */
+function smsNeedsUnicode(text: string): boolean {
+  for (const ch of text) {
+    if (!GSM_ALPHABET.has(ch)) return true;
+  }
+  return false;
+}
+
 async function verifyOwner(
   req: NextRequest,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
@@ -76,6 +109,7 @@ export async function POST(req: NextRequest) {
     from: sender,
     to,
     text,
+    type: smsNeedsUnicode(text) ? "unicode" : "text",
   });
 
   try {

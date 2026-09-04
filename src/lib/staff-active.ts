@@ -207,6 +207,29 @@ export function onboardingListStatus(raw: StaffOnboardingFlags): OnboardingListS
   return hasStartedOnboarding(raw) ? "started" : "invited";
 }
 
+/** The three stages a new hire passes through, in order. */
+export const ONBOARDING_LIST_TABS = ["new", "progress", "ready"] as const;
+
+export type OnboardingListTab = (typeof ONBOARDING_LIST_TABS)[number];
+
+/**
+ * Which stage a row is showing at, from the state it is in.
+ *
+ * The stages are named for who is being waited on. `new` is the two states
+ * where the new hire has done nothing — the request nobody has approved and
+ * the login nobody has used — because from the outside they are the same
+ * thing: a hire who has not begun. `progress` is the form open and moving,
+ * and `ready` is it finished and waiting on the owner to sign it off.
+ *
+ * So four states and three stages, which is why this mapping is written down
+ * rather than left implied by a filter: `invited` sitting under `new` is the
+ * one pairing that is not obvious from the words.
+ */
+export function onboardingListTab(status: OnboardingListStatus): OnboardingListTab {
+  if (status === "ready") return "ready";
+  return status === "started" ? "progress" : "new";
+}
+
 export function staffStatusAfterOnboardingSteps(accountCreated: boolean): "active" | "approved" {
   return accountCreated ? "active" : "approved";
 }

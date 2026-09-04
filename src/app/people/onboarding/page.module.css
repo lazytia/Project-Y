@@ -63,21 +63,26 @@
 }
 
 /* ── Tab bar ── */
+/* Flex rather than fixed columns. The three labels are very different
+   lengths, and equal thirds would wrap "Ready for Review" on a narrow phone
+   while leaving "New" mostly white space. `flex: 1 1 auto` gives each tab its
+   own text plus a share of the slack, and the number of tabs stays written
+   down in one place — the markup — rather than two. */
 .tabBar {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
 
 .tab {
-  padding: 10px 0;
+  flex: 1 1 auto;
+  padding: 10px 6px;
   background: var(--color-bg);
   border: none;
   border-right: 1px solid var(--color-border);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--color-fg-muted);
   cursor: pointer;

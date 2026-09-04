@@ -3,12 +3,20 @@
 /**
  * New Employees — everyone hired but not yet signed off.
  *
- * Two tabs, because there are only two things the owner does here. "New" is
- * the people still working through the form, where the only question is who
- * is holding it up; "Ready for Review" is the ones who have finished and are
- * waiting on the owner, where there is a decision to make. Mixing them into
- * one list buried the second kind, which is the half with a deadline — the
- * employee cannot start until someone presses Activate.
+ * Three tabs, one per stage, and a row moves between them on its own:
+ *
+ *   New              the request has been raised
+ *   In Progress      the hire has signed in and started their onboarding
+ *   Ready for Review the form is finished and the owner has to sign it off
+ *
+ * "New" and "Ready for Review" were the whole of it for a while, on the
+ * reasoning that those are the only two things the owner *does* here. But it
+ * left "New" holding two quite different people — the hire who has not
+ * touched the app since being texted, and the one halfway through the form —
+ * told apart only by a pill inside the row, which had to be scrolled past to
+ * be counted. Whether the new hires have got going is the question this page
+ * is opened to answer, so it gets a tab of its own and the answer is a number
+ * on the way in.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -21,8 +29,10 @@ import { ROUTES } from "@/lib/routes";
 import {
   isOnboardingListEmployee,
   onboardingListStatus,
+  onboardingListTab,
   staffOnboardingFlags,
   type OnboardingListStatus,
+  type OnboardingListTab,
 } from "@/lib/staff-active";
 import { registerFcmToken } from "@/lib/fcm";
 import Splash from "@/components/Splash";
@@ -56,7 +66,40 @@ type StaffOnboarding = {
   listStatus: OnboardingListStatus;
 };
 
-type TabKey = "new" | "ready";
+/**
+ * The tab bar, in stage order, and what sits under each list.
+ *
+ * `note` is what happens next and `emptyNote` is why the tab is empty. Both
+ * are per-tab because the three stages are waiting on three different people:
+ * one sentence covering all of them would have to be vague enough to fit an
+ * empty New and an empty Ready for Review, and a vague note under an empty
+ * list reads as a stuck page.
+ */
+const TABS: readonly {
+  key: OnboardingListTab;
+  label: string;
+  note: string;
+  emptyNote: string;
+}[] = [
+  {
+    key: "new",
+    label: "New",
+    note: "Once they log in and begin, the request will move to In Progress automatically.",
+    emptyNote: "Everyone here has started their onboarding.",
+  },
+  {
+    key: "progress",
+    label: "In Progress",
+    note: "Once onboarding is complete, the request will move to Ready for Review automatically.",
+    emptyNote: "Nobody is part-way through their onboarding right now.",
+  },
+  {
+    key: "ready",
+    label: "Ready for Review",
+    note: "All required onboarding items have been submitted.",
+    emptyNote: "Nobody is waiting on a review right now.",
+  },
+];
 
 /**
  * The pill each state wears — for the two states that wear one.
@@ -186,7 +229,7 @@ export default function ManagerOnboardingPage() {
 
   const [rows, setRows] = useState<StaffOnboarding[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("new");
+  const [tab, setTab] = useState<OnboardingListTab>("new");
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [activating, setActivating] = useState<StaffOnboarding | null>(null);
 
@@ -266,16 +309,20 @@ export default function ManagerOnboardingPage() {
     };
   }, [allowed, user]);
 
-  const { total, newRows, readyRows } = useMemo(() => {
-    if (!rows) return { total: 0, newRows: [], readyRows: [] };
-    return {
-      total: rows.length,
-      newRows: rows.filter((r) => r.listStatus !== "ready"),
-      readyRows: rows.filter((r) => r.listStatus === "ready"),
-    };
+  /** The rows of each stage, keyed by tab, so a count and its list cannot
+   *  be filtered by two different rules. */
+  const byTab = useMemo(() => {
+    const out = { new: [], progress: [], ready: [] } as Record<
+      OnboardingListTab,
+      StaffOnboarding[]
+    >;
+    for (const row of rows ?? []) out[onboardingListTab(row.listStatus)].push(row);
+    return out;
   }, [rows]);
 
-  const filtered = tab === "ready" ? readyRows : newRows;
+  const total = rows?.length ?? 0;
+  const filtered = byTab[tab];
+  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
 
   /** Drop an activated row without a refetch — it has left this list. */
   function handleActivated(uid: string) {
@@ -338,20 +385,16 @@ export default function ManagerOnboardingPage() {
 
           {/* Tabs */}
           <div className={styles.tabBar}>
-            <button
-              type="button"
-              className={`${styles.tab} ${tab === "new" ? styles.tabActive : ""}`}
-              onClick={() => setTab("new")}
-            >
-              New ({newRows.length})
-            </button>
-            <button
-              type="button"
-              className={`${styles.tab} ${tab === "ready" ? styles.tabActive : ""}`}
-              onClick={() => setTab("ready")}
-            >
-              Ready for Review ({readyRows.length})
-            </button>
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                className={`${styles.tab} ${tab === t.key ? styles.tabActive : ""}`}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label} ({byTab[t.key].length})
+              </button>
+            ))}
           </div>
 
           {/* Card list */}
@@ -471,23 +514,10 @@ export default function ManagerOnboardingPage() {
           </ul>
 
           {/* What happens next, so an empty-looking tab is not read as a
-              stuck one. The two tabs are waiting on different people, so
-              they say different things. */}
-          {filtered.length > 0 && (
-            <p className={styles.footerNote}>
-              {tab === "ready"
-                ? "All required onboarding items have been submitted."
-                : "Once onboarding is complete, the request will move to Ready for Review automatically."}
-            </p>
-          )}
-
-          {filtered.length === 0 && (
-            <p className={styles.footerNote}>
-              {tab === "ready"
-                ? "Nobody is waiting on a review right now."
-                : "Everyone here has finished their onboarding."}
-            </p>
-          )}
+              stuck one. Both sentences live in TABS, above. */}
+          <p className={styles.footerNote}>
+            {filtered.length > 0 ? activeTab.note : activeTab.emptyNote}
+          </p>
         </>
       )}
 
