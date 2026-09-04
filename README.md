@@ -1,6 +1,10 @@
-# Project Y
+# Project YURICA
 
 Next.js 15 (App Router) + TypeScript + Firebase, PWA-ready.
+
+The product was called "Project Y" until 2026-09; the GitHub repo, the local
+folder and the Firebase project keep the old spelling and are not worth
+renaming. Anything a user can read comes from `src/lib/brand.ts`.
 
 ## Setup
 

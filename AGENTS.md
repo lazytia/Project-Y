@@ -1,7 +1,13 @@
 # Agent guide (Claude / Cursor)
 
-Shared rules for AI assistants working on Project Y. Both Claude Code and
+Shared rules for AI assistants working on Project YURICA. Both Claude Code and
 Cursor read this file before making changes.
+
+The repo, the folder and the Firebase project are all still named `project-y`
+— the product was renamed, the infrastructure was not. Never write the app's
+name as a literal: import `APP_NAME` / `HOME_SCREEN_NAME` from
+`src/lib/brand.ts`. The two service workers in `public/` are the documented
+exception, since they never pass through the bundler.
 
 ## Stack
 
