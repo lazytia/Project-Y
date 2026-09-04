@@ -101,7 +101,7 @@ export const HR_DOCUMENTS: readonly HrDocument[] = [
     // tell us who that is.
     key: "privacyPolicy",
     label: "Privacy Policy",
-    href: "/hr-records/acknowledgements/privacyPolicy",
+    href: "/staff/privacy-policy",
     version: PRIVACY_POLICY_VERSION,
     updated: null,
     unversionedLabel: "",
@@ -110,13 +110,9 @@ export const HR_DOCUMENTS: readonly HrDocument[] = [
   {
     // Signed once, inside the onboarding form. There is no second version to
     // re-sign — a changed contract is a new contract, not a new revision.
-    //
-    // Alone among these it has no published document of its own, so — like
-    // the privacy policy above it — the row opens who has signed it rather
-    // than a copy of what they signed.
     key: "employmentContract",
     label: "Employment Contract",
-    href: "/hr-records/acknowledgements/employmentContract",
+    href: "/staff/employment-contract",
     version: null,
     updated: null,
     unversionedLabel: "Current template",

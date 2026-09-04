@@ -12,21 +12,17 @@
  * down when rows disappear so the next addition still reads as new.
  *
  * New Employees is the exception, and counts absolutely instead. Its badge is
- * the number of requests waiting on the owner to approve them, which is a
- * queue rather than news: it is not finished with by being read, so a mark
- * that cleared it the moment the page was opened cleared it while the work was
- * still outstanding. It goes away when the requests are approved.
+ * the size of the list itself, which is a queue rather than news: it is not
+ * finished with by being read, so a mark that cleared it the moment the page
+ * was opened cleared it while the work was still outstanding. It goes away
+ * when the last of those employees is activated.
  */
 
 import type { User } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
 import { getDb } from "./firebase";
 import { canViewStaffRequest } from "./permissions";
-import {
-  isOnboardingListEmployee,
-  onboardingListStatus,
-  staffOnboardingFlags,
-} from "./staff-active";
+import { isOnboardingListEmployee, staffOnboardingFlags } from "./staff-active";
 
 /** Menu entries that carry a change badge, keyed by their nav href. */
 export const NAV_BADGE_HREFS = {
@@ -108,7 +104,7 @@ export function navBadgeValue(href: string, count: number, seen: number | undefi
  */
 export function navBadgeLabel(href: string, value: number): string {
   if (!ABSOLUTE_BADGE_HREFS.has(href)) return `${value} new since you last looked`;
-  return `${value} request${value === 1 ? "" : "s"} awaiting approval`;
+  return `${value} new employee${value === 1 ? "" : "s"} not yet activated`;
 }
 
 /**
@@ -154,16 +150,20 @@ type RequesterDoc = {
 /**
  * What each tracked entry's badge is counting.
  *
- * Notice Given and Ready to Terminate are the size of the page they point at
- * — a badge that counted differently to the list it opens would never clear.
- * New Employees counts only the rows still waiting on an approval, because
- * that is the badge's whole subject: the rest of that page is people already
- * approved and working through their forms, and nothing about them is owed.
+ * Every entry is the size of the page it points at — a badge that counted
+ * differently to the list it opens would never clear.
+ *
+ * New Employees counted only the rows still waiting on an approval, which
+ * meant a request raised and approved in the same sitting — the usual way one
+ * is raised, since whoever files it can also create the login — arrived on
+ * the list without ever having been announced. The owner learned about the
+ * new hire by opening the page she had no reason to open. It counts the whole
+ * list now, and empties as each of them is activated.
  *
  * `viewer` is needed because New Employees is not the same list for everyone:
  * the chef sees only his own requests and the manager only hers, so a count
  * taken over the whole collection would leave a badge nobody could clear by
- * approving what they can see.
+ * working through what they can see.
  */
 export async function loadNavBadgeCounts(viewer: User | null | undefined): Promise<NavCountMap> {
   const db = getDb();
@@ -178,12 +178,10 @@ export async function loadNavBadgeCounts(viewer: User | null | undefined): Promi
       .map((d) => d.id),
   );
 
-  const pendingApproval = staffSnap.docs.filter((d) => {
+  const onboarding = staffSnap.docs.filter((d) => {
     const raw = d.data() as Record<string, unknown>;
-    const flags = staffOnboardingFlags(raw);
     return (
-      isOnboardingListEmployee(flags) &&
-      onboardingListStatus(flags) === "submitted" &&
+      isOnboardingListEmployee(staffOnboardingFlags(raw)) &&
       canViewStaffRequest(viewer, raw as RequesterDoc)
     );
   }).length;
@@ -196,7 +194,7 @@ export async function loadNavBadgeCounts(viewer: User | null | undefined): Promi
   }).length;
 
   return {
-    [NAV_BADGE_HREFS.newEmployees]: pendingApproval,
+    [NAV_BADGE_HREFS.newEmployees]: onboarding,
     [NAV_BADGE_HREFS.noticeGiven]: noticeGiven,
     [NAV_BADGE_HREFS.terminated]: terminatedUids.size,
   };

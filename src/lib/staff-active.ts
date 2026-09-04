@@ -2,7 +2,7 @@
 
 import { FIRST_LOGIN_FIELD } from "./first-login";
 import { TOTAL_ONBOARDING_STEPS } from "./onboarding-steps";
-import { STRICT_OWNER_USERNAMES } from "./permissions";
+import { CHEF_USERNAMES, OWNER_USERNAMES, STRICT_OWNER_USERNAMES } from "./permissions";
 import { emailToUsername } from "./username";
 
 export type StaffOnboardingFlags = {
@@ -85,6 +85,24 @@ export function isTeamMember(raw: StaffOnboardingFlags): boolean {
   return !STRICT_OWNER_USERNAMES.has(username);
 }
 
+/**
+ * The owners, the store manager and the chefs.
+ *
+ * Their staff_onboarding documents exist to hold a login and a pay rate, not
+ * an onboarding form, so none of them is ever a new hire.
+ *
+ * The `role` field cannot answer this on its own. AuthProvider stamps "owner"
+ * on the owner-tier accounts but leaves a chef as "chef", so the two shift
+ * leads disagreed about themselves: Yurina was filtered out of New Employees
+ * and Chuck — same standing, same length of service — sat on it as "Ready for
+ * Review". Every other tier decision in the app is made from the username, so
+ * this one is too, and the two of them answer alike.
+ */
+function isLeadershipAccount(raw: StaffOnboardingFlags): boolean {
+  const username = (raw.username ?? emailToUsername(raw.email ?? "")).toLowerCase();
+  return OWNER_USERNAMES.has(username) || CHEF_USERNAMES.has(username);
+}
+
 /** Matches the owner-approval rule used on /people/onboarding. */
 export function isOwnerApproved(raw: StaffOnboardingFlags): boolean {
   const status = (raw.status ?? "").toLowerCase();
@@ -129,7 +147,7 @@ export function isActivated(raw: StaffOnboardingFlags): boolean {
  * what they are — employed, and not finished.
  */
 export function isOnboardingListEmployee(raw: StaffOnboardingFlags): boolean {
-  if (raw.role === "owner") return false;
+  if (isLeadershipAccount(raw)) return false;
   if ((raw.status ?? "").toLowerCase() === "terminated") return false;
   if (isActivated(raw)) return false;
   if (!isActiveEmployee(raw)) return true;

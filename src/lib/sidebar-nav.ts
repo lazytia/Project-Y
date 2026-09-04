@@ -79,14 +79,20 @@ export const OWNER_NAV: NavGroup[] = [
     // The documents used to hang here as four siblings, which said nothing
     // about which of them anyone still owed a signature on — the one thing
     // the owner opens this section to find out. They now live on the
-    // /hr-records page, listed with their version and what is outstanding,
-    // and the menu entry is the way in to it. HR Notes stays: it is a
-    // running record rather than a document, and is reached often enough to
-    // be worth one click.
+    // /hr-records page, listed with their version and what is outstanding.
+    //
+    // That page is reached through Staff Compliance rather than by tapping
+    // the group header. The header did both jobs — navigate on the label,
+    // expand on a separate chevron — so the one entry in this section that is
+    // a page of its own was also the only one you could not see listed.
     icon: "📋",
     label: "HR Records",
-    href: "/hr-records",
-    children: [{ label: "HR Notes", href: "/people/hr-notes" }],
+    children: [
+      { label: "Staff Compliance", href: "/hr-records" },
+      // A running record of conversations rather than a document anyone
+      // signs, which is why it sits beside the compliance page, not on it.
+      { label: "HR Notes", href: "/people/hr-notes" },
+    ],
   },
   {
     icon: "⚙️",
