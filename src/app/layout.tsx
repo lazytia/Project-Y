@@ -57,7 +57,14 @@ export default async function RootLayout({
     <html lang="en" className={inter.variable}>
       <head>
         {/* Boot splash must paint before layout.css downloads — otherwise users
-            see a long blank white screen on cold start / slow networks. */}
+            see a long blank white screen on cold start / slow networks.
+
+            Every .bootSplash* rule here is a duplicate of one in globals.css
+            and has to be changed in both places. Only this copy decides what
+            the first paint looks like, so a change made in globals.css alone
+            is invisible in development and wrong on a cold start — which is
+            exactly how the stacked wordmark first shipped as "ProjectYURICA"
+            on one line. */}
         <style
           dangerouslySetInnerHTML={{
             __html: `
@@ -66,9 +73,10 @@ export default async function RootLayout({
               .bootSplash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fff;will-change:auto}
               .bootSplashHidden{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important;height:0!important;width:0!important;overflow:hidden!important;position:absolute!important;inset:auto!important;z-index:-1!important}
               .bootSplashHidden,.bootSplashHidden *{animation:none!important;transition:none!important}
+              .bootSplashBrand{display:flex;flex-direction:column;align-items:center;gap:12px}
               .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
               .bootSplashMark{color:#fff;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:40px;line-height:1}
-              .bootSplashWordmark{font-family:Arial,sans-serif;font-size:16px;font-weight:600;color:#111;letter-spacing:.04em}
+              .bootSplashWord{font-family:Arial,sans-serif;font-size:16px;font-weight:600;line-height:1;color:#111;letter-spacing:.04em}
               .bootSplashStatus{font-family:Arial,sans-serif;font-size:13px;color:#6E6E73;margin-top:4px}
               .bootSplashDots{display:flex;gap:6px;margin-top:8px}
               .bootSplashDots span{width:6px;height:6px;border-radius:50%;background:#6E6E73;animation:bootDotBounce 1.2s ease-in-out infinite}

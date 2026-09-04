@@ -10,6 +10,16 @@
   z-index: 1000;
 }
 
+/* Logo and both words as evenly spaced siblings — see .bootSplashBrand in
+   globals.css, which this has to match or the handover between the two
+   flickers. */
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .logo {
   width: 72px;
   height: 72px;
@@ -31,13 +41,10 @@
   letter-spacing: -0.02em;
 }
 
-/* Stacked one word per line — see .bootSplashWordmark in globals.css, which
-   this has to be pixel-identical to or the handover between the two flickers. */
-.wordmark {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.2;
+/* line-height: 1 so .brand's gap is the only thing spacing these — see the
+   note on .bootSplashWord in globals.css. */
+.word {
+  line-height: 1;
   font-family: var(--font-display, var(--font-sans));
   font-size: var(--font-size-lg);
   font-weight: 600;

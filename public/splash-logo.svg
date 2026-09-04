@@ -16,14 +16,21 @@
         font-weight="900"
         font-size="96"
         fill="#ffffff">Y</text>
-  <text x="256" y="326"
+  <!-- The three baselines below are not round numbers, and should not be
+       rounded: they were solved so the white space under the logo, and the
+       white space between the two words, measure the same 30 units. Type
+       metrics are what make that awkward — "Project" hangs a "j" below its
+       baseline and "YURICA" has nothing below its own, so equal baseline
+       steps would look unequal. scripts/measure-splash.mjs prints both gaps;
+       keep them at 30 if you move anything here. -->
+  <text x="256" y="334"
         text-anchor="middle"
         font-family="Arial, sans-serif"
         font-weight="600"
         font-size="34"
         letter-spacing="1.5"
         fill="#111111">Project</text>
-  <text x="256" y="366"
+  <text x="256" y="396"
         text-anchor="middle"
         font-family="Arial, sans-serif"
         font-weight="600"

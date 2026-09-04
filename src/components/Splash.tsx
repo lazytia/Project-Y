@@ -51,12 +51,14 @@ export default function Splash({ label, forceVisible = false }: Props) {
 
   return (
     <div className={styles.splash} data-splash="true" role="status" aria-live="polite">
-      <div className={styles.logo} aria-hidden="true">
-        <span className={styles.mark}>Y</span>
-      </div>
-      <div className={styles.wordmark}>
+      <div className={styles.brand}>
+        <div className={styles.logo} aria-hidden="true">
+          <span className={styles.mark}>Y</span>
+        </div>
         {APP_NAME_LINES.map((line) => (
-          <span key={line}>{line}</span>
+          <span key={line} className={styles.word}>
+            {line}
+          </span>
         ))}
       </div>
       <div className={styles.dots} aria-hidden="true">
