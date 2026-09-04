@@ -234,7 +234,7 @@ export default function CreateLoginDetailsPage() {
         const firstName = request.fullName.split(" ")[0];
         const projectYLink = "https://project.yurica.com.au";
         const trimmedStaffId = squareStaffId.trim();
-        // The emoji and the em-dash below are the reason send-sms picks its
+        // The ticks and the em-dashes below are the reason send-sms picks its
         // encoding rather than taking Vonage's GSM-7 default: sent as GSM-7
         // they arrive as "?", which is what an earlier version of this text
         // did and why it was cut back to plain ASCII. Sending them properly
@@ -242,7 +242,7 @@ export default function CreateLoginDetailsPage() {
         // so the wording below is kept to what the new hire has to be told
         // before their first shift, and nothing else.
         const smsText = [
-          `Hi ${firstName}, welcome to YURICA 👋`,
+          `Hi ${firstName}, welcome to YURICA`,
           // A blank Clock In ID is not required to approve a request, and a
           // heading over an empty line is worse than no heading.
           ...(trimmedStaffId ? ["", "Clock In ID", trimmedStaffId] : []),

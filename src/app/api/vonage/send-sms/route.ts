@@ -36,8 +36,8 @@ const GSM_ALPHABET = new Set(
  * Whether this message has to travel as UCS-2.
  *
  * Vonage defaults to `type=text`, which is GSM-7, and silently replaces
- * anything outside that alphabet with "?" — so the welcome text's emoji and
- * em-dash arrived mangled and were once removed rather than encoded. Asking
+ * anything outside that alphabet with "?" — so the welcome text's ticks and
+ * em-dashes arrived mangled and were once removed rather than encoded. Asking
  * for unicode fixes that at a cost worth knowing about: a UCS-2 message fits
  * 70 characters where GSM-7 fits 160, and 67 against 153 once it is long
  * enough to be split. One stray character therefore roughly doubles what a
