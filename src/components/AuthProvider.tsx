@@ -16,6 +16,18 @@ import { emailToUsername } from "@/lib/username";
 
 const STAFF_STEP_CACHE_KEY = "y.staffStep";
 
+/**
+ * How long sign-out waits for the session-cookie DELETE before leaving anyway.
+ *
+ * The login page is server-rendered from those cookies, so leaving before the
+ * DELETE lands means rendering it as if a session were still live. Waiting
+ * forever is worse: on a dead connection the press would hold the user on a
+ * splash with nothing left to resolve it. Past this we navigate regardless —
+ * Firebase is already signed out locally, so the next load's authStateReady
+ * clears the cookies again on arrival.
+ */
+const SIGN_OUT_COOKIE_WAIT_MS = 2_500;
+
 type StaffStepCache = { uid: string; step: number; activated?: boolean };
 
 /** `activated: null` for a record written before it was cached — unknown, not
@@ -347,6 +359,13 @@ export function AuthProvider({
   useEffect(() => {
     const isPublic = PUBLIC_ROUTES.has(pathname);
 
+    // A sign-out is already on its way to /login by document request. Letting
+    // this effect fire its own router.replace() on the way past would put a
+    // client navigation in the air alongside it, and the login form would
+    // flash for as long as the cookie DELETE takes before the real handover
+    // replaced it. signOut() owns the exit; leave it alone.
+    if (signOutStarted.current) return;
+
     // Sign-in handoff — wait for session cookies, then hard-navigate so iOS
     // PWA gets SSR HTML with the correct dash cookie (client router.refresh
     // often races the POST and leaves main empty).
@@ -462,8 +481,9 @@ export function AuthProvider({
    * doing nothing the user could see — and `clearClientSessionHint()` left
    * the client-readable `y_sess` cookie behind, so the shell kept believing
    * a session was live. Revoking Firebase locally is instant and needs no
-   * network, so it goes first; clearing the server cookie is the slow part
-   * and only the refresh below has to wait on it.
+   * network, so it goes first — the shell drops to the signed-out splash on
+   * the press itself. Clearing the server cookie is the slow part, and only
+   * the handover to /login has to wait on it.
    */
   const signOut = async () => {
     if (signOutStarted.current) return;
@@ -496,22 +516,39 @@ export function AuthProvider({
       document.getElementById("static-chrome-fallback")?.setAttribute("hidden", "");
       setUser(null);
       setLoading(false);
-      router.replace(ROUTES.login);
 
       // The login page is server-rendered from the `uid` cookie, so it can only
-      // be trusted once the DELETE has landed — refresh after, not before.
-      await clearAuthSession();
+      // be trusted once the DELETE has landed — wait for it, then navigate.
+      await Promise.race([
+        clearAuthSession().catch(() => {/* navigate anyway */}),
+        new Promise<void>((resolve) => setTimeout(resolve, SIGN_OUT_COOKIE_WAIT_MS)),
+      ]);
 
       // Clear the hint a second time, after the DELETE. Every request made
-      // while `uid` was still alive — including the /login navigation above —
-      // passes through middleware that mints a fresh `y_sess=1` from it, so
-      // one of those responses can land after the teardown and re-arm the
-      // very cookie this sign-out cleared. The shell trusts `y_sess` over
-      // Firebase, so a leftover one paints signed-in chrome over a signed-out
-      // user: the press looks ignored, and the splash waits for a session
-      // that is never coming.
+      // while `uid` was still alive passes through middleware that mints a
+      // fresh `y_sess=1` from it, so one of those responses can land after the
+      // teardown and re-arm the very cookie this sign-out cleared. The shell
+      // trusts `y_sess` over Firebase, so a leftover one paints signed-in
+      // chrome over a signed-out user: the press looks ignored, and the splash
+      // waits for a session that is never coming.
       clearClientSessionHint();
-      router.refresh();
+
+      // A document request, not router.replace() — the same handover the
+      // sign-in path above uses, for the same reason.
+      //
+      // This used to be `router.replace(login)` fired before the DELETE and
+      // then `router.refresh()` fired after it. The refresh invalidated the
+      // router cache while that navigation was still in flight, so the two
+      // cancelled each other and the app stayed on the protected route with
+      // `user` already null — which is exactly the branch where AppShell
+      // paints `<Splash label="Redirecting…" />`. Nothing was left to resolve
+      // it: the navigation it was waiting on had been thrown away. That is
+      // the first press looking ignored and the second one ending on a logo
+      // screen that never goes anywhere. A document request cannot be
+      // cancelled by a later client-side call, it re-reads the cookies this
+      // press just deleted, and it drops every piece of signed-in state along
+      // with the JS context.
+      window.location.replace(ROUTES.login);
     } finally {
       signOutStarted.current = false;
     }
