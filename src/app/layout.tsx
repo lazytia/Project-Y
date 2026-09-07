@@ -11,6 +11,7 @@ import { BOOT_SPLASH_HEAD_HINT_SCRIPT, bootSplashEarlyDismissScript } from "@/li
 import { BOOT_SPLASH_MARKUP } from "@/lib/boot-splash";
 import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
 import { SPLASH_SCREENS, splashMediaQuery } from "@/lib/splash-screens";
+import { SPLASH_TRACE_SCRIPT } from "@/lib/splash-trace";
 import "./globals.css";
 
 const LanguageProvider = dynamic(
@@ -137,6 +138,9 @@ export default async function RootLayout({
               : BOOT_SPLASH_HEAD_HINT_SCRIPT,
           }}
         />
+        {/* TEMPORARY — see src/lib/splash-trace.ts. Does nothing without
+            ?splashtrace=1 on the URL. Remove with that file. */}
+        <script dangerouslySetInnerHTML={{ __html: SPLASH_TRACE_SCRIPT }} />
       </head>
       <body className="appBody">
         <div
