@@ -101,10 +101,8 @@ export default function AppShell({
   return (
     <div data-app-shell-root="true">
       <AppReadyMarker />
-      {/* Signed out with nothing to restore — on the way to /login, so this is
-          still the launch path and nothing on it should move. */}
       {!loading && !user && !hasSessionGuess ? (
-        <Splash label="Redirecting…" still />
+        <Splash label="Redirecting…" />
       ) : (
         <AuthenticatedShell
           interactive={shellInteractive}

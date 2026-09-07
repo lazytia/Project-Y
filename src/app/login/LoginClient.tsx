@@ -89,14 +89,7 @@ export default function LoginClient({ initialHasSession }: LoginClientProps) {
   };
 
   if (shouldHoldSplash) {
-    // `still` — this is the app opening, not a page loading. See Splash's prop.
-    return (
-      <Splash
-        label={user || busy ? "Signing in…" : undefined}
-        forceVisible={!!user || busy}
-        still
-      />
-    );
+    return <Splash label={user || busy ? "Signing in…" : undefined} forceVisible={!!user || busy} />;
   }
 
   return (

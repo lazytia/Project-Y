@@ -19,20 +19,6 @@
   gap: var(--space-3);
 }
 
-/* 74px is half the 100px brand block plus the 24px that used to separate the
-   two when this was one flex column. */
-.progress {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  margin-top: 74px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-5);
-}
-
 /*
  * No animation. This logo is the third and last drawing of a picture the user
  * has already been looking at for a second — the iOS launch PNG, then the boot
@@ -73,28 +59,25 @@
   letter-spacing: 0.04em;
 }
 
-.dots {
-  display: flex;
-  gap: 6px;
-}
-
-.dots span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-fg-muted);
-  animation: bounce 1.2s ease-in-out infinite;
-}
-
-.dots span:nth-child(2) { animation-delay: 0.15s; }
-.dots span:nth-child(3) { animation-delay: 0.3s; }
-
+/*
+ * Taken out of the centred flow so .brand stays the only child in it, and the
+ * logo therefore sits in the same place whether or not a caller passed a label.
+ * 74px is half the 100px brand block plus the 24px that used to separate the
+ * two when this was one flex column.
+ *
+ * There were three bouncing dots above this. Nothing on the splash moves now:
+ * the mark is the same still 72px box the iOS launch PNG and the boot splash
+ * in globals.css draw, and this is the last of the three to hand over to. A
+ * dot that hops 5px is small, but it was the only thing on screen doing
+ * anything, which is what made the logo look like it was twitching.
+ */
 .label {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  margin-top: 74px;
+  text-align: center;
   font-size: var(--font-size-sm);
   color: var(--color-fg-subtle);
-}
-
-@keyframes bounce {
-  0%, 80%, 100% { transform: translateY(0);    opacity: 0.4; }
-  40%           { transform: translateY(-5px); opacity: 1;   }
 }
