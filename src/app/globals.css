@@ -106,13 +106,12 @@ button {
 /*
  * Instant boot splash — visible before JS loads (PWA cold start).
  *
- * .bootSplashBrand is the only child in flow, so it is centred on the screen
- * and nothing else can move it. That is deliberate: iOS has already painted a
- * launch screen with the logo dead centre, and this markup replaces it mid-
- * blink. Back when the status line and the dots were in the column too, they
- * pushed the brand block about 18px above the middle and the logo visibly
- * hopped upwards as the app opened. The progress group below is positioned
- * off the centre line instead, so it can say and be whatever it likes.
+ * It holds one thing, the brand block, and centres it. iOS has already painted
+ * a launch screen with exactly that on it, and this markup replaces it mid-
+ * blink, so the two have to agree to the pixel: same 72px logo, same 100px
+ * block, same centre. Anything else in here would push the block off centre
+ * and make the logo hop as the app opens, which is what a status line and a
+ * row of bouncing dots used to do.
  */
 .bootSplash {
   position: fixed;
@@ -150,24 +149,6 @@ button {
   gap: var(--space-3);
 }
 
-/*
- * "Loading…" and the dots, hung off the centre line rather than sharing it.
- * 70px is half the brand block plus the 20px that used to sit between the two
- * when this was one flex column — the spacing is unchanged, but it is now
- * measured from a point that cannot move the logo.
- */
-.bootSplashProgress {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  margin-top: 70px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-5);
-}
-
 .bootSplashLogo {
   width: 72px;
   height: 72px;
@@ -201,33 +182,6 @@ button {
   font-weight: 600;
   color: var(--color-fg);
   letter-spacing: 0.04em;
-}
-
-.bootSplashStatus {
-  font-family: var(--font-splash-word);
-  font-size: var(--font-size-sm);
-  color: var(--color-fg-muted);
-}
-
-.bootSplashDots {
-  display: flex;
-  gap: 6px;
-}
-
-.bootSplashDots span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-fg-muted);
-  animation: bootSplashBounce 1.2s ease-in-out infinite;
-}
-
-.bootSplashDots span:nth-child(2) { animation-delay: 0.15s; }
-.bootSplashDots span:nth-child(3) { animation-delay: 0.3s; }
-
-@keyframes bootSplashBounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-  40% { transform: translateY(-5px); opacity: 1; }
 }
 
 /* ── Desktop-friendly centering ──

@@ -3,24 +3,22 @@ import { HOME_SCREEN_NAME } from "./brand";
 const BOOT_SPLASH_ID = "boot-splash";
 const BOOT_SPLASH_HIDDEN = "bootSplashHidden";
 
-// The mark and the name are grouped so their own spacing is set apart from the
-// looser rhythm of the status line and the dots below — the name belongs to
-// the logo, and reads that way only if it sits closer to it than to anything
-// else. scripts/generate-splash.mjs bakes this same block into the launch
-// screens iOS paints first.
+// The mark and the name, and deliberately nothing else. This is the whole boot
+// splash: scripts/generate-splash.mjs bakes the same block into the launch
+// screens iOS paints first, so the handover between the two is not a transition
+// the user can see — it is the same picture twice.
+//
+// There was a "Loading…" line and three bouncing dots under this. They were the
+// only part that moved, and they announced a wait rather than covering one:
+// nothing about them was progress, they just started up under a logo that was
+// already on screen and then disappeared again. A launch screen that holds
+// still until the app is ready reads as the app opening. This one does.
 const brand =
   `<div class="bootSplashLogo"><span class="bootSplashMark">Y</span></div>` +
   `<span class="bootSplashWord">${HOME_SCREEN_NAME}</span>`;
 
-// Held apart from the brand so the brand can be the only thing the splash
-// centres. Anything added here — a longer status, a fourth dot, a progress bar
-// — grows downwards from a fixed point and leaves the logo where iOS put it.
-const progress =
-  `<div class="bootSplashStatus">Loading…</div>` +
-  `<div class="bootSplashDots" aria-hidden="true"><span></span><span></span><span></span></div>`;
-
 /** Injected via dangerouslySetInnerHTML so React never reconciles inner nodes. */
-export const BOOT_SPLASH_MARKUP = `<div id="boot-splash" class="bootSplash" aria-hidden="true"><div class="bootSplashBrand">${brand}</div><div class="bootSplashProgress">${progress}</div></div>`;
+export const BOOT_SPLASH_MARKUP = `<div id="boot-splash" class="bootSplash" aria-hidden="true"><div class="bootSplashBrand">${brand}</div></div>`;
 
 export function isBootSplashVisible(): boolean {
   if (typeof document === "undefined") return false;

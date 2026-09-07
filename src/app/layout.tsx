@@ -82,16 +82,9 @@ export default async function RootLayout({
               .bootSplashHidden{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important;height:0!important;width:0!important;overflow:hidden!important;position:absolute!important;inset:auto!important;z-index:-1!important}
               .bootSplashHidden,.bootSplashHidden *{animation:none!important;transition:none!important}
               .bootSplashBrand{display:flex;flex-direction:column;align-items:center;gap:12px}
-              .bootSplashProgress{position:absolute;top:50%;left:0;right:0;margin-top:70px;display:flex;flex-direction:column;align-items:center;gap:24px}
               .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
               .bootSplashMark{color:#fff;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:40px;line-height:1;letter-spacing:-.02em}
               .bootSplashWord{font-family:Arial,sans-serif;font-size:16px;font-weight:600;line-height:1;color:#111;letter-spacing:.04em}
-              .bootSplashStatus{font-family:Arial,sans-serif;font-size:13px;color:#6E6E73}
-              .bootSplashDots{display:flex;gap:6px}
-              .bootSplashDots span{width:6px;height:6px;border-radius:50%;background:#6E6E73;animation:bootDotBounce 1.2s ease-in-out infinite}
-              .bootSplashDots span:nth-child(2){animation-delay:.15s}
-              .bootSplashDots span:nth-child(3){animation-delay:.3s}
-              @keyframes bootDotBounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
               #server-app-shell:not([hidden]){min-height:100vh;position:relative;background:#fff}
               #server-app-shell:not([hidden]) aside{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #ececec;box-sizing:border-box;padding:24px}
               #server-app-shell [data-nav-collapsed]{display:none}
