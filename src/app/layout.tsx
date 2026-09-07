@@ -10,6 +10,7 @@ import { readServerSession } from "@/lib/dashboard-session";
 import { BOOT_SPLASH_HEAD_HINT_SCRIPT, bootSplashEarlyDismissScript } from "@/lib/client-session-hint";
 import { BOOT_SPLASH_MARKUP } from "@/lib/boot-splash";
 import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
+import { SPLASH_SCREENS, splashMediaQuery } from "@/lib/splash-screens";
 import "./globals.css";
 
 const LanguageProvider = dynamic(
@@ -64,21 +65,29 @@ export default async function RootLayout({
             the first paint looks like, so a change made in globals.css alone
             is invisible in development and wrong on a cold start — which is
             exactly how a wordmark change once shipped as "ProjectYURICA" run
-            together on one line. */}
+            together on one line.
+
+            The sizes below have a third copy, in src/lib/splash-screens.json,
+            which is what the launch-screen PNGs are drawn to. iOS paints one of
+            those and then hands over to this markup mid-blink, so a number that
+            moves here and not there shows up as the logo twitching as the app
+            opens. Change all three, then re-run scripts/generate-splash.mjs and
+            scripts/measure-splash.mjs. */}
         <style
           dangerouslySetInnerHTML={{
             __html: `
               html,body{margin:0;background:#fff}
               html.y-has-session #boot-splash{display:none!important;visibility:hidden!important}
-              .bootSplash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fff;will-change:auto}
+              .bootSplash{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#fff;will-change:auto}
               .bootSplashHidden{display:none!important;visibility:hidden!important;pointer-events:none!important;opacity:0!important;height:0!important;width:0!important;overflow:hidden!important;position:absolute!important;inset:auto!important;z-index:-1!important}
               .bootSplashHidden,.bootSplashHidden *{animation:none!important;transition:none!important}
               .bootSplashBrand{display:flex;flex-direction:column;align-items:center;gap:12px}
+              .bootSplashProgress{position:absolute;top:50%;left:0;right:0;margin-top:70px;display:flex;flex-direction:column;align-items:center;gap:24px}
               .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
-              .bootSplashMark{color:#fff;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:40px;line-height:1}
+              .bootSplashMark{color:#fff;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:40px;line-height:1;letter-spacing:-.02em}
               .bootSplashWord{font-family:Arial,sans-serif;font-size:16px;font-weight:600;line-height:1;color:#111;letter-spacing:.04em}
-              .bootSplashStatus{font-family:Arial,sans-serif;font-size:13px;color:#6E6E73;margin-top:4px}
-              .bootSplashDots{display:flex;gap:6px;margin-top:8px}
+              .bootSplashStatus{font-family:Arial,sans-serif;font-size:13px;color:#6E6E73}
+              .bootSplashDots{display:flex;gap:6px}
               .bootSplashDots span{width:6px;height:6px;border-radius:50%;background:#6E6E73;animation:bootDotBounce 1.2s ease-in-out infinite}
               .bootSplashDots span:nth-child(2){animation-delay:.15s}
               .bootSplashDots span:nth-child(3){animation-delay:.3s}
@@ -111,16 +120,19 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="application-name" content={APP_NAME} />
         <link rel="manifest" href="/manifest.webmanifest" />
-        {/* iOS PWA launch splash — common iPhone/iPad sizes only (reduces HTML parse). */}
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-1170-2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-1179-2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-1284-2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-1290-2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-1125-2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-1242-2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-828-1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-750-1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-        <link rel="apple-touch-startup-image" href="/splash/apple-splash-1536-2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+        {/* iOS PWA launch splash — common iPhone/iPad sizes only (reduces HTML
+            parse). The list is in src/lib/splash-screens.json because
+            scripts/generate-splash.mjs draws the artwork from the same entries;
+            a size named in one place and not the other is either a device that
+            launches to a blank screen or a PNG nobody ever sees. */}
+        {SPLASH_SCREENS.map((screen) => (
+          <link
+            key={screen.file}
+            rel="apple-touch-startup-image"
+            href={`/splash/${screen.file}`}
+            media={splashMediaQuery(screen)}
+          />
+        ))}
         <script
           dangerouslySetInnerHTML={{
             __html: session.authenticated

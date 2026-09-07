@@ -57,12 +57,17 @@ export default function Splash({ label, forceVisible = false }: Props) {
         </div>
         <span className={styles.word}>{HOME_SCREEN_NAME}</span>
       </div>
-      <div className={styles.dots} aria-hidden="true">
-        <span />
-        <span />
-        <span />
+      {/* Held out of the centred flow with .brand — see Splash.module.css.
+          The label is optional, and the logo must not move depending on
+          whether a caller passed one. */}
+      <div className={styles.progress}>
+        <div className={styles.dots} aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        {label && <div className={styles.label}>{label}</div>}
       </div>
-      {label && <div className={styles.label}>{label}</div>}
     </div>
   );
 }

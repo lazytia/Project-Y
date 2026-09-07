@@ -1,23 +1,36 @@
+/* .brand is the only child in flow, so it sits dead centre no matter what is
+   below it — the same arrangement as .bootSplash in globals.css, which this
+   has to match or the handover between the two flickers. */
 .splash {
   position: fixed;
   inset: 0;
   background: var(--color-bg);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-4);
   z-index: 1000;
 }
 
-/* The mark and its name, spaced apart from the status line and dots below —
-   see .bootSplashBrand in globals.css, which this has to match or the handover
-   between the two flickers. */
+/* The mark and its name — see .bootSplashBrand in globals.css. */
 .brand {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
+}
+
+/* 74px is half the 100px brand block plus the 24px that used to separate the
+   two when this was one flex column. */
+.progress {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  margin-top: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
 }
 
 .logo {
@@ -34,7 +47,7 @@
 
 .mark {
   color: var(--color-bg);
-  font-family: "Arial Black", var(--font-display, var(--font-sans));
+  font-family: var(--font-splash-mark);
   font-weight: 900;
   font-size: 40px;
   line-height: 1;
@@ -45,7 +58,7 @@
    note on .bootSplashWord in globals.css. */
 .word {
   line-height: 1;
-  font-family: var(--font-display, var(--font-sans));
+  font-family: var(--font-splash-word);
   font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--color-fg);
@@ -55,7 +68,6 @@
 .dots {
   display: flex;
   gap: 6px;
-  margin-top: var(--space-2);
 }
 
 .dots span {
@@ -72,7 +84,6 @@
 .label {
   font-size: var(--font-size-sm);
   color: var(--color-fg-subtle);
-  margin-top: var(--space-1);
 }
 
 @keyframes pulse {

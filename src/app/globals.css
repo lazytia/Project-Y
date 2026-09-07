@@ -45,6 +45,16 @@
   /* Typography */
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /*
+   * The splash is the one place that must not use --font-display. It is drawn
+   * three times on the way in — baked into public/splash/*.png by iOS, then by
+   * the inline critical CSS in layout.tsx, then by this stylesheet — and Inter
+   * is a webfont that has loaded for none of them. Asking for it here only
+   * means the wordmark changes face partway through opening the app. Arial is
+   * on the device already, and is what the PNGs are rendered with.
+   */
+  --font-splash-mark: "Arial Black", Arial, sans-serif;
+  --font-splash-word: Arial, sans-serif;
   --font-size-xs: 11px;
   --font-size-sm: 13px;
   --font-size-md: 14px;
@@ -93,16 +103,24 @@ button {
   font-family: inherit;
 }
 
-/* Instant boot splash — visible before JS loads (PWA cold start) */
+/*
+ * Instant boot splash — visible before JS loads (PWA cold start).
+ *
+ * .bootSplashBrand is the only child in flow, so it is centred on the screen
+ * and nothing else can move it. That is deliberate: iOS has already painted a
+ * launch screen with the logo dead centre, and this markup replaces it mid-
+ * blink. Back when the status line and the dots were in the column too, they
+ * pushed the brand block about 18px above the middle and the logo visibly
+ * hopped upwards as the app opened. The progress group below is positioned
+ * off the centre line instead, so it can say and be whatever it likes.
+ */
 .bootSplash {
   position: fixed;
   inset: 0;
   z-index: 9999;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-4);
   background: var(--color-bg);
 }
 
@@ -119,17 +137,35 @@ button {
 }
 
 /*
- * The mark and the name it belongs to, spaced tighter than the status line and
- * dots below them — grouped so that gap is set on its own and not by the
- * container's looser rhythm. 12px is the same proportion of the 72px mark that
- * the launch-screen PNG's 30 units are of its 160, so the artwork iOS paints
- * first and the markup drawn over it hold the same shape.
+ * The mark and the name it belongs to. Its height — 72 + 12 + 16 = 100px — is
+ * what scripts/generate-splash.mjs centres the launch-screen artwork on, so
+ * these three numbers are shared with src/lib/splash-screens.json and none of
+ * them can change on its own. The word's `line-height: 1` below is what makes
+ * the sum that simple.
  */
 .bootSplashBrand {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
+}
+
+/*
+ * "Loading…" and the dots, hung off the centre line rather than sharing it.
+ * 70px is half the brand block plus the 20px that used to sit between the two
+ * when this was one flex column — the spacing is unchanged, but it is now
+ * measured from a point that cannot move the logo.
+ */
+.bootSplashProgress {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  margin-top: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
 }
 
 .bootSplashLogo {
@@ -145,7 +181,7 @@ button {
 
 .bootSplashMark {
   color: var(--color-bg);
-  font-family: "Arial Black", var(--font-display, var(--font-sans));
+  font-family: var(--font-splash-mark);
   font-weight: 900;
   font-size: 40px;
   line-height: 1;
@@ -160,17 +196,22 @@ button {
  */
 .bootSplashWord {
   line-height: 1;
-  font-family: var(--font-display, var(--font-sans));
+  font-family: var(--font-splash-word);
   font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--color-fg);
   letter-spacing: 0.04em;
 }
 
+.bootSplashStatus {
+  font-family: var(--font-splash-word);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
 .bootSplashDots {
   display: flex;
   gap: 6px;
-  margin-top: var(--space-2);
 }
 
 .bootSplashDots span {

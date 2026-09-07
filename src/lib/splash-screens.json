@@ -1,0 +1,33 @@
+{
+  "screens": [
+    { "file": "apple-splash-750-1334.png", "cssWidth": 375, "cssHeight": 667, "scale": 2 },
+    { "file": "apple-splash-1125-2436.png", "cssWidth": 375, "cssHeight": 812, "scale": 3 },
+    { "file": "apple-splash-1170-2532.png", "cssWidth": 390, "cssHeight": 844, "scale": 3 },
+    { "file": "apple-splash-1179-2556.png", "cssWidth": 393, "cssHeight": 852, "scale": 3 },
+    { "file": "apple-splash-828-1792.png", "cssWidth": 414, "cssHeight": 896, "scale": 2 },
+    { "file": "apple-splash-1242-2688.png", "cssWidth": 414, "cssHeight": 896, "scale": 3 },
+    { "file": "apple-splash-1284-2778.png", "cssWidth": 428, "cssHeight": 926, "scale": 3 },
+    { "file": "apple-splash-1290-2796.png", "cssWidth": 430, "cssHeight": 932, "scale": 3 },
+    { "file": "apple-splash-1536-2048.png", "cssWidth": 768, "cssHeight": 1024, "scale": 2 }
+  ],
+  "geometry": {
+    "background": "#ffffff",
+    "foreground": "#111111",
+    "logoSize": 72,
+    "logoRadius": 18,
+    "markFontFamily": "Arial Black, Arial, sans-serif",
+    "markFontSize": 40,
+    "markFontWeight": 900,
+    "markLetterSpacing": -0.8,
+    "markColor": "#ffffff",
+    "markFontAscent": 1.02539,
+    "markFontDescent": 0.2251,
+    "gap": 12,
+    "wordFontFamily": "Arial, sans-serif",
+    "wordFontSize": 16,
+    "wordFontWeight": 600,
+    "wordLetterSpacing": 0.64,
+    "wordFontAscent": 0.90527,
+    "wordFontDescent": 0.21191
+  }
+}
