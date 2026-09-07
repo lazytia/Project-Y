@@ -120,11 +120,15 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="application-name" content={APP_NAME} />
         <link rel="manifest" href="/manifest.webmanifest" />
-        {/* iOS PWA launch splash — common iPhone/iPad sizes only (reduces HTML
-            parse). The list is in src/lib/splash-screens.json because
+        {/* iOS PWA launch splash. A device with no matching size here opens on
+            a blank white screen instead, so the list covers every iPhone and
+            iPad still likely to be running this — it is a couple of kB of head
+            for the one moment the app is judged on.
+
+            It lives in src/lib/splash-screens.json because
             scripts/generate-splash.mjs draws the artwork from the same entries;
-            a size named in one place and not the other is either a device that
-            launches to a blank screen or a PNG nobody ever sees. */}
+            a size named in one place and not the other is either that blank
+            screen or a PNG nobody ever sees. */}
         {SPLASH_SCREENS.map((screen) => (
           <link
             key={screen.file}

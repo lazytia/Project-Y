@@ -34,6 +34,12 @@ export type SplashScreen = {
   cssHeight: number;
   /** Device pixel ratio; cssWidth * scale is the PNG's pixel width. */
   scale: number;
+  /**
+   * Which hardware reports that size. Documentation only — nothing matches on
+   * it — but a bare 834x1210 tells you nothing about whether it is still worth
+   * carrying, and JSON has nowhere else to put a comment.
+   */
+  device: string;
 };
 
 export const SPLASH_SCREENS: readonly SplashScreen[] = data.screens;
