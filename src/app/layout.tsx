@@ -73,7 +73,12 @@ export default async function RootLayout({
             those and then hands over to this markup mid-blink, so a number that
             moves here and not there shows up as the logo twitching as the app
             opens. Change all three, then re-run scripts/generate-splash.mjs and
-            scripts/measure-splash.mjs. */}
+            scripts/measure-splash.mjs.
+
+            The doubled `height:100vh;height:100dvh` pairs are deliberate and
+            explained at the top of AppShell.module.css — on an installed iOS
+            PWA 100vh is taller than the window, which makes the boot page
+            scrollable and slides the fixed splash. Keep both halves. */}
         <style
           dangerouslySetInnerHTML={{
             __html: `
@@ -86,15 +91,15 @@ export default async function RootLayout({
               .bootSplashLogo{width:72px;height:72px;border-radius:18px;background:#111;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(0,0,0,.08)}
               .bootSplashMark{color:#fff;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:40px;line-height:1;letter-spacing:-.02em}
               .bootSplashWord{font-family:Arial,sans-serif;font-size:16px;font-weight:600;line-height:1;color:#111;letter-spacing:.04em}
-              #server-app-shell:not([hidden]){min-height:100vh;position:relative;background:#fff}
-              #server-app-shell:not([hidden]) aside{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #ececec;box-sizing:border-box;padding:24px}
+              #server-app-shell:not([hidden]){min-height:100vh;min-height:100dvh;position:relative;background:#fff}
+              #server-app-shell:not([hidden]) aside{position:fixed;top:0;left:0;width:260px;height:100vh;height:100dvh;background:#fff;border-right:1px solid #ececec;box-sizing:border-box;padding:24px}
               #server-app-shell [data-nav-collapsed]{display:none}
-              #static-chrome-fallback{min-height:100vh;background:#fff;position:relative}
+              #static-chrome-fallback{min-height:100vh;min-height:100dvh;background:#fff;position:relative}
               #static-chrome-fallback[hidden]{display:none!important}
               .staticChromeHeader{display:none;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;height:52px;padding:0 12px;background:#fff;border-bottom:1px solid #ececec;z-index:100;box-sizing:border-box}
               .staticChromeBrand{flex:1;text-align:center;font-family:Arial,sans-serif;font-size:18px;font-weight:500;color:#111;letter-spacing:.35em;margin:0 12px}
               .staticChromeIcon{width:36px;height:36px;border-radius:8px;background:#f5f5f5;flex-shrink:0}
-              .staticChromeSidebar{position:fixed;top:0;left:0;width:260px;height:100vh;background:#fff;border-right:1px solid #ececec;padding:24px;box-sizing:border-box}
+              .staticChromeSidebar{position:fixed;top:0;left:0;width:260px;height:100vh;height:100dvh;background:#fff;border-right:1px solid #ececec;padding:24px;box-sizing:border-box}
               .staticChromeSidebarBrand{font-family:Arial,sans-serif;font-size:20px;font-weight:700;color:#111;margin-bottom:24px}
               .staticChromeSidebarItem{height:36px;border-radius:8px;background:#f5f5f5;margin-bottom:12px}
               @media(max-width:767px){.staticChromeHeader{display:flex}.staticChromeSidebar{display:none}}

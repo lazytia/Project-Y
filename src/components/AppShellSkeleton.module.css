@@ -1,5 +1,10 @@
+/* 100vh then 100dvh throughout — see the note at the top of
+   AppShell.module.css. This skeleton paints on the same cold-start path as
+   the shell it stands in for, so it has to agree with it about how tall the
+   window is or it re-introduces the scroll the shell just removed. */
 .shell {
   min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
 }
 
@@ -7,6 +12,7 @@
   margin-left: var(--sidebar-width);
   padding: var(--space-6);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .mobileHeader {
@@ -38,6 +44,7 @@
   left: 0;
   width: var(--sidebar-width);
   height: 100vh;
+  height: 100dvh;
   background: var(--color-bg);
   border-right: 1px solid var(--color-border);
   padding: var(--space-5);
