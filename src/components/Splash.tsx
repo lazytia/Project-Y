@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { isBootSplashVisible, ssrShellVisible } from "@/lib/boot-splash";
-import { APP_NAME_LINES } from "@/lib/brand";
+import { HOME_SCREEN_NAME } from "@/lib/brand";
 import { hasClientSessionHint } from "@/lib/client-session-hint";
 import styles from "./Splash.module.css";
 
@@ -55,11 +55,7 @@ export default function Splash({ label, forceVisible = false }: Props) {
         <div className={styles.logo} aria-hidden="true">
           <span className={styles.mark}>Y</span>
         </div>
-        {APP_NAME_LINES.map((line) => (
-          <span key={line} className={styles.word}>
-            {line}
-          </span>
-        ))}
+        <span className={styles.word}>{HOME_SCREEN_NAME}</span>
       </div>
       <div className={styles.dots} aria-hidden="true">
         <span />

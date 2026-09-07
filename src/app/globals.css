@@ -119,11 +119,11 @@ button {
 }
 
 /*
- * Logo, "Project" and "YURICA" as three siblings in one column, evenly spaced.
- * The even spacing is the point: the launch-screen PNG this is painted over
- * puts the same air under the mark as it puts between the two words, and the
- * only way to hold that here is to let one `gap` set both. 12px is the same
- * proportion of the 72px mark that the PNG's 30 units are of its 160.
+ * The mark and the name it belongs to, spaced tighter than the status line and
+ * dots below them — grouped so that gap is set on its own and not by the
+ * container's looser rhythm. 12px is the same proportion of the 72px mark that
+ * the launch-screen PNG's 30 units are of its 160, so the artwork iOS paints
+ * first and the markup drawn over it hold the same shape.
  */
 .bootSplashBrand {
   display: flex;
@@ -153,13 +153,10 @@ button {
 }
 
 /*
- * One word per line — set in a row the name is wider than the mark it names
- * and reads as a caption rather than as part of it.
- *
- * line-height: 1 so the flex gap above is the whole story. Leave it at the
- * default and each word carries half a line of invisible padding, which lands
- * between the logo and "Project" but only once between "Project" and
- * "YURICA" — the two gaps then differ by a few pixels for no visible reason.
+ * line-height: 1 so .bootSplashBrand's gap is the whole story. Left at the
+ * default, the word carries half a line of invisible padding above it and the
+ * space under the mark measures several pixels more than the number that sets
+ * it — which makes matching the launch screen guesswork.
  */
 .bootSplashWord {
   line-height: 1;

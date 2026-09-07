@@ -2,9 +2,10 @@
  * What the app calls itself.
  *
  * It has been "Project Y" and is now "Project YURICA", which is reason enough
- * not to spell it out in the places where a mismatch is a real defect rather
- * than a typo: the splash wordmark has to match the window title or the app
- * appears to change identity while it boots.
+ * not to spell it out anywhere a mismatch would be a real defect rather than a
+ * typo — the window title, the manifest and the login heading all have to move
+ * together or the app appears to change identity between one screen and the
+ * next.
  *
  * Running prose is deliberately left as prose. A sentence like "log in to
  * Project YURICA" reads as copy, and a translator working through the
@@ -29,20 +30,10 @@ export const APP_NAME = "Project YURICA";
  * the login screen's "notifications are blocked" instructions point at this
  * and not at APP_NAME — an instruction that names a row the user cannot find
  * is worse than no instruction.
+ *
+ * The splash uses it too, so the name under the mark is the same one that sits
+ * under the icon the user just tapped. That the boot splash therefore says
+ * something shorter than the window title behind it is deliberate; a wordmark
+ * is not a sentence and does not have to spell out the whole name.
  */
 export const HOME_SCREEN_NAME = "YURICA";
-
-/**
- * APP_NAME broken into the lines the splash stacks it on.
- *
- * Set one word per line rather than in a single row: the splash sits under a
- * square logo mark, and a wordmark wider than the mark it belongs to reads as
- * a caption instead of a name. Stacked, the two together make a block.
- *
- * Derived from APP_NAME instead of spelled out because the launch-screen PNGs
- * in public/splash carry the same two lines as pixels. Those are regenerated
- * by hand, so the one thing that must not happen is the name changing here and
- * the split staying behind — the boot splash would then disagree with the
- * launch image it is drawn on top of.
- */
-export const APP_NAME_LINES = APP_NAME.split(" ");

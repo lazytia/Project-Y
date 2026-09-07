@@ -1,15 +1,15 @@
 /**
  * Prints the white space between the bands of ink in public/splash-logo.svg.
  *
- * The splash puts the logo, "Project" and "YURICA" in a column with the same
- * air between each, and the baselines that produce that are not round numbers
- * — "Project" hangs a "j" below its baseline and "YURICA" has nothing below
- * its own, so evenly spaced baselines look unevenly spaced. Rather than trust
- * font metrics, this renders the file and measures the result.
+ * What the eye measures the space under the logo by is the top of the letters,
+ * and a baseline is not that — the offset between the two is a property of the
+ * typeface at a given size, and guessing it is how a gap ends up a few units
+ * off what the source says it is. So rather than trust font metrics, this
+ * renders the file and reads the ink back.
  *
- * Both gaps should read 30. If you move any text in splash-logo.svg, run this,
- * nudge the baselines until they match again, then regenerate the launch
- * screens with scripts/generate-splash.mjs.
+ * The gap should read 30. If you move anything in splash-logo.svg, run this,
+ * nudge the baseline until it does, then regenerate the launch screens with
+ * scripts/generate-splash.mjs.
  *
  * Run: node scripts/measure-splash.mjs
  */

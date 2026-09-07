@@ -1,18 +1,15 @@
-import { APP_NAME_LINES } from "./brand";
+import { HOME_SCREEN_NAME } from "./brand";
 
 const BOOT_SPLASH_ID = "boot-splash";
 const BOOT_SPLASH_HIDDEN = "bootSplashHidden";
 
-// The logo and the two words are siblings in one column, not a logo beside a
-// wordmark block, because that is the only arrangement where a single `gap`
-// spaces all three of them equally — and equal is how the launch-screen PNG
-// underneath is drawn. Nest the words and the gap under the logo comes out of
-// a different budget than the gap between them, and no pair of numbers keeps
-// the two in step.
-const brand = [
-  `<div class="bootSplashLogo"><span class="bootSplashMark">Y</span></div>`,
-  ...APP_NAME_LINES.map((line) => `<span class="bootSplashWord">${line}</span>`),
-].join("");
+// The mark and the name are grouped so their own spacing is set apart from the
+// looser rhythm of the status line and the dots below — the name belongs to
+// the logo, and reads that way only if it sits closer to it than to anything
+// else. public/splash-logo.svg draws the launch screen to the same proportion.
+const brand =
+  `<div class="bootSplashLogo"><span class="bootSplashMark">Y</span></div>` +
+  `<span class="bootSplashWord">${HOME_SCREEN_NAME}</span>`;
 
 /** Injected via dangerouslySetInnerHTML so React never reconciles inner nodes. */
 export const BOOT_SPLASH_MARKUP = `<div id="boot-splash" class="bootSplash" aria-hidden="true"><div class="bootSplashBrand">${brand}</div><div class="bootSplashStatus">Loading…</div><div class="bootSplashDots" aria-hidden="true"><span></span><span></span><span></span></div></div>`;

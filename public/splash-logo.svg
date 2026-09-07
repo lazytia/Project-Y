@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Matches the boot-splash design in RootLayout: black rounded square
-       with a bold white "Y" mark, and the wordmark stacked below it —
-       "Project" over "YURICA", so the name reads as a block under the icon
-       instead of a long thin line that has to shrink to fit.
+  <!-- Matches the boot-splash design in RootLayout: black rounded square with
+       a bold white "Y" mark, and "YURICA" under it. Not the full "Project
+       YURICA" — this is the same name that sits under the icon the user just
+       tapped, and a wordmark is not a sentence.
 
        Source of truth for public/splash/*.png. Those are flat images, so a
        change here is invisible until scripts/generate-splash.mjs regenerates
@@ -16,21 +16,12 @@
         font-weight="900"
         font-size="96"
         fill="#ffffff">Y</text>
-  <!-- The three baselines below are not round numbers, and should not be
-       rounded: they were solved so the white space under the logo, and the
-       white space between the two words, measure the same 30 units. Type
-       metrics are what make that awkward — "Project" hangs a "j" below its
-       baseline and "YURICA" has nothing below its own, so equal baseline
-       steps would look unequal. scripts/measure-splash.mjs prints both gaps;
-       keep them at 30 if you move anything here. -->
-  <text x="256" y="334"
-        text-anchor="middle"
-        font-family="Arial, sans-serif"
-        font-weight="600"
-        font-size="34"
-        letter-spacing="1.5"
-        fill="#111111">Project</text>
-  <text x="256" y="396"
+  <!-- Baseline solved, not chosen, so exactly 30 units of white sit between
+       the bottom of the mark and the top of the letters. The cap height of
+       Arial at this size is the awkward part: it is what the eye measures
+       from, and it is not the baseline. scripts/measure-splash.mjs renders
+       this file and prints the gap — keep it at 30 if you move anything. -->
+  <text x="256" y="334.5"
         text-anchor="middle"
         font-family="Arial, sans-serif"
         font-weight="600"

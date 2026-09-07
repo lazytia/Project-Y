@@ -63,8 +63,8 @@ export default async function RootLayout({
             and has to be changed in both places. Only this copy decides what
             the first paint looks like, so a change made in globals.css alone
             is invisible in development and wrong on a cold start — which is
-            exactly how the stacked wordmark first shipped as "ProjectYURICA"
-            on one line. */}
+            exactly how a wordmark change once shipped as "ProjectYURICA" run
+            together on one line. */}
         <style
           dangerouslySetInnerHTML={{
             __html: `

@@ -10,9 +10,9 @@
   z-index: 1000;
 }
 
-/* Logo and both words as evenly spaced siblings — see .bootSplashBrand in
-   globals.css, which this has to match or the handover between the two
-   flickers. */
+/* The mark and its name, spaced apart from the status line and dots below —
+   see .bootSplashBrand in globals.css, which this has to match or the handover
+   between the two flickers. */
 .brand {
   display: flex;
   flex-direction: column;
@@ -41,7 +41,7 @@
   letter-spacing: -0.02em;
 }
 
-/* line-height: 1 so .brand's gap is the only thing spacing these — see the
+/* line-height: 1 so .brand's gap is the only thing spacing this — see the
    note on .bootSplashWord in globals.css. */
 .word {
   line-height: 1;
