@@ -11,6 +11,16 @@ type Props = {
   label?: string;
   /** Show the Y splash even when SSR chrome is visible (e.g. post-login handoff). */
   forceVisible?: boolean;
+  /**
+   * Drop the bouncing dots.
+   *
+   * On the launch path this splash is not a loading cover, it is the boot
+   * splash carrying on: the user has been looking at a still logo since the
+   * iOS launch screen, and the dots are the first thing to move since. Set
+   * this wherever the splash is what the app opens into. In-app covers, which
+   * appear after a deliberate tap, keep them as ordinary loading feedback.
+   */
+  still?: boolean;
 };
 
 function subscribeBootSplash(onStoreChange: () => void) {
@@ -31,7 +41,7 @@ function chromeAlreadyVisible(): boolean {
   return ssrShellVisible() || fallbackVisible || hasClientSessionHint();
 }
 
-export default function Splash({ label, forceVisible = false }: Props) {
+export default function Splash({ label, forceVisible = false, still = false }: Props) {
   const bootVisible = useSyncExternalStore(
     subscribeBootSplash,
     isBootSplashVisible,
@@ -58,16 +68,20 @@ export default function Splash({ label, forceVisible = false }: Props) {
         <span className={styles.word}>{HOME_SCREEN_NAME}</span>
       </div>
       {/* Held out of the centred flow with .brand — see Splash.module.css.
-          The label is optional, and the logo must not move depending on
-          whether a caller passed one. */}
-      <div className={styles.progress}>
-        <div className={styles.dots} aria-hidden="true">
-          <span />
-          <span />
-          <span />
+          Both children are optional, and the logo must not move depending on
+          whether a caller passed either one. */}
+      {(!still || label) && (
+        <div className={styles.progress}>
+          {!still && (
+            <div className={styles.dots} aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+          )}
+          {label && <div className={styles.label}>{label}</div>}
         </div>
-        {label && <div className={styles.label}>{label}</div>}
-      </div>
+      )}
     </div>
   );
 }
