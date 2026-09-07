@@ -33,6 +33,15 @@
   gap: var(--space-5);
 }
 
+/*
+ * No animation. This logo is the third and last drawing of a picture the user
+ * has already been looking at for a second — the iOS launch PNG, then the boot
+ * splash in globals.css, then this — and all three put a 72px box in the same
+ * place. A `scale(0.96)` breath here is 1.44px off every edge, twice per cycle,
+ * on the one element that has been rock steady up to that point, so opening the
+ * app ended with the logo starting to twitch under its own name. Whatever moves
+ * on this screen, it cannot be the mark.
+ */
 .logo {
   width: 72px;
   height: 72px;
@@ -42,7 +51,6 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
-  animation: pulse 1.6s ease-in-out infinite;
 }
 
 .mark {
@@ -84,11 +92,6 @@
 .label {
   font-size: var(--font-size-sm);
   color: var(--color-fg-subtle);
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1);    opacity: 1;   }
-  50%      { transform: scale(0.96); opacity: 0.85; }
 }
 
 @keyframes bounce {
