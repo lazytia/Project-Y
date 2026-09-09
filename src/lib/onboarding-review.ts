@@ -18,6 +18,35 @@ import { tsToDate } from "./staff-display";
 /** The five sections of the onboarding form, in the order staff meet them. */
 export type SectionKey = "personal" | "tfn" | "bank" | "documents" | "policies";
 
+/**
+ * The TFN declaration, as the employee filled it in.
+ *
+ * All of it, not just the number. This is the form that decides what is
+ * withheld from every pay the business runs: whether they are claiming the
+ * tax-free threshold, whether there is a HELP debt to withhold against,
+ * which residency they declared. The owner used to be shown the nine digits
+ * alone, which is the one part of it payroll can look up anyway — the answers
+ * she actually has to check were on the page and never read back.
+ *
+ * `declarationDate` is the date the employee put to their declaration, which
+ * the form lets them set, and so is not the date the row was written.
+ */
+export type TfnDeclaration = {
+  fullLegalName: string;
+  dateOfBirth: string;
+  homeAddress: string;
+  suburb: string;
+  state: string;
+  postcode: string;
+  taxFileNumber: string;
+  taxResident: string;
+  taxFreeThreshold: string;
+  helpDebt: string;
+  otherGovDebt: string;
+  declarationAgreed: boolean;
+  declarationDate: string;
+};
+
 export type OnboardingSubmission = {
   name: string;
   phone: string;
@@ -29,6 +58,7 @@ export type OnboardingSubmission = {
     gender: string;
     email: string;
   };
+  tfn: TfnDeclaration;
   taxFileNumber: string;
   signatureDataUrl: string;
   bank: {
@@ -103,14 +133,14 @@ export const ONBOARDING_SECTIONS: readonly OnboardingSection[] = [
     key: "documents",
     step: 4,
     label: "Documents (Photo ID, Visa, RSA)",
-    // Named upload fields rather than the whole `documents` map: older rows
-    // keep `documents.visaExpiry` in there, and that date is what the
-    // dashboard and Action Required count visa warnings from.
-    clearPaths: [
-      "documents.passportUrl", "documents.passportUrls",
-      "documents.visaUrl",     "documents.visaUrls",
-      "documents.rsaUrl",      "documents.rsaUrls",
-    ],
+    // Clears nothing, for the same reason as personal above. This section is
+    // three sets of photos taken off a passport, a visa grant and an RSA
+    // card, and a rejection is almost always about one of them being blurred
+    // or cropped. Deleting the URLs made the employee produce all three
+    // documents again to fix the one, and the step rollback already reopens
+    // the screen — the upload page pre-fills from these fields, so they
+    // replace the photo that was wrong and leave the rest alone.
+    clearPaths: [],
     hasData: (s) => s.documents.length > 0,
   },
   {
@@ -159,32 +189,54 @@ export function isSectionSubmitted(
     : submission.completedStep >= section.step;
 }
 
+/** The three upload slots, and both field names each has been written under. */
+const DOCUMENT_SLOTS = [
+  { key: "passport", singular: "passportUrl", plural: "passportUrls", label: "Passport" },
+  { key: "visa",     singular: "visaUrl",     plural: "visaUrls",     label: "Visa" },
+  { key: "rsa",      singular: "rsaUrl",      plural: "rsaUrls",      label: "RSA Certificate" },
+] as const;
+
+export type DocumentSlot = (typeof DOCUMENT_SLOTS)[number]["key"];
+
 /**
- * Read every uploaded document URL. Employees can attach multiple photos
- * per section (plural `*Urls` arrays); older docs may only carry the
- * legacy singular `*Url` string, so fall back to it when the array is
- * missing.
+ * Every uploaded photo URL, kept per slot and in order.
+ *
+ * Employees can attach several photos per section (the plural `*Urls`
+ * arrays); rows written before that could only hold one, under the singular
+ * `*Url`, so fall back to it when the array has nothing usable in it.
+ *
+ * The onboarding upload screen reads this to pre-fill itself, which is the
+ * whole of why a sent-back section does not cost the employee their photos.
+ * It shares the reader with the owner's review below on purpose — the two
+ * disagreeing about where a photo lives would show the owner a document the
+ * employee's own screen thinks it never received.
  */
-export function collectDocuments(raw: Record<string, unknown>): { label: string; url: string }[] {
+export function readDocumentUrls(
+  raw: Record<string, unknown>,
+): Record<DocumentSlot, string[]> {
   const docs = (raw.documents ?? {}) as Record<string, unknown>;
-  const known: { singular: string; plural: string; label: string }[] = [
-    { singular: "passportUrl", plural: "passportUrls", label: "Passport" },
-    { singular: "visaUrl",     plural: "visaUrls",     label: "Visa" },
-    { singular: "rsaUrl",      plural: "rsaUrls",      label: "RSA Certificate" },
-  ];
-  const out: { label: string; url: string }[] = [];
-  for (const { singular, plural, label } of known) {
+  const out = { passport: [], visa: [], rsa: [] } as Record<DocumentSlot, string[]>;
+  for (const { key, singular, plural } of DOCUMENT_SLOTS) {
     const arr = docs[plural];
-    if (Array.isArray(arr) && arr.length > 0) {
-      arr.forEach((v, i) => {
-        if (typeof v === "string" && v) {
-          out.push({ label: arr.length > 1 ? `${label} (${i + 1})` : label, url: v });
-        }
-      });
-      continue;
+    if (Array.isArray(arr)) {
+      out[key] = arr.filter((v): v is string => typeof v === "string" && v.length > 0);
+      if (out[key].length > 0) continue;
     }
     const v = docs[singular];
-    if (typeof v === "string" && v) out.push({ label, url: v });
+    if (typeof v === "string" && v) out[key] = [v];
+  }
+  return out;
+}
+
+/** The same photos, flattened and labelled for the owner's review list. */
+export function collectDocuments(raw: Record<string, unknown>): { label: string; url: string }[] {
+  const urls = readDocumentUrls(raw);
+  const out: { label: string; url: string }[] = [];
+  for (const { key, label } of DOCUMENT_SLOTS) {
+    const list = urls[key];
+    list.forEach((url, i) => {
+      out.push({ label: list.length > 1 ? `${label} (${i + 1})` : label, url });
+    });
   }
   return out;
 }
@@ -194,16 +246,42 @@ function strField(raw: Record<string, unknown>, key: string): string {
   return typeof v === "string" ? v : "";
 }
 
+/**
+ * Read the TFN declaration off a staff_onboarding document.
+ *
+ * The step nests everything under `tfn`. Rows written before it did kept a
+ * few of the same names at the top level, so each field falls back there —
+ * except the state, which the form calls `auState` locally to stay clear of
+ * React's reserved prop and writes as `tfn.state`.
+ */
+export function readTfnDeclaration(raw: Record<string, unknown>): TfnDeclaration {
+  const t = (raw.tfn ?? {}) as Record<string, unknown>;
+  const pick = (key: string) => strField(t, key) || strField(raw, key);
+  return {
+    fullLegalName: pick("fullLegalName"),
+    dateOfBirth: pick("dateOfBirth"),
+    homeAddress: pick("homeAddress"),
+    suburb: pick("suburb"),
+    state: strField(t, "state") || strField(raw, "auState"),
+    postcode: pick("postcode"),
+    taxFileNumber: pick("taxFileNumber"),
+    taxResident: pick("taxResident"),
+    taxFreeThreshold: pick("taxFreeThreshold"),
+    helpDebt: pick("helpDebt"),
+    otherGovDebt: pick("otherGovDebt"),
+    declarationAgreed: t.declarationAgreed === true || raw.declarationAgreed === true,
+    declarationDate: pick("declarationDate"),
+  };
+}
+
 /** Everything the review screens read out of a staff_onboarding document. */
 export function readOnboardingSubmission(
   raw: Record<string, unknown>,
   name: string,
 ): OnboardingSubmission {
   const policies = (raw.policies ?? {}) as Record<string, unknown>;
-  // TFN declaration nests the actual TFN + signature under `tfn` — the
-  // top-level field only exists on very old rows, so fall back to it for
-  // completeness.
   const tfnBlock = (raw.tfn ?? {}) as Record<string, unknown>;
+  const tfn = readTfnDeclaration(raw);
   return {
     name,
     phone: strField(raw, "mobileNumber"),
@@ -215,7 +293,10 @@ export function readOnboardingSubmission(
       gender: strField(raw, "gender"),
       email: strField(raw, "email"),
     },
-    taxFileNumber: strField(tfnBlock, "taxFileNumber") || strField(raw, "taxFileNumber"),
+    tfn,
+    // Kept alongside the block it came from: the section table's hasData and
+    // the employee detail pages both read it directly.
+    taxFileNumber: tfn.taxFileNumber,
     signatureDataUrl: strField(tfnBlock, "signatureDataUrl"),
     bank: (raw.bankSuper ?? {}) as OnboardingSubmission["bank"],
     handbookSignedAt: tsToDate(policies.handbookSignedAt),

@@ -34,7 +34,9 @@ import {
   ONBOARDING_SECTIONS,
   collectDocuments,
   isSectionSubmitted,
+  readTfnDeclaration,
   type SectionKey,
+  type TfnDeclaration,
 } from "@/lib/onboarding-review";
 import CalendarPicker from "@/components/CalendarPicker";
 import { OnboardingSectionModal } from "@/components/OnboardingSectionModal";
@@ -86,6 +88,7 @@ type Staff = {
    *  before the field existed. */
   completedStep: number | null;
   personal: Personal;
+  tfn: TfnDeclaration;
   taxFileNumber: string;
   signatureDataUrl: string;
   bank: BankSuper;
@@ -317,13 +320,12 @@ export default function EmployeeDetailPage() {
         const policies = (raw.policies ?? {}) as Record<string, unknown>;
         const bank = (raw.bankSuper ?? {}) as BankSuper;
         const documents = (raw.documents ?? {}) as Record<string, unknown>;
-        // TFN declaration nests the actual TFN + signature under `tfn` —
-        // the top-level field only exists on very old rows, so fall back
-        // to it for completeness.
+        // Read through the shared reader, not by hand: this page hands `staff`
+        // straight to OnboardingSectionModal, which now shows the whole
+        // declaration, and a private copy of the field names here would be a
+        // second answer to what the employee wrote.
+        const tfn = readTfnDeclaration(raw);
         const tfnBlock = (raw.tfn ?? {}) as Record<string, unknown>;
-        const tfnValue =
-          (typeof tfnBlock.taxFileNumber === "string" ? tfnBlock.taxFileNumber : "") ||
-          (typeof raw.taxFileNumber === "string" ? raw.taxFileNumber : "");
         const signatureDataUrl =
           typeof tfnBlock.signatureDataUrl === "string" ? tfnBlock.signatureDataUrl : "";
 
@@ -347,7 +349,8 @@ export default function EmployeeDetailPage() {
             gender: strField(raw, "gender"),
             email: strField(raw, "email"),
           },
-          taxFileNumber: tfnValue,
+          tfn,
+          taxFileNumber: tfn.taxFileNumber,
           signatureDataUrl,
           bank,
           handbookSignedAt: tsToDate(policies.handbookSignedAt),
