@@ -22,9 +22,14 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
 /**
  * Owner Payroll overview — reads from /api/payroll/summary which pulls
  * the selected week's detail (per-employee breakdown + weekly totals)
- * from the Google Pay History sheet plus the two prior weeks, and looks
+ * from the Google Pay History sheet plus the week before it, and looks
  * up the matching Sydney-week Gross Sales from Firestore so the
  * "Payroll % of sales" gauge is meaningful.
+ *
+ * The week shown defaults to the last finished pay week and follows the
+ * Sydney date until the owner picks one from the calendar. Every week
+ * heading and chip caption is named from that week's distance to today,
+ * so the words and the numbers cannot drift apart.
  */
 
 
@@ -94,6 +99,25 @@ function fmtWeekRange(mondayISO: string): string {
   return `${monPart} – ${sunPart}`;
 }
 
+/** Whole weeks between `mondayISO` and the Monday of the Sydney week we are
+ *  in now. 0 = this week, 1 = last week. Both ends are date-only UTC
+ *  midnights, so no DST transition can make the division come out ragged. */
+function weeksAgo(mondayISO: string, todayKey: string): number {
+  const [ty, tm, td] = isoMondayOf(todayKey).split("-").map(Number);
+  const [my, mm, md] = mondayISO.split("-").map(Number);
+  const diff = Date.UTC(ty, tm - 1, td) - Date.UTC(my, mm - 1, md);
+  return Math.round(diff / (7 * 24 * 60 * 60 * 1000));
+}
+
+/** "This Week" / "Last Week" / "3 Weeks Ago". Every week heading and chip
+ *  caption on this page is written by this one function, so a heading can
+ *  never name a different week than the number printed under it. */
+function weekOffsetLabel(n: number): string {
+  if (n <= 0) return "This Week";
+  if (n === 1) return "Last Week";
+  return `${n} Weeks Ago`;
+}
+
 function fmtCurrency(n: number): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -113,6 +137,11 @@ function initials(name: string): string {
 /* ── Session cache ── */
 
 const SESSION_TTL_MS = 5 * 60 * 1000;
+
+/** How often an open page re-checks the Sydney date. Only has to be finer
+ *  than a person's patience on the one night a week the date rolls into a
+ *  new pay week. */
+const DATE_ROLL_POLL_MS = 60 * 1000;
 
 function readSession<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
@@ -143,7 +172,11 @@ export default function PayrollOverviewPage() {
   const allowed = isOwner(user);
 
   const [weekMondayISO, setWeekMondayISO] = useState(isoLastCompletedPayWeek);
-  const [todayKey] = useState(sydneyTodayKey);
+  const [todayKey, setTodayKey] = useState(sydneyTodayKey);
+  /** Set once the owner picks a week from the calendar. From then on the
+   *  page stops following the date — rolling a hand-picked week forward
+   *  underneath them would be the more surprising behaviour. */
+  const [weekPinned, setWeekPinned] = useState(false);
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -154,6 +187,33 @@ export default function PayrollOverviewPage() {
     if (!user) return;
     if (!allowed) router.replace(ROUTES.home);
   }, [allowed, authLoading, user, router]);
+
+  // Both the shown week and the calendar's max date are derived from today,
+  // and both were read once at mount. Installed as a PWA the page is not
+  // reloaded between openings, so a phone carried over a Monday would keep
+  // showing the week before last until it was force-quit. Re-derive when the
+  // page comes back to the front, and on a slow timer for a screen that is
+  // simply left open across midnight.
+  useEffect(() => {
+    const sync = () => {
+      const key = sydneyTodayKey();
+      setTodayKey((prev) => (prev === key ? prev : key));
+      if (weekPinned) return;
+      const week = isoLastCompletedPayWeek();
+      setWeekMondayISO((prev) => (prev === week ? prev : week));
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+    const timer = window.setInterval(sync, DATE_ROLL_POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", sync);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", sync);
+    };
+  }, [weekPinned]);
 
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
@@ -236,6 +296,14 @@ export default function PayrollOverviewPage() {
   const prevTotals = summary?.previous.totals;
   const previousLabel = summary ? fmtWeekRange(summary.previous.weekStartISO) : "—";
 
+  // Named from where the shown week sits relative to today, not written into
+  // the markup: on the default view that is still "Last Week" comparing
+  // against "2 weeks ago", but pick July from the calendar and the captions
+  // follow instead of insisting it is last week.
+  const shownWeeksAgo = weeksAgo(weekMondayISO, todayKey);
+  const shownWeekLabel = weekOffsetLabel(shownWeeksAgo);
+  const baselineLabel = weekOffsetLabel(shownWeeksAgo + 1).toLowerCase();
+
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
@@ -274,6 +342,7 @@ export default function PayrollOverviewPage() {
             // Snap whichever day the owner picked to that week's Monday
             // so the summary always fetches a full Mon–Sun window.
             setWeekMondayISO(isoMondayOf(pickedISO));
+            setWeekPinned(true);
             setCalendarOpen(false);
           }}
           onRangeChange={() => {
@@ -293,7 +362,7 @@ export default function PayrollOverviewPage() {
           <p className={styles.heroValue}>
             {totals ? fmtCurrency(totals.totalIncSuper) : "—"}
           </p>
-          <HeroDelta pct={chips?.totalIncSuper ?? null} />
+          <HeroDelta pct={chips?.totalIncSuper ?? null} baseline={baselineLabel} />
         </section>
 
         <section className={styles.heroCard}>
@@ -310,7 +379,7 @@ export default function PayrollOverviewPage() {
             </p>
             <GaugeChart pct={summary?.payrollPctSales ?? null} />
           </div>
-          <HeroDelta pct={payrollPctChip} />
+          <HeroDelta pct={payrollPctChip} baseline={baselineLabel} />
         </section>
       </div>
 
@@ -320,7 +389,7 @@ export default function PayrollOverviewPage() {
       <section className={styles.card}>
         <div className={styles.cardHead}>
           <p className={styles.cardTitle}>
-            PAYROLL SUMMARY <span className={styles.cardTitleSub}>(Last Week)</span>
+            PAYROLL SUMMARY <span className={styles.cardTitleSub}>({shownWeekLabel})</span>
           </p>
           <p className={styles.cardTitleRange}>
             {summary ? fmtWeekRange(summary.current.weekStartISO) : ""}
@@ -333,6 +402,7 @@ export default function PayrollOverviewPage() {
             label="Net Pay"
             value={totals ? fmtCurrency(totals.netPay) : "—"}
             deltaPct={chips?.netPay ?? null}
+            baseline={baselineLabel}
             loading={fetching && !summary}
           />
           <SummaryTile
@@ -340,6 +410,7 @@ export default function PayrollOverviewPage() {
             label="Tax"
             value={totals ? fmtCurrency(totals.tax) : "—"}
             deltaPct={chips?.tax ?? null}
+            baseline={baselineLabel}
             loading={fetching && !summary}
           />
           <SummaryTile
@@ -347,6 +418,7 @@ export default function PayrollOverviewPage() {
             label="Superannuation"
             value={totals ? fmtCurrency(totals.superAnn) : "—"}
             deltaPct={chips?.superAnn ?? null}
+            baseline={baselineLabel}
             loading={fetching && !summary}
           />
           <SummaryTile
@@ -354,6 +426,7 @@ export default function PayrollOverviewPage() {
             label="Cash Pay"
             value={totals ? fmtCurrency(totals.cashPay) : "—"}
             deltaPct={chips?.cashPay ?? null}
+            baseline={baselineLabel}
             loading={fetching && !summary}
           />
         </div>
@@ -387,7 +460,7 @@ export default function PayrollOverviewPage() {
       <section className={styles.card}>
         <div className={styles.cardHead}>
           <p className={styles.cardTitle}>
-            TOP PAID EMPLOYEES <span className={styles.cardTitleSub}>(last week)</span>
+            TOP PAID EMPLOYEES <span className={styles.cardTitleSub}>({shownWeekLabel.toLowerCase()})</span>
           </p>
         </div>
         <div className={styles.tableWrap}>
@@ -429,7 +502,7 @@ export default function PayrollOverviewPage() {
 /* ── Sub-components ── */
 
 /** Rising payroll is the bad direction, so up reads warm and down reads positive. */
-function HeroDelta({ pct }: { pct: number | null }) {
+function HeroDelta({ pct, baseline }: { pct: number | null; baseline: string }) {
   return (
     <div className={styles.heroFoot}>
       <div className={styles.heroDivider} />
@@ -440,7 +513,7 @@ function HeroDelta({ pct }: { pct: number | null }) {
       ) : (
         <p className={styles.heroDeltaMuted}>—</p>
       )}
-      <p className={styles.heroDeltaSub}>vs 2 weeks ago</p>
+      <p className={styles.heroDeltaSub}>vs {baseline}</p>
     </div>
   );
 }
@@ -450,12 +523,14 @@ function SummaryTile({
   label,
   value,
   deltaPct,
+  baseline,
   loading,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   deltaPct: number | null;
+  baseline: string;
   loading: boolean;
 }) {
   return (
@@ -474,7 +549,7 @@ function SummaryTile({
       ) : (
         <p className={styles.tileDeltaMuted}>—</p>
       )}
-      <p className={styles.tileDeltaSub}>vs 2 weeks ago</p>
+      <p className={styles.tileDeltaSub}>vs {baseline}</p>
     </div>
   );
 }
