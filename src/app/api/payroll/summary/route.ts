@@ -15,10 +15,10 @@ import { shiftDateKey } from "@/lib/square";
 /**
  * GET /api/payroll/summary?weekStart=YYYY-MM-DD
  *
- * Powers /payroll/payroll. Returns the selected week's payroll detail
- * plus the previous two weeks — the week before it drives the WEEKLY
- * COMPARISON card, the one before that is the baseline for the "vs 2 weeks
- * ago" chips — and pulls the matching Sydney-week Gross Sales from
+ * Powers /payroll/payroll. Returns the selected week's payroll detail plus
+ * the week immediately before it, which is both the WEEKLY COMPARISON card's
+ * right-hand column and the baseline for every delta chip on the page — one
+ * week, one meaning. Also pulls the matching Sydney-week Gross Sales from
  * Firestore so the payroll % of sales gauge is meaningful.
  */
 
@@ -223,8 +223,7 @@ export async function GET(req: NextRequest) {
   }
 
   const prev1 = shiftDateKey(weekStart, -7, TIMEZONE);
-  const prev2 = shiftDateKey(weekStart, -14, TIMEZONE);
-  const weekKeys = [weekStart, prev1, prev2];
+  const weekKeys = [weekStart, prev1];
 
   const [cachedDetails, sales] = await Promise.all([
     readSummaryCaches(weekKeys, { respectTtl: true }),
@@ -244,7 +243,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const [currentDetail, prev1Detail, prev2Detail] = await Promise.all(
+  const [currentDetail, prev1Detail] = await Promise.all(
     weekKeys.map((ws, i) =>
       cachedDetails[i]
         ? Promise.resolve(cachedDetails[i])
@@ -252,7 +251,7 @@ export async function GET(req: NextRequest) {
     ),
   );
 
-  const [salesCurrent, salesPrev1, salesPrev2] = sales;
+  const [salesCurrent, salesPrev1] = sales;
 
   const empty = {
     weekStartISO: "",
@@ -263,16 +262,14 @@ export async function GET(req: NextRequest) {
 
   const cur = currentDetail ?? { ...empty, weekStartISO: weekStart };
   const p1 = prev1Detail ?? { ...empty, weekStartISO: prev1 };
-  const p2 = prev2Detail ?? { ...empty, weekStartISO: prev2 };
 
   const payrollPctSales =
     salesCurrent > 0 ? (cur.totals.totalIncSuper / salesCurrent) * 100 : null;
-  // The same ratio for the week two back, which is what the chips compare
-  // against. Its own week's payroll over its own week's sales — blending two
-  // weeks into one ratio, as this used to, answered a question nobody asked
-  // and could not be checked against any single row of the sheet.
+  // The same ratio for the week before, computed from that week's own payroll
+  // over that week's own sales. It is the baseline the % of sales chip reads
+  // against, so it has to be the same week the other chips use.
   const payrollPctPrev =
-    salesPrev2 > 0 ? (p2.totals.totalIncSuper / salesPrev2) * 100 : null;
+    salesPrev1 > 0 ? (p1.totals.totalIncSuper / salesPrev1) * 100 : null;
 
   return NextResponse.json(
     {
@@ -280,11 +277,9 @@ export async function GET(req: NextRequest) {
       weekEnd: shiftDateKey(weekStart, 6, TIMEZONE),
       current: cur,
       previous: p1,
-      twoWeeksAgo: p2,
       sales: {
         current: salesCurrent,
         prev1: salesPrev1,
-        prev2: salesPrev2,
       },
       payrollPctSales,
       payrollPctPrev,

@@ -57,8 +57,7 @@ type SummaryPayload = {
   weekEnd: string;
   current: WeekDetail;
   previous: WeekDetail;
-  twoWeeksAgo: WeekDetail;
-  sales: { current: number; prev1: number; prev2: number };
+  sales: { current: number; prev1: number };
   payrollPctSales: number | null;
   payrollPctPrev: number | null;
 };
@@ -159,12 +158,12 @@ export default function PayrollOverviewPage() {
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    // v9: the chips compare against the week two back rather than a two-week
-    // average, and payrollPctPrev is that week's own ratio. A v8 entry still
-    // parses, so without the bump the old percentages would be replayed from
-    // session storage for five minutes after the deploy — right numbers on
-    // the tiles, wrong numbers on the chips underneath them.
-    const cacheKey = `y.payroll.summary.v9.${weekMondayISO}`;
+    // v10: the chips compare against summary.previous, and payrollPctPrev is
+    // that week's own ratio. A v9 entry still parses — twoWeeksAgo simply goes
+    // unread — so without the bump the old percentages would be replayed from
+    // session storage for five minutes after the deploy: right numbers on the
+    // tiles, wrong numbers on the chips underneath them.
+    const cacheKey = `y.payroll.summary.v10.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
     const cachedHasPayroll =
       cached && (cached.current?.totals?.totalIncSuper ?? 0) > 0;
@@ -194,15 +193,17 @@ export default function PayrollOverviewPage() {
     };
   }, [allowed, weekMondayISO]);
 
-  // Every chip on this page reads against the week two back — one real week
-  // that can be opened in the sheet and checked, rather than the average of
-  // the last two that used to sit here. An average moves when either of two
-  // weeks moves, so a chip could swing without the week it was compared to
-  // having changed at all, and there was no row anywhere to reconcile it to.
+  // Every chip reads against summary.previous — the week immediately before
+  // the one on the tiles, which is exactly the WEEKLY COMPARISON card's
+  // right-hand column further down the page. The tiles show the last finished
+  // week, so from today that baseline is two weeks ago, which is what the
+  // chip labels say. The bucket a week further back is not fetched at all:
+  // having two candidate baselines in the payload is how a chip ended up
+  // reporting a rise off a week nothing on this page ever printed.
   const chips = useMemo(() => {
     if (!summary) return null;
     const a = summary.current.totals;
-    const b = summary.twoWeeksAgo.totals;
+    const b = summary.previous.totals;
     return {
       netPay: safePct(a.netPay, b.netPay),
       tax: safePct(a.tax, b.tax),
@@ -232,8 +233,6 @@ export default function PayrollOverviewPage() {
   if (authLoading || !user || !allowed) return <Splash />;
 
   const totals = summary?.current.totals;
-  // The right-hand comparison card is labelled "Previous Week" so it reads
-  // from the immediately-prior week, not the twoWeeksAgo bucket.
   const prevTotals = summary?.previous.totals;
   const previousLabel = summary ? fmtWeekRange(summary.previous.weekStartISO) : "—";
 
