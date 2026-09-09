@@ -46,15 +46,19 @@ const EN: Dict = {
   "common.english": "English",
   "common.japanese": "日本語",
 
-  // Notifications prompt
+  // Notifications prompt. The six reasons are the six things the app
+  // actually pushes; "new roster published" and "roster changes" used to be
+  // two rows saying one thing, and holiday requests and training were pushed
+  // without ever being named here.
   "notif.title": "Enable Notifications",
-  "notif.subtitle": "Stay up to date with important updates from Project YURICA.",
-  "notif.reason.newRoster": "New roster published",
-  "notif.reason.rosterChanges": "Roster changes",
+  "notif.subtitle": "Stay updated with important alerts from Project YURICA.",
+  "notif.reason.nextWeekRoster": "Next week roster",
   "notif.reason.shiftReminders": "Shift reminders",
+  "notif.reason.holidayRequests": "Holiday request updates",
   "notif.reason.payslip": "Payslip available",
+  "notif.reason.trainingPolicy": "Training & policy updates",
   "notif.reason.announcements": "Important company announcements",
-  "notif.trust": "We will only send you relevant updates.",
+  "notif.trust": "We only send relevant updates.",
   "notif.denied": "Notifications are required to continue. Please allow the prompt in your browser or check your device settings, then try again.",
   "notif.enabling": "Enabling…",
   "notif.enableBtn": "Enable Notifications",
@@ -63,6 +67,10 @@ const EN: Dict = {
   "settings.title": "Settings",
   "settings.language.title": "Language",
   "settings.language.help": "Choose the language you'd like to see across the app.",
+  // Shown when the language card is gone, which is exactly when the app is
+  // pinned to English — so this line is only ever read in English. Carried in
+  // both dictionaries regardless, so neither can drift ahead of the other.
+  "settings.empty": "Nothing to configure here yet.",
 
   // Onboarding overview
   "onb.welcome": "Welcome",
@@ -539,10 +547,11 @@ const JA: Dict = {
   // Notifications prompt
   "notif.title": "通知をオンにする",
   "notif.subtitle": "Project YURICA からの大切なお知らせを受け取りましょう。",
-  "notif.reason.newRoster": "新しいシフト表の公開",
-  "notif.reason.rosterChanges": "シフトの変更",
+  "notif.reason.nextWeekRoster": "来週のシフト表",
   "notif.reason.shiftReminders": "シフトのリマインダー",
+  "notif.reason.holidayRequests": "休暇申請の更新",
   "notif.reason.payslip": "給与明細の発行",
+  "notif.reason.trainingPolicy": "研修・ポリシーの更新",
   "notif.reason.announcements": "会社からの重要なお知らせ",
   "notif.trust": "必要な通知のみお送りします。",
   "notif.denied": "続けるには通知の許可が必要です。ブラウザのプロンプトを許可するか、端末の設定を確認してから、もう一度お試しください。",
@@ -553,6 +562,7 @@ const JA: Dict = {
   "settings.title": "設定",
   "settings.language.title": "言語",
   "settings.language.help": "アプリで使用する言語を選択してください。",
+  "settings.empty": "設定できる項目はまだありません。",
 
   // Onboarding overview
   "onb.welcome": "ようこそ",

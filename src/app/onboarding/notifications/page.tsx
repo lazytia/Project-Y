@@ -39,31 +39,28 @@ const ICON_PROPS = {
 
 /**
  * What we will actually push them about, in the order they will meet it:
- * the roster comes first, pay comes after the week is worked, and
- * announcements are the catch-all.
+ * next week's roster before the week starts, a reminder before each shift,
+ * the answer to a holiday request, pay after the week is worked, training
+ * they have been assigned, and announcements as the catch-all.
  *
- * A list rather than five near-identical <li> blocks — the rows differ only
+ * A list rather than six near-identical <li> blocks — the rows differ only
  * by icon and label, and the copy that used to be duplicated around each one
- * is where a fifth row would have gone wrong.
+ * is where a sixth row would have gone wrong.
+ *
+ * Six, not the previous five: "new roster published" and "roster changes"
+ * were two rows for one thing, and the two notifications nobody had listed —
+ * the reply to a holiday request, and a newly assigned policy or training —
+ * are the two people actually ask about.
  */
 const REASONS: readonly { labelKey: string; icon: ReactNode }[] = [
   {
-    labelKey: "notif.reason.newRoster",
+    labelKey: "notif.reason.nextWeekRoster",
     icon: (
       <svg {...ICON_PROPS}>
         <rect x="3" y="4" width="18" height="18" rx="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
         <line x1="8" y1="2" x2="8" y2="6" />
         <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    ),
-  },
-  {
-    labelKey: "notif.reason.rosterChanges",
-    icon: (
-      <svg {...ICON_PROPS}>
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
       </svg>
     ),
   },
@@ -77,6 +74,18 @@ const REASONS: readonly { labelKey: string; icon: ReactNode }[] = [
     ),
   },
   {
+    labelKey: "notif.reason.holidayRequests",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+        <polyline points="9 14.5 11 16.5 15.5 12" />
+      </svg>
+    ),
+  },
+  {
     labelKey: "notif.reason.payslip",
     icon: (
       <svg {...ICON_PROPS}>
@@ -84,6 +93,16 @@ const REASONS: readonly { labelKey: string; icon: ReactNode }[] = [
         <polyline points="14 2 14 8 20 8" />
         <path d="M13.75 12.25h-2.5a1.25 1.25 0 0 0 0 2.5h1.5a1.25 1.25 0 0 1 0 2.5h-2.5" />
         <line x1="12" y1="11" x2="12" y2="18.5" />
+      </svg>
+    ),
+  },
+  {
+    labelKey: "notif.reason.trainingPolicy",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22z" />
+        <line x1="8" y1="7" x2="16" y2="7" />
+        <line x1="8" y1="11" x2="13" y2="11" />
       </svg>
     ),
   },
@@ -101,7 +120,7 @@ const REASONS: readonly { labelKey: string; icon: ReactNode }[] = [
 export default function NotificationsPromptPage() {
   const router = useRouter();
   const { user, loading: authLoading, staffCompletedStep } = useAuth();
-  const { t } = useLang();
+  const { t, canChooseLanguage } = useLang();
 
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
@@ -190,10 +209,16 @@ export default function NotificationsPromptPage() {
       </ul>
 
       {/* Language toggle — the first-login placement asked for by the
-          owner so Japanese staff can switch before starting onboarding. */}
-      <div className={styles.langRow}>
-        <LanguageToggle />
-      </div>
+          owner so Japanese staff can switch before starting onboarding.
+          Gone once the owner activates them: at that point the provider
+          pins the app to English, so a toggle here would be a control that
+          does nothing. Reachable in that state because a rejected section
+          sends an already-activated employee back through onboarding. */}
+      {canChooseLanguage && (
+        <div className={styles.langRow}>
+          <LanguageToggle />
+        </div>
+      )}
 
       <p className={styles.trustLine}>
         <span aria-hidden="true">🛡️</span> {t("notif.trust")}

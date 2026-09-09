@@ -1,6 +1,6 @@
 /* ── First-run notifications prompt ──
    This screen has one job: get the permission prompt accepted. Everything
-   that matters — the five reasons, the language toggle, the button — has to
+   that matters — the six reasons, the language toggle, the button — has to
    be on screen at once, because a staff member who has to scroll to find the
    button is a staff member who might not.
 
@@ -8,7 +8,9 @@
    Every vertical measurement is a clamp whose middle term is in vh: the
    design keeps its intended proportions on a big phone and gives them up,
    in step, on a small one. The maxima are set so the tallest version still
-   fits a standard phone with the fifth row (Payslip available) added.
+   fits a standard phone with all six rows — the list has since grown from
+   five, and the vh terms absorbed it without any of the maxima moving; a
+   667px viewport still lands about 45px clear of the fold.
 
    The single `gap` on .page owns all the vertical rhythm — the children
    deliberately carry no vertical margins of their own, so there is one
