@@ -202,23 +202,46 @@ function sectionModalContent(
             </ul>
           ),
       };
-    // One sheet for all three signatures. They are collected together on the
+    // One sheet for all three documents. They are collected together on the
     // single onboarding "Policies" step and rolled back together on reject,
     // so splitting them across two sheets only made the owner open both to
     // answer one question: has this person signed everything?
+    //
+    // With the signature each time, not just the date. These are the three
+    // documents the employee signed their name to, and the sheet used to show
+    // three dates and then reach for tfn.signatureDataUrl — a field no screen
+    // in the app has ever written, so the block never rendered and the owner
+    // had no way to see a signature she is holding on file. Each document
+    // carries its own, drawn on its own screen, so all three are shown: they
+    // are three separate agreements, and "signed the handbook" is not
+    // evidence for the employment agreement.
     case "policies":
       return {
         title: "Policies",
         body: (
           <>
-            <dl className={styles.modalDefs}>
-              <SignedRow label="Staff Handbook" at={s.handbookSignedAt} />
-              <SignedRow label="Privacy Policy" at={s.privacySignedAt} />
-              <SignedRow label="Employee Agreement" at={s.agreementSignedAt} />
-            </dl>
-            {s.signatureDataUrl && (
-              <SignatureBlock label="Signed by" name={s.name} src={s.signatureDataUrl} />
-            )}
+            {s.policies.map((p) => (
+              <section key={p.key} className={styles.policyBlock}>
+                <p className={styles.modalSectionTitle}>{p.label}</p>
+                <dl className={styles.modalDefs}>
+                  <DefRow
+                    label="Signed"
+                    value={p.signedAt ? fmtDate(p.signedAt) : "Not signed"}
+                  />
+                  <DefRow label="Version" value={p.version} />
+                </dl>
+                {p.signature ? (
+                  <SignatureBlock label="Signature" name={s.name} src={p.signature} />
+                ) : p.signedAt ? (
+                  // Agreed, but before the step drew a signature. Say so —
+                  // an empty space under a signed date reads as a sheet that
+                  // failed to load, and gets chased as one.
+                  <p className={styles.modalHint}>
+                    Agreed without a drawn signature, so there is no image on file.
+                  </p>
+                ) : null}
+              </section>
+            ))}
           </>
         ),
       };
@@ -230,15 +253,6 @@ function DefRow({ label, value }: { label: string; value: string | undefined }) 
     <div className={styles.modalDefRow}>
       <dt className={styles.modalDefLabel}>{label}</dt>
       <dd className={styles.modalDefValue}>{value?.trim() ? value : "—"}</dd>
-    </div>
-  );
-}
-
-function SignedRow({ label, at }: { label: string; at: Date | null }) {
-  return (
-    <div className={styles.modalDefRow}>
-      <dt className={styles.modalDefLabel}>{label}</dt>
-      <dd className={styles.modalDefValue}>{at ? `Signed ${fmtDate(at)}` : "Not signed"}</dd>
     </div>
   );
 }

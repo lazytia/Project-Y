@@ -34,7 +34,9 @@ import {
   ONBOARDING_SECTIONS,
   collectDocuments,
   isSectionSubmitted,
+  readPolicySignatures,
   readTfnDeclaration,
+  type PolicySignature,
   type SectionKey,
   type TfnDeclaration,
 } from "@/lib/onboarding-review";
@@ -92,9 +94,7 @@ type Staff = {
   taxFileNumber: string;
   signatureDataUrl: string;
   bank: BankSuper;
-  handbookSignedAt: Date | null;
-  agreementSignedAt: Date | null;
-  privacySignedAt: Date | null;
+  policies: PolicySignature[];
   documents: { label: string; url: string }[];
   isReactivated: boolean;
   rehireDate: string;
@@ -317,7 +317,6 @@ export default function EmployeeDetailPage() {
 
         const rates = readStaffRates(raw);
 
-        const policies = (raw.policies ?? {}) as Record<string, unknown>;
         const bank = (raw.bankSuper ?? {}) as BankSuper;
         const documents = (raw.documents ?? {}) as Record<string, unknown>;
         // Read through the shared reader, not by hand: this page hands `staff`
@@ -353,9 +352,7 @@ export default function EmployeeDetailPage() {
           taxFileNumber: tfn.taxFileNumber,
           signatureDataUrl,
           bank,
-          handbookSignedAt: tsToDate(policies.handbookSignedAt),
-          agreementSignedAt: tsToDate(policies.agreementSignedAt),
-          privacySignedAt: tsToDate(policies.privacySignedAt),
+          policies: readPolicySignatures(raw),
           documents: collectDocuments(raw),
           isReactivated,
           rehireDate,

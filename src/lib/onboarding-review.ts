@@ -47,6 +47,50 @@ export type TfnDeclaration = {
   declarationDate: string;
 };
 
+/**
+ * The three documents signed on the Policies step, and where each one lands.
+ *
+ * Each is signed on its own screen, with its own signature pad and its own
+ * version stamp, so each keeps its own trio of fields. The label lives here
+ * too — the modal used to spell the three names out itself, which is one more
+ * place for "Employee Agreement" to become "Employment Agreement".
+ */
+const POLICY_DOCS = [
+  {
+    key: "handbook",
+    label: "Staff Handbook",
+    signedAt: "handbookSignedAt",
+    signature: "handbookSignature",
+    version: "handbookVersion",
+  },
+  {
+    key: "privacy",
+    label: "Privacy Policy",
+    signedAt: "privacySignedAt",
+    signature: "privacySignature",
+    version: "privacyVersion",
+  },
+  {
+    key: "agreement",
+    label: "Employee Agreement",
+    signedAt: "agreementSignedAt",
+    signature: "agreementSignature",
+    version: "agreementVersion",
+  },
+] as const;
+
+export type PolicyKey = (typeof POLICY_DOCS)[number]["key"];
+
+export type PolicySignature = {
+  key: PolicyKey;
+  label: string;
+  signedAt: Date | null;
+  /** The drawn signature, as the data URL the pad produced. */
+  signature: string;
+  /** Which revision of the document they put their name to. */
+  version: string;
+};
+
 export type OnboardingSubmission = {
   name: string;
   phone: string;
@@ -69,9 +113,8 @@ export type OnboardingSubmission = {
     usi?: string;
     memberNumber?: string;
   };
-  handbookSignedAt: Date | null;
-  agreementSignedAt: Date | null;
-  privacySignedAt: Date | null;
+  /** One entry per POLICY_DOCS row, always all three and always in order. */
+  policies: PolicySignature[];
   documents: { label: string; url: string }[];
   /** Null on rows written before the form existed. */
   completedStep: number | null;
@@ -147,13 +190,15 @@ export const ONBOARDING_SECTIONS: readonly OnboardingSection[] = [
     key: "policies",
     step: 5,
     label: "Policies (Staff Handbook, Privacy Policy, Employee Agreement)",
-    clearPaths: [
-      "policies.handbookSignedAt",
-      "policies.privacySignedAt",
-      "policies.agreementSignedAt",
-    ],
-    hasData: (s) =>
-      Boolean(s.handbookSignedAt || s.privacySignedAt || s.agreementSignedAt),
+    // The signature goes with the date it was signed on. Left behind, a sent-
+    // back section showed the owner a drawn signature sitting directly under
+    // the words "Not signed" — and re-signing costs the employee one swipe,
+    // unlike the passport photos two rows up.
+    clearPaths: POLICY_DOCS.flatMap((d) => [
+      `policies.${d.signedAt}`,
+      `policies.${d.signature}`,
+    ]),
+    hasData: (s) => s.policies.some((p) => p.signedAt !== null),
   },
 ];
 
@@ -274,12 +319,29 @@ export function readTfnDeclaration(raw: Record<string, unknown>): TfnDeclaration
   };
 }
 
+/**
+ * What the employee signed on the Policies step, per document.
+ *
+ * Always three entries, signed or not — the sheet lists all three documents
+ * either way, and an absent one is the answer to "has this person signed
+ * everything?" rather than a row to leave out.
+ */
+export function readPolicySignatures(raw: Record<string, unknown>): PolicySignature[] {
+  const p = (raw.policies ?? {}) as Record<string, unknown>;
+  return POLICY_DOCS.map((d) => ({
+    key: d.key,
+    label: d.label,
+    signedAt: tsToDate(p[d.signedAt]),
+    signature: strField(p, d.signature),
+    version: strField(p, d.version),
+  }));
+}
+
 /** Everything the review screens read out of a staff_onboarding document. */
 export function readOnboardingSubmission(
   raw: Record<string, unknown>,
   name: string,
 ): OnboardingSubmission {
-  const policies = (raw.policies ?? {}) as Record<string, unknown>;
   const tfnBlock = (raw.tfn ?? {}) as Record<string, unknown>;
   const tfn = readTfnDeclaration(raw);
   return {
@@ -299,9 +361,7 @@ export function readOnboardingSubmission(
     taxFileNumber: tfn.taxFileNumber,
     signatureDataUrl: strField(tfnBlock, "signatureDataUrl"),
     bank: (raw.bankSuper ?? {}) as OnboardingSubmission["bank"],
-    handbookSignedAt: tsToDate(policies.handbookSignedAt),
-    agreementSignedAt: tsToDate(policies.agreementSignedAt),
-    privacySignedAt: tsToDate(policies.privacySignedAt),
+    policies: readPolicySignatures(raw),
     documents: collectDocuments(raw),
     completedStep: typeof raw.completedStep === "number" ? raw.completedStep : null,
   };

@@ -112,6 +112,18 @@
   margin-top: 0;
 }
 
+/* One signed policy — its date, its version and the signature drawn on it.
+   Three stack in the sheet, and the three signatures are the same hand on the
+   same afternoon, so without a rule between them they read as one block of
+   near-identical images with nothing saying which document each belongs to.
+   The first block needs no rule, and .modalSectionTitle:first-child above
+   already drops its top margin inside each one. */
+.policyBlock + .policyBlock {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
 .modalHint {
   margin: var(--space-2) 0 0;
   font-size: 12px;
