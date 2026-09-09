@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getDb } from "@/lib/firebase";
 import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
+import { readDocumentUrls } from "@/lib/onboarding-review";
 import Toast from "@/components/Toast";
 import styles from "./page.module.css";
 
@@ -60,6 +61,25 @@ async function compressImage(file: File): Promise<Blob> {
   return blob ?? file;
 }
 
+/**
+ * One photo in a section.
+ *
+ * A photo carried over from an earlier visit only exists as a Storage URL —
+ * there is no File to re-upload and nothing to compress. A photo just picked
+ * on this device is the other way round: a File, plus a blob URL that lives
+ * only until the tab closes. Both have to sit in the same list, in the order
+ * the employee arranged them, so that the grid, the remove button and the
+ * "how many are attached" checks never have to care which kind they hold.
+ */
+type Attachment =
+  | { kind: "stored"; url: string }
+  | { kind: "picked"; file: File; previewUrl: string };
+
+/** What to point an <img> at, whichever kind it is. */
+function attachmentSrc(a: Attachment): string {
+  return a.kind === "stored" ? a.url : a.previewUrl;
+}
+
 async function uploadFile(file: File, path: string): Promise<string> {
   const storage = getStorage();
   const fileRef = ref(storage, path);
@@ -76,12 +96,9 @@ export default function DocumentsPage() {
   const { user } = useAuth();
   const { t } = useLang();
 
-  const [passportFiles, setPassportFiles] = useState<File[]>([]);
-  const [passportPreviews, setPassportPreviews] = useState<string[]>([]);
-  const [visaFiles, setVisaFiles] = useState<File[]>([]);
-  const [visaPreviews, setVisaPreviews] = useState<string[]>([]);
-  const [rsaFiles, setRsaFiles] = useState<File[]>([]);
-  const [rsaPreviews, setRsaPreviews] = useState<string[]>([]);
+  const [passportDocs, setPassportDocs] = useState<Attachment[]>([]);
+  const [visaDocs, setVisaDocs] = useState<Attachment[]>([]);
+  const [rsaDocs, setRsaDocs] = useState<Attachment[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,34 +113,71 @@ export default function DocumentsPage() {
   const rsaCameraRef = useRef<HTMLInputElement>(null);
   const rsaGalleryRef = useRef<HTMLInputElement>(null);
 
+  // Show what has already been uploaded rather than an empty form.
+  //
+  // This is what a sent-back section rides on. The owner rejects Documents
+  // because one photo is blurred, the employee lands back here, and without
+  // this they would be looking at three empty slots and would have to find
+  // their passport and visa again to re-shoot documents that were fine. The
+  // URLs survive the rejection on purpose — see the `documents` row in
+  // onboarding-review.ts.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        if (cancelled || !snap.exists()) return;
+        const urls = readDocumentUrls(snap.data() as Record<string, unknown>);
+        // Functional updates, and only into a section that is still empty:
+        // this read is async, and silently swallowing a photo the employee
+        // managed to pick while it was in flight would be worse than not
+        // pre-filling at all.
+        const seed = (list: string[]) => (prev: Attachment[]) =>
+          prev.length > 0
+            ? prev
+            : list
+                .slice(0, MAX_PHOTOS_PER_SECTION)
+                .map((url) => ({ kind: "stored" as const, url }));
+        setPassportDocs(seed(urls.passport));
+        setVisaDocs(seed(urls.visa));
+        setRsaDocs(seed(urls.rsa));
+      } catch {
+        // Silent — the employee can still upload from scratch.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
   function handleFileChange(
     e: React.ChangeEvent<HTMLInputElement>,
-    files: File[],
-    previews: string[],
-    setFiles: (f: File[]) => void,
-    setPreviews: (p: string[]) => void,
+    docs: Attachment[],
+    setDocs: (d: Attachment[]) => void,
   ) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (picked.length === 0) return;
-    const remaining = Math.max(0, MAX_PHOTOS_PER_SECTION - files.length);
+    const remaining = Math.max(0, MAX_PHOTOS_PER_SECTION - docs.length);
     if (remaining === 0) return;
-    const accepted = picked.slice(0, remaining);
-    setFiles([...files, ...accepted]);
-    setPreviews([...previews, ...accepted.map((f) => URL.createObjectURL(f))]);
+    setDocs([
+      ...docs,
+      ...picked.slice(0, remaining).map((file) => ({
+        kind: "picked" as const,
+        file,
+        previewUrl: URL.createObjectURL(file),
+      })),
+    ]);
   }
 
-  function removeFileAt(
+  function removeDocAt(
     index: number,
-    files: File[],
-    previews: string[],
-    setFiles: (f: File[]) => void,
-    setPreviews: (p: string[]) => void,
+    docs: Attachment[],
+    setDocs: (d: Attachment[]) => void,
   ) {
-    const removed = previews[index];
-    if (removed) URL.revokeObjectURL(removed);
-    setFiles(files.filter((_, i) => i !== index));
-    setPreviews(previews.filter((_, i) => i !== index));
+    const removed = docs[index];
+    // Only a blob URL has to be handed back; a stored one is just a string.
+    if (removed?.kind === "picked") URL.revokeObjectURL(removed.previewUrl);
+    setDocs(docs.filter((_, i) => i !== index));
   }
 
   async function saveToFirestore(markComplete = false) {
@@ -136,15 +190,28 @@ export default function DocumentsPage() {
     setSaving(true);
     setError(null);
     try {
-      // Compress + upload every attached photo in parallel. Files land at
-      // `<section>/0`, `<section>/1`, … so re-uploading overwrites cleanly.
+      // Turn every section into a list of URLs: upload the photos picked on
+      // this device, and pass the ones already in Storage straight through.
+      //
+      // The name carries a timestamp rather than being `<section>/<index>`.
+      // Indexes shift the moment a photo is removed, so a fixed name let a
+      // newly picked photo land on top of the object a kept photo was still
+      // pointing at — the employee replaced one blurred passport page and
+      // the other one turned into a copy of it.
       const base = `staff_onboarding/${user.uid}`;
-      const uploadAll = (files: File[], section: string) =>
-        Promise.all(files.map((f, i) => uploadFile(f, `${base}/${section}/${i}`)));
+      const stamp = Date.now();
+      const resolveAll = (docs: Attachment[], section: string) =>
+        Promise.all(
+          docs.map((a, i) =>
+            a.kind === "stored"
+              ? a.url
+              : uploadFile(a.file, `${base}/${section}/${stamp}-${i}`),
+          ),
+        );
       const [passportUrls, visaUrls, rsaUrls] = await Promise.all([
-        uploadAll(passportFiles, "passport"),
-        uploadAll(visaFiles, "visa"),
-        uploadAll(rsaFiles, "rsa"),
+        resolveAll(passportDocs, "passport"),
+        resolveAll(visaDocs, "visa"),
+        resolveAll(rsaDocs, "rsa"),
       ]);
 
       const db = getDb();
@@ -180,9 +247,11 @@ export default function DocumentsPage() {
   }
 
   async function handleSaveAndContinue() {
+    // Counts stored photos too — an employee sent back over their visa has
+    // a passport on file already, and must not be told to upload it again.
     const missing: string[] = [];
-    if (passportFiles.length === 0) missing.push("Passport / Photo ID");
-    if (visaFiles.length === 0) missing.push("Visa");
+    if (passportDocs.length === 0) missing.push("Passport / Photo ID");
+    if (visaDocs.length === 0) missing.push("Visa");
 
     if (missing.length > 0) {
       setErrorTitle("Required Documents Missing");
@@ -253,10 +322,8 @@ export default function DocumentsPage() {
     title: string;
     icon: React.ReactNode;
     infoText: string;
-    files: File[];
-    previews: string[];
-    setFiles: (f: File[]) => void;
-    setPreviews: (p: string[]) => void;
+    docs: Attachment[];
+    setDocs: (d: Attachment[]) => void;
     cameraRef: React.RefObject<HTMLInputElement | null>;
     galleryRef: React.RefObject<HTMLInputElement | null>;
   };
@@ -266,10 +333,8 @@ export default function DocumentsPage() {
       title: t("onb.docs.passportTitle"),
       icon: passportSvg,
       infoText: t("onb.docs.passportHelp"),
-      files: passportFiles,
-      previews: passportPreviews,
-      setFiles: setPassportFiles,
-      setPreviews: setPassportPreviews,
+      docs: passportDocs,
+      setDocs: setPassportDocs,
       cameraRef: passportCameraRef,
       galleryRef: passportGalleryRef,
     },
@@ -277,10 +342,8 @@ export default function DocumentsPage() {
       title: t("onb.docs.visaTitle"),
       icon: documentSvg,
       infoText: t("onb.docs.visaHelp"),
-      files: visaFiles,
-      previews: visaPreviews,
-      setFiles: setVisaFiles,
-      setPreviews: setVisaPreviews,
+      docs: visaDocs,
+      setDocs: setVisaDocs,
       cameraRef: visaCameraRef,
       galleryRef: visaGalleryRef,
     },
@@ -288,10 +351,8 @@ export default function DocumentsPage() {
       title: t("onb.docs.rsaTitle"),
       icon: certificateSvg,
       infoText: t("onb.docs.rsaHelp"),
-      files: rsaFiles,
-      previews: rsaPreviews,
-      setFiles: setRsaFiles,
-      setPreviews: setRsaPreviews,
+      docs: rsaDocs,
+      setDocs: setRsaDocs,
       cameraRef: rsaCameraRef,
       galleryRef: rsaGalleryRef,
     },
@@ -357,7 +418,7 @@ export default function DocumentsPage() {
 
         <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
           {sections.map((section) => {
-            const canAddMore = section.files.length < MAX_PHOTOS_PER_SECTION;
+            const canAddMore = section.docs.length < MAX_PHOTOS_PER_SECTION;
             return (
               <div key={section.title} className={styles.docSection}>
                 <h3 className={styles.docSectionTitle}>{section.title}</h3>
@@ -369,28 +430,20 @@ export default function DocumentsPage() {
                   </p>
                 </div>
 
-                {section.previews.length > 0 && (
+                {section.docs.length > 0 && (
                   <div className={styles.previewGrid}>
-                    {section.previews.map((src, idx) => (
-                      <div key={src} className={styles.previewWrap}>
+                    {section.docs.map((att, idx) => (
+                      <div key={attachmentSrc(att)} className={styles.previewWrap}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={src}
+                          src={attachmentSrc(att)}
                           alt={`Document preview ${idx + 1}`}
                           className={styles.previewImg}
                         />
                         <button
                           type="button"
                           className={styles.removeBtn}
-                          onClick={() =>
-                            removeFileAt(
-                              idx,
-                              section.files,
-                              section.previews,
-                              section.setFiles,
-                              section.setPreviews,
-                            )
-                          }
+                          onClick={() => removeDocAt(idx, section.docs, section.setDocs)}
                           aria-label={`Remove photo ${idx + 1}`}
                         >
                           ×
@@ -409,7 +462,7 @@ export default function DocumentsPage() {
                     >
                       <span className={styles.uploadBtnIcon}>{cameraSvg}</span>
                       <span className={styles.uploadBtnLabel}>
-                        {section.files.length > 0 ? t("onb.docs.addAnother") : t("onb.docs.takePhoto")}
+                        {section.docs.length > 0 ? t("onb.docs.addAnother") : t("onb.docs.takePhoto")}
                       </span>
                       <span className={styles.uploadBtnSub}>{t("onb.docs.camera")}</span>
                     </button>
@@ -433,15 +486,7 @@ export default function DocumentsPage() {
                   accept="image/*"
                   capture="environment"
                   className={styles.hiddenInput}
-                  onChange={(e) =>
-                    handleFileChange(
-                      e,
-                      section.files,
-                      section.previews,
-                      section.setFiles,
-                      section.setPreviews,
-                    )
-                  }
+                  onChange={(e) => handleFileChange(e, section.docs, section.setDocs)}
                 />
                 <input
                   ref={section.galleryRef}
@@ -449,15 +494,7 @@ export default function DocumentsPage() {
                   accept="image/*"
                   multiple
                   className={styles.hiddenInput}
-                  onChange={(e) =>
-                    handleFileChange(
-                      e,
-                      section.files,
-                      section.previews,
-                      section.setFiles,
-                      section.setPreviews,
-                    )
-                  }
+                  onChange={(e) => handleFileChange(e, section.docs, section.setDocs)}
                 />
               </div>
             );
