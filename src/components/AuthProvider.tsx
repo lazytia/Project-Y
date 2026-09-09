@@ -87,6 +87,14 @@ type AuthContextValue = {
    * and they are held on the submitted screen.
    */
   staffAwaitingActivation: boolean;
+  /**
+   * Has an owner signed this employee off yet?
+   *
+   * `null` until the server document has answered — the same three-way the
+   * routing below leans on, so a reader has to decide for itself what to do
+   * with silence rather than have it collapsed into a false.
+   */
+  staffActivated: boolean | null;
 };
 
 const AuthContext = createContext<AuthContextValue>({
@@ -96,6 +104,7 @@ const AuthContext = createContext<AuthContextValue>({
   staffCompletedStep: null,
   staffNeedsOnboarding: false,
   staffAwaitingActivation: false,
+  staffActivated: null,
 });
 
 export function AuthProvider({
@@ -563,6 +572,7 @@ export function AuthProvider({
         staffCompletedStep,
         staffNeedsOnboarding,
         staffAwaitingActivation,
+        staffActivated,
       }}
     >
       {children}
