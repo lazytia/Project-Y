@@ -16,9 +16,10 @@ import { shiftDateKey } from "@/lib/square";
  * GET /api/payroll/summary?weekStart=YYYY-MM-DD
  *
  * Powers /payroll/payroll. Returns the selected week's payroll detail
- * plus the previous two weeks (for the "vs prev 2 weeks avg" chips and
- * the WEEKLY COMPARISON card), and pulls the matching Sydney-week Gross
- * Sales from Firestore so the payroll % of sales gauge is meaningful.
+ * plus the previous two weeks — the week before it drives the WEEKLY
+ * COMPARISON card, the one before that is the baseline for the "vs 2 weeks
+ * ago" chips — and pulls the matching Sydney-week Gross Sales from
+ * Firestore so the payroll % of sales gauge is meaningful.
  */
 
 export const dynamic = "force-dynamic";
@@ -264,21 +265,14 @@ export async function GET(req: NextRequest) {
   const p1 = prev1Detail ?? { ...empty, weekStartISO: prev1 };
   const p2 = prev2Detail ?? { ...empty, weekStartISO: prev2 };
 
-  // Average of prev 2 weeks for the "vs prev 2 weeks avg" chips.
-  const avg2 = {
-    netPay: (p1.totals.netPay + p2.totals.netPay) / 2,
-    tax: (p1.totals.tax + p2.totals.tax) / 2,
-    superAnn: (p1.totals.superAnn + p2.totals.superAnn) / 2,
-    cashPay: (p1.totals.cashPay + p2.totals.cashPay) / 2,
-    totalIncSuper: (p1.totals.totalIncSuper + p2.totals.totalIncSuper) / 2,
-  };
-
   const payrollPctSales =
     salesCurrent > 0 ? (cur.totals.totalIncSuper / salesCurrent) * 100 : null;
-  const prev2WeeksSales = salesPrev1 + salesPrev2;
-  const prev2WeeksPayroll = p1.totals.totalIncSuper + p2.totals.totalIncSuper;
+  // The same ratio for the week two back, which is what the chips compare
+  // against. Its own week's payroll over its own week's sales — blending two
+  // weeks into one ratio, as this used to, answered a question nobody asked
+  // and could not be checked against any single row of the sheet.
   const payrollPctPrev =
-    prev2WeeksSales > 0 ? (prev2WeeksPayroll / prev2WeeksSales) * 100 : null;
+    salesPrev2 > 0 ? (p2.totals.totalIncSuper / salesPrev2) * 100 : null;
 
   return NextResponse.json(
     {
@@ -287,7 +281,6 @@ export async function GET(req: NextRequest) {
       current: cur,
       previous: p1,
       twoWeeksAgo: p2,
-      prev2WeekAvg: avg2,
       sales: {
         current: salesCurrent,
         prev1: salesPrev1,

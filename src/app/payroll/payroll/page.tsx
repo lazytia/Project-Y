@@ -58,7 +58,6 @@ type SummaryPayload = {
   current: WeekDetail;
   previous: WeekDetail;
   twoWeeksAgo: WeekDetail;
-  prev2WeekAvg: PayrollTotals;
   sales: { current: number; prev1: number; prev2: number };
   payrollPctSales: number | null;
   payrollPctPrev: number | null;
@@ -160,8 +159,12 @@ export default function PayrollOverviewPage() {
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    // v8: drops entries holding the double-counted-cash total.
-    const cacheKey = `y.payroll.summary.v8.${weekMondayISO}`;
+    // v9: the chips compare against the week two back rather than a two-week
+    // average, and payrollPctPrev is that week's own ratio. A v8 entry still
+    // parses, so without the bump the old percentages would be replayed from
+    // session storage for five minutes after the deploy — right numbers on
+    // the tiles, wrong numbers on the chips underneath them.
+    const cacheKey = `y.payroll.summary.v9.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
     const cachedHasPayroll =
       cached && (cached.current?.totals?.totalIncSuper ?? 0) > 0;
@@ -191,10 +194,15 @@ export default function PayrollOverviewPage() {
     };
   }, [allowed, weekMondayISO]);
 
+  // Every chip on this page reads against the week two back — one real week
+  // that can be opened in the sheet and checked, rather than the average of
+  // the last two that used to sit here. An average moves when either of two
+  // weeks moves, so a chip could swing without the week it was compared to
+  // having changed at all, and there was no row anywhere to reconcile it to.
   const chips = useMemo(() => {
     if (!summary) return null;
     const a = summary.current.totals;
-    const b = summary.prev2WeekAvg;
+    const b = summary.twoWeeksAgo.totals;
     return {
       netPay: safePct(a.netPay, b.netPay),
       tax: safePct(a.tax, b.tax),
@@ -433,7 +441,7 @@ function HeroDelta({ pct }: { pct: number | null }) {
       ) : (
         <p className={styles.heroDeltaMuted}>—</p>
       )}
-      <p className={styles.heroDeltaSub}>vs 2-wk avg</p>
+      <p className={styles.heroDeltaSub}>vs 2 weeks ago</p>
     </div>
   );
 }
@@ -467,7 +475,7 @@ function SummaryTile({
       ) : (
         <p className={styles.tileDeltaMuted}>—</p>
       )}
-      <p className={styles.tileDeltaSub}>vs prev 2 weeks avg</p>
+      <p className={styles.tileDeltaSub}>vs 2 weeks ago</p>
     </div>
   );
 }
