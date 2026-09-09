@@ -142,6 +142,11 @@ export default function TfnDeclarationPage() {
           (typeof t.declarationAgreed === "boolean" ? (t.declarationAgreed as boolean) : undefined) ??
           (typeof d.declarationAgreed === "boolean" ? (d.declarationAgreed as boolean) : undefined);
         if (da !== undefined) setDeclarationAgreed(da);
+        const dd = pick("declarationDate");
+        if (dd) {
+          setDeclarationDateKey(dd);
+          setDeclarationDate(formatDeclarationDisplay(dd));
+        }
       } catch {
         // Silent — fall back to defaults so the form stays usable.
       }
@@ -173,6 +178,10 @@ export default function TfnDeclarationPage() {
           helpDebt,
           otherGovDebt,
           declarationAgreed,
+          // The date the employee dated their declaration, which the picker
+          // above lets them change. It was collected and then dropped on
+          // save, so the owner's copy of a signed tax form had no date on it.
+          declarationDate: declarationDateKey,
         },
         step: CURRENT_STEP,
         status: markComplete ? "step_complete" : "in_progress",

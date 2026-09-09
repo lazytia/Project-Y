@@ -35,6 +35,24 @@ function fmtDobDisplay(iso: string): string {
   return `${d} / ${m} / ${y}`;
 }
 
+/**
+ * The tax questions as words, not as the radio value that was stored.
+ *
+ * Empty stays empty so DefRow prints its dash: a section the employee has
+ * not reached yet must not read as though they answered "No", which is a
+ * real answer with a real effect on their pay.
+ */
+function yesNoLabel(v: string): string {
+  if (v === "yes") return "Yes";
+  if (v === "no") return "No";
+  return "";
+}
+
+function residencyLabel(v: string): string {
+  if (v === "working_holiday") return "Working holiday maker";
+  return yesNoLabel(v);
+}
+
 export function OnboardingSectionModal({
   sectionKey,
   submission,
@@ -87,26 +105,65 @@ function sectionModalContent(
           </dl>
         ),
       };
-    case "tfn":
+    // The whole declaration, laid out in the four parts the employee filled
+    // in, rather than the number on its own. Payroll can find a TFN; what
+    // needs reading back is what they declared around it, because those four
+    // answers are what the withholding is calculated from and a wrong one
+    // shows up as an employee under- or over-taxed all year.
+    case "tfn": {
+      const d = s.tfn;
       return {
-        title: "Tax File Number",
+        title: "TFN Declaration",
         body: (
           <>
+            <p className={styles.modalSectionTitle}>Employee Details</p>
             <dl className={styles.modalDefs}>
-              <div className={styles.modalDefRow}>
-                <dt className={styles.modalDefLabel}>TFN</dt>
-                <dd className={styles.modalDefValue}>{s.taxFileNumber || "—"}</dd>
-              </div>
+              <DefRow label="Full Legal Name" value={d.fullLegalName || s.name} />
+              <DefRow
+                label="Date of Birth"
+                value={fmtDobDisplay(d.dateOfBirth || s.personal.dateOfBirth)}
+              />
+              <DefRow label="Home Address" value={d.homeAddress} />
+              <DefRow label="Suburb" value={d.suburb} />
+              <DefRow label="State" value={d.state} />
+              <DefRow label="Postcode" value={d.postcode} />
+            </dl>
+
+            <p className={styles.modalSectionTitle}>Tax File Number</p>
+            <dl className={styles.modalDefs}>
+              <DefRow label="TFN" value={d.taxFileNumber || s.taxFileNumber} />
+            </dl>
+
+            <p className={styles.modalSectionTitle}>Tax Details</p>
+            <dl className={styles.modalDefs}>
+              <DefRow label="Australian tax resident" value={residencyLabel(d.taxResident)} />
+              <DefRow
+                label="Claiming the tax-free threshold"
+                value={yesNoLabel(d.taxFreeThreshold)}
+              />
+              <DefRow label="HELP / HECS debt" value={yesNoLabel(d.helpDebt)} />
+              <DefRow label="Other government debt" value={yesNoLabel(d.otherGovDebt)} />
+            </dl>
+
+            <p className={styles.modalSectionTitle}>Declaration</p>
+            <dl className={styles.modalDefs}>
+              <DefRow
+                label="Declared true and correct"
+                value={d.declarationAgreed ? "Yes — agreed" : "Not agreed"}
+              />
+              <DefRow label="Dated" value={fmtDobDisplay(d.declarationDate)} />
             </dl>
             {s.signatureDataUrl && (
               <SignatureBlock label="Signed by" name={s.name} src={s.signatureDataUrl} />
             )}
             <p className={styles.modalHint}>
-              Submitted during onboarding. Visible to owner and manager only.
+              Signed electronically during onboarding by ticking the declaration.
+              Visible to owner and manager only.
             </p>
           </>
         ),
       };
+    }
     case "bank":
       return {
         title: "Bank & Super Details",

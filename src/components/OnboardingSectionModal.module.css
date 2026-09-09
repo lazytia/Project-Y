@@ -97,6 +97,21 @@
   overflow-wrap: anywhere;
 }
 
+/* Groups the TFN declaration into the four parts the employee filled in, so
+   a long sheet reads as the form they signed rather than one flat list. */
+.modalSectionTitle {
+  margin: var(--space-4) 0 var(--space-3);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.modalSectionTitle:first-child {
+  margin-top: 0;
+}
+
 .modalHint {
   margin: var(--space-2) 0 0;
   font-size: 12px;
