@@ -12,8 +12,13 @@ import {
   type Decision,
   type PublishShift,
 } from "@/lib/manager-actions";
-import { onboardingProgressPatch, type StaffOnboardingFlags } from "@/lib/staff-active";
-import { isChef } from "@/lib/permissions";
+import { isTeamMember, onboardingProgressPatch, type StaffOnboardingFlags } from "@/lib/staff-active";
+import {
+  CHEF_USERNAMES,
+  OWNER_USERNAMES,
+  STRICT_OWNER_USERNAMES,
+  isChef,
+} from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
 import styles from "./page.module.css";
 
@@ -47,6 +52,9 @@ type StoredAvailabilityRequest = {
 type StaffDoc = {
   uid: string;
   username?: string;
+  /** Only used to recover the username on an account that has never signed
+   *  in, which is exactly the new hire this page has to be able to roster. */
+  email?: string;
   firstName?: string;
   lastName?: string;
   role?: string;
@@ -98,10 +106,22 @@ function colorForUid(uid: string): string {
   return STAFF_COLORS[h % STAFF_COLORS.length];
 }
 
-function staffRoleLabel(role: string | undefined): string {
-  if (role === "manager") return "MANAGER";
-  if (role === "chef") return "CHEF";
-  if (role === "owner") return "OWNER";
+/**
+ * The pill beside a name on the roster.
+ *
+ * Resolved from the username, like every other tier decision in the app. The
+ * `role` field cannot answer it: AuthProvider writes "owner" for anyone with
+ * owner-level UI access, and the store manager is in that tier, so reading
+ * the field would badge her OWNER on her own roster. The role is still the
+ * fallback for accounts that predate the username being stamped.
+ */
+function staffRoleLabel(d: StaffDoc): string {
+  const username = (d.username ?? emailToUsername(d.email ?? "")).toLowerCase();
+  if (CHEF_USERNAMES.has(username)) return "CHEF";
+  if (STRICT_OWNER_USERNAMES.has(username)) return "OWNER";
+  if (OWNER_USERNAMES.has(username)) return "MANAGER";
+  if (d.role === "manager") return "MANAGER";
+  if (d.role === "chef") return "CHEF";
   return "STAFF";
 }
 
@@ -561,7 +581,15 @@ export default function ManagerRosterPage() {
           });
         }
       }
-      const nextStaff = [...byUid.values()].filter((d) => d.role !== "owner");
+      // Who is on the team, which is not what `role` can answer. AuthProvider
+      // stamps role="owner" on every account with owner-level UI access, and
+      // that tier includes the store manager — so filtering on the role took
+      // her off her own roster. It also let anyone terminated stay on it,
+      // because a role says nothing about whether someone still works here.
+      // isTeamMember reads the username against the three real owners and
+      // drops terminated staff, and deliberately keeps a hire who has not
+      // finished onboarding: they work shifts before the paperwork is in.
+      const nextStaff = [...byUid.values()].filter(isTeamMember);
       setStaffDocs(nextStaff);
 
       const nextWeek = (weekSnap.exists() ? (weekSnap.data() as RosterWeekDoc) : {}) ?? {};
@@ -634,8 +662,10 @@ export default function ManagerRosterPage() {
   }, [staffDocs]);
 
   const staffAvailRows: StaffAvailRow[] = useMemo(() => {
+    // No second filter here: staffDocs is already the team. Re-filtering on
+    // role would take the manager back out of the availability grid while
+    // leaving her in the roster above it.
     return staffDocs
-      .filter((d) => d.role !== "owner")
       .map((d) => ({
         uid: d.uid,
         name: displayName(d),
@@ -871,7 +901,10 @@ export default function ManagerRosterPage() {
       }
     }
 
-    const recipients = staffDocs.filter((s) => s.role !== "owner");
+    // staffDocs is already the team, so this is everyone who should be told.
+    // The old role filter here was the one that mattered most: it decided who
+    // got the text, so the manager was rostered and then not notified.
+    const recipients = staffDocs;
     const total = recipients.length;
     const withShifts = recipients.filter((s) => (byStaff.get(s.uid)?.length ?? 0) > 0).length;
 
@@ -1687,7 +1720,7 @@ export default function ManagerRosterPage() {
                     .map((d) => ({
                       uid: d.uid,
                       name: displayName(d),
-                      role: staffRoleLabel(d.role),
+                      role: staffRoleLabel(d),
                       isTemp: false,
                       warning: warningMap.get(d.uid) ?? null,
                     }))

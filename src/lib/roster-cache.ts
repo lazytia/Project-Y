@@ -1,4 +1,10 @@
-const CACHE_KEY = "y.roster";
+/** v2: staffDocs is now filtered by isTeamMember rather than by role, so a
+ *  v1 entry holds a different population — the manager missing, anyone
+ *  terminated still present. It parses cleanly under the same type, so
+ *  without the rename a cached roster would be painted from the old rule for
+ *  up to MAX_AGE_MS after the rollout. Rename this whenever what goes into
+ *  staffDocs changes, not just when its shape does. */
+const CACHE_KEY = "y.roster.v2";
 const MAX_AGE_MS = 3 * 60 * 1000;
 
 export type RosterCachePayload = {
