@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "firebase/auth";
@@ -206,6 +206,9 @@ function NavGroupBlock({
   );
 }
 
+/** Shortest gap between two badge reads triggered by returning to the tab. */
+const NAV_BADGE_REFRESH_MS = 60_000;
+
 /** Does this menu contain anything a change badge is tracked for? */
 function navHasBadgedHref(nav: NavGroup[]): boolean {
   const tracked = new Set<string>(Object.values(NAV_BADGE_HREFS));
@@ -219,15 +222,16 @@ function navHasBadgedHref(nav: NavGroup[]): boolean {
  * have arrived since this user last looked, or, for New Employees, new hires
  * who have moved on a stage. What each entry measures is decided next door.
  *
- * The snapshot is read once per mount and deliberately behind runWhenIdle —
- * the badge is decoration and must never compete with the page it sits next
- * to.
+ * The snapshot is read on mount, and again when the tab is returned to after
+ * a while — see below. Always behind runWhenIdle: the badge is decoration and
+ * must never compete with the page it sits next to.
  */
 function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pathname: string) {
   const uid = user?.uid;
   const [snapshot, setSnapshot] = useState<NavBadgeSnapshot | null>(null);
   const [seen, setSeen] = useState<NavCountMap>({});
   const [stagesSeen, setStagesSeen] = useState<OnboardingStageMap | undefined>(undefined);
+  const lastLoadRef = useRef(0);
 
   useEffect(() => {
     setSeen(uid ? readNavSeen(uid) : {});
@@ -237,18 +241,41 @@ function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pat
   useEffect(() => {
     if (!user || !enabled) return;
     let alive = true;
-    const cancel = runWhenIdle(() => {
-      loadNavBadgeSnapshot(user)
-        .then((next) => {
-          if (alive) setSnapshot(next);
-        })
-        .catch(() => {
-          /* offline or rules — just render no badges */
-        });
-    }, 0);
+    let cancelIdle: (() => void) | null = null;
+
+    const load = () => {
+      cancelIdle?.();
+      cancelIdle = runWhenIdle(() => {
+        lastLoadRef.current = Date.now();
+        loadNavBadgeSnapshot(user)
+          .then((next) => {
+            if (alive) setSnapshot(next);
+          })
+          .catch(() => {
+            /* offline or rules — just render no badges */
+          });
+      }, 0);
+    };
+
+    load();
+
+    // Read once per mount was too seldom for the one menu that reports other
+    // people's progress: the sidebar stays mounted all day, so an employee
+    // finishing a step showed up only after the owner happened to reload.
+    // Coming back to the tab is the cheap stand-in for "something may have
+    // happened while you were away". Throttled, because this reads a whole
+    // collection and alt-tabbing twice in a minute is not news.
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastLoadRef.current < NAV_BADGE_REFRESH_MS) return;
+      load();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       alive = false;
-      cancel();
+      cancelIdle?.();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [user, enabled]);
 
@@ -289,7 +316,7 @@ function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pat
 export default function Sidebar({ open, onClose, initialDashboard = null }: Props) {
   const pathname = usePathname();
   const { user, signOut, staffNeedsOnboarding, staffAwaitingActivation } = useAuth();
-  const { t } = useLang();
+  const { t, canChooseLanguage } = useLang();
   // Firebase Auth hydrates a second or two after paint, and until it does
   // every isOwner/isChef check reads false — which sent owners and chefs
   // through the staff branch below, so the wrong menu rendered and then
@@ -411,14 +438,21 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     // into the sidebar. Owner asked for this so the staff can flip
     // languages in place while filling out a form; no navigation, no
     // Settings detour, just the current page's copy switches.
+    //
+    // Still gated, even though this branch is mostly people who have not
+    // been activated: an owner sending a section back to somebody she has
+    // already activated lands them here too, and the toggle would be a
+    // control the provider ignores.
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
         <div className={styles.brand}>YURICA</div>
         <nav className={styles.nav}>
-          <div className={styles.sidebarLangBlock}>
-            <p className={styles.sidebarLangLabel}>{t("common.language")}</p>
-            <LanguageToggle />
-          </div>
+          {canChooseLanguage && (
+            <div className={styles.sidebarLangBlock}>
+              <p className={styles.sidebarLangLabel}>{t("common.language")}</p>
+              <LanguageToggle />
+            </div>
+          )}
         </nav>
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>
@@ -433,7 +467,8 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
   // Staff sidebar — staffNav is built above, next to the other trees. The
   // EN/JA toggle sits at the bottom of it for the same reason it sits in the
   // stripped sidebar above: the crew is largely Japanese, and reaching it
-  // through Settings meant leaving whatever page they were reading.
+  // through Settings meant leaving whatever page they were reading. It is
+  // gone once they are activated — see LanguageProvider.
   if (!userIsOwner && !userIsChef) {
     return (
       <aside className={`${styles.sidebar} ${open ? "" : styles.sidebarClosed}`}>
@@ -449,10 +484,12 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
               onNavigate={onClose}
             />
           ))}
-          <div className={styles.sidebarLangBlock}>
-            <p className={styles.sidebarLangLabel}>{t("common.language")}</p>
-            <LanguageToggle />
-          </div>
+          {canChooseLanguage && (
+            <div className={styles.sidebarLangBlock}>
+              <p className={styles.sidebarLangLabel}>{t("common.language")}</p>
+              <LanguageToggle />
+            </div>
+          )}
         </nav>
         <div className={styles.footer}>
           <div className={styles.userEmail}>{emailToUsername(user?.email)}</div>

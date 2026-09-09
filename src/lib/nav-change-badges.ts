@@ -20,6 +20,15 @@
  * instead, and counts the rows standing somewhere other than where she left
  * them — which covers an arrival too, a row she has never seen being a row
  * that has moved.
+ *
+ * What counts as a stage is onboardingStageMark below, and it is deliberately
+ * finer than the four words the list prints. Most of a new hire's life on this
+ * page is spent inside "started": they fill in one step an evening, and a
+ * rejected section sends them back a step to redo it. All of that read as the
+ * same stage, so the badge sat silent through the entire form and only spoke
+ * when the row went ready — and it never spoke at all for the resubmission
+ * the owner was waiting on, because coming back from a rejection lands on the
+ * stage the row was already at.
  */
 
 import type { User } from "firebase/auth";
@@ -30,7 +39,7 @@ import {
   isOnboardingListEmployee,
   onboardingListStatus,
   staffOnboardingFlags,
-  type OnboardingListStatus,
+  type StaffOnboardingFlags,
 } from "./staff-active";
 
 /** Menu entries that carry a change badge, keyed by their nav href. */
@@ -44,7 +53,26 @@ export const NAV_BADGE_HREFS = {
 export type NavCountMap = Record<string, number>;
 
 /** What stage each new hire was standing at, keyed by their uid. */
-export type OnboardingStageMap = Record<string, OnboardingListStatus>;
+export type OnboardingStageMap = Record<string, string>;
+
+/**
+ * Where one new hire is standing, as a string that changes whenever they move.
+ *
+ * The list status on its own is too coarse to be that string: it says
+ * "started" from the moment they open the form until the moment they finish
+ * it, which is most of the fortnight anyone spends on it. Pairing it with
+ * `completedStep` makes every step they finish a move, and — because a
+ * rejection rolls that number back and their fix pushes it forward again —
+ * makes a resubmission one too.
+ *
+ * It is only ever compared against itself, so the exact text does not matter
+ * and is not shown anywhere. Changing the recipe is safe but not free: stored
+ * marks are strings from the old recipe, so nothing will match on the first
+ * load after a deploy and every row shows as moved once.
+ */
+export function onboardingStageMark(flags: StaffOnboardingFlags): string {
+  return `${onboardingListStatus(flags)}:${flags.completedStep ?? 0}`;
+}
 
 /** Everything the badges are computed from, read in one pass. */
 export type NavBadgeSnapshot = {
@@ -109,7 +137,7 @@ export function readOnboardingSeen(uid: string): OnboardingStageMap | undefined 
     if (!parsed || typeof parsed !== "object") return undefined;
     const out: OnboardingStageMap = {};
     for (const [rowUid, stage] of Object.entries(parsed as Record<string, unknown>)) {
-      if (typeof stage === "string") out[rowUid] = stage as OnboardingListStatus;
+      if (typeof stage === "string") out[rowUid] = stage;
     }
     return out;
   } catch {
@@ -283,7 +311,7 @@ export async function loadNavBadgeSnapshot(
     const flags = staffOnboardingFlags(raw);
     if (!isOnboardingListEmployee(flags)) continue;
     if (!canViewStaffRequest(viewer, raw as RequesterDoc)) continue;
-    onboarding[d.id] = onboardingListStatus(flags);
+    onboarding[d.id] = onboardingStageMark(flags);
   }
 
   // Notices for someone already terminated drop off that page, so they must
