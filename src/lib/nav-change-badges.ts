@@ -32,7 +32,7 @@
  */
 
 import type { User } from "firebase/auth";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { getDb } from "./firebase";
 import { canViewStaffRequest } from "./permissions";
 import {
@@ -277,6 +277,9 @@ type RequesterDoc = {
   requestedByName?: string;
 };
 
+/** One staff_onboarding document, as the badge maths wants it. */
+export type StaffBadgeRow = { id: string; data: Record<string, unknown> };
+
 /**
  * What each tracked entry's badge is measuring.
  *
@@ -290,36 +293,30 @@ type RequesterDoc = {
  * taken over the whole collection would be one nobody could clear by working
  * through what they can see.
  */
-export async function loadNavBadgeSnapshot(
+export function computeNavBadgeSnapshot(
   viewer: User | null | undefined,
-): Promise<NavBadgeSnapshot> {
-  const db = getDb();
-  const [noticeSnap, staffSnap] = await Promise.all([
-    getDocs(collection(db, "notice_given")),
-    getDocs(collection(db, "staff_onboarding")),
-  ]);
-
+  staffRows: readonly StaffBadgeRow[],
+  noticeRows: readonly NoticeDoc[],
+): NavBadgeSnapshot {
   const terminatedUids = new Set(
-    staffSnap.docs
-      .filter((d) => ((d.data() as StaffStatusDoc).status ?? "").toLowerCase() === TERMINATED_STATUS)
-      .map((d) => d.id),
+    staffRows
+      .filter((r) => ((r.data as StaffStatusDoc).status ?? "").toLowerCase() === TERMINATED_STATUS)
+      .map((r) => r.id),
   );
 
   const onboarding: OnboardingStageMap = {};
-  for (const d of staffSnap.docs) {
-    const raw = d.data() as Record<string, unknown>;
-    const flags = staffOnboardingFlags(raw);
+  for (const row of staffRows) {
+    const flags = staffOnboardingFlags(row.data);
     if (!isOnboardingListEmployee(flags)) continue;
-    if (!canViewStaffRequest(viewer, raw as RequesterDoc)) continue;
-    onboarding[d.id] = onboardingStageMark(flags);
+    if (!canViewStaffRequest(viewer, row.data as RequesterDoc)) continue;
+    onboarding[row.id] = onboardingStageMark(flags);
   }
 
   // Notices for someone already terminated drop off that page, so they must
   // not count here either.
-  const noticeGiven = noticeSnap.docs.filter((d) => {
-    const uid = (d.data() as NoticeDoc).employeeUid;
-    return !!uid && !terminatedUids.has(uid);
-  }).length;
+  const noticeGiven = noticeRows.filter(
+    (n) => !!n.employeeUid && !terminatedUids.has(n.employeeUid),
+  ).length;
 
   return {
     counts: {
@@ -327,5 +324,64 @@ export async function loadNavBadgeSnapshot(
       [NAV_BADGE_HREFS.terminated]: terminatedUids.size,
     },
     onboarding,
+  };
+}
+
+/**
+ * Watch the badge inputs and report a fresh snapshot on every change.
+ *
+ * A live subscription rather than a read, because of what the New Employees
+ * badge promises: it announces a hire moving between stages, and those moves
+ * are made by the hire on their own phone at their own hour. A snapshot taken
+ * once when the menu mounted could only ever be as fresh as the last reload,
+ * and the sidebar stays mounted for the whole working day.
+ *
+ * The two collections are watched separately and not joined by a `Promise.all`
+ * on purpose. Notice Given is owner-and-chef-only in the rules, so for anyone
+ * else that listener fails — and paired reads would have taken New Employees
+ * down with it, which is how the badge came to say nothing at all. A failed
+ * listener contributes its empty self and lets the others speak.
+ */
+export function subscribeNavBadgeSnapshot(
+  viewer: User | null | undefined,
+  onChange: (snapshot: NavBadgeSnapshot) => void,
+): () => void {
+  const db = getDb();
+  let staff: StaffBadgeRow[] | null = null;
+  let notices: NoticeDoc[] = [];
+
+  // Nothing is emitted until staff has arrived once: every badge is derived
+  // from it, and a snapshot built from an empty roster would read as "all the
+  // new hires are gone" and settle the marks against a list nobody has seen.
+  const emit = () => {
+    if (staff) onChange(computeNavBadgeSnapshot(viewer, staff, notices));
+  };
+
+  const unsubStaff = onSnapshot(
+    collection(db, "staff_onboarding"),
+    (snap) => {
+      staff = snap.docs.map((d) => ({ id: d.id, data: d.data() as Record<string, unknown> }));
+      emit();
+    },
+    () => {
+      /* offline or rules — leave whatever the menu is already showing */
+    },
+  );
+
+  const unsubNotices = onSnapshot(
+    collection(db, "notice_given"),
+    (snap) => {
+      notices = snap.docs.map((d) => d.data() as NoticeDoc);
+      emit();
+    },
+    () => {
+      notices = [];
+      emit();
+    },
+  );
+
+  return () => {
+    unsubStaff();
+    unsubNotices();
   };
 }

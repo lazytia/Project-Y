@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "firebase/auth";
@@ -16,7 +16,6 @@ import { runWhenIdle } from "@/lib/run-when-idle";
 import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import {
   NAV_BADGE_HREFS,
-  loadNavBadgeSnapshot,
   navBadgeDelta,
   navBadgeLabel,
   onboardingBadgeDelta,
@@ -24,6 +23,7 @@ import {
   readOnboardingSeen,
   reconcileNavSeen,
   reconcileOnboardingSeen,
+  subscribeNavBadgeSnapshot,
   writeNavSeen,
   writeOnboardingSeen,
   type NavBadgeSnapshot,
@@ -206,9 +206,6 @@ function NavGroupBlock({
   );
 }
 
-/** Shortest gap between two badge reads triggered by returning to the tab. */
-const NAV_BADGE_REFRESH_MS = 60_000;
-
 /** Does this menu contain anything a change badge is tracked for? */
 function navHasBadgedHref(nav: NavGroup[]): boolean {
   const tracked = new Set<string>(Object.values(NAV_BADGE_HREFS));
@@ -222,16 +219,17 @@ function navHasBadgedHref(nav: NavGroup[]): boolean {
  * have arrived since this user last looked, or, for New Employees, new hires
  * who have moved on a stage. What each entry measures is decided next door.
  *
- * The snapshot is read on mount, and again when the tab is returned to after
- * a while — see below. Always behind runWhenIdle: the badge is decoration and
- * must never compete with the page it sits next to.
+ * Subscribed rather than read. A read on mount, even repeated when the tab is
+ * returned to, was too seldom for the one menu that reports other people's
+ * progress: the sidebar stays mounted all day, so a new hire signing in or
+ * finishing a step was news the owner got on her next reload. The badge is
+ * meant to tell her as it happens, so it listens.
  */
 function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pathname: string) {
   const uid = user?.uid;
   const [snapshot, setSnapshot] = useState<NavBadgeSnapshot | null>(null);
   const [seen, setSeen] = useState<NavCountMap>({});
   const [stagesSeen, setStagesSeen] = useState<OnboardingStageMap | undefined>(undefined);
-  const lastLoadRef = useRef(0);
 
   useEffect(() => {
     setSeen(uid ? readNavSeen(uid) : {});
@@ -241,41 +239,12 @@ function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pat
   useEffect(() => {
     if (!user || !enabled) return;
     let alive = true;
-    let cancelIdle: (() => void) | null = null;
-
-    const load = () => {
-      cancelIdle?.();
-      cancelIdle = runWhenIdle(() => {
-        lastLoadRef.current = Date.now();
-        loadNavBadgeSnapshot(user)
-          .then((next) => {
-            if (alive) setSnapshot(next);
-          })
-          .catch(() => {
-            /* offline or rules — just render no badges */
-          });
-      }, 0);
-    };
-
-    load();
-
-    // Read once per mount was too seldom for the one menu that reports other
-    // people's progress: the sidebar stays mounted all day, so an employee
-    // finishing a step showed up only after the owner happened to reload.
-    // Coming back to the tab is the cheap stand-in for "something may have
-    // happened while you were away". Throttled, because this reads a whole
-    // collection and alt-tabbing twice in a minute is not news.
-    const onVisibility = () => {
-      if (document.visibilityState !== "visible") return;
-      if (Date.now() - lastLoadRef.current < NAV_BADGE_REFRESH_MS) return;
-      load();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
+    const stop = subscribeNavBadgeSnapshot(user, (next) => {
+      if (alive) setSnapshot(next);
+    });
     return () => {
       alive = false;
-      cancelIdle?.();
-      document.removeEventListener("visibilitychange", onVisibility);
+      stop();
     };
   }, [user, enabled]);
 
