@@ -12,6 +12,7 @@ import {
   TRAINING_DOCUMENT_KEYS,
   type SignableDocumentKey,
 } from "@/lib/document-signatures";
+import { needsRsaCertificate } from "@/lib/staff-display";
 import styles from "./page.module.css";
 
 /* ── types ── */
@@ -174,6 +175,10 @@ export default function StaffDashboardPage() {
   const [firstName, setFirstName] = useState("");
   const [position, setPosition] = useState("");
   const [weekShiftCount, setWeekShiftCount] = useState<number | null>(null);
+  // How many of the documents this person is asked to upload are still not
+  // there. `null` until the record has been read, so the tile says "—"
+  // instead of claiming everything is in order before it knows.
+  const [missingUploads, setMissingUploads] = useState<number | null>(null);
 
   const [today, setTodayDate] = useState<Date>(() => {
     const d = new Date(0);
@@ -213,6 +218,15 @@ export default function StaffDashboardPage() {
       const full = typeof data.fullName === "string" ? data.fullName.trim() : "";
       setFirstName(given || full.split(" ")[0] || "");
       setPosition(typeof data.position === "string" ? data.position : "");
+
+      // The documents tile opens the upload page, so it has to count what
+      // that page asks for: the visa from everyone, the RSA only from the
+      // people who serve. It used to count unsigned training instead, which
+      // is why tapping "1 to sign" landed on a screen about certificates.
+      const uploaded = (data.documents ?? {}) as Record<string, unknown>;
+      const wanted: string[] = ["visaUrl"];
+      if (needsRsaCertificate(data as Record<string, unknown>)) wanted.push("rsaUrl");
+      setMissingUploads(wanted.filter((key) => !uploaded[key]).length);
 
       // Roster — check this week + next week
       const thisRoster = (data.roster?.[thisWeekISO] ?? null) as RosterDoc | null;
@@ -316,25 +330,22 @@ export default function StaffDashboardPage() {
   const countdown =
     nowMs !== null && nextShift ? fmtCountdown(nowMs, nextShift.startDate.getTime()) : "";
 
-  // Everything the employee is being asked to do, newest first. Unsigned
-  // training leads: it is the only entry that is owed rather than announced,
-  // and it clears itself when the document is signed.
-  const attention = [
-    ...unsignedTraining.map((key) => ({
-      id: `training:${key}`,
-      href: SIGNABLE_DOCUMENTS[key].href,
-      title: t(SIGNABLE_DOCUMENTS[key].labelKey, SIGNABLE_DOCUMENTS[key].label),
-      detail: t("staff.attention.reviewAndSign"),
-      ago: "",
-    })),
-    ...notifications.map((n) => ({
-      id: `notif:${n.id}`,
-      href: `/staff/notifications/${n.id}`,
-      title: n.label,
-      detail: n.detail,
-      ago: n.ago,
-    })),
-  ];
+  /**
+   * What has been announced to this employee, newest first.
+   *
+   * Unsigned training used to sit at the top of this same list, as one more
+   * bullet among the notices. It is not the same kind of thing: a notice is
+   * read and finished with, a signature is owed until it is given, and the
+   * one that is owed was the one that read as the quietest. It has its own
+   * card above now, and this list is the announcements again.
+   */
+  const attention = notifications.map((n) => ({
+    id: `notif:${n.id}`,
+    href: `/staff/notifications/${n.id}`,
+    title: n.label,
+    detail: n.detail,
+    ago: n.ago,
+  }));
   const attentionPreview = attention.slice(0, 3);
 
   return (
@@ -391,15 +402,40 @@ export default function StaffDashboardPage() {
         <Link href="/staff/documents" className={styles.tile}>
           <span className={styles.tileLabel}>{t("staff.tile.documents")}</span>
           <span className={styles.tileValueSmall}>
-            {unsignedTraining.length > 0
-              ? `${unsignedTraining.length} ${t("staff.tile.toSign")}`
-              : t("staff.tile.allSigned")}
+            {missingUploads === null
+              ? "—"
+              : missingUploads > 0
+                ? `${missingUploads} ${t("staff.tile.toUpload")}`
+                : t("staff.tile.allUploaded")}
           </span>
           <span className={styles.tileSub}>
-            {unsignedTraining.length > 0 ? t("staff.tile.actionNeeded") : t("staff.tile.upToDate")}
+            {missingUploads ? t("staff.tile.actionNeeded") : t("staff.tile.upToDate")}
           </span>
         </Link>
       </div>
+
+      {/* Training still owed a signature — the one thing on this screen that
+          is asked of the employee rather than told to them. */}
+      {unsignedTraining.map((key) => (
+        <section key={key} className={styles.actionCard}>
+          <span className={styles.actionIcon} aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="7" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </span>
+          <div className={styles.actionBody}>
+            <p className={styles.actionKicker}>{t("staff.action.required")}</p>
+            <p className={styles.actionTitle}>
+              {t(SIGNABLE_DOCUMENTS[key].labelKey, SIGNABLE_DOCUMENTS[key].label)}
+            </p>
+            <p className={styles.actionDetail}>{t("staff.attention.reviewAndSign")}</p>
+            <Link href={SIGNABLE_DOCUMENTS[key].href} className={styles.actionBtn}>
+              {t("staff.action.reviewAndSign")} <span aria-hidden="true">›</span>
+            </Link>
+          </div>
+        </section>
+      ))}
 
       {/* Needs Your Attention */}
       {attention.length > 0 && (
