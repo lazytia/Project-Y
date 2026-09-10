@@ -15,7 +15,13 @@ import { useParams, useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { actorNameOf, canViewStaffRequest, isChef, isOwner } from "@/lib/permissions";
+import {
+  actorNameOf,
+  canViewStaffRequest,
+  isChef,
+  isOwner,
+  isStrictOwner,
+} from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
 import {
@@ -66,6 +72,16 @@ export default function EmployeeReviewPage() {
   const uid = typeof params.id === "string" ? params.id : (params.id?.[0] ?? "");
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user) || isChef(user);
+  /**
+   * Who may act on what is here, as opposed to who may look at it.
+   *
+   * The manager and the chefs raise the request and then follow it — that is
+   * why they can open this page at all. But sending a section back and signing
+   * the onboarding off are the owner's calls, and the buttons were offered to
+   * everyone who could see the page. Reading is unchanged; only the two
+   * decisions are narrowed.
+   */
+  const canDecide = isStrictOwner(user);
 
   const [review, setReview] = useState<Review | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -216,8 +232,10 @@ export default function EmployeeReviewPage() {
                 </span>
                 {/* Nothing to open and nothing to send back until it arrives —
                     a live-looking button on an empty section only invites the
-                    tap. */}
-                {submitted && (
+                    tap. And nothing at all for anyone who cannot act on it:
+                    for them this page is a progress report, so a row reads as
+                    its label and its state and stops there. */}
+                {submitted && canDecide && (
                   <span className={styles.itemActions}>
                     <button
                       type="button"
@@ -257,15 +275,22 @@ export default function EmployeeReviewPage() {
 
       {error && <p className={styles.error}>{error}</p>}
 
+      {/* The note tells you what to do next, so it has to know whether you are
+          the one who does it. Promising a manager that anything submitted "can
+          still be sent back" describes a button she has not got. */}
       <p className={styles.footerNote}>
         {review.activated
           ? "This employee has already been activated."
           : review.ready
-            ? "All required onboarding items have been submitted."
-            : "Waiting on the employee to finish their onboarding. Anything already submitted can still be sent back."}
+            ? canDecide
+              ? "All required onboarding items have been submitted."
+              : "All required onboarding items have been submitted. The owner will review and activate this employee."
+            : canDecide
+              ? "Waiting on the employee to finish their onboarding. Anything already submitted can still be sent back."
+              : "Waiting on the employee to finish their onboarding."}
       </p>
 
-      {!review.activated && (
+      {!review.activated && canDecide && (
         <div className={styles.bottomBar}>
           <button
             type="button"
