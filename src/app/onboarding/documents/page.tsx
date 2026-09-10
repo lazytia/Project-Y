@@ -9,6 +9,7 @@ import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
 import { readDocumentUrls } from "@/lib/onboarding-review";
+import { needsRsaCertificate } from "@/lib/staff-display";
 import Toast from "@/components/Toast";
 import styles from "./page.module.css";
 
@@ -99,6 +100,15 @@ export default function DocumentsPage() {
   const [passportDocs, setPassportDocs] = useState<Attachment[]>([]);
   const [visaDocs, setVisaDocs] = useState<Attachment[]>([]);
   const [rsaDocs, setRsaDocs] = useState<Attachment[]>([]);
+  /**
+   * Whether to ask for an RSA at all.
+   *
+   * Starts false so that the section cannot flash into view and back out
+   * while the position is still being read — the employee would see a third
+   * document appear and vanish and reasonably wonder which they were meant
+   * to believe.
+   */
+  const [wantsRsa, setWantsRsa] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +138,9 @@ export default function DocumentsPage() {
       try {
         const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
         if (cancelled || !snap.exists()) return;
-        const urls = readDocumentUrls(snap.data() as Record<string, unknown>);
+        const raw = snap.data() as Record<string, unknown>;
+        setWantsRsa(needsRsaCertificate(raw));
+        const urls = readDocumentUrls(raw);
         // Functional updates, and only into a section that is still empty:
         // this read is async, and silently swallowing a photo the employee
         // managed to pick while it was in flight would be worse than not
@@ -328,6 +340,9 @@ export default function DocumentsPage() {
     galleryRef: React.RefObject<HTMLInputElement | null>;
   };
 
+  // The RSA section is only for the people who will be serving alcohol. It is
+  // dropped rather than marked optional: an optional slot on a form is still
+  // a slot, and the kitchen was reading it as something they had failed to do.
   const sections: DocSection[] = [
     {
       title: t("onb.docs.passportTitle"),
@@ -347,15 +362,19 @@ export default function DocumentsPage() {
       cameraRef: visaCameraRef,
       galleryRef: visaGalleryRef,
     },
-    {
-      title: t("onb.docs.rsaTitle"),
-      icon: certificateSvg,
-      infoText: t("onb.docs.rsaHelp"),
-      docs: rsaDocs,
-      setDocs: setRsaDocs,
-      cameraRef: rsaCameraRef,
-      galleryRef: rsaGalleryRef,
-    },
+    ...(wantsRsa
+      ? [
+          {
+            title: t("onb.docs.rsaTitle"),
+            icon: certificateSvg,
+            infoText: t("onb.docs.rsaHelp"),
+            docs: rsaDocs,
+            setDocs: setRsaDocs,
+            cameraRef: rsaCameraRef,
+            galleryRef: rsaGalleryRef,
+          },
+        ]
+      : []),
   ];
 
   return (

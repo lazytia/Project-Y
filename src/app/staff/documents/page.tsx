@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
+import { needsRsaCertificate } from "@/lib/staff-display";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -43,6 +44,8 @@ export default function MyDocumentsPage() {
   const { t } = useLang();
   const [loading, setLoading] = useState(true);
   const [docs, setDocs] = useState<StaffDocs>({});
+  /** Whether this employee is asked for an RSA at all — hall staff only. */
+  const [wantsRsa, setWantsRsa] = useState(false);
   const [uploading, setUploading] = useState<DocKey | null>(null);
   const [error, setError] = useState<string | null>(null);
   const visaInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +58,7 @@ export default function MyDocumentsPage() {
         const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
         const data = snap.data() ?? {};
         setDocs((data.documents ?? {}) as StaffDocs);
+        setWantsRsa(needsRsaCertificate(data as Record<string, unknown>));
       } catch {
         /* ignore */
       } finally {
@@ -172,7 +176,8 @@ export default function MyDocumentsPage() {
         </div>
       </section>
 
-      {/* ── RSA ── */}
+      {/* ── RSA — hall staff only; the kitchen is never asked to serve ── */}
+      {wantsRsa && (
       <section className={styles.docCard}>
         <div className={styles.docCardTop}>
           <span className={styles.docIcon} aria-hidden="true">
@@ -231,6 +236,7 @@ export default function MyDocumentsPage() {
           />
         </div>
       </section>
+      )}
 
       {error && <p className={styles.error}>{error}</p>}
 

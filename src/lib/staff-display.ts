@@ -73,6 +73,24 @@ export function positionLabelOf(raw: Record<string, unknown>): string {
   return "Staff";
 }
 
+/**
+ * Does this person need an RSA certificate on file?
+ *
+ * Only the people who serve alcohol do — that is what the certificate is for.
+ * The form asked everyone, so the kitchen was told to produce a document it
+ * has no reason to hold, and "My Documents" showed a permanently missing RSA
+ * to chefs who could never clear it.
+ *
+ * Hall Staff is the position chosen when the request is raised, and the
+ * manager is hall too: she is on the floor and pours. Read through
+ * `positionLabelOf` so the stored machine value ("hall") and the printed one
+ * ("Hall Staff") answer the same, and so a record that predates the position
+ * field still falls back to its role.
+ */
+export function needsRsaCertificate(raw: Record<string, unknown>): boolean {
+  return positionLabelOf(raw) === "Hall Staff";
+}
+
 export function reasonDisplayOf(raw: Record<string, unknown>): string {
   if (typeof raw.terminationReason === "string" && raw.terminationReason.trim()) {
     return raw.terminationReason.trim();
