@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
@@ -153,6 +154,7 @@ function writeSession<T>(key: string, data: T) {
 
 export default function SalesPage() {
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
 
@@ -523,7 +525,7 @@ export default function SalesPage() {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={() => router.back()}
+          onClick={goBack}
           aria-label="Back"
         >
           <ChevronLeft />

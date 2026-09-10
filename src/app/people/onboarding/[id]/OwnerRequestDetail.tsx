@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
@@ -130,6 +131,7 @@ function isApprovedStatus(status: string): boolean {
 
 export default function OwnerRequestDetail() {
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : (params.id?.[0] ?? "");
   const { user } = useAuth();
@@ -252,7 +254,7 @@ export default function OwnerRequestDetail() {
           <button
             type="button"
             className={styles.backBtn}
-            onClick={() => router.back()}
+            onClick={goBack}
             aria-label="Back"
           >
             <ChevronLeft />
@@ -271,8 +273,8 @@ export default function OwnerRequestDetail() {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={() => router.back()}
-          aria-label="Back to requests"
+          onClick={goBack}
+          aria-label="Back"
         >
           <ChevronLeft />
         </button>

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -80,6 +81,7 @@ function collectDocuments(raw: Record<string, unknown>): { label: string; url: s
 
 export default function TerminatedEmployeeDetailPage() {
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const params = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user) || isChef(user);
@@ -190,7 +192,7 @@ export default function TerminatedEmployeeDetailPage() {
   if (notFound) {
     return (
       <div className={styles.page}>
-        <TopBar onBack={() => router.back()} />
+        <TopBar onBack={goBack} />
         <p className={styles.notFound}>This employee record no longer exists.</p>
       </div>
     );
@@ -201,7 +203,7 @@ export default function TerminatedEmployeeDetailPage() {
 
   return (
     <div className={styles.page}>
-      <TopBar onBack={() => router.back()} />
+      <TopBar onBack={goBack} />
 
       <section className={styles.profileCard}>
         <div className={styles.profileTop}>

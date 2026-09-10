@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -85,6 +86,7 @@ function normalisePosition(raw: unknown): Position {
 
 export default function ManagerEditForm() {
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : (params.id?.[0] ?? "");
 
@@ -219,8 +221,8 @@ export default function ManagerEditForm() {
           <button
             type="button"
             className={styles.backBtn}
-            onClick={() => router.back()}
-            aria-label="Back to onboarding"
+            onClick={goBack}
+            aria-label="Back"
           >
             <ChevronLeft />
           </button>
@@ -242,8 +244,8 @@ export default function ManagerEditForm() {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={() => router.back()}
-          aria-label="Back to onboarding"
+          onClick={goBack}
+          aria-label="Back"
         >
           <ChevronLeft />
         </button>

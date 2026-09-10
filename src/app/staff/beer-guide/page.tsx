@@ -1,14 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useLang } from "@/components/LanguageProvider";
 import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { BEER_GUIDE_VIDEOS } from "@/lib/beer-guide-videos";
 import { BEER_GUIDE_UPDATED, BEER_GUIDE_VERSION } from "@/lib/hr-documents";
 import styles from "./page.module.css";
 
 export default function BeerGuidePage() {
-  const router = useRouter();
+  const goBack = useBackToDashboard();
   const { t } = useLang();
 
   return (
@@ -16,7 +16,7 @@ export default function BeerGuidePage() {
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => router.back()}
+        onClick={goBack}
         aria-label={t("common.back")}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { deleteField, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import {
@@ -42,6 +43,7 @@ type StaffPreview = {
 
 export default function ReactivateEmployeePage() {
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const params = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user) || isChef(user);
@@ -212,7 +214,7 @@ export default function ReactivateEmployeePage() {
   if (notFound) {
     return (
       <div className={styles.page}>
-        <BackButton onClick={() => router.back()} />
+        <BackButton onClick={goBack} />
         <p className={styles.notFound}>Employee not found.</p>
       </div>
     );

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isoLastCompletedPayWeek, sydneyTodayKey } from "@/lib/owner-money-prefetch";
@@ -141,6 +142,7 @@ function writeSession<T>(key: string, data: T) {
 
 export default function PurchasingCostPage() {
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user);
 
@@ -221,7 +223,7 @@ export default function PurchasingCostPage() {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={() => router.back()}
+          onClick={goBack}
           aria-label="Back"
         >
           <ChevronLeft />

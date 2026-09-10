@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isStrictOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
@@ -183,6 +184,7 @@ function fmtFriendlyDate(iso: string): string {
 export default function NewCateringOrderPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const allowed = isStrictOwner(user);
 
   useEffect(() => {
@@ -395,7 +397,7 @@ export default function NewCateringOrderPage() {
   return (
     <div className={styles.page}>
       <div className={styles.topBar}>
-        <button type="button" className={styles.backBtn} onClick={() => router.back()} aria-label="Back">
+        <button type="button" className={styles.backBtn} onClick={goBack} aria-label="Back">
           <BackIcon />
         </button>
         <p className={styles.title}>{editId ? "EDIT CATERING ORDER" : "NEW CATERING ORDER"}</p>

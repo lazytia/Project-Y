@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
@@ -249,6 +250,7 @@ function visaTypeOf(raw: Record<string, unknown>): string {
 
 export default function EmployeeDetailPage() {
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const params = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user) || isChef(user);
@@ -693,7 +695,7 @@ export default function EmployeeDetailPage() {
   if (notFound) {
     return (
       <div className={styles.page}>
-        <TopBar onBack={() => router.back()} />
+        <TopBar onBack={goBack} />
         <p className={styles.notFound}>This employee record no longer exists.</p>
       </div>
     );
@@ -811,7 +813,7 @@ export default function EmployeeDetailPage() {
   return (
     <div className={styles.page}>
       <TopBar
-        onBack={() => router.back()}
+        onBack={goBack}
         menuOpen={menuOpen}
         onToggleMenu={() => setMenuOpen((v) => !v)}
         onDelete={handleDeleteEmployee}

@@ -9,18 +9,18 @@
  * manual when it is written.
  */
 
-import { useRouter } from "next/navigation";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import styles from "./page.module.css";
 
 export default function TrainingManualPage() {
-  const router = useRouter();
+  const goBack = useBackToDashboard();
 
   return (
     <div className={styles.page}>
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => router.back()}
+        onClick={goBack}
         aria-label="Back"
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

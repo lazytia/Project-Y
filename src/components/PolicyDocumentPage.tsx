@@ -15,8 +15,8 @@
  */
 
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { useLang } from "@/components/LanguageProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { hrDocument, hrDocumentVersionLabel, type HrDocumentKey } from "@/lib/hr-documents";
 import styles from "@/app/staff/handbook/page.module.css";
 
@@ -27,7 +27,7 @@ export default function PolicyDocumentPage({
   docKey: HrDocumentKey;
   children: ReactNode;
 }) {
-  const router = useRouter();
+  const goBack = useBackToDashboard();
   const { t } = useLang();
   const doc = hrDocument(docKey);
   const subtitle = doc ? hrDocumentVersionLabel(doc) : "";
@@ -37,7 +37,7 @@ export default function PolicyDocumentPage({
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => router.back()}
+        onClick={goBack}
         aria-label={t("common.back")}
       >
         <svg

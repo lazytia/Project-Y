@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isStrictOwner } from "@/lib/permissions";
 import {
   type CateringOrder,
@@ -101,6 +102,7 @@ function ChatIcon() {
 export default function CateringOrderDetailPage() {
   const params = useParams<{ orderId: string }>();
   const router = useRouter();
+  const goBack = useBackToDashboard();
   const { user } = useAuth();
   const [order, setOrder] = useState<CateringOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -258,7 +260,7 @@ export default function CateringOrderDetailPage() {
   if (error || !order) {
     return (
       <div className={styles.page}>
-        <button type="button" className={styles.backTop} onClick={() => router.back()} aria-label="Back"><BackIcon /></button>
+        <button type="button" className={styles.backTop} onClick={goBack} aria-label="Back"><BackIcon /></button>
         <p className={styles.center}>{error ?? "Order not found."}</p>
         <Link href="/operations/catering-orders" className={styles.center}>← Back to calendar</Link>
       </div>
@@ -272,7 +274,7 @@ export default function CateringOrderDetailPage() {
 
   return (
     <div className={styles.page}>
-      <button type="button" className={styles.backTop} onClick={() => router.back()} aria-label="Back">
+      <button type="button" className={styles.backTop} onClick={goBack} aria-label="Back">
         <BackIcon />
       </button>
 

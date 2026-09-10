@@ -22,11 +22,22 @@ export const ROUTES = {
 
 export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([ROUTES.login]);
 
+/**
+ * This user's dashboard — the screen that is "home" for them.
+ *
+ * Owners, the manager and the chefs share the one at `/`; everybody else has
+ * `/staff`. Signing in lands on it and every Back button returns to it, so the
+ * two must agree, which is why they are the same function.
+ */
+export function dashboardRoute(user: User | null | undefined): string {
+  if (!user) return ROUTES.home;
+  if (isOwner(user) || isChef(user)) return ROUTES.home;
+  return ROUTES.staffHome;
+}
+
 /** First screen after sign-in — must match AuthProvider routing. */
 export function postLoginRoute(user: User): string {
-  if (isOwner(user)) return ROUTES.home;
-  if (isChef(user)) return ROUTES.home;
-  return ROUTES.staffHome;
+  return dashboardRoute(user);
 }
 
 /**

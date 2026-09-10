@@ -1,15 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useLang } from "@/components/LanguageProvider";
 import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
 import StaffHandbookDocument from "@/components/StaffHandbookDocument";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { HANDBOOK_UPDATED, HANDBOOK_VERSION } from "@/lib/hr-documents";
 import handbookStyles from "@/app/onboarding/policies/staff-handbook/page.module.css";
 import styles from "./page.module.css";
 
 export default function StaffHandbookPage() {
-  const router = useRouter();
+  const goBack = useBackToDashboard();
   const { t } = useLang();
 
   return (
@@ -17,7 +17,7 @@ export default function StaffHandbookPage() {
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => router.back()}
+        onClick={goBack}
         aria-label={t("common.back")}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
