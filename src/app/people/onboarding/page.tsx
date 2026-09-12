@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { collection, getDocs, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import { isOwner, isChef, canViewStaffRequest } from "@/lib/permissions";
+import { isOwner, isChef, isStrictOwner, canViewStaffRequest } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import {
   isOnboardingListEmployee,
@@ -226,6 +226,10 @@ export default function ManagerOnboardingPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user) || isChef(user);
+  // Who may sign a hire off, as opposed to who may watch one progress. The
+  // review screen behind these buttons already draws this line; the list has
+  // to draw it too, or the buttons are simply somewhere else to be refused.
+  const canDecide = isStrictOwner(user);
 
   const [rows, setRows] = useState<StaffOnboarding[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -467,9 +471,10 @@ export default function ManagerOnboardingPage() {
                   </div>
 
                   {/* Ready rows carry the verdict itself: read what was sent,
-                      or sign it off. Both are the owner's, so they sit on the
-                      card rather than a screen further in. */}
-                  {ready && (
+                      or sign it off. Both are the owner's alone — for anyone
+                      else the row is a status and nothing to answer, and the
+                      card still opens the progress behind it. */}
+                  {ready && canDecide && (
                     <div className={styles.cardActions}>
                       <button
                         type="button"
