@@ -237,7 +237,7 @@ export default function PayslipsPage() {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
         </span>
-        <p className={styles.infoBody}>{t("pay.available12Months")}</p>
+        <p className={styles.infoBody}>{t("pay.recentShownHere")}</p>
       </div>
     </div>
   );
