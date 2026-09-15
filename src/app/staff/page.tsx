@@ -12,6 +12,7 @@ import {
   TRAINING_DOCUMENT_KEYS,
   type SignableDocumentKey,
 } from "@/lib/document-signatures";
+import { CLOCK_IN_GUIDE_HREF, isWithinGettingStarted } from "@/lib/clock-in-guide";
 import { needsRsaCertificate } from "@/lib/staff-display";
 import styles from "./page.module.css";
 
@@ -179,6 +180,10 @@ export default function StaffDashboardPage() {
   // there. `null` until the record has been read, so the tile says "—"
   // instead of claiming everything is in order before it knows.
   const [missingUploads, setMissingUploads] = useState<number | null>(null);
+  // When the owner signed this employee off, and the four digits they type
+  // into the POS. Both feed the Getting Started card and nothing else.
+  const [activatedAt, setActivatedAt] = useState<Date | null>(null);
+  const [staffId, setStaffId] = useState("");
 
   const [today, setTodayDate] = useState<Date>(() => {
     const d = new Date(0);
@@ -227,6 +232,9 @@ export default function StaffDashboardPage() {
       const wanted: string[] = ["visaUrl"];
       if (needsRsaCertificate(data as Record<string, unknown>)) wanted.push("rsaUrl");
       setMissingUploads(wanted.filter((key) => !uploaded[key]).length);
+
+      setActivatedAt(tsToDate(data.activatedAt));
+      setStaffId(String(data.squareStaffId ?? "").trim());
 
       // Roster — check this week + next week
       const thisRoster = (data.roster?.[thisWeekISO] ?? null) as RosterDoc | null;
@@ -330,14 +338,18 @@ export default function StaffDashboardPage() {
   const countdown =
     nowMs !== null && nextShift ? fmtCountdown(nowMs, nextShift.startDate.getTime()) : "";
 
+  // The first fortnight after activation, when nobody has the POS by heart
+  // yet. False until `nowMs` is set, which is also what keeps the card out of
+  // the server-rendered HTML where there is no clock to compare against.
+  const gettingStarted = isWithinGettingStarted(activatedAt, nowMs);
+
   /**
    * What has been announced to this employee, newest first.
    *
-   * Unsigned training used to sit at the top of this same list, as one more
-   * bullet among the notices. It is not the same kind of thing: a notice is
-   * read and finished with, a signature is owed until it is given, and the
-   * one that is owed was the one that read as the quietest. It has its own
-   * card above now, and this list is the announcements again.
+   * Kept apart from the unsigned documents above it in the same card. Both
+   * are things to attend to, but a notice is read and finished with while a
+   * signature is owed until it is given — so the documents get a button that
+   * says what to do, and these stay rows you tap.
    */
   const attention = notifications.map((n) => ({
     id: `notif:${n.id}`,
@@ -347,6 +359,10 @@ export default function StaffDashboardPage() {
     ago: n.ago,
   }));
   const attentionPreview = attention.slice(0, 3);
+  // The pill counts everything owed, not the three that fit — "1 item" beside
+  // a list of one is a label; "3 items" beside a list of three when eleven
+  // are waiting is a lie the View all link then contradicts.
+  const attentionCount = unsignedTraining.length + notifications.length;
 
   return (
     <div className={styles.page}>
@@ -357,6 +373,51 @@ export default function StaffDashboardPage() {
         </h1>
         <p className={styles.greetSub}>{t("staff.greeting.sub")}</p>
       </header>
+
+      {/* Getting Started — the POS time clock, for the first fortnight only.
+          Above the roster on purpose: a shift you forgot to clock into is a
+          shift you were not paid for, and that is the mistake week one makes. */}
+      {gettingStarted && (
+        <section className={styles.startCard}>
+          <div className={styles.startTop}>
+            <div className={styles.startHeading}>
+              <p className={styles.startKicker}>{t("staff.start.kicker")}</p>
+              <p className={styles.startTitle}>{t("staff.start.title")}</p>
+              <p className={styles.startSub}>{t("staff.start.sub")}</p>
+            </div>
+            <span className={styles.startIcon} aria-hidden="true">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <polyline points="12 7 12 12 15.5 14" />
+              </svg>
+            </span>
+          </div>
+
+          <div className={styles.startDivider} />
+
+          <div className={styles.startBottom}>
+            {/* No chip when the owner has not set a clock-in ID yet: a blank
+                one would send them to the POS to type nothing. */}
+            {staffId && (
+              <p className={styles.startId}>
+                <span className={styles.startIdIcon} aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="16" rx="2" />
+                    <circle cx="9" cy="10" r="2" />
+                    <path d="M6 16c.6-1.6 1.8-2.4 3-2.4s2.4.8 3 2.4" />
+                    <line x1="15" y1="10" x2="18" y2="10" />
+                    <line x1="15" y1="14" x2="18" y2="14" />
+                  </svg>
+                </span>
+                {t("staff.start.staffId")} <strong>{staffId}</strong>
+              </p>
+            )}
+            <Link href={CLOCK_IN_GUIDE_HREF} className={styles.startBtn}>
+              {t("staff.start.viewGuide")} <span aria-hidden="true">›</span>
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Next Shift */}
       <Link href="/staff/schedule/roster" className={styles.shiftCard}>
@@ -414,56 +475,72 @@ export default function StaffDashboardPage() {
         </Link>
       </div>
 
-      {/* Training still owed a signature — the one thing on this screen that
-          is asked of the employee rather than told to them. */}
-      {unsignedTraining.map((key) => (
-        <section key={key} className={styles.actionCard}>
-          <span className={styles.actionIcon} aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="7" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </span>
-          <div className={styles.actionBody}>
-            <p className={styles.actionKicker}>{t("staff.action.required")}</p>
-            <p className={styles.actionTitle}>
-              {t(SIGNABLE_DOCUMENTS[key].labelKey, SIGNABLE_DOCUMENTS[key].label)}
-            </p>
-            <p className={styles.actionDetail}>{t("staff.attention.reviewAndSign")}</p>
-            <Link href={SIGNABLE_DOCUMENTS[key].href} className={styles.actionBtn}>
-              {t("staff.action.reviewAndSign")} <span aria-hidden="true">›</span>
-            </Link>
+      {/* Needs Your Attention — documents still owed a signature first, then
+          what has been announced. */}
+      {attentionCount > 0 && (
+        <section className={styles.attentionCard}>
+          <div className={styles.attentionHeader}>
+            <p className={styles.attentionTitle}>{t("staff.attention.title")}</p>
+            <span className={styles.attentionPill}>
+              <span className={styles.attentionPillDot} aria-hidden="true" />
+              {attentionCount}{" "}
+              {t(attentionCount === 1 ? "staff.attention.item" : "staff.attention.items")}
+            </span>
           </div>
-        </section>
-      ))}
 
-      {/* Needs Your Attention */}
-      {attention.length > 0 && (
-        <section className={styles.notifCard}>
-          <div className={styles.notifHeader}>
-            <p className={styles.notifTitle}>{t("staff.attention.title")}</p>
-            {notifications.length > 0 && (
-              <button
-                type="button"
-                className={styles.notifLink}
-                onClick={() => setNotifOpen(true)}
-              >
-                {t("staff.notif.viewAll")} <span aria-hidden="true">›</span>
-              </button>
-            )}
-          </div>
-          <ul className={styles.notifList}>
-            {attentionPreview.map((item) => (
-              <li key={item.id} className={styles.notifItem}>
-                <span className={styles.notifDot} aria-hidden="true" />
-                <Link href={item.href} className={styles.notifBody}>
-                  <span className={styles.notifText}>{item.title}</span>
-                  {item.detail && <span className={styles.notifDetail}>{item.detail}</span>}
+          <ul className={styles.attentionList}>
+            {unsignedTraining.map((key) => (
+              <li key={`training:${key}`} className={styles.attentionRow}>
+                <span className={styles.attentionIcon} aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="8" y1="13" x2="16" y2="13" />
+                    <line x1="8" y1="17" x2="13" y2="17" />
+                  </svg>
+                </span>
+                <div className={styles.attentionBody}>
+                  <span className={styles.attentionName}>
+                    {t(SIGNABLE_DOCUMENTS[key].labelKey, SIGNABLE_DOCUMENTS[key].label)}
+                  </span>
+                  <span className={styles.attentionDetail}>
+                    {t("staff.attention.reviewAndSign")}
+                  </span>
+                </div>
+                <Link href={SIGNABLE_DOCUMENTS[key].href} className={styles.attentionBtn}>
+                  {t("staff.action.review")} <span aria-hidden="true">›</span>
                 </Link>
-                {item.ago && <span className={styles.notifAgo}>{item.ago}</span>}
+              </li>
+            ))}
+
+            {attentionPreview.map((item) => (
+              <li key={item.id} className={styles.attentionRow}>
+                <span className={styles.attentionIcon} aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+                  </svg>
+                </span>
+                <Link href={item.href} className={styles.attentionBody}>
+                  <span className={styles.attentionName}>{item.title}</span>
+                  {item.detail && (
+                    <span className={styles.attentionDetail}>{item.detail}</span>
+                  )}
+                </Link>
+                {item.ago && <span className={styles.attentionAgo}>{item.ago}</span>}
               </li>
             ))}
           </ul>
+
+          {notifications.length > attentionPreview.length && (
+            <button
+              type="button"
+              className={styles.attentionViewAll}
+              onClick={() => setNotifOpen(true)}
+            >
+              {t("staff.notif.viewAll")} <span aria-hidden="true">›</span>
+            </button>
+          )}
         </section>
       )}
 

@@ -7,6 +7,7 @@ import type { User } from "firebase/auth";
 import { useAuth } from "./AuthProvider";
 import { useLang } from "./LanguageProvider";
 import LanguageToggle from "./LanguageToggle";
+import { CLOCK_IN_GUIDE_HREF } from "@/lib/clock-in-guide";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import { readClientDashboardHint } from "@/lib/client-session-hint";
@@ -343,6 +344,9 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
         label: t("nav.schedule"),
         children: [
           { label: t("nav.roster"), href: "/staff/schedule/roster" },
+          // Second, under the roster it belongs to. The dashboard only
+          // promotes it for a fortnight; this is where it lives after that.
+          { label: t("nav.clockInGuide"), href: CLOCK_IN_GUIDE_HREF },
           { label: t("nav.requestHoliday"), href: "/staff/schedule/request-holiday" },
           { label: t("nav.availabilityChange"), href: "/staff/schedule/availability-change" },
         ],
