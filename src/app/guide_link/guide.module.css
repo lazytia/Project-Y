@@ -1,0 +1,258 @@
+/**
+ * Shared by the chooser and both sets of steps, so the three screens a new
+ * employee walks through are plainly the same document.
+ */
+
+.page {
+  position: relative;
+  font-family: var(--font-sans);
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: var(--space-4) 0 var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  text-align: center;
+}
+
+/* A warm wash behind the whole viewport rather than a panel behind the
+   content: this is the first screen of ours anyone sees, and a white card on
+   a white page looks like a page that failed to load. Fixed so it covers the
+   shell's padding too, which the page box itself cannot reach. */
+.page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--color-warm) 5%, var(--color-bg));
+}
+
+/* ── heading ── */
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The trailing letter-space would push a centred wordmark left by half of it,
+   so it is given back as an indent. */
+.wordmark {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  color: var(--color-fg);
+}
+
+.kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--color-fg);
+}
+
+.sub {
+  margin: 0;
+  max-width: 300px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-fg-muted);
+}
+
+/* ── the chooser ── */
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+
+.choice:hover { border-color: var(--color-warm); }
+
+.choiceMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+}
+
+.markApple { color: var(--color-fg); }
+.markAndroid { color: var(--color-positive); }
+
+.choiceLabel {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.choiceBrowser {
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.choiceGo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-top: var(--space-1);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-warm) 12%, transparent);
+  color: var(--color-warm);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.hint {
+  margin: 0;
+  max-width: 220px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.8;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
+}
+
+/* ── the steps ── */
+.backLink {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: calc(-1 * var(--space-3));
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  text-decoration: none;
+}
+
+.backLink:hover { color: var(--color-fg); }
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-align: left;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.stepNo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.stepBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--color-fg);
+}
+
+.stepText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-fg-muted);
+}
+
+.note {
+  margin: 0;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-warm-bg);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+/* ── footer ── */
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.footerRule {
+  width: 100%;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.tagline {
+  margin: 0;
+  max-width: 190px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.8;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
+}

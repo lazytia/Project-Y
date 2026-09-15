@@ -6,7 +6,7 @@ import Sidebar from "./Sidebar";
 import Splash from "./Splash";
 import AppReadyMarker from "./AppReadyMarker";
 import { useAuth } from "./AuthProvider";
-import { PUBLIC_ROUTES } from "@/lib/routes";
+import { isPublicPath } from "@/lib/routes";
 import type { DashboardKind } from "@/lib/session-dashboard";
 import { isOwner, isChef } from "@/lib/permissions";
 import { fetchSessionHint } from "@/lib/auth-session-client";
@@ -33,7 +33,7 @@ export default function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const { user, loading, staffCompletedStep } = useAuth();
-  const isPublic = PUBLIC_ROUTES.has(pathname);
+  const isPublic = isPublicPath(pathname);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessionVerified, setSessionVerified] = useState<boolean | null>(() => {
     if (initialHasSession) return true;

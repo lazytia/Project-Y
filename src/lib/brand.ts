@@ -37,3 +37,14 @@ export const APP_NAME = "Project YURICA";
  * is not a sentence and does not have to spell out the whole name.
  */
 export const HOME_SCREEN_NAME = "YURICA";
+
+/**
+ * The line at the foot of the screens a new employee meets first.
+ *
+ * It is the one piece of copy on those pages that is about the place rather
+ * than the software, which is the whole reason it is there: the setup guide
+ * arrives by text from a number they do not have saved, and a page that only
+ * gives instructions reads like a form. Kept here rather than typed into each
+ * page so it says the same thing in every one of them.
+ */
+export const TAGLINE = "Great people make great places";

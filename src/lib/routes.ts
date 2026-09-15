@@ -18,9 +18,44 @@ export const ROUTES = {
   staffHandbook: "/staff/handbook",
   staffBeerGuide: "/staff/beer-guide",
   reservations: "/operations/reservations",
+  setupGuide: "/guide_link",
 } as const;
 
 export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([ROUTES.login]);
+
+/**
+ * Subtrees that open without a session, matched by prefix.
+ *
+ * The setup guide is the only one. It is texted to a new hire the day they are
+ * hired — instructions for installing an app they have a password for but have
+ * never opened — so it has to render for someone with no session at all, and
+ * so do the per-phone pages under it. Anything that bounced it to /login would
+ * make the link in the welcome message a dead end.
+ */
+const PUBLIC_ROUTE_PREFIXES: readonly string[] = [ROUTES.setupGuide];
+
+/**
+ * Where the app answers in public.
+ *
+ * Deliberately a constant rather than window.location.origin. The only thing
+ * that needs it is a link being put into a text message, and that message is
+ * composed in whatever browser tab the owner happens to have open — a preview
+ * build, or localhost. A new hire cannot be sent a link to somebody's laptop.
+ */
+export const PUBLIC_ORIGIN = "https://project.yurica.com.au";
+
+/** Absolute URL for a path, for the places that leave the app. */
+export function publicUrl(path: string): string {
+  return `${PUBLIC_ORIGIN}${path}`;
+}
+
+/** Does this path open without signing in? */
+export function isPublicPath(pathname: string): boolean {
+  if (PUBLIC_ROUTES.has(pathname)) return true;
+  return PUBLIC_ROUTE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
 
 /**
  * This user's dashboard — the screen that is "home" for them.

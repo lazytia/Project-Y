@@ -8,7 +8,7 @@ import { AUTH_READY_EVENT } from "@/lib/app-ready";
 import { hideServerAppShell } from "@/lib/boot-splash";
 import { clearClientSessionHint, hasClientSessionHint, setClientSessionHint, setClientDashboardHint } from "@/lib/client-session-hint";
 import { runWhenIdle } from "@/lib/run-when-idle";
-import { PUBLIC_ROUTES, ROUTES, isStaffAllowedPath, postLoginRoute } from "@/lib/routes";
+import { ROUTES, isPublicPath, isStaffAllowedPath, postLoginRoute } from "@/lib/routes";
 import { isOwner, isChef } from "@/lib/permissions";
 import { dashboardKindFromEmail } from "@/lib/session-dashboard";
 import { TOTAL_ONBOARDING_STEPS } from "@/lib/onboarding-steps";
@@ -366,7 +366,7 @@ export function AuthProvider({
     staffActivated === false;
 
   useEffect(() => {
-    const isPublic = PUBLIC_ROUTES.has(pathname);
+    const isPublic = isPublicPath(pathname);
 
     // A sign-out is already on its way to /login by document request. Letting
     // this effect fire its own router.replace() on the way past would put a
@@ -378,7 +378,7 @@ export function AuthProvider({
     // Sign-in handoff — wait for session cookies, then hard-navigate so iOS
     // PWA gets SSR HTML with the correct dash cookie (client router.refresh
     // often races the POST and leaves main empty).
-    if (user && isPublic) {
+    if (user && pathname === ROUTES.login) {
       if (loginRedirectStarted.current) return;
       loginRedirectStarted.current = true;
       void (async () => {
@@ -406,6 +406,12 @@ export function AuthProvider({
       router.replace(ROUTES.login);
       return;
     }
+    // A public page is public for everybody, so none of the role routing below
+    // applies to it. The sign-in handover above is deliberately pinned to
+    // /login rather than to this flag: the setup guide is read by a new hire
+    // who has not signed in and by the owner checking what was texted, and
+    // throwing either of them at a dashboard makes the link unusable.
+    if (isPublic) return;
     // Wait until we know the staff's completedStep before routing them around
     // — otherwise we'd flash /staff before bouncing back to /onboarding.
     const userIsOwnerNow = isOwner(user);
