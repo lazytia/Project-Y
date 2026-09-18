@@ -11,12 +11,12 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
 import { useAuth } from "@/components/AuthProvider";
 import { actorNameOf, isStrictOwner } from "@/lib/permissions";
 import { shouldActivatePayrollReminder } from "@/lib/payroll-attention";
 import { onboardingProgressPatch } from "@/lib/staff-active";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, publicUrl } from "@/lib/routes";
 import { createStaffAccount } from "@/lib/staff-admin";
 import { emailToUsername, usernameToEmail, validateUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -247,34 +247,28 @@ export default function CreateLoginDetailsPage() {
         // the owner but doesn't roll back the account creation — the
         // login is already usable; they can retry the SMS manually.
         const firstName = request.fullName.split(" ")[0];
-        const appLink = "https://project.yurica.com.au";
-        const trimmedStaffId = squareStaffId.trim();
         // Every character below is in the GSM 03.38 alphabet, deliberately.
         // send-sms will encode as UCS-2 the moment one is not, and UCS-2 fits
         // 67 characters to a segment against GSM-7's 153 — the tick and
         // em-dash version of this text cost six segments where this one costs
         // three, on every invite. Prettier punctuation is not worth double the
         // bill, so keep additions to plain ASCII; hyphens, not dashes.
+        //
+        // The install steps that used to be listed here are on the page behind
+        // the link instead. They differ between iPhone and Android, so half of
+        // any list short enough to text was always the wrong half, and the
+        // Clock In ID has its own card on the employee's home screen for their
+        // first fortnight — a passcode is better read off a screen only they
+        // can open than off a message anyone holding the phone can see.
         const smsText = [
-          `Hi ${firstName}, welcome to YURICA.`,
+          `Hi ${firstName}, welcome to ${HOME_SCREEN_NAME}.`,
           "",
-          `Please set up ${APP_NAME} before your first shift.`,
+          `Please set up ${APP_NAME} before your first shift so you can access your roster, payslips and important staff updates.`,
           "",
-          APP_NAME,
-          appLink,
           `Username: ${finalUsername}`,
           `Password: ${password}`,
           "",
-          "Use it to check shifts, view payslips and receive updates.",
-          "",
-          "Setup",
-          "",
-          "1. Add to Home Screen",
-          "2. Allow Notifications",
-          "3. Log in and complete onboarding",
-          // A blank Clock In ID is not required to approve a request, so the
-          // whole line goes rather than arriving with nothing after the colon.
-          ...(trimmedStaffId ? ["", `Clock In ID: ${trimmedStaffId}`] : []),
+          `Setup Guide: ${publicUrl(ROUTES.setupGuide)}`,
         ].join("\n");
         try {
           const idToken = await user?.getIdToken();
