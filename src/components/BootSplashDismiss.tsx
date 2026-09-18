@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { APP_READY_EVENT, AUTH_READY_EVENT } from "@/lib/app-ready";
+import { APP_READY_EVENT, AUTH_READY_EVENT, isAppReady } from "@/lib/app-ready";
 import {
   clientShellPainted,
   hasPageLoadingMarker,
@@ -24,9 +24,17 @@ export default function BootSplashDismiss() {
       hidden = true;
     }
 
-    let appReady = false;
+    // Seeded, not waited for. APP_READY_EVENT is dispatched from
+    // AppReadyMarker's useLayoutEffect, and React runs every layout effect in a
+    // commit before any passive one — so by the time this effect subscribes the
+    // event has already been and gone, and markAppReady() latches, so it never
+    // comes again. The listener below caught nothing, and the only thing left
+    // taking the splash down was the 2s fallback: measured at 2043ms on a
+    // signed-out launch, every launch.
+    let appReady = isAppReady();
     let authReady = false;
     let raf = 0;
+    let fallbackTimer = 0;
 
     const handoffFromSsr = () => {
       if (clientShellPainted()) {
@@ -119,20 +127,49 @@ export default function BootSplashDismiss() {
       hideOnce();
     };
 
+    const armFallback = () => {
+      window.clearTimeout(fallbackTimer);
+      fallbackTimer = window.setTimeout(() => {
+        appReady = true;
+        authReady = true;
+        hideOnce();
+      }, FALLBACK_MS);
+    };
+
+    /**
+     * Start the whole thing again on the way back to the foreground.
+     *
+     * Every route out of here is either a requestAnimationFrame chain or a
+     * setTimeout, and a backgrounded app gets neither: rAF stops at the frame
+     * the app was hidden on, and iOS suspends — then, past a minute or so of
+     * another app, drops — pending timers outright. So an app put down during
+     * its first two seconds comes back to a splash with nothing running that
+     * could take it down. It is `position: fixed; inset: 0` over everything, so
+     * that is the app open, on a white screen, ignoring every tap.
+     *
+     * Re-arming rather than forcing: the conditions in hideOnce() are still the
+     * right ones, they just need something to ask them again.
+     */
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      cancelAnimationFrame(raf);
+      if (!hidden) armFallback();
+      hideOnce();
+    };
+
     window.addEventListener(APP_READY_EVENT, onAppReady);
     window.addEventListener(AUTH_READY_EVENT, onAuthReady);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
 
-    const fallbackTimer = window.setTimeout(() => {
-      appReady = true;
-      authReady = true;
-      hideOnce();
-    }, FALLBACK_MS);
-
+    armFallback();
     hideOnce();
 
     return () => {
       window.removeEventListener(APP_READY_EVENT, onAppReady);
       window.removeEventListener(AUTH_READY_EVENT, onAuthReady);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onVisible);
       window.clearTimeout(fallbackTimer);
       cancelAnimationFrame(raf);
     };
