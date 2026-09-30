@@ -71,7 +71,7 @@
   .main {
     margin-left: 0;
     padding: var(--space-4);
-    padding-top: calc(var(--space-4) + 52px);
+    padding-top: calc(var(--space-4) + 52px + var(--install-banner-h, 0px));
   }
 
   .mobileHeader {
@@ -79,7 +79,8 @@
     align-items: center;
     justify-content: space-between;
     position: fixed;
-    top: 0;
+    /* Same as the real header — see AppShell.module.css. */
+    top: var(--install-banner-h, 0px);
     left: 0;
     right: 0;
     height: 52px;

@@ -1,0 +1,100 @@
+/*
+ * Sits above the app's own fixed header (z-index 300) and below the bell
+ * modal (500), so it stays put while the page scrolls but never covers a
+ * dialog the reader opened on purpose.
+ *
+ * No `env(safe-area-inset-top)` padding here on purpose. The bar only ever
+ * renders in a browser tab, where the browser's own chrome already owns the
+ * strip above it — and the header below adds that inset itself, so claiming
+ * it here too would push the whole app down by it twice.
+ */
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+.mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-warm);
+  color: #ffffff;
+  font-family: var(--font-splash-mark);
+  font-size: var(--font-size-lg);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  /* The second sentence is the reason, not the instruction — dimmed so the
+     bar can be understood from the bold half alone at a glance. */
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.lead {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-accent-fg);
+}
+
+.action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-warm);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:hover {
+  opacity: 0.9;
+}
+
+/* Small, and last in the reading order. It is a way out, not an option being
+   offered — the bar is worth more to the reader than closing it is. */
+.close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+
+.close:hover {
+  color: var(--color-accent-fg);
+}
