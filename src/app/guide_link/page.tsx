@@ -13,7 +13,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { APP_NAME, HOME_SCREEN_NAME, TAGLINE } from "@/lib/brand";
+import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
 import { ROUTES } from "@/lib/routes";
 import { AndroidMark, AppleMark, PLATFORMS, PLATFORM_KEYS } from "./platforms";
 import styles from "./guide.module.css";
@@ -64,11 +64,6 @@ export default function SetupGuidePage() {
       </div>
 
       <p className={styles.hint}>Choose your phone type to see the setup guide.</p>
-
-      <footer className={styles.footer}>
-        <span className={styles.footerRule} aria-hidden="true" />
-        <p className={styles.tagline}>{TAGLINE}</p>
-      </footer>
     </main>
   );
 }

@@ -8,7 +8,7 @@
  */
 
 import Link from "next/link";
-import { HOME_SCREEN_NAME, TAGLINE } from "@/lib/brand";
+import { HOME_SCREEN_NAME } from "@/lib/brand";
 import { ROUTES } from "@/lib/routes";
 import { PLATFORMS, type PlatformKey } from "./platforms";
 import styles from "./guide.module.css";
@@ -50,11 +50,6 @@ export default function SetupSteps({ platform }: { platform: PlatformKey }) {
         Your username and password are in the same message as this link. If you
         cannot find them, ask your manager.
       </p>
-
-      <footer className={styles.footer}>
-        <span className={styles.footerRule} aria-hidden="true" />
-        <p className={styles.tagline}>{TAGLINE}</p>
-      </footer>
     </main>
   );
 }
