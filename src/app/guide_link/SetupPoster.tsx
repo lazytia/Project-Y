@@ -20,13 +20,40 @@ import Link from "next/link";
 import { SETUP_GUIDE_CHOOSER } from "@/lib/routes";
 import styles from "./guide.module.css";
 
+/**
+ * Where the artwork prints the app's address, as fractions of the image.
+ *
+ * Step 1 of both guides is "go to project.yurica.com.au", and until now that
+ * was a sentence you had to retype into a URL bar — the one instruction in
+ * the picture the reader could not simply follow. It cannot be marked up,
+ * because the picture is a PNG, so a hotspot is laid over it instead.
+ *
+ * Measured off the PNG by colour (the URL is the only warm-orange text in
+ * that band) rather than guessed, and declared beside the import of the PNG
+ * it describes: re-exporting the artwork moves the text, and these are the
+ * numbers that have to move with it.
+ */
+export type PosterLink = {
+  href: string;
+  /** What the link is, for a reader who never sees the picture. */
+  label: string;
+  /** Centre of the drawn text, 0–1 of the image's width and height. */
+  x: number;
+  y: number;
+  /** Width of the drawn text, 0–1 of the image's width. */
+  width: number;
+};
+
 export default function SetupPoster({
   poster,
   alt,
+  link,
 }: {
   poster: StaticImageData;
   /** Everything the picture says, for a reader who cannot see it. */
   alt: string;
+  /** The address drawn into step 1, made tappable. */
+  link?: PosterLink;
 }) {
   return (
     <main className={styles.posterPage}>
@@ -39,16 +66,39 @@ export default function SetupPoster({
         Back
       </Link>
 
-      <Image
-        src={poster}
-        alt={alt}
-        className={styles.poster}
-        /* The whole page is this one image, so it is the largest paint by
-           definition — there is nothing for it to be deprioritised behind. */
-        priority
-        placeholder="blur"
-        sizes="(max-width: 520px) 100vw, 480px"
-      />
+      {/* The hotspot is positioned against the picture, so the picture has to
+          be the thing it is positioned against. */}
+      <div className={styles.posterFrame}>
+        <Image
+          src={poster}
+          alt={alt}
+          className={styles.poster}
+          /* The whole page is this one image, so it is the largest paint by
+             definition — there is nothing for it to be deprioritised behind. */
+          priority
+          placeholder="blur"
+          sizes="(max-width: 520px) 100vw, 480px"
+        />
+        {link && (
+          /* New tab on purpose. The reader is midway through a list of steps
+             they will need again at step 2, and a guide that navigates away
+             from itself at step 1 is a guide they have to find their way back
+             to. rel is not optional with target=_blank: without it the opened
+             page gets a handle on this one through window.opener. */
+          <a
+            className={styles.posterLink}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={link.label}
+            style={{
+              left: `${link.x * 100}%`,
+              top: `${link.y * 100}%`,
+              width: `${link.width * 100}%`,
+            }}
+          />
+        )}
+      </div>
 
       {/* Kept as real text, outside the picture, because it is the one thing a
           reader can get stuck on that no instruction of ours can fix — and the

@@ -258,10 +258,40 @@
   background: color-mix(in srgb, var(--color-warm) 5%, var(--color-bg));
 }
 
+/* Flex rather than block to drop the baseline gap under the image, which would
+   otherwise make the frame taller than the picture and throw the percentages
+   the hotspot is positioned with. */
+.posterFrame {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
 /* height: auto overrides the intrinsic height next/image writes inline; without
    it the picture keeps its export height and squashes on a narrow phone. */
 .poster {
   width: 100%;
   height: auto;
   border-radius: var(--radius-lg);
+}
+
+/* Lies over the address drawn into step 1 of the artwork.
+   Invisible, because the text underneath is already drawn to look like a link
+   and a box on top of it would be a second, worse-looking one.
+   Centred on the text rather than sized to it: the drawn line is around 14px
+   tall at phone width and a finger needs 44, so the target grows around the
+   text instead of matching it. */
+.posterLink {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  height: 5%;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+}
+
+/* Nothing marks this as focusable otherwise — there is no text in it to
+   underline, so keyboard focus would land on an invisible box silently. */
+.posterLink:focus-visible {
+  outline: 2px solid var(--color-warm);
+  outline-offset: 2px;
 }
