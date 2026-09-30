@@ -6,10 +6,14 @@ import { usePathname } from "next/navigation";
 import { HOME_SCREEN_NAME } from "@/lib/brand";
 import { setupGuideRoute } from "@/lib/routes";
 import {
+  clearInstallPrompt,
   detectGuidePlatform,
+  INSTALL_PROMPT_READY,
   isStandaloneDisplay,
+  readInstallPrompt,
   STANDALONE_QUERY,
   type GuidePlatform,
+  type InstallPromptEvent,
 } from "@/lib/pwa-display";
 import styles from "./InstallBanner.module.css";
 
@@ -51,12 +55,6 @@ const DISMISS_KEY = "y-install-banner-dismissed";
 /** Read by AppShell to make room, so the bar pushes the app down instead of
  *  sitting on top of the header. Absent = zero, which is the normal case. */
 const HEIGHT_VAR = "--install-banner-h";
-
-/** Chromium's install prompt. Not in lib.dom, and iOS has no equivalent. */
-type InstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
 
 function wasDismissed(): boolean {
   try {
@@ -102,21 +100,19 @@ export default function InstallBanner() {
   }, []);
 
   useEffect(() => {
-    // Chromium fires this when the app is installable. Holding onto it turns
-    // the bar's button into a one-tap install; without it (iOS, Firefox) the
-    // button has to send the reader to the written instructions instead.
-    const onBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e as InstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setInstallPrompt(null);
-      setEligible(false);
-    };
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    // Chromium fires `beforeinstallprompt` when the app is installable, and it
+    // has almost always fired before this component exists — so the prompt is
+    // collected from the stash the head script keeps rather than waited for
+    // here. Holding onto it turns the bar's button into a one-tap install;
+    // without it (iOS, Firefox) the button falls back to the instructions.
+    const collect = () => setInstallPrompt(readInstallPrompt());
+    const onInstalled = () => setEligible(false);
+
+    collect();
+    window.addEventListener(INSTALL_PROMPT_READY, collect);
     window.addEventListener("appinstalled", onInstalled);
     return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener(INSTALL_PROMPT_READY, collect);
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
@@ -154,7 +150,9 @@ export default function InstallBanner() {
     if (!installPrompt) return;
     await installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
-    // The prompt is single-use either way — a second prompt() throws.
+    // The prompt is single-use either way — a second prompt() throws. Cleared
+    // in the stash as well, or the next mount collects a spent event.
+    clearInstallPrompt();
     setInstallPrompt(null);
     if (outcome === "accepted") setEligible(false);
   }, [installPrompt]);

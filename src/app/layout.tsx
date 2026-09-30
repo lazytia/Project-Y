@@ -12,6 +12,7 @@ import { BOOT_SPLASH_MARKUP } from "@/lib/boot-splash";
 import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
 import { SPLASH_SCREENS, splashMediaQuery } from "@/lib/splash-screens";
 import { SPLASH_TRACE_SCRIPT } from "@/lib/splash-trace";
+import { INSTALL_PROMPT_CAPTURE_SCRIPT } from "@/lib/pwa-display";
 import "./globals.css";
 
 const LanguageProvider = dynamic(
@@ -146,6 +147,10 @@ export default async function RootLayout({
         {/* TEMPORARY — see src/lib/splash-trace.ts. Does nothing without
             ?splashtrace=1 on the URL. Remove with that file. */}
         <script dangerouslySetInnerHTML={{ __html: SPLASH_TRACE_SCRIPT }} />
+        {/* Must be in <head>: the event it catches fires once and early, and
+            the banner that needs it loads too late to hear it. See the note on
+            INSTALL_PROMPT_CAPTURE_SCRIPT. */}
+        <script dangerouslySetInnerHTML={{ __html: INSTALL_PROMPT_CAPTURE_SCRIPT }} />
       </head>
       <body className="appBody">
         <div

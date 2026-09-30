@@ -34,6 +34,58 @@ export function isStandaloneDisplay(): boolean {
   return window.matchMedia(STANDALONE_QUERY).matches;
 }
 
+/** Chromium's install prompt. Not in lib.dom, and iOS has no equivalent. */
+export type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+/** Where the script below leaves the caught event for the banner to collect. */
+const INSTALL_PROMPT_PROP = "__yInstallPrompt";
+
+/** Announced on window whenever that stash changes, so a banner that mounted
+ *  after the catch hears about it instead of polling for it. */
+export const INSTALL_PROMPT_READY = "y:install-prompt";
+
+/**
+ * Catch Chromium's install prompt in <head>, before React exists.
+ *
+ * `beforeinstallprompt` fires once, early, and is gone — there is no way to
+ * ask for it later. InstallBanner is a `dynamic(ssr:false)` import, so on a
+ * cold load its chunk is still being fetched when the event goes past, and a
+ * listener attached in its useEffect is in a race it frequently loses.
+ *
+ * Losing it is silent and it is worst exactly where it matters most: on the
+ * setup guide the bar's fallback is no button at all (the only link it could
+ * offer is the page already open), so a reader who came specifically to
+ * install is shown a bar telling them to install and nothing to press.
+ *
+ * Running here makes that deterministic. The event is caught by the first
+ * script in the document, kept, and handed over whenever the banner turns up.
+ */
+export const INSTALL_PROMPT_CAPTURE_SCRIPT =
+  `(function(){var w=window;function s(v){w.${INSTALL_PROMPT_PROP}=v;` +
+  `w.dispatchEvent(new Event("${INSTALL_PROMPT_READY}"))}` +
+  `w.addEventListener("beforeinstallprompt",function(e){e.preventDefault();s(e)});` +
+  `w.addEventListener("appinstalled",function(){s(null)})})();`;
+
+function promptStash(): Record<string, unknown> | null {
+  if (typeof window === "undefined") return null;
+  return window as unknown as Record<string, unknown>;
+}
+
+/** The prompt caught in <head>, if one has been. */
+export function readInstallPrompt(): InstallPromptEvent | null {
+  const w = promptStash();
+  return w ? ((w[INSTALL_PROMPT_PROP] as InstallPromptEvent | undefined) ?? null) : null;
+}
+
+/** Drop it once used: prompt() throws the second time it is called. */
+export function clearInstallPrompt(): void {
+  const w = promptStash();
+  if (w) w[INSTALL_PROMPT_PROP] = null;
+}
+
 /** The two phones the setup guide is written for. */
 export type GuidePlatform = "iphone" | "android";
 
