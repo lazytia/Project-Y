@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HOME_SCREEN_NAME } from "@/lib/brand";
-import { ROUTES, setupGuideRoute } from "@/lib/routes";
+import { setupGuideRoute } from "@/lib/routes";
 import {
   detectGuidePlatform,
   isStandaloneDisplay,
@@ -25,9 +25,11 @@ import styles from "./InstallBanner.module.css";
  * that can say so, because it is the only thing that knows which of the two
  * the page is being read in.
  *
- * Deliberately not shown on the setup guide itself. A bar telling you to go
- * read the instructions, printed across the top of the instructions, is just
- * something else covering them up.
+ * Shown on the setup guide too. On Chromium it is the shortest path there
+ * is — the guide's own first step is "open the menu and find Install", and
+ * this bar is that, as a button, above the picture describing it. What it
+ * drops on those pages is the link to the guide, because a button that
+ * navigates to the page already on screen is a button that does nothing.
  */
 
 /** Matches the width AppShell swaps to its mobile header at. `pointer:
@@ -73,9 +75,11 @@ export default function InstallBanner() {
   const [platform, setPlatform] = useState<GuidePlatform | null>(null);
   const [node, setNode] = useState<HTMLDivElement | null>(null);
 
-  // The guide is excluded by prefix so the per-phone pages under it are too.
-  const onGuide = pathname === ROUTES.setupGuide || pathname.startsWith(`${ROUTES.setupGuide}/`);
-  const visible = eligible && !dismissed && !onGuide;
+  const guideHref = setupGuideRoute(platform);
+  // A button that navigates to the page already on screen is a button that does
+  // nothing. The bar still says its piece there; it just stops offering the way.
+  const showGuideLink = pathname !== guideHref;
+  const visible = eligible && !dismissed;
 
   useEffect(() => {
     const handheld = window.matchMedia(HANDHELD_QUERY);
@@ -170,11 +174,11 @@ export default function InstallBanner() {
         <button type="button" className={styles.action} onClick={install}>
           Install
         </button>
-      ) : (
-        <Link href={setupGuideRoute(platform)} className={styles.action}>
+      ) : showGuideLink ? (
+        <Link href={guideHref} className={styles.action}>
           Set up
         </Link>
-      )}
+      ) : null}
       <button
         type="button"
         className={styles.close}
