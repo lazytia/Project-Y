@@ -1,7 +1,43 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { guidePlatformFromUserAgent } from "./lib/pwa-display";
+import { GUIDE_CHOOSE_PARAM, ROUTES, setupGuideRoute } from "./lib/routes";
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+/**
+ * Send the setup-guide link straight to the guide for the phone holding it.
+ *
+ * `/guide_link` is the URL texted to a new hire, so it has to keep answering;
+ * what it no longer does is ask a question the request already contains. Done
+ * here rather than in the page because the edge can answer before any HTML
+ * exists: the chooser is not rendered and then replaced, it is never built.
+ * That also makes it work with JavaScript off, which the page cannot.
+ *
+ * The page still exists behind this for the two cases the header cannot
+ * settle — an iPad, which is indistinguishable from a laptop here, and an
+ * actual laptop. The iPad is then caught in the browser by detectGuidePlatform.
+ */
+function guideRedirect(request: NextRequest): NextResponse | null {
+  const { pathname, searchParams } = request.nextUrl;
+  // The guides themselves are under this path and must be left alone.
+  if (pathname !== ROUTES.setupGuide) return null;
+  if (searchParams.has(GUIDE_CHOOSE_PARAM)) return null;
+
+  const platform = guidePlatformFromUserAgent(request.headers.get("user-agent") ?? "");
+  if (!platform) return null;
+
+  const url = request.nextUrl.clone();
+  url.pathname = setupGuideRoute(platform);
+  // 307, and never 308: the destination is a property of the device asking,
+  // not of the address. A permanent redirect would be remembered by the one
+  // browser that followed it and handed to whatever opens the link next.
+  const response = NextResponse.redirect(url, 307);
+  // The response differs by request header, so anything caching it has to key
+  // on that header. Without this a CDN can hand an Android hit to an iPhone.
+  response.headers.set("Vary", "user-agent");
+  return response;
+}
 
 /**
  * Backfill the client-readable `y_sess` cookie whenever `uid` is present so
@@ -9,6 +45,11 @@ const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
  * y_sess never got the hint from /api/auth/session alone).
  */
 export function middleware(request: NextRequest) {
+  // Before the cookie backfill: this leaves the app rather than entering it,
+  // and the reader has no session to backfill for in the first place.
+  const guide = guideRedirect(request);
+  if (guide) return guide;
+
   const uid = request.cookies.get("uid")?.value?.trim();
   const ySess = request.cookies.get("y_sess")?.value;
   if (!uid || ySess === "1") {

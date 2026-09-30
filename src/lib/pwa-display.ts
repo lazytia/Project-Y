@@ -55,13 +55,27 @@ export type GuidePlatform = "iphone" | "android";
 export function detectGuidePlatform(): GuidePlatform | null {
   if (typeof window === "undefined") return null;
   const nav = window.navigator;
+  const fromUA = guidePlatformFromUserAgent(nav.userAgent);
+  if (fromUA) return fromUA;
+  // iPadOS 13 and later identify as macOS, byte for byte — there is nothing
+  // in the user-agent to tell an iPad from a laptop, which is why the edge
+  // cannot answer this one and the browser can. A touch-capable "Mac" is an
+  // iPad. `platform` is deprecated and still the only thing that says so.
+  if (nav.platform === "MacIntel" && nav.maxTouchPoints > 1) return "iphone";
+  return null;
+}
+
+/**
+ * The same question asked of a user-agent string on its own.
+ *
+ * Split out so the redirect in middleware and the one in the browser cannot
+ * drift apart: the edge has only this header to go on, and the browser starts
+ * here and then adds what the header cannot say.
+ */
+export function guidePlatformFromUserAgent(ua: string): GuidePlatform | null {
   // Android first: its user-agent also says "Linux", which nothing else here
   // tests for, but the order makes the precedence explicit rather than lucky.
-  if (/android/i.test(nav.userAgent)) return "android";
-  if (/iPhone|iPad|iPod/.test(nav.userAgent)) return "iphone";
-  // iPadOS 13 and later identify as macOS and there is nothing in the
-  // user-agent to tell them apart from a laptop. A touch-capable "Mac" is an
-  // iPad. `platform` is deprecated and still the only thing that answers this.
-  if (nav.platform === "MacIntel" && nav.maxTouchPoints > 1) return "iphone";
+  if (/android/i.test(ua)) return "android";
+  if (/iPhone|iPad|iPod/.test(ua)) return "iphone";
   return null;
 }

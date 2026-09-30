@@ -61,6 +61,18 @@ export function setupGuideRoute(platform: GuidePlatform | null): string {
   return platform ? `${ROUTES.setupGuide}/${platform}` : ROUTES.setupGuide;
 }
 
+/**
+ * Asks the chooser not to send this device to its own guide.
+ *
+ * Without it the way back out of a guide is a trap: the chooser would
+ * recognise the phone again and return it to the page it just left. It is
+ * also how somebody helping a colleague reaches the other phone's steps.
+ */
+export const GUIDE_CHOOSE_PARAM = "choose";
+
+/** The chooser, shown as a chooser. The way back from a phone's guide. */
+export const SETUP_GUIDE_CHOOSER = `${ROUTES.setupGuide}?${GUIDE_CHOOSE_PARAM}=1`;
+
 /** Does this path open without signing in? */
 export function isPublicPath(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true;

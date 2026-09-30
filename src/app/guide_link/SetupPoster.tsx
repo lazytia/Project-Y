@@ -17,7 +17,7 @@
 
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
-import { ROUTES } from "@/lib/routes";
+import { SETUP_GUIDE_CHOOSER } from "@/lib/routes";
 import styles from "./guide.module.css";
 
 export default function SetupPoster({
@@ -30,7 +30,9 @@ export default function SetupPoster({
 }) {
   return (
     <main className={styles.posterPage}>
-      <Link href={ROUTES.setupGuide} className={styles.backLink}>
+      {/* The chooser asked for by name. A plain link to it would be a trap:
+          it recognises the phone and sends the reader straight back here. */}
+      <Link href={SETUP_GUIDE_CHOOSER} className={styles.backLink}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
