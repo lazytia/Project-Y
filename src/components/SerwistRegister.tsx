@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { isSetupGuidePath } from "@/lib/routes";
 import { runWhenIdle } from "@/lib/run-when-idle";
 
 const SW_PATH = "/sw.js";
@@ -17,6 +19,23 @@ const SW_PATH = "/sw.js";
  * "Application error" crash.
  */
 export default function SerwistRegister() {
+  const pathname = usePathname();
+  /**
+   * Skip the idle wait on the setup guide.
+   *
+   * Chrome will not fire `beforeinstallprompt` until a service worker is
+   * registered, and that event is the only thing that can put a working
+   * Install button in the bar above the page. Waiting for idle everywhere
+   * else keeps registration off the critical path; waiting for it *here* is
+   * waiting for the button on the one page whose entire purpose is installing.
+   *
+   * Read once, at mount, and deliberately not a dependency below: this
+   * component lives for the whole document, and re-running the effect on
+   * every navigation would re-arm its listeners and reset the one-shot
+   * reload guard.
+   */
+  const eagerRef = useRef(isSetupGuidePath(pathname));
+
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
@@ -31,11 +50,17 @@ export default function SerwistRegister() {
       onControllerChange,
     );
 
-    const cancel = runWhenIdle(() => {
+    const register = () => {
       void navigator.serviceWorker.register(SW_PATH).catch(() => {
         /* offline / private mode */
       });
-    }, 4000);
+    };
+    let cancel: (() => void) | undefined;
+    if (eagerRef.current) {
+      register();
+    } else {
+      cancel = runWhenIdle(register, 4000);
+    }
 
     // Belt-and-suspenders: if a JS chunk fails to load (typical when the
     // browser cached HTML from an older deploy whose chunks are gone),

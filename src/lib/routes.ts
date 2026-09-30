@@ -62,6 +62,18 @@ export function setupGuideRoute(platform: GuidePlatform | null): string {
 }
 
 /**
+ * Is the reader already inside the setup guide — chooser or either phone?
+ *
+ * Asked by anything that would otherwise offer them a way to it. Note that
+ * this is deliberately not "is this the page setupGuideRoute would pick":
+ * that question has a different answer on a device we cannot identify, and
+ * the reader is on the guide either way.
+ */
+export function isSetupGuidePath(pathname: string): boolean {
+  return pathname === ROUTES.setupGuide || pathname.startsWith(`${ROUTES.setupGuide}/`);
+}
+
+/**
  * Asks the chooser not to send this device to its own guide.
  *
  * Without it the way back out of a guide is a trap: the chooser would

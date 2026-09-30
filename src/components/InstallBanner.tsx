@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HOME_SCREEN_NAME } from "@/lib/brand";
-import { setupGuideRoute } from "@/lib/routes";
+import { isSetupGuidePath, setupGuideRoute } from "@/lib/routes";
 import {
   clearInstallPrompt,
   detectGuidePlatform,
@@ -74,9 +74,16 @@ export default function InstallBanner() {
   const [node, setNode] = useState<HTMLDivElement | null>(null);
 
   const guideHref = setupGuideRoute(platform);
-  // A button that navigates to the page already on screen is a button that does
-  // nothing. The bar still says its piece there; it just stops offering the way.
-  const showGuideLink = pathname !== guideHref;
+  // Never offer the guide to somebody already reading it. The bar still says
+  // its piece there; it just stops offering the way.
+  //
+  // Asked of the path, not of `guideHref`. Comparing the two was the same
+  // question only on a device we can name: everywhere else — a desktop, an
+  // iPad, Firefox — `platform` is null, `guideHref` falls back to the chooser,
+  // and the bar put a "Set up" button on the android guide that walked the
+  // reader to the chooser and, once its own detection ran, straight back to
+  // the page they started on. A button that does nothing, slowly.
+  const showGuideLink = !isSetupGuidePath(pathname);
   const visible = eligible && !dismissed;
 
   useEffect(() => {
