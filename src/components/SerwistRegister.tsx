@@ -39,9 +39,24 @@ export default function SerwistRegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
+    // Only a *replacement* worker is worth reloading for.
+    //
+    // sw.ts sets clientsClaim, so the very first worker of a visit claims the
+    // page it was registered from and fires controllerchange too — on a page
+    // whose code nothing has changed underneath. Reloading then throws away a
+    // perfectly good page for no reason. It also reloads the setup guide now
+    // that registration there is immediate, which is a blank flash on the
+    // first screen a new hire ever sees.
+    //
+    // A page that already had a controller is the case this is for: that
+    // controllerchange means a new deploy's worker took over HTML that is
+    // still on screen and still pointing at chunks the deploy replaced.
+    // Captured before the claim can land.
+    const hadController = navigator.serviceWorker.controller !== null;
+
     let reloadedOnce = false;
     const onControllerChange = () => {
-      if (reloadedOnce) return;
+      if (!hadController || reloadedOnce) return;
       reloadedOnce = true;
       window.location.reload();
     };

@@ -74,6 +74,7 @@ export default function InstallBanner() {
   const [node, setNode] = useState<HTMLDivElement | null>(null);
 
   const guideHref = setupGuideRoute(platform);
+  const onGuide = isSetupGuidePath(pathname);
   // Never offer the guide to somebody already reading it. The bar still says
   // its piece there; it just stops offering the way.
   //
@@ -83,8 +84,18 @@ export default function InstallBanner() {
   // and the bar put a "Set up" button on the android guide that walked the
   // reader to the chooser and, once its own detection ran, straight back to
   // the page they started on. A button that does nothing, slowly.
-  const showGuideLink = !isSetupGuidePath(pathname);
-  const visible = eligible && !dismissed;
+  const showGuideLink = !onGuide;
+  // Dismissal is for the pages where this bar is an interruption laid over
+  // the thing somebody came to read. On the setup guide it is not covering
+  // the content, it is part of it: the Install button lives in here, and that
+  // button is the entire reason the link was texted to them.
+  //
+  // So the guide does not honour a dismissal, and does not offer one. The X
+  // sat exactly where a thumb reaches for Install, and hitting it took the
+  // only one-tap install away for the rest of the browser session with
+  // nothing on the page able to bring it back — the bar was simply gone, on
+  // every guide page, until the tab was closed.
+  const visible = eligible && (onGuide || !dismissed);
 
   useEffect(() => {
     const handheld = window.matchMedia(HANDHELD_QUERY);
@@ -184,17 +195,19 @@ export default function InstallBanner() {
           Set up
         </Link>
       ) : null}
-      <button
-        type="button"
-        className={styles.close}
-        onClick={dismiss}
-        aria-label="Hide until next time"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
+      {!onGuide && (
+        <button
+          type="button"
+          className={styles.close}
+          onClick={dismiss}
+          aria-label="Hide until next time"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
