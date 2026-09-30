@@ -163,9 +163,15 @@
   flex-shrink: 0;
 }
 
+/* Half-width now that the period picker shares a row with the training rate,
+   and "Until Fully Trained" is longer than that. Clipped with an ellipsis
+   rather than wrapped, so the row keeps the height of everything beside it. */
 .pickerValue {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pickerBtn .selectChev {
@@ -173,13 +179,17 @@
   transform: none;
 }
 
-/* ── Rate input ── */
+/* ── Rate input ──
+   Sized for half a row: all three rates are paired with something else, and
+   the 56px-tall version with a 20px figure in it does not survive being cut
+   to that width. 48px also lines the training rate up with the period picker
+   sitting next to it. */
 .rateWrap {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  height: 56px;
-  padding: 0 var(--space-4);
+  gap: var(--space-2);
+  height: 48px;
+  padding: 0 var(--space-3);
   background: var(--color-bg);
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -191,21 +201,16 @@
   background: var(--color-warm-bg);
 }
 
-.rateWrapMuted {
-  background: var(--color-surface);
-  border-width: 1px;
-}
-
 .rateBadge {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--color-surface-hover);
   color: var(--color-fg-muted);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-sm);
   font-weight: 800;
   flex-shrink: 0;
 }
@@ -222,7 +227,7 @@
   border: none;
   outline: none;
   font-family: var(--font-sans);
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   font-weight: 700;
   color: var(--color-fg);
   appearance: textfield;
@@ -242,7 +247,7 @@
 
 .rateSuffix {
   color: var(--color-fg-muted);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   flex-shrink: 0;
 }
 
@@ -282,18 +287,44 @@
   gap: var(--space-3);
 }
 
-/* ── Picker placeholder ── */
-.pickerPlaceholder {
-  color: var(--color-fg-muted);
-  opacity: 0.55;
+/* ── Section header ──
+   A rule that runs out from the label to the edge of the page, so the number
+   reads as the start of a group rather than as a field of its own. */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
 }
 
-/* ── Hint icon ── */
-.hintIcon {
-  width: 14px;
-  height: 14px;
-  color: var(--color-fg-muted);
+.sectionNo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  font-size: var(--font-size-xs);
+  font-weight: 800;
   flex-shrink: 0;
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-fg);
+}
+
+.sectionRule {
+  flex: 1;
+  height: 1px;
+  min-width: var(--space-4);
+  background: var(--color-border);
 }
 
 /* ── Mobile number ── */
@@ -349,15 +380,6 @@
   opacity: 0.55;
 }
 
-.fieldHint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--font-size-xs);
-  color: var(--color-fg-muted);
-  margin-top: -4px;
-}
-
 /* ── Textarea ── */
 .textarea {
   width: 100%;
@@ -385,6 +407,17 @@
 }
 
 /* ── Submit ── */
+
+/* Sits directly on the button, not spaced away from it like a field hint —
+   it is a note about what pressing the button does. */
+.smsNote {
+  margin: var(--space-2) 0 calc(-1 * var(--space-2));
+  text-align: center;
+  font-size: var(--font-size-xs);
+  font-style: italic;
+  color: var(--color-fg-muted);
+}
+
 .submitBtn {
   display: block;
   width: 100%;

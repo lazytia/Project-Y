@@ -19,10 +19,22 @@ import CalendarPicker from "@/components/CalendarPicker";
 import styles from "./page.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Onboarding → New Employee (manager view).
+ * Onboarding → Add Employee (manager view).
  * Adds a record to the `staff_onboarding` collection so the new employee
  * appears on the /people/onboarding list with a "Waiting for Documents"
  * status pill.
+ *
+ * The form asks only what the manager is the authority on: who the person
+ * is, how to reach them, and what they are paid. Visa type, date of birth
+ * and visa expiry were asked here too and were never read again — approval
+ * does not copy them onto the employee record, the visa-expiry reminder
+ * reads the employee's own `documents.visaExpiry`, and the birthday
+ * countdown reads the date of birth they enter during /onboarding. Three
+ * fields the manager had to guess at, for two facts already held elsewhere.
+ *
+ * The numbered sections follow the order the information arrives in, not the
+ * shape of the document: the person is standing there for the first section
+ * and the manager is reading off a payroll sheet by the third.
  * ────────────────────────────────────────────────────────────────────────── */
 
 const POSITIONS = ["Hall Staff", "Kitchen Staff", "Manager", "Head Chef"] as const;
@@ -39,18 +51,16 @@ type Position = (typeof POSITIONS)[number];
  */
 const OWNER_ONLY_POSITIONS: ReadonlySet<Position> = new Set(["Manager", "Head Chef"]);
 
-const VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
-type VisaType = (typeof VISA_TYPES)[number];
-
 const DEFAULT_STATUS = "Waiting for Documents";
 const FAR_FUTURE = "2030-12-31";
 /** Earliest selectable Start Date — owner needs to back-fill hires as far
  *  back as 2022. */
 const START_DATE_MIN = "2022-01-01";
-/** Earliest selectable Date of Birth. Wide enough that the year grid never
- *  runs out from under a hire, without scrolling to the 1900s. */
-const DOB_MIN = "1940-01-01";
 const NOTES_MAX = 500;
+
+/** Which of the three rate inputs currently has focus. One value rather than
+ *  a boolean each, so the highlighted field cannot get stuck on. */
+type RateField = "training" | "standard" | "saturday";
 
 function todayIso(): string {
   const d = new Date();
@@ -66,6 +76,12 @@ function requesterDisplayName(email: string | null | undefined): string {
   if (u === "tia") return "Tia";
   if (!u) return "Manager";
   return u.charAt(0).toUpperCase() + u.slice(1);
+}
+
+/** A rate the form will accept: typed, and a number. All three are required,
+ *  so payroll never has to guess what an employee is owed on a Saturday. */
+function isRate(raw: string): boolean {
+  return raw.trim().length > 0 && !Number.isNaN(parseFloat(raw));
 }
 
 function fmtIsoShort(iso: string): string {
@@ -97,19 +113,15 @@ export default function NewEmployeePage() {
   const [familyName, setFamilyName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [position, setPosition] = useState<Position>("Hall Staff");
-  const [visaType, setVisaType] = useState<VisaType>("Student");
-  const [dateOfBirth, setDateOfBirth] = useState("");
   const [startDate, setStartDate] = useState("");
-  const [visaExpiry, setVisaExpiry] = useState("");
   const [trainingRate, setTrainingRate] = useState("");
   const [trainingPeriod, setTrainingPeriod] = useState<TrainingPeriod>(DEFAULT_TRAINING_PERIOD);
   const [afterTrainingRate, setAfterTrainingRate] = useState("");
   const [saturdayRate, setSaturdayRate] = useState("");
   const [notes, setNotes] = useState("");
 
-  const [rateFocused, setRateFocused] = useState(false);
-  const [satRateFocused, setSatRateFocused] = useState(false);
-  const [calOpen, setCalOpen] = useState<"start" | "visa" | "dob" | null>(null);
+  const [focusedRate, setFocusedRate] = useState<RateField | null>(null);
+  const [calOpen, setCalOpen] = useState(false);
   const [periodSheetOpen, setPeriodSheetOpen] = useState(false);
   const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>(DEFAULT_TRAINING_PERIOD);
 
@@ -124,10 +136,11 @@ export default function NewEmployeePage() {
   const canSave =
     givenName.trim().length > 0 &&
     familyName.trim().length > 0 &&
+    mobileNumber.trim().length > 0 &&
     !!startDate &&
-    !!trainingRate.trim() &&
-    !Number.isNaN(parseFloat(trainingRate)) &&
-    mobileNumber.trim().length > 0;
+    isRate(trainingRate) &&
+    isRate(afterTrainingRate) &&
+    isRate(saturdayRate);
 
   async function handleSave() {
     if (!canSave || saving) return;
@@ -141,18 +154,11 @@ export default function NewEmployeePage() {
         fullName: `${g} ${f}`,
         mobileNumber: mobileNumber.trim(),
         position,
-        visaType,
-        dateOfBirth: dateOfBirth || null,
         startDate,
-        // Residents have no visa expiry — always null it regardless of any
-        // stale value left in state from a previous visa-type choice.
-        visaExpiry: visaType === "Resident" ? null : visaExpiry || null,
         trainingRate: parseFloat(trainingRate),
         trainingPeriod,
-        afterTrainingRate: afterTrainingRate.trim()
-          ? parseFloat(afterTrainingRate)
-          : null,
-        saturdayRate: saturdayRate.trim() ? parseFloat(saturdayRate) : null,
+        afterTrainingRate: parseFloat(afterTrainingRate),
+        saturdayRate: parseFloat(saturdayRate),
         notes: notes.trim(),
         status: DEFAULT_STATUS,
         role: "staff",
@@ -190,10 +196,12 @@ export default function NewEmployeePage() {
         </button>
         <div className={styles.headerTitles}>
           <span className={styles.eyebrow}>Onboarding</span>
-          <h1 className={styles.title}>New Employee</h1>
+          <h1 className={styles.title}>Add Employee</h1>
         </div>
         <span className={styles.headerSpacer} />
       </header>
+
+      <SectionHead no={1} label="Basic Information" />
 
       {/* Given / family name */}
       <div className={styles.dateRow}>
@@ -251,10 +259,12 @@ export default function NewEmployeePage() {
       <div className={styles.infoBox}>
         <InfoIcon className={styles.infoIcon} />
         <p className={styles.infoText}>
-          Mobile number is required. We will send the employee their Clock In ID
-          and Project YURICA login details via SMS.
+          Please enter the correct mobile number. Their Clock In ID and the link
+          to Project YURICA are sent there by SMS.
         </p>
       </div>
+
+      <SectionHead no={2} label="Employment" />
 
       {/* Position */}
       <div className={styles.field}>
@@ -278,184 +288,87 @@ export default function NewEmployeePage() {
         </div>
       </div>
 
-      {/* Visa Type */}
+      {/* Start date */}
       <div className={styles.field}>
-        <label className={styles.fieldLabel} htmlFor="visaType">
-          VISA TYPE
-        </label>
-        <div className={styles.selectWrap}>
-          <select
-            id="visaType"
-            className={styles.select}
-            value={visaType}
-            onChange={(e) => setVisaType(e.target.value as VisaType)}
-          >
-            {VISA_TYPES.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className={styles.selectChev} />
-        </div>
-      </div>
-
-      {/* Date of birth — drives the "Birthday Coming Up" countdown on the
-          Active Employees page, so it is worth capturing at hire time. */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>DATE OF BIRTH</label>
+        <label className={styles.fieldLabel}>START DATE</label>
         <button
           type="button"
           className={styles.pickerBtn}
-          onClick={() => setCalOpen("dob")}
+          onClick={() => setCalOpen(true)}
         >
           <CalendarIcon className={styles.pickerLeadIcon} />
-          <span className={`${styles.pickerValue} ${!dateOfBirth ? styles.pickerPlaceholder : ""}`}>
-            {dateOfBirth ? fmtIsoShort(dateOfBirth) : "Select date"}
-          </span>
+          <span className={styles.pickerValue}>{fmtIsoShort(startDate)}</span>
           <ChevronDown className={styles.selectChev} />
         </button>
       </div>
 
-      {/* Start date + Visa expiry (Visa expiry hidden for Residents) */}
+      <SectionHead no={3} label="Pay Rates" />
+
+      {/* Training rate + how long it runs for. Paired because one is
+          meaningless without the other. */}
       <div className={styles.dateRow}>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>START DATE</label>
+          <label className={styles.fieldLabel} htmlFor="trainingRate">
+            TRAINING RATE <span className={styles.required}>*</span>
+          </label>
+          <RateInput
+            id="trainingRate"
+            value={trainingRate}
+            onChange={setTrainingRate}
+            focused={focusedRate === "training"}
+            onFocus={() => setFocusedRate("training")}
+            onBlur={() => setFocusedRate(null)}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel}>TRAINING PERIOD</label>
           <button
             type="button"
             className={styles.pickerBtn}
-            onClick={() => setCalOpen("start")}
+            onClick={() => {
+              setPeriodDraft(trainingPeriod);
+              setPeriodSheetOpen(true);
+            }}
           >
-            <CalendarIcon className={styles.pickerLeadIcon} />
-            <span className={styles.pickerValue}>{fmtIsoShort(startDate)}</span>
+            <span className={styles.pickerValue}>{trainingPeriod}</span>
             <ChevronDown className={styles.selectChev} />
           </button>
         </div>
-        {visaType !== "Resident" && (
-          <div className={styles.field}>
-            <label className={styles.fieldLabel}>
-              VISA EXPIRY DATE <span className={styles.required}>*</span>
-            </label>
-            <button
-              type="button"
-              className={styles.pickerBtn}
-              onClick={() => setCalOpen("visa")}
-            >
-              <CalendarIcon className={styles.pickerLeadIcon} />
-              <span className={`${styles.pickerValue} ${!visaExpiry ? styles.pickerPlaceholder : ""}`}>
-                {visaExpiry ? fmtIsoShort(visaExpiry) : "Select date"}
-              </span>
-              <ChevronDown className={styles.selectChev} />
-            </button>
-          </div>
-        )}
-      </div>
-      {visaType !== "Resident" && (
-        <span className={styles.fieldHint}>
-          <InfoIcon className={styles.hintIcon} /> We&rsquo;ll remind you before this date.
-        </span>
-      )}
-
-      {/* Training rate */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>TRAINING RATE</label>
-        <div
-          className={`${styles.rateWrap} ${rateFocused ? styles.rateWrapFocused : ""}`}
-        >
-          <span
-            className={`${styles.rateBadge} ${rateFocused ? styles.rateBadgeOn : ""}`}
-            aria-hidden="true"
-          >
-            $
-          </span>
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.01"
-            className={styles.rateInput}
-            placeholder="0.00"
-            value={trainingRate}
-            onChange={(e) => setTrainingRate(e.target.value)}
-            onFocus={() => setRateFocused(true)}
-            onBlur={() => setRateFocused(false)}
-          />
-          <span className={styles.rateSuffix}>/ hour</span>
-        </div>
       </div>
 
-      {/* Training period */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>TRAINING PERIOD</label>
-        <button
-          type="button"
-          className={styles.pickerBtn}
-          onClick={() => {
-            setPeriodDraft(trainingPeriod);
-            setPeriodSheetOpen(true);
-          }}
-        >
-          <span className={styles.pickerValue}>{trainingPeriod}</span>
-          <ChevronDown className={styles.selectChev} />
-        </button>
-      </div>
-
-      {/* Info box */}
-      <div className={styles.infoBox}>
-        <InfoIcon className={styles.infoIcon} />
-        <p className={styles.infoText}>
-          This rate will apply for the selected training period above.
-        </p>
-      </div>
-
-      {/* After training rate */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>AFTER TRAINING RATE</label>
-        <div className={`${styles.rateWrap} ${styles.rateWrapMuted}`}>
-          <span className={styles.rateBadge} aria-hidden="true">
-            $
-          </span>
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.01"
-            className={styles.rateInput}
-            placeholder="0.00"
+      {/* What they move onto, and the weekend loading. Both required: payroll
+          runs off these two numbers every week the employee is here, and a
+          blank one only ever gets noticed on a payslip. */}
+      <div className={styles.dateRow}>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel} htmlFor="standardRate">
+            STANDARD RATE <span className={styles.required}>*</span>
+          </label>
+          <RateInput
+            id="standardRate"
             value={afterTrainingRate}
-            onChange={(e) => setAfterTrainingRate(e.target.value)}
+            onChange={setAfterTrainingRate}
+            focused={focusedRate === "standard"}
+            onFocus={() => setFocusedRate("standard")}
+            onBlur={() => setFocusedRate(null)}
           />
-          <span className={styles.rateSuffix}>/ hour</span>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.fieldLabel} htmlFor="saturdayRate">
+            SATURDAY RATE <span className={styles.required}>*</span>
+          </label>
+          <RateInput
+            id="saturdayRate"
+            value={saturdayRate}
+            onChange={setSaturdayRate}
+            focused={focusedRate === "saturday"}
+            onFocus={() => setFocusedRate("saturday")}
+            onBlur={() => setFocusedRate(null)}
+          />
         </div>
       </div>
 
-      {/* Saturday rate */}
-      <div className={styles.field}>
-        <label className={styles.fieldLabel}>SATURDAY RATE</label>
-        <div
-          className={`${styles.rateWrap} ${satRateFocused ? styles.rateWrapFocused : ""}`}
-        >
-          <span
-            className={`${styles.rateBadge} ${satRateFocused ? styles.rateBadgeOn : ""}`}
-            aria-hidden="true"
-          >
-            $
-          </span>
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.01"
-            className={styles.rateInput}
-            placeholder="0.00"
-            value={saturdayRate}
-            onChange={(e) => setSaturdayRate(e.target.value)}
-            onFocus={() => setSatRateFocused(true)}
-            onBlur={() => setSatRateFocused(false)}
-          />
-          <span className={styles.rateSuffix}>/ hour</span>
-        </div>
-      </div>
+      <SectionHead no={4} label="Notes" />
 
       {/* Notes */}
       <div className={styles.field}>
@@ -475,7 +388,10 @@ export default function NewEmployeePage() {
         />
       </div>
 
-      {/* Submit */}
+      {/* Submit. The caption is here rather than in the info box above because
+          it describes what the button is about to do, not what the field
+          beside it is for. */}
+      <p className={styles.smsNote}>SMS invite sent automatically.</p>
       <button
         type="button"
         className={styles.submitBtn}
@@ -485,29 +401,21 @@ export default function NewEmployeePage() {
         {saving ? "Creating…" : "Create Employee"}
       </button>
 
-      {/* Calendar bottom sheet */}
+      {/* Start date bottom sheet */}
       {calOpen && (
-        <div className={styles.calOverlay} onClick={() => setCalOpen(null)}>
+        <div className={styles.calOverlay} onClick={() => setCalOpen(false)}>
           <div className={styles.calSheet} onClick={(e) => e.stopPropagation()}>
             <CalendarPicker
-              value={
-                (calOpen === "visa" ? visaExpiry : calOpen === "dob" ? dateOfBirth : startDate) ||
-                todayIso()
-              }
-              minDate={
-                calOpen === "start" ? START_DATE_MIN : calOpen === "dob" ? DOB_MIN : undefined
-              }
-              // Nobody is born tomorrow — cap the birthday picker at today.
-              maxDate={calOpen === "dob" ? todayIso() : FAR_FUTURE}
+              value={startDate || todayIso()}
+              minDate={START_DATE_MIN}
+              maxDate={FAR_FUTURE}
               singleOnly
               onChange={(dateKey) => {
-                if (calOpen === "visa") setVisaExpiry(dateKey);
-                else if (calOpen === "dob") setDateOfBirth(dateKey);
-                else setStartDate(dateKey);
-                setCalOpen(null);
+                setStartDate(dateKey);
+                setCalOpen(false);
               }}
               onRangeChange={() => {}}
-              onClose={() => setCalOpen(null)}
+              onClose={() => setCalOpen(false)}
             />
           </div>
         </div>
@@ -570,6 +478,77 @@ export default function NewEmployeePage() {
           onClose={() => setShowToast(false)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * A numbered divider between groups of fields.
+ *
+ * The form is long enough that a manager filling it on a phone loses their
+ * place in it. Numbering the four groups turns one long list into four short
+ * ones, and says how much is left without a progress bar that would imply
+ * steps you cannot skip — every field on this page is on one screen and can
+ * be filled in any order.
+ */
+function SectionHead({ no, label }: { no: number; label: string }) {
+  return (
+    <div className={styles.sectionHead}>
+      <span className={styles.sectionNo} aria-hidden="true">
+        {no}
+      </span>
+      <h2 className={styles.sectionLabel}>{label}</h2>
+      <span className={styles.sectionRule} aria-hidden="true" />
+    </div>
+  );
+}
+
+/**
+ * One "$ ⟨amount⟩ /hr" field.
+ *
+ * All three rates on the page share a row with something else, so this is
+ * written for half width: on a 375px screen the column is about 141px, and
+ * once the dollar badge and the unit have taken their share the figure is
+ * left with roughly 60px. That is what "/hr" buys over "/ hour" — the
+ * difference between "100.00" fitting and not.
+ */
+function RateInput({
+  id,
+  value,
+  onChange,
+  focused,
+  onFocus,
+  onBlur,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  focused: boolean;
+  onFocus: () => void;
+  onBlur: () => void;
+}) {
+  return (
+    <div className={`${styles.rateWrap} ${focused ? styles.rateWrapFocused : ""}`}>
+      <span
+        className={`${styles.rateBadge} ${focused ? styles.rateBadgeOn : ""}`}
+        aria-hidden="true"
+      >
+        $
+      </span>
+      <input
+        id={id}
+        type="number"
+        inputMode="decimal"
+        min={0}
+        step="0.01"
+        className={styles.rateInput}
+        placeholder="0.00"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />
+      <span className={styles.rateSuffix}>/hr</span>
     </div>
   );
 }
