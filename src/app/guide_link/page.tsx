@@ -10,6 +10,10 @@
  * genuinely different on the two, and a single page covering both would be a
  * page where half the sentences are for somebody else.
  *
+ * Except on an Android phone that has handed us an install prompt, where the
+ * answer to the question is worth less than the install itself and the card
+ * does it on the spot — see PlatformChoices.
+ *
  * On a phone it does not wait to be asked: PlatformRedirect recognises the
  * device and moves on. The markup below is still rendered in full, because it
  * is what a desktop reader, an unrecognised device and a reader with no
@@ -17,10 +21,9 @@
  */
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
-import { GUIDE_CHOOSE_PARAM, ROUTES } from "@/lib/routes";
-import { AndroidMark, AppleMark, PLATFORMS, PLATFORM_KEYS } from "./platforms";
+import { GUIDE_CHOOSE_PARAM } from "@/lib/routes";
+import PlatformChoices from "./PlatformChoices";
 import PlatformRedirect from "./PlatformRedirect";
 import styles from "./guide.module.css";
 
@@ -28,11 +31,6 @@ export const metadata: Metadata = {
   title: `Set up ${APP_NAME}`,
   description: "Get your roster, payslips and important staff updates.",
 };
-
-const MARKS = {
-  iphone: { Mark: AppleMark, className: styles.markApple },
-  android: { Mark: AndroidMark, className: styles.markAndroid },
-} as const;
 
 export default async function SetupGuidePage({
   searchParams,
@@ -54,28 +52,7 @@ export default async function SetupGuidePage({
         </p>
       </header>
 
-      <div className={styles.choices}>
-        {PLATFORM_KEYS.map((key) => {
-          const platform = PLATFORMS[key];
-          const { Mark, className } = MARKS[key];
-          return (
-            <Link
-              key={key}
-              href={`${ROUTES.setupGuide}/${platform.slug}`}
-              className={styles.choice}
-            >
-              <span className={`${styles.choiceMark} ${className}`}>
-                <Mark />
-              </span>
-              <span className={styles.choiceLabel}>{platform.choice}</span>
-              <span className={styles.choiceBrowser}>{platform.browser}</span>
-              <span className={styles.choiceGo} aria-hidden="true">
-                &rarr;
-              </span>
-            </Link>
-          );
-        })}
-      </div>
+      <PlatformChoices />
 
       <p className={styles.hint}>Choose your phone type to see the setup guide.</p>
     </main>

@@ -84,17 +84,24 @@
   width: 100%;
 }
 
+/* Worn by an <a> and, on an Android phone that can install from here, by a
+   <button> — see PlatformChoices. `width`, `font` and `cursor` are the three
+   things a button does not take from the page on its own; without them that
+   one card shrink-wraps its text in the UA's form font. */
 .choice {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
   padding: var(--space-4) var(--space-3);
+  font: inherit;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   text-decoration: none;
   color: inherit;
+  cursor: pointer;
   transition: border-color 0.15s;
 }
 
