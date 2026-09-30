@@ -24,8 +24,25 @@ function guideRedirect(request: NextRequest): NextResponse | null {
   if (pathname !== ROUTES.setupGuide) return null;
   if (searchParams.has(GUIDE_CHOOSE_PARAM)) return null;
 
-  const platform = guidePlatformFromUserAgent(request.headers.get("user-agent") ?? "");
-  if (!platform) return null;
+  const ua = request.headers.get("user-agent") ?? "";
+  const platform = guidePlatformFromUserAgent(ua);
+  if (!platform) {
+    // TEMPORARY, like SPLASH_TRACE — remove once this has been read once.
+    //
+    // This redirect returns a 307 for an iPhone user-agent on a local
+    // production build and a 200 on App Hosting, for the same commit, while
+    // middleware is demonstrably running there (the y_sess backfill below
+    // fires on the deployed site). That leaves the inputs, and the only input
+    // this branch has is the header. Echoing what the edge actually received
+    // settles it in one request instead of another round of guessing.
+    //
+    // Safe to ship: it is the caller's own header, on one public path, and
+    // the guide has no session to backfill so nothing below is skipped.
+    const seen = NextResponse.next();
+    seen.headers.set("x-y-guide-ua", ua === "" ? "(empty)" : ua);
+    seen.headers.set("Vary", "user-agent");
+    return seen;
+  }
 
   const url = request.nextUrl.clone();
   url.pathname = setupGuideRoute(platform);
