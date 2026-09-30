@@ -183,7 +183,16 @@ export default function InstallBanner() {
         Y
       </span>
       <p className={styles.text}>
-        <strong className={styles.lead}>Open {HOME_SCREEN_NAME} from your home screen.</strong>{" "}
+        {/* "Open it from your home screen" is a nudge for somebody who may
+            already have done this. On the setup guide it is addressed to the
+            one reader we know has not: they were sent here to install, and
+            telling them to open something that is not on their home screen
+            yet is an instruction they cannot follow. */}
+        <strong className={styles.lead}>
+          {onGuide
+            ? `Add ${HOME_SCREEN_NAME} to your home screen.`
+            : `Open ${HOME_SCREEN_NAME} from your home screen.`}
+        </strong>{" "}
         Notifications about your roster only arrive in the installed app.
       </p>
       {installPrompt ? (
