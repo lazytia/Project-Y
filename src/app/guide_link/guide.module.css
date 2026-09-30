@@ -229,3 +229,39 @@
   line-height: 1.5;
   color: var(--color-fg);
 }
+
+/* ── the drawn version of the steps ── */
+
+/* Wider than .page: the artwork carries its own margins, so constraining it to
+   the 420px the text version wants would inset it twice and shrink the only
+   thing on the page anyone came to read. */
+.posterPage {
+  position: relative;
+  font-family: var(--font-sans);
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-4) 0 var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Same wash as .page, so the drawn page and the written one are plainly the
+   same document. See the note on .page::before. */
+.posterPage::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--color-warm) 5%, var(--color-bg));
+}
+
+/* height: auto overrides the intrinsic height next/image writes inline; without
+   it the picture keeps its export height and squashes on a narrow phone. */
+.poster {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-lg);
+}
