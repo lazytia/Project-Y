@@ -1,5 +1,6 @@
 import type { User } from "firebase/auth";
 import { isChef, isOwner } from "./permissions";
+import type { GuidePlatform } from "./pwa-display";
 
 export const ROUTES = {
   home: "/",
@@ -47,6 +48,17 @@ export const PUBLIC_ORIGIN = "https://project.yurica.com.au";
 /** Absolute URL for a path, for the places that leave the app. */
 export function publicUrl(path: string): string {
   return `${PUBLIC_ORIGIN}${path}`;
+}
+
+/**
+ * The setup guide for one kind of phone, or the chooser when we cannot tell.
+ *
+ * The chooser stays the fallback rather than being removed: the same link is
+ * texted to new hires and is sometimes opened on a desktop, and somebody
+ * helping a colleague needs to be able to reach the other phone's page.
+ */
+export function setupGuideRoute(platform: GuidePlatform | null): string {
+  return platform ? `${ROUTES.setupGuide}/${platform}` : ROUTES.setupGuide;
 }
 
 /** Does this path open without signing in? */

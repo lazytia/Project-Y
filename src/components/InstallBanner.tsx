@@ -4,8 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HOME_SCREEN_NAME } from "@/lib/brand";
-import { ROUTES } from "@/lib/routes";
-import { isStandaloneDisplay, STANDALONE_QUERY } from "@/lib/pwa-display";
+import { ROUTES, setupGuideRoute } from "@/lib/routes";
+import {
+  detectGuidePlatform,
+  isStandaloneDisplay,
+  STANDALONE_QUERY,
+  type GuidePlatform,
+} from "@/lib/pwa-display";
 import styles from "./InstallBanner.module.css";
 
 /**
@@ -65,6 +70,7 @@ export default function InstallBanner() {
   const [eligible, setEligible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [platform, setPlatform] = useState<GuidePlatform | null>(null);
   const [node, setNode] = useState<HTMLDivElement | null>(null);
 
   // The guide is excluded by prefix so the per-phone pages under it are too.
@@ -78,6 +84,11 @@ export default function InstallBanner() {
 
     update();
     setDismissed(wasDismissed());
+    // Set here rather than at render so the first paint already has the right
+    // destination: the device cannot change under us, but the server does not
+    // know it, and a link that corrects itself after hydration is a link
+    // somebody can tap in the wrong state.
+    setPlatform(detectGuidePlatform());
     handheld.addEventListener("change", update);
     standalone.addEventListener("change", update);
     return () => {
@@ -160,7 +171,7 @@ export default function InstallBanner() {
           Install
         </button>
       ) : (
-        <Link href={ROUTES.setupGuide} className={styles.action}>
+        <Link href={setupGuideRoute(platform)} className={styles.action}>
           Set up
         </Link>
       )}
