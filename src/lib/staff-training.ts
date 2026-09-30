@@ -14,17 +14,32 @@
 
 import { tsToDate, todayIso } from "./staff-display";
 
+/**
+ * `short` is what a control too narrow for `value` shows instead. The intake
+ * form puts this picker beside the training rate, which leaves it about 90px:
+ * "First 2 Weeks" needs 85 of them on a 375px phone and more than it has on a
+ * 360px one, so every option ellipsised. Dropping the leading word costs
+ * nothing under a label that already says TRAINING PERIOD, and it is a display
+ * form only — `value` is still what is stored and what every other screen
+ * shows, so no record changes meaning.
+ */
 export const TRAINING_PERIODS = [
-  { value: "First 2 Weeks", weeks: 2, subtitle: "" },
-  { value: "First 3 Weeks", weeks: 3, subtitle: "" },
+  { value: "First 2 Weeks", short: "2 Weeks", weeks: 2, subtitle: "" },
+  { value: "First 3 Weeks", short: "3 Weeks", weeks: 3, subtitle: "" },
   {
     value: "Until Fully Trained",
+    short: "Until Trained",
     weeks: null,
     subtitle: "Until the person can perform their duties in full capacity",
   },
 ] as const;
 
 export type TrainingPeriod = (typeof TRAINING_PERIODS)[number]["value"];
+
+/** The narrow form of a stored period, for controls that cannot hold `value`. */
+export function shortTrainingPeriod(period: TrainingPeriod): string {
+  return TRAINING_PERIODS.find((p) => p.value === period)?.short ?? period;
+}
 
 export const DEFAULT_TRAINING_PERIOD: TrainingPeriod = "First 2 Weeks";
 

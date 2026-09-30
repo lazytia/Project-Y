@@ -11,6 +11,7 @@ import { emailToUsername } from "@/lib/username";
 import {
   DEFAULT_TRAINING_PERIOD,
   TRAINING_PERIODS,
+  shortTrainingPeriod,
   type TrainingPeriod,
 } from "@/lib/staff-training";
 import Splash from "@/components/Splash";
@@ -330,7 +331,10 @@ export default function NewEmployeePage() {
               setPeriodSheetOpen(true);
             }}
           >
-            <span className={styles.pickerValue}>{trainingPeriod}</span>
+            {/* Short form: this button shares its row with the training rate,
+                which leaves it too little width for "First 2 Weeks". The sheet
+                below still lists the full wording. */}
+            <span className={styles.pickerValue}>{shortTrainingPeriod(trainingPeriod)}</span>
             <ChevronDown className={styles.selectChev} />
           </button>
         </div>
