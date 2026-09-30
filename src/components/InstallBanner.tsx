@@ -6,15 +6,12 @@ import { usePathname } from "next/navigation";
 import { HOME_SCREEN_NAME } from "@/lib/brand";
 import { isSetupGuidePath, setupGuideRoute } from "@/lib/routes";
 import {
-  clearInstallPrompt,
   detectGuidePlatform,
-  INSTALL_PROMPT_READY,
   isStandaloneDisplay,
-  readInstallPrompt,
   STANDALONE_QUERY,
   type GuidePlatform,
-  type InstallPromptEvent,
 } from "@/lib/pwa-display";
+import { useInstallPrompt } from "@/lib/use-install-prompt";
 import styles from "./InstallBanner.module.css";
 
 /**
@@ -69,9 +66,9 @@ export default function InstallBanner() {
   const pathname = usePathname();
   const [eligible, setEligible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [platform, setPlatform] = useState<GuidePlatform | null>(null);
   const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const { installPrompt, install } = useInstallPrompt();
 
   const guideHref = setupGuideRoute(platform);
   const onGuide = isSetupGuidePath(pathname);
@@ -117,22 +114,14 @@ export default function InstallBanner() {
     };
   }, []);
 
+  // Once the app is installed there is nothing left for the bar to say, and
+  // saying it anyway — in the tab that is still open behind the new icon — is
+  // telling somebody to do the thing they just did. useInstallPrompt handles
+  // the prompt itself; this is only the bar's own reaction to the news.
   useEffect(() => {
-    // Chromium fires `beforeinstallprompt` when the app is installable, and it
-    // has almost always fired before this component exists — so the prompt is
-    // collected from the stash the head script keeps rather than waited for
-    // here. Holding onto it turns the bar's button into a one-tap install;
-    // without it (iOS, Firefox) the button falls back to the instructions.
-    const collect = () => setInstallPrompt(readInstallPrompt());
     const onInstalled = () => setEligible(false);
-
-    collect();
-    window.addEventListener(INSTALL_PROMPT_READY, collect);
     window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener(INSTALL_PROMPT_READY, collect);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
+    return () => window.removeEventListener("appinstalled", onInstalled);
   }, []);
 
   // Publish the real rendered height rather than a number written down twice.
@@ -164,16 +153,9 @@ export default function InstallBanner() {
     }
   }, []);
 
-  const install = useCallback(async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    // The prompt is single-use either way — a second prompt() throws. Cleared
-    // in the stash as well, or the next mount collects a spent event.
-    clearInstallPrompt();
-    setInstallPrompt(null);
-    if (outcome === "accepted") setEligible(false);
-  }, [installPrompt]);
+  const onInstall = useCallback(async () => {
+    if ((await install()) === "accepted") setEligible(false);
+  }, [install]);
 
   if (!visible) return null;
 
@@ -196,7 +178,7 @@ export default function InstallBanner() {
         Notifications about your roster only arrive in the installed app.
       </p>
       {installPrompt ? (
-        <button type="button" className={styles.action} onClick={install}>
+        <button type="button" className={styles.action} onClick={onInstall}>
           Install
         </button>
       ) : showGuideLink ? (

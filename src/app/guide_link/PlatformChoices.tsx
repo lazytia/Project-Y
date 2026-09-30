@@ -26,17 +26,11 @@
  * is exactly what that card's guide is for.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ROUTES } from "@/lib/routes";
-import {
-  clearInstallPrompt,
-  detectGuidePlatform,
-  INSTALL_PROMPT_READY,
-  readInstallPrompt,
-  type GuidePlatform,
-  type InstallPromptEvent,
-} from "@/lib/pwa-display";
+import { detectGuidePlatform, type GuidePlatform } from "@/lib/pwa-display";
+import { useInstallPrompt } from "@/lib/use-install-prompt";
 import { AndroidMark, AppleMark, PLATFORMS, PLATFORM_KEYS } from "./platforms";
 import styles from "./guide.module.css";
 
@@ -53,36 +47,17 @@ const INSTALL_LABEL = "Install";
 
 export default function PlatformChoices() {
   const [device, setDevice] = useState<GuidePlatform | null>(null);
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const { installPrompt, install } = useInstallPrompt();
 
-  useEffect(() => {
-    // Both are client-only answers, and both are deliberately left out of the
-    // first render rather than guessed at: the server cannot know either, and
-    // the fallback — a link to the guide — is the correct thing to have been
-    // showing if it turns out neither is available.
-    setDevice(detectGuidePlatform());
-    // Caught in <head> before React exists, and announced again if it arrives
-    // late. See INSTALL_PROMPT_CAPTURE_SCRIPT for why it cannot be waited for
-    // here instead.
-    const collect = () => setInstallPrompt(readInstallPrompt());
-    collect();
-    window.addEventListener(INSTALL_PROMPT_READY, collect);
-    return () => window.removeEventListener(INSTALL_PROMPT_READY, collect);
-  }, []);
+  // Client-only, and deliberately left out of the first render rather than
+  // guessed at: the server cannot know, and the fallback — a link to the
+  // guide — is the right thing to have been showing if it turns out this is
+  // not a phone we can install on.
+  useEffect(() => setDevice(detectGuidePlatform()), []);
 
-  const install = useCallback(async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    await installPrompt.userChoice;
-    // Single-use either way — a second prompt() throws. Dropped from the stash
-    // as well, so nothing else on the page collects a spent event, and this
-    // card falls back to the guide rather than offering a button that cannot
-    // fire twice. On acceptance the guide is the right fallback anyway: its
-    // last step is opening the new icon and logging in.
-    clearInstallPrompt();
-    setInstallPrompt(null);
-  }, [installPrompt]);
-
+  // Spending the prompt drops it, so the card returns to being a link to the
+  // guide. That is the right place to land either way: the guide's last step
+  // is opening the new icon and logging in.
   const canInstallHere = device === "android" && installPrompt !== null;
 
   return (

@@ -47,6 +47,10 @@ const INSTALL_PROMPT_PROP = "__yInstallPrompt";
  *  after the catch hears about it instead of polling for it. */
 export const INSTALL_PROMPT_READY = "y:install-prompt";
 
+/** Chromium's own event. Named once so the head script below and the hook that
+ *  listens for it directly cannot drift apart. */
+export const INSTALL_PROMPT_EVENT = "beforeinstallprompt";
+
 /**
  * Catch Chromium's install prompt in <head>, before React exists.
  *
@@ -62,12 +66,32 @@ export const INSTALL_PROMPT_READY = "y:install-prompt";
  *
  * Running here makes that deterministic. The event is caught by the first
  * script in the document, kept, and handed over whenever the banner turns up.
+ * It is a head start, not the mechanism: useInstallPrompt listens for the
+ * event itself as well, so a browser that never runs this still installs.
+ *
+ * Assembled by joining plain strings, which looks fussier than it should and
+ * is not a style choice. Written the obvious way — a template literal with
+ * `${}` holes in it, concatenated with `+` — the production build silently
+ * dropped the three characters `=v;` from the middle of the emitted string:
+ *
+ *     function s(v){w.__yInstallPromptw.dispatchEvent(new Event(...))}
+ *
+ * which is a syntax error, so the whole IIFE failed to parse and nothing ever
+ * caught the prompt. Chrome was offering the install the entire time — the
+ * address bar showed its own install icon — and the bar had no button under
+ * it. Nothing announces this: an inline script that fails to parse is one
+ * console line on a phone nobody has a console attached to. Keep it literal.
  */
-export const INSTALL_PROMPT_CAPTURE_SCRIPT =
-  `(function(){var w=window;function s(v){w.${INSTALL_PROMPT_PROP}=v;` +
-  `w.dispatchEvent(new Event("${INSTALL_PROMPT_READY}"))}` +
-  `w.addEventListener("beforeinstallprompt",function(e){e.preventDefault();s(e)});` +
-  `w.addEventListener("appinstalled",function(){s(null)})})();`;
+export const INSTALL_PROMPT_CAPTURE_SCRIPT = [
+  "(function(){var w=window;function s(v){w.",
+  INSTALL_PROMPT_PROP,
+  '=v;w.dispatchEvent(new Event("',
+  INSTALL_PROMPT_READY,
+  '"))}w.addEventListener("',
+  INSTALL_PROMPT_EVENT,
+  '",function(e){e.preventDefault();s(e)});',
+  'w.addEventListener("appinstalled",function(){s(null)})})();',
+].join("");
 
 function promptStash(): Record<string, unknown> | null {
   if (typeof window === "undefined") return null;
