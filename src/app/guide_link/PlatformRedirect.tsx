@@ -12,6 +12,12 @@
  * detectGuidePlatform. So the chooser remains what a desktop reader, an
  * unrecognised device, and anyone without JavaScript gets, which is why the
  * page still renders it in full behind this.
+ *
+ * And this is the only thing doing it. There was a middleware redirect in
+ * front of this that would have covered the JavaScript-off reader as well; it
+ * never ran in production, because App Hosting does not pass the browser's
+ * user-agent through to the edge. Anything wanting to redirect earlier than
+ * React needs an input other than that header — see src/middleware.ts.
  */
 
 import { useEffect } from "react";

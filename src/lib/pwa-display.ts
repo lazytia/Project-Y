@@ -110,9 +110,9 @@ export function detectGuidePlatform(): GuidePlatform | null {
   const fromUA = guidePlatformFromUserAgent(nav.userAgent);
   if (fromUA) return fromUA;
   // iPadOS 13 and later identify as macOS, byte for byte — there is nothing
-  // in the user-agent to tell an iPad from a laptop, which is why the edge
-  // cannot answer this one and the browser can. A touch-capable "Mac" is an
-  // iPad. `platform` is deprecated and still the only thing that says so.
+  // in the user-agent to tell an iPad from a laptop, so no amount of header
+  // reading answers this one and only the browser can. A touch-capable "Mac"
+  // is an iPad. `platform` is deprecated and still the only thing that says so.
   if (nav.platform === "MacIntel" && nav.maxTouchPoints > 1) return "iphone";
   return null;
 }
@@ -120,11 +120,14 @@ export function detectGuidePlatform(): GuidePlatform | null {
 /**
  * The same question asked of a user-agent string on its own.
  *
- * Split out so the redirect in middleware and the one in the browser cannot
- * drift apart: the edge has only this header to go on, and the browser starts
- * here and then adds what the header cannot say.
+ * Deliberately not exported. It was, for a middleware redirect, and that never
+ * worked: App Hosting hands the edge the literal string `Google` in place of
+ * the browser's user-agent, so this returned null on every production request
+ * and the redirect silently did nothing for as long as it existed. Keeping it
+ * private means the only caller is the one above, which is handed a real
+ * `navigator.userAgent`. See the note at the top of src/middleware.ts.
  */
-export function guidePlatformFromUserAgent(ua: string): GuidePlatform | null {
+function guidePlatformFromUserAgent(ua: string): GuidePlatform | null {
   // Android first: its user-agent also says "Linux", which nothing else here
   // tests for, but the order makes the precedence explicit rather than lucky.
   if (/android/i.test(ua)) return "android";
