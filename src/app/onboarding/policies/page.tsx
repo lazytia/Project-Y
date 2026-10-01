@@ -116,9 +116,10 @@ export default function PoliciesPage() {
   const { user } = useAuth();
   const { t } = useLang();
   const [signedAt, setSignedAt] = useState<Partial<Record<DocKey, Timestamp | null>>>({});
-  // Null until the snapshot arrives, so a card is never drawn against a
-  // position we are only guessing at.
-  const [position, setPosition] = useState<Record<string, unknown> | null>(null);
+  // The onboarding record itself, which is what `showFor` reads the position
+  // out of. Null until the snapshot arrives, so a card is never drawn against
+  // a position we are only guessing at.
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -143,7 +144,7 @@ export default function PoliciesPage() {
           agreement: p.agreementSignedAt ?? null,
           beerGuide: p.beerGuideSignedAt ?? null,
         });
-        setPosition(data as Record<string, unknown>);
+        setProfile(data as Record<string, unknown>);
         setLoading(false);
       },
       () => setLoading(false),
@@ -154,8 +155,8 @@ export default function PoliciesPage() {
   // Everything below counts the cards this person can actually see. Measured
   // against all four, a chef would sign every document in front of them and
   // still be held on 3/4 with "Save & Continue" greyed out forever.
-  const visibleCards = position
-    ? DOC_CARDS.filter((card) => !card.showFor || card.showFor(position))
+  const visibleCards = profile
+    ? DOC_CARDS.filter((card) => !card.showFor || card.showFor(profile))
     : [];
   const signedCount = visibleCards.filter((card) => signedAt[card.key]).length;
   const allSigned = visibleCards.length > 0 && signedCount === visibleCards.length;
