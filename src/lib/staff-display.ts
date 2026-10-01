@@ -74,21 +74,44 @@ export function positionLabelOf(raw: Record<string, unknown>): string {
 }
 
 /**
- * Does this person need an RSA certificate on file?
- *
- * Only the people who serve alcohol do — that is what the certificate is for.
- * The form asked everyone, so the kitchen was told to produce a document it
- * has no reason to hold, and "My Documents" showed a permanently missing RSA
- * to chefs who could never clear it.
+ * Is this person on the floor?
  *
  * Hall Staff is the position chosen when the request is raised, and the
  * manager is hall too: she is on the floor and pours. Read through
  * `positionLabelOf` so the stored machine value ("hall") and the printed one
  * ("Hall Staff") answer the same, and so a record that predates the position
  * field still falls back to its role.
+ *
+ * Two things hang off this now rather than one, which is why it is its own
+ * function: both are "do you serve alcohol", and they must never disagree
+ * about who that is.
+ */
+export function isHallStaff(raw: Record<string, unknown>): boolean {
+  return positionLabelOf(raw) === "Hall Staff";
+}
+
+/**
+ * Does this person need an RSA certificate on file?
+ *
+ * Only the people who serve alcohol do — that is what the certificate is for.
+ * The form asked everyone, so the kitchen was told to produce a document it
+ * has no reason to hold, and "My Documents" showed a permanently missing RSA
+ * to chefs who could never clear it.
  */
 export function needsRsaCertificate(raw: Record<string, unknown>): boolean {
-  return positionLabelOf(raw) === "Hall Staff";
+  return isHallStaff(raw);
+}
+
+/**
+ * Does this person have to work through the Beer Guide?
+ *
+ * Pouring and cleaning the taps is hall work, so the kitchen was being shown
+ * eight training videos about a job it does not do. Hidden rather than shown
+ * and greyed out: a card nobody can ever clear reads as an outstanding task
+ * forever.
+ */
+export function needsBeerGuide(raw: Record<string, unknown>): boolean {
+  return isHallStaff(raw);
 }
 
 export function reasonDisplayOf(raw: Record<string, unknown>): string {

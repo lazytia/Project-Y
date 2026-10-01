@@ -67,19 +67,37 @@ function readEntry(v: unknown): DocumentSignatureWire | null {
   };
 }
 
-/** Staff who signed the handbook during onboarding have it under
- *  staff_onboarding/{uid}.policies, written before this collection existed —
- *  without this they would be asked to sign the same document a second time. */
-async function legacyHandbook(uid: string): Promise<DocumentSignatureWire | null> {
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+/**
+ * Signatures taken inside the onboarding form rather than in the app.
+ *
+ * The handbook has always been signed there, written to
+ * staff_onboarding/{uid}.policies before this collection existed; the beer
+ * guide joined it when hall staff started signing it as an onboarding step.
+ * Without this, finishing onboarding would hand someone a dashboard asking
+ * them to sign the documents they just signed.
+ *
+ * The field names are the document key plus a suffix — `handbookSignature`,
+ * `beerGuideSignedAt` — so one read answers for every key and a third
+ * document needs nothing added here.
+ */
+async function onboardingSignatures(uid: string): Promise<DocumentSignaturesWire> {
   const snap = await adminDb().collection("staff_onboarding").doc(uid).get();
   const policies = (snap.data()?.policies ?? {}) as Record<string, unknown>;
-  const signature = typeof policies.handbookSignature === "string" ? policies.handbookSignature : "";
-  if (!signature) return null;
-  return {
-    signature,
-    signedAtISO: toISO(policies.handbookSignedAt),
-    version: typeof policies.handbookVersion === "string" ? policies.handbookVersion : "",
-  };
+  const out: DocumentSignaturesWire = {};
+  for (const key of SIGNABLE_DOCUMENT_KEYS) {
+    const signature = str(policies[`${key}Signature`]);
+    if (!signature) continue;
+    out[key] = {
+      signature,
+      signedAtISO: toISO(policies[`${key}SignedAt`]),
+      version: str(policies[`${key}Version`]),
+    };
+  }
+  return out;
 }
 
 async function readSignatures(uid: string): Promise<DocumentSignaturesWire> {
@@ -90,9 +108,12 @@ async function readSignatures(uid: string): Promise<DocumentSignaturesWire> {
     const entry = readEntry(data[key]);
     if (entry) out[key] = entry;
   }
-  if (!out.handbook) {
-    const legacy = await legacyHandbook(uid);
-    if (legacy) out.handbook = legacy;
+  // One extra read, and only when something is still unaccounted for.
+  if (SIGNABLE_DOCUMENT_KEYS.some((key) => !out[key])) {
+    const fromOnboarding = await onboardingSignatures(uid);
+    for (const key of SIGNABLE_DOCUMENT_KEYS) {
+      if (!out[key] && fromOnboarding[key]) out[key] = fromOnboarding[key];
+    }
   }
   return out;
 }

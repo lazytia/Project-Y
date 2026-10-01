@@ -12,6 +12,7 @@ import {
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
+import { needsBeerGuide } from "@/lib/staff-display";
 import styles from "./page.module.css";
 
 const STEPS = [
@@ -28,7 +29,7 @@ const CURRENT_STEP = 5;
 const TOTAL_STEPS = 7;
 const PERCENT = Math.round((CURRENT_STEP / TOTAL_STEPS) * 100);
 
-type DocKey = "handbook" | "privacy" | "agreement";
+type DocKey = "handbook" | "privacy" | "agreement" | "beerGuide";
 
 type DocCardConfig = {
   key: DocKey;
@@ -36,6 +37,12 @@ type DocCardConfig = {
   description: string;
   href: string;
   icon: React.ReactNode;
+  /**
+   * Which staff see this card. Omitted means everybody — only the beer guide
+   * is narrower, and saying so here keeps the rule next to the card instead
+   * of in the filter further down.
+   */
+  showFor?: (raw: Record<string, unknown>) => boolean;
 };
 
 const DOC_CARDS: DocCardConfig[] = [
@@ -79,6 +86,19 @@ const DOC_CARDS: DocCardConfig[] = [
       </svg>
     ),
   },
+  {
+    key: "beerGuide",
+    title: "Beer Guide",
+    description: "Watch the beer training video.",
+    href: "/onboarding/policies/beer-guide",
+    showFor: needsBeerGuide,
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polygon points="10 8 16 12 10 16 10 8" />
+      </svg>
+    ),
+  },
 ];
 
 function fmtDate(t: Timestamp | Date | null | undefined): string {
@@ -95,21 +115,23 @@ export default function PoliciesPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { t } = useLang();
-  const [signedAt, setSignedAt] = useState<Record<DocKey, Timestamp | null>>({
-    handbook: null,
-    privacy: null,
-    agreement: null,
-  });
+  const [signedAt, setSignedAt] = useState<Partial<Record<DocKey, Timestamp | null>>>({});
+  // Null until the snapshot arrives, so a card is never drawn against a
+  // position we are only guessing at.
+  const [position, setPosition] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     // Live listen instead of a one-shot getDoc: the child pages
-    // (staff-handbook / privacy-policy / employee-agreement) write
-    // `policies.{key}SignedAt` and navigate back here — the snapshot
+    // (staff-handbook / privacy-policy / employee-agreement / beer-guide)
+    // write `policies.{key}SignedAt` and navigate back here — the snapshot
     // updates the Signed/Pending badges immediately, so a card that was
     // just signed no longer flashes as Pending on the way back.
+    //
+    // The same document carries the position, so which cards to show comes
+    // out of this listener rather than a second read.
     const unsub = onSnapshot(
       doc(getDb(), "staff_onboarding", user.uid),
       (snap) => {
@@ -119,7 +141,9 @@ export default function PoliciesPage() {
           handbook: p.handbookSignedAt ?? null,
           privacy: p.privacySignedAt ?? null,
           agreement: p.agreementSignedAt ?? null,
+          beerGuide: p.beerGuideSignedAt ?? null,
         });
+        setPosition(data as Record<string, unknown>);
         setLoading(false);
       },
       () => setLoading(false),
@@ -127,9 +151,17 @@ export default function PoliciesPage() {
     return () => unsub();
   }, [user]);
 
-  const signedCount = Object.values(signedAt).filter(Boolean).length;
-  const allSigned = signedCount === DOC_CARDS.length;
-  const progressPct = Math.round((signedCount / DOC_CARDS.length) * 100);
+  // Everything below counts the cards this person can actually see. Measured
+  // against all four, a chef would sign every document in front of them and
+  // still be held on 3/4 with "Save & Continue" greyed out forever.
+  const visibleCards = position
+    ? DOC_CARDS.filter((card) => !card.showFor || card.showFor(position))
+    : [];
+  const signedCount = visibleCards.filter((card) => signedAt[card.key]).length;
+  const allSigned = visibleCards.length > 0 && signedCount === visibleCards.length;
+  const progressPct = visibleCards.length
+    ? Math.round((signedCount / visibleCards.length) * 100)
+    : 0;
 
   async function handleSaveAndContinue() {
     if (!user || !allSigned || saving) return;
@@ -216,7 +248,7 @@ export default function PoliciesPage() {
 
       {/* Document cards */}
       <div className={styles.docList}>
-        {DOC_CARDS.map((card) => {
+        {visibleCards.map((card) => {
           const signed = signedAt[card.key];
           return (
             <button
@@ -278,7 +310,7 @@ export default function PoliciesPage() {
               />
             </div>
             <span className={styles.progressCardCount}>
-              {signedCount} / {DOC_CARDS.length} Completed
+              {signedCount} / {visibleCards.length} Completed
             </span>
           </div>
         </div>

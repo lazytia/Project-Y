@@ -44,9 +44,14 @@ export const SIGNABLE_DOCUMENTS: Record<
  * The documents the staff dashboard chases as "Required Training".
  *
  * A subset rather than all of SIGNABLE_DOCUMENT_KEYS: the handbook is a
- * policy the employee already signs inside the onboarding form, so listing it
- * here would ask a second time for something they have done. The beer guide
- * has no such step and is the one that has to be chased.
+ * policy every employee signs inside the onboarding form, so listing it here
+ * would ask a second time for something they have done.
+ *
+ * The beer guide is listed because it still has to be chased for anyone who
+ * has not signed it — hall staff now get an onboarding step for it, and the
+ * document-signatures route reads that signature back, so finishing the step
+ * clears this row rather than duplicating it. Kitchen staff have no such step
+ * and are still asked here, which is a question outstanding with the owner.
  */
 export const TRAINING_DOCUMENT_KEYS: readonly SignableDocumentKey[] = ["beerGuide"];
 

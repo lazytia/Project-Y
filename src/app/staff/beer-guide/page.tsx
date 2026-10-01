@@ -1,9 +1,9 @@
 "use client";
 
 import { useLang } from "@/components/LanguageProvider";
+import BeerGuideDocument from "@/components/BeerGuideDocument";
 import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
-import { BEER_GUIDE_VIDEOS } from "@/lib/beer-guide-videos";
 import { BEER_GUIDE_UPDATED, BEER_GUIDE_VERSION } from "@/lib/hr-documents";
 import styles from "./page.module.css";
 
@@ -25,30 +25,7 @@ export default function BeerGuidePage() {
         <span>{t("common.back")}</span>
       </button>
 
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t("nav.beerGuide")}</h1>
-        <p className={styles.subtitle}>{t("staff.beerGuide.subtitle")}</p>
-      </header>
-
-      <ol className={styles.list}>
-        {BEER_GUIDE_VIDEOS.map((video, index) => (
-          <li key={video.src} className={styles.item}>
-            <h2 className={styles.videoTitle}>
-              <span className={styles.videoNum}>{index + 1}</span>
-              {t(video.titleKey)}
-            </h2>
-            <div className={styles.videoWrap}>
-              <video
-                className={styles.video}
-                src={video.src}
-                controls
-                playsInline
-                preload="metadata"
-              />
-            </div>
-          </li>
-        ))}
-      </ol>
+      <BeerGuideDocument />
 
       <DocumentAcknowledgement
         documentKey="beerGuide"

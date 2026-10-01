@@ -139,39 +139,58 @@ export default function StaffHandbookDocument() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionH}>{t("onb.pol.hb.s8.h")}</h2>
-        <p className={styles.paragraph}>{t("onb.pol.hb.s8.expected")}</p>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s8.intro")}</p>
         <ul className={styles.bulletList}>
-          <li>{t("onb.pol.hb.s8.e1")}</li>
-          <li>{t("onb.pol.hb.s8.e2")}</li>
-          <li>{t("onb.pol.hb.s8.e3")}</li>
-          <li>{t("onb.pol.hb.s8.e4")}</li>
-          <li>{t("onb.pol.hb.s8.e5")}</li>
+          <li>{t("onb.pol.hb.s8.b1")}</li>
+          <li>{t("onb.pol.hb.s8.b2")}</li>
+          <li>{t("onb.pol.hb.s8.b3")}</li>
+          <li>{t("onb.pol.hb.s8.b4")}</li>
+          <li>{t("onb.pol.hb.s8.b5")}</li>
         </ul>
-        <p className={styles.paragraph}>{t("onb.pol.hb.s8.notTolerated")}</p>
-        <ul className={styles.bulletList}>
-          <li>{t("onb.pol.hb.s8.n1")}</li>
-          <li>{t("onb.pol.hb.s8.n2")}</li>
-          <li>{t("onb.pol.hb.s8.n3")}</li>
-          <li>{t("onb.pol.hb.s8.n4")}</li>
-          <li>{t("onb.pol.hb.s8.n5")}</li>
-          <li>{t("onb.pol.hb.s8.n6")}</li>
-          <li>{t("onb.pol.hb.s8.n7")}</li>
-        </ul>
-        <p className={styles.paragraph}>{t("onb.pol.hb.s8.consequence")}</p>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s8.p1")}</p>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s8.p2")}</p>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s8.p3")}</p>
       </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionH}>{t("onb.pol.hb.s9.h")}</h2>
-        <p className={styles.paragraph}>{t("onb.pol.hb.s9.p1")}</p>
-        <p className={styles.paragraph}>{t("onb.pol.hb.s9.p2")}</p>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s9.expected")}</p>
+        {/* Smoking is no longer one of these. It has a section of its own
+            directly above, and leaving the bullet here too would be the one
+            rule in the handbook stated twice — in two different scopes, since
+            the bullet banned it outright and the section allows it on an
+            authorised break. */}
+        <ul className={styles.bulletList}>
+          <li>{t("onb.pol.hb.s9.e1")}</li>
+          <li>{t("onb.pol.hb.s9.e2")}</li>
+          <li>{t("onb.pol.hb.s9.e3")}</li>
+          <li>{t("onb.pol.hb.s9.e4")}</li>
+        </ul>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s9.notTolerated")}</p>
+        <ul className={styles.bulletList}>
+          <li>{t("onb.pol.hb.s9.n1")}</li>
+          <li>{t("onb.pol.hb.s9.n2")}</li>
+          <li>{t("onb.pol.hb.s9.n3")}</li>
+          <li>{t("onb.pol.hb.s9.n4")}</li>
+          <li>{t("onb.pol.hb.s9.n5")}</li>
+          <li>{t("onb.pol.hb.s9.n6")}</li>
+          <li>{t("onb.pol.hb.s9.n7")}</li>
+        </ul>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s9.consequence")}</p>
       </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionH}>{t("onb.pol.hb.s10.h")}</h2>
         <p className={styles.paragraph}>{t("onb.pol.hb.s10.p1")}</p>
         <p className={styles.paragraph}>{t("onb.pol.hb.s10.p2")}</p>
-        <p className={styles.paragraph}>{t("onb.pol.hb.s10.p3")}</p>
-        <p className={styles.paragraph}>{t("onb.pol.hb.s10.p4")}</p>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionH}>{t("onb.pol.hb.s11.h")}</h2>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s11.p1")}</p>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s11.p2")}</p>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s11.p3")}</p>
+        <p className={styles.paragraph}>{t("onb.pol.hb.s11.p4")}</p>
       </section>
 
       <section className={styles.section}>

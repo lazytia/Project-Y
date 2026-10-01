@@ -60,9 +60,9 @@ export default function EmploymentAgreementDocument({ children }: { children?: R
           the Project YURICA Employee Portal.
         </p>
         <p className={styles.paragraph}>
-          Availability changes and holiday requests must be submitted through
-          the Project YURICA Employee Portal at least{" "}
-          <strong>3 weeks in advance</strong>.
+          Availability changes and holiday requests must be communicated to
+          management and submitted through the Project YURICA Employee Portal
+          at least <strong>2 weeks in advance</strong>.
         </p>
         <p className={styles.paragraph}>
           Requests are not approved unless confirmed by management.
@@ -73,17 +73,23 @@ export default function EmploymentAgreementDocument({ children }: { children?: R
       <section className={styles.section}>
         <h2 className={styles.sectionH}>3. PAY</h2>
         <p className={styles.paragraph}>
-          The Employee will be paid in accordance with applicable workplace
-          laws.
+          The Employee will be paid in accordance with the applicable
+          workplace laws and the Restaurant Industry Award 2020.
         </p>
         <p className={styles.paragraph}>
-          The Employee is paid an above-award rate of pay.
+          The Employee may be paid an hourly rate above the applicable Award
+          minimum rate.
         </p>
         <p className={styles.paragraph}>
-          This rate is intended to compensate for and absorb applicable award
-          loadings, penalty rates and other monetary entitlements under the
-          Hospitality Industry (General) Award 2020, to the extent permitted
-          by law.
+          To the extent permitted by law, any amount paid above the applicable
+          Award minimum may be taken into account when assessing whether
+          applicable Award entitlements, including relevant penalty rates and
+          loadings, have been satisfied for that pay period.
+        </p>
+        <p className={styles.paragraph}>
+          The Employee will always receive at least their minimum legal
+          entitlements under the applicable Award and the National Employment
+          Standards.
         </p>
       </section>
 
