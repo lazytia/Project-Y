@@ -183,6 +183,13 @@ export default function TfnDeclarationPage() {
           // save, so the owner's copy of a signed tax form had no date on it.
           declarationDate: declarationDateKey,
         },
+        // Also at the top level, which is where the date of birth has always
+        // been read from: the employee detail page, the active-staff list and
+        // the owner's review of the Personal Information section all look
+        // there. Step 1 used to put it there and no longer asks for it — this
+        // step does, and it is required here — so this is now the one place
+        // it is collected, and it has to land where the readers look.
+        dateOfBirth,
         step: CURRENT_STEP,
         status: markComplete ? "step_complete" : "in_progress",
         updatedAt: serverTimestamp(),

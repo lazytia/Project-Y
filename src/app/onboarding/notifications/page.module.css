@@ -1,6 +1,6 @@
 /* ── First-run notifications prompt ──
    This screen has one job: get the permission prompt accepted. Everything
-   that matters — the six reasons, the language toggle, the button — has to
+   that matters — the five reasons, the language toggle, the button — has to
    be on screen at once, because a staff member who has to scroll to find the
    button is a staff member who might not.
 
@@ -8,9 +8,9 @@
    Every vertical measurement is a clamp whose middle term is in vh: the
    design keeps its intended proportions on a big phone and gives them up,
    in step, on a small one. The maxima are set so the tallest version still
-   fits a standard phone with all six rows — the list has since grown from
-   five, and the vh terms absorbed it without any of the maxima moving; a
-   667px viewport still lands about 45px clear of the fold.
+   fits a standard phone with all five rows — the list has been six and is
+   now five, and the vh terms absorbed both changes without any of the
+   maxima moving; a 667px viewport lands comfortably clear of the fold.
 
    The single `gap` on .page owns all the vertical rhythm — the children
    deliberately carry no vertical margins of their own, so there is one
@@ -39,9 +39,9 @@
   padding: 0;
 }
 .bellHalo {
-  /* One measurement drives the halo, the bell and the check, so they shrink
-     together instead of drifting apart. Ratios are the original 160px
-     design: bell 88/160, check 40/160, inset 8/160. */
+  /* One measurement drives the halo and the bell inside it, so they shrink
+     together instead of drifting apart. The ratio is the original 160px
+     design: bell 88/160. */
   --bell-halo: clamp(64px, 13vh, 128px);
 
   position: relative;
@@ -52,25 +52,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(var(--bell-halo) * 0.55);
 }
 .bell {
-  filter: drop-shadow(0 8px 12px rgba(255, 106, 19, 0.35));
-}
-.bellCheck {
-  position: absolute;
-  right: calc(var(--bell-halo) * 0.05);
-  bottom: calc(var(--bell-halo) * 0.05);
-  width: calc(var(--bell-halo) * 0.25);
-  height: calc(var(--bell-halo) * 0.25);
-  border-radius: 999px;
-  background: #fff;
+  width: calc(var(--bell-halo) * 0.55);
+  height: calc(var(--bell-halo) * 0.55);
   color: var(--color-warm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+  filter: drop-shadow(0 8px 12px rgba(255, 106, 19, 0.35));
 }
 
 .title {
@@ -106,9 +93,9 @@
   display: flex;
   align-items: center;
   gap: clamp(9px, 1.6vh, 14px);
-  /* Horizontal padding gives way on narrow phones too: at 18px the longest
-     label ("Important company announcements") wrapped to a second line and
-     took the whole card past the fold. */
+  /* Horizontal padding gives way on narrow phones too: at a fixed 18px the
+     longest label wrapped to a second line and took the whole card past the
+     fold, and the chevron at the end of each row spends that width again. */
   padding: clamp(6px, 1.15vh, 14px) clamp(12px, 4vw, 18px);
   border-bottom: 1px solid var(--color-border);
   font-size: clamp(12.5px, 2vh, 15px);
@@ -117,6 +104,9 @@
   color: var(--color-fg);
 }
 .reason:last-child { border-bottom: none; }
+/* Neutral, not orange. The orange on this screen has a job — the halo, the
+   one button to press — and five orange pills in a row next to it made the
+   list compete with the thing it is supposed to be leading up to. */
 .reasonIcon {
   --reason-icon: clamp(28px, 4.6vh, 40px);
 
@@ -126,8 +116,8 @@
   width: var(--reason-icon);
   height: var(--reason-icon);
   border-radius: 999px;
-  background: var(--color-warm-bg);
-  color: var(--color-warm);
+  background: var(--color-surface);
+  color: var(--color-fg);
   flex-shrink: 0;
 }
 /* The glyphs are drawn at a fixed 18px, which starts to crowd the pill once
@@ -135,6 +125,16 @@
 .reasonIcon svg {
   width: calc(var(--reason-icon) * 0.45);
   height: calc(var(--reason-icon) * 0.45);
+}
+
+/* Pushed to the end of the row by the auto margin rather than by a spacer,
+   so a label that wraps takes the width it needs and the chevron stays put. */
+.reasonGo {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
 }
 
 .langRow {

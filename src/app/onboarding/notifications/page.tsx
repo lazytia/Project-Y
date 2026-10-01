@@ -40,17 +40,18 @@ const ICON_PROPS = {
 /**
  * What we will actually push them about, in the order they will meet it:
  * next week's roster before the week starts, a reminder before each shift,
- * the answer to a holiday request, pay after the week is worked, training
- * they have been assigned, and announcements as the catch-all.
+ * pay after the week is worked, training they have been assigned, and
+ * announcements as the catch-all.
  *
- * A list rather than six near-identical <li> blocks — the rows differ only
- * by icon and label, and the copy that used to be duplicated around each one
- * is where a sixth row would have gone wrong.
+ * A list rather than five near-identical <li> blocks — the rows differ only
+ * by icon and label, which is why this list has gained a row and lost one
+ * since it was written without either change touching the markup.
  *
- * Six, not the previous five: "new roster published" and "roster changes"
- * were two rows for one thing, and the two notifications nobody had listed —
- * the reply to a holiday request, and a newly assigned policy or training —
- * are the two people actually ask about.
+ * The one it lost is holiday requests. It is the only thing that was on the
+ * list that is not news from the company — it is the answer to a question
+ * the reader asked, and they go and look for those. Five rows also leave the
+ * whole screen above the fold with room to spare, which is the one thing
+ * this screen has to do.
  */
 const REASONS: readonly { labelKey: string; icon: ReactNode }[] = [
   {
@@ -70,18 +71,6 @@ const REASONS: readonly { labelKey: string; icon: ReactNode }[] = [
       <svg {...ICON_PROPS}>
         <circle cx="12" cy="12" r="9" />
         <polyline points="12 7 12 12 15 14" />
-      </svg>
-    ),
-  },
-  {
-    labelKey: "notif.reason.holidayRequests",
-    icon: (
-      <svg {...ICON_PROPS}>
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-        <polyline points="9 14.5 11 16.5 15.5 12" />
       </svg>
     ),
   },
@@ -116,6 +105,37 @@ const REASONS: readonly { labelKey: string; icon: ReactNode }[] = [
     ),
   },
 ];
+
+/**
+ * The bell at the top, drawn rather than typed.
+ *
+ * It was the 🔔 emoji, and an emoji is a different picture on every
+ * platform — a gold handbell here, a flat outline there, a shape that is
+ * nobody's idea of this brand's orange on either. The one illustration on
+ * the one screen a new employee cannot skip should not be chosen by the
+ * phone. Drawn here it takes the app's own colour from CSS, it is ringing
+ * rather than sitting still, and it is built on the same stroke set as the
+ * five rows underneath it.
+ */
+const BELL = (
+  <svg
+    className={styles.bell}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    <path d="M2.2 9.6A10 10 0 0 1 4.4 3.5" />
+    <path d="M21.8 9.6A10 10 0 0 0 19.6 3.5" />
+    <path d="M5.3 6.2A7.2 7.2 0 0 1 7 3.4" />
+    <path d="M18.7 6.2A7.2 7.2 0 0 0 17 3.4" />
+  </svg>
+);
 
 export default function NotificationsPromptPage() {
   const router = useRouter();
@@ -188,10 +208,7 @@ export default function NotificationsPromptPage() {
           YURICA, so "PROJECT YURICA" was branding the same screen twice — and it
           cost a line of height on the one screen that has to fit whole. */}
       <div className={styles.bellWrap} aria-hidden="true">
-        <div className={styles.bellHalo}>
-          <span className={styles.bell}>🔔</span>
-          <span className={styles.bellCheck}>✓</span>
-        </div>
+        <div className={styles.bellHalo}>{BELL}</div>
       </div>
 
       <h1 className={styles.title}>{t("notif.title")}</h1>
@@ -204,6 +221,14 @@ export default function NotificationsPromptPage() {
               {reason.icon}
             </span>
             <span>{t(reason.labelKey)}</span>
+            {/* Decoration, not a control: the rows are a list of what will be
+                sent, and there is nowhere for any of them to lead until the
+                permission this screen is asking for has been given. It is
+                here because it makes the card read as a list of things rather
+                than a wall of text, which is what the design asks of it. */}
+            <svg {...ICON_PROPS} className={styles.reasonGo} aria-hidden="true">
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
           </li>
         ))}
       </ul>

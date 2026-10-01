@@ -47,19 +47,16 @@ const EN: Dict = {
   "common.english": "English",
   "common.japanese": "日本語",
 
-  // Notifications prompt. The six reasons are the six things the app
-  // actually pushes; "new roster published" and "roster changes" used to be
-  // two rows saying one thing, and holiday requests and training were pushed
-  // without ever being named here.
+  // Notifications prompt. The five reasons are the five things the app
+  // actually pushes, named in the order a new employee meets them.
   "notif.title": "Enable Notifications",
-  "notif.subtitle": "Stay updated with important alerts from Project YURICA.",
+  "notif.subtitle": "Get roster, payslip and important staff updates.",
   "notif.reason.nextWeekRoster": "Next week roster",
   "notif.reason.shiftReminders": "Shift reminders",
-  "notif.reason.holidayRequests": "Holiday request updates",
   "notif.reason.payslip": "Payslip available",
   "notif.reason.trainingPolicy": "Training & policy updates",
-  "notif.reason.announcements": "Important company announcements",
-  "notif.trust": "We only send relevant updates.",
+  "notif.reason.announcements": "Company announcements",
+  "notif.trust": "Relevant updates only.",
   "notif.denied": "Notifications are required to continue. Please allow the prompt in your browser or check your device settings, then try again.",
   "notif.enabling": "Enabling…",
   "notif.enableBtn": "Enable Notifications",
@@ -113,8 +110,6 @@ const EN: Dict = {
   "onb.personal.preferredName": "Preferred Name (Optional)",
   "onb.personal.firstNameEg": "e.g. Alex",
   "onb.personal.lastNameEg": "e.g. Smith",
-  "onb.personal.dob": "Date of Birth",
-  "onb.personal.dobPlaceholder": "DD / MM / YYYY",
   "onb.personal.gender": "Gender",
   "onb.personal.selectDefault": "Select",
   "onb.personal.male": "Male",
@@ -556,13 +551,12 @@ const JA: Dict = {
 
   // Notifications prompt
   "notif.title": "通知をオンにする",
-  "notif.subtitle": "Project YURICA からの大切なお知らせを受け取りましょう。",
+  "notif.subtitle": "シフト表・給与明細・大切なお知らせを受け取れます。",
   "notif.reason.nextWeekRoster": "来週のシフト表",
   "notif.reason.shiftReminders": "シフトのリマインダー",
-  "notif.reason.holidayRequests": "休暇申請の更新",
   "notif.reason.payslip": "給与明細の発行",
   "notif.reason.trainingPolicy": "研修・ポリシーの更新",
-  "notif.reason.announcements": "会社からの重要なお知らせ",
+  "notif.reason.announcements": "会社からのお知らせ",
   "notif.trust": "必要な通知のみお送りします。",
   "notif.denied": "続けるには通知の許可が必要です。ブラウザのプロンプトを許可するか、端末の設定を確認してから、もう一度お試しください。",
   "notif.enabling": "有効化しています…",
@@ -614,8 +608,6 @@ const JA: Dict = {
   "onb.personal.preferredName": "呼び名（任意）",
   "onb.personal.firstNameEg": "例：Alex",
   "onb.personal.lastNameEg": "例：Smith",
-  "onb.personal.dob": "生年月日",
-  "onb.personal.dobPlaceholder": "日 / 月 / 年",
   "onb.personal.gender": "性別",
   "onb.personal.selectDefault": "選択",
   "onb.personal.male": "男性",

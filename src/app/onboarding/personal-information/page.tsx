@@ -5,20 +5,9 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
-import CalendarPicker from "@/components/CalendarPicker";
 import Toast from "@/components/Toast";
 import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
-
-const STEPS = [
-  { num: 1, label: "Personal\nInformation" },
-  { num: 2, label: "TFN\nDeclaration" },
-  { num: 3, label: "Bank & Super\nDetails" },
-  { num: 4, label: "Documents" },
-  { num: 5, label: "Policies" },
-  { num: 6, label: "Review &\nSign" },
-  { num: 7, label: "Complete" },
-];
 
 const CURRENT_STEP = 1;
 const TOTAL_STEPS = 7;
@@ -32,24 +21,15 @@ export default function PersonalInformationPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [preferredName, setPreferredName] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [email, setEmail] = useState("");
-
-  const [showCalendar, setShowCalendar] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState("Required Fields Missing");
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
-
-  const [todayKey, setTodayKey] = useState("");
-
-  useEffect(() => {
-    setTodayKey(new Date().toLocaleDateString("en-CA"));
-  }, []);
 
   // Load any previously saved values so navigating back to this step doesn't
   // erase the user's input.
@@ -64,7 +44,6 @@ export default function PersonalInformationPage() {
         if (typeof data.firstName === "string") setFirstName(data.firstName);
         if (typeof data.lastName === "string") setLastName(data.lastName);
         if (typeof data.preferredName === "string") setPreferredName(data.preferredName);
-        if (typeof data.dateOfBirth === "string") setDateOfBirth(data.dateOfBirth);
         if (typeof data.gender === "string") setGender(data.gender);
         if (typeof data.mobileNumber === "string") setMobileNumber(data.mobileNumber);
         if (typeof data.email === "string") setEmail(data.email);
@@ -74,12 +53,6 @@ export default function PersonalInformationPage() {
     })();
     return () => { cancelled = true; };
   }, [user]);
-
-  function formatDobDisplay(raw: string): string {
-    if (!raw) return "";
-    const [y, m, d] = raw.split("-");
-    return `${d} / ${m} / ${y}`;
-  }
 
   async function saveToFirestore(markComplete = false) {
     if (!user) {
@@ -94,7 +67,6 @@ export default function PersonalInformationPage() {
         uid: user.uid,
         firstName,
         lastName,
-        dateOfBirth,
         gender,
         mobileNumber,
         email,
@@ -122,7 +94,6 @@ export default function PersonalInformationPage() {
     const missing: string[] = [];
     if (!firstName.trim()) missing.push("Legal First Name");
     if (!lastName.trim()) missing.push("Legal Last Name");
-    if (!dateOfBirth) missing.push("Date of Birth");
     if (!gender) missing.push("Gender");
     if (!mobileNumber.trim()) missing.push("Mobile Number");
     if (!email.trim()) missing.push("Email Address");
@@ -146,52 +117,33 @@ export default function PersonalInformationPage() {
 
   return (
     <div className={styles.page}>
-      {/* Header */}
+      {/* Header. No back arrow: every way out of this step is at the bottom
+          of the form, and the one at the top went back without saving — a
+          chevron that silently discards a half-filled form is a trap, and
+          "Save & Exit" is the same journey with the work kept. */}
       <div className={styles.header}>
-        <button
-          type="button"
-          className={styles.backBtn}
-          onClick={() => router.push("/onboarding")}
-          aria-label="Back to onboarding"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-        <p className={styles.stepLabel}>{t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}</p>
         <h1 className={styles.title}>{t("onb.personal.title")}</h1>
-      </div>
 
-      {/* Step Indicators */}
-      <div className={styles.stepsContainer}>
-        {STEPS.map((step, idx) => (
-          <div key={step.num} className={styles.stepItem}>
-            {idx > 0 && <div className={styles.connector} />}
-            <div className={styles.stepCircleWrap}>
-              <div
-                className={
-                  step.num === CURRENT_STEP
-                    ? `${styles.stepCircle} ${styles.stepCircleActive}`
-                    : styles.stepCircle
-                }
-              >
-                {step.num}
-              </div>
-              <span className={styles.stepItemLabel}>{step.label}</span>
-            </div>
+        {/* Where you are, said once. "Step 1 of 7", the bar and the
+            percentage are three readings of the same number, so they sit
+            together. They replace a row of seven numbered circles whose
+            labels were set at 8px — small enough that the row was really
+            just decoration, and it cost the top third of the first screen
+            of the form somebody was sent here to fill in. */}
+        <div className={styles.progressSection}>
+          <div className={styles.progressMeta}>
+            <span className={styles.stepLabel}>
+              {t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}
+            </span>
+            <span className={styles.progressText}>{PERCENT}{t("onb.percentComplete")}</span>
           </div>
-        ))}
-      </div>
-
-      {/* Progress Bar */}
-      <div className={styles.progressSection}>
-        <div className={styles.progressBarTrack}>
-          <div
-            className={styles.progressBarFill}
-            style={{ width: `${PERCENT}%` }}
-          />
+          <div className={styles.progressBarTrack}>
+            <div
+              className={styles.progressBarFill}
+              style={{ width: `${PERCENT}%` }}
+            />
+          </div>
         </div>
-        <span className={styles.progressText}>{PERCENT}{t("onb.percentComplete")}</span>
       </div>
 
       {/* Form Card */}
@@ -202,41 +154,45 @@ export default function PersonalInformationPage() {
         {error && <p className={styles.errorMessage}>{error}</p>}
 
         <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
-          {/* Legal First Name */}
-          <div className={styles.fieldGroup}>
-            <label className={styles.label}>
-              {t("onb.personal.legalFirstName")} <span className={styles.required}>*</span>
-            </label>
-            <div className={styles.inputWrapper}>
-              <span className={styles.inputIcon}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </span>
-              <input
-                type="text"
-                className={styles.input}
-                placeholder={t("onb.personal.firstNameEg")}
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
+          {/* Legal first and last name, on one line. They are one answer
+              asked in two halves, and they are the two shortest fields on
+              the form — stacked, they spent two full rows saying what fits
+              in one and pushed everything else further down the phone. */}
+          <div className={styles.nameRow}>
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>
+                {t("onb.personal.legalFirstName")} <span className={styles.required}>*</span>
+              </label>
+              <div className={styles.inputWrapper}>
+                <span className={styles.inputIcon}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <input
+                  type="text"
+                  className={styles.input}
+                  placeholder={t("onb.personal.firstNameEg")}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Legal Last Name */}
-          <div className={styles.fieldGroup}>
-            <label className={styles.label}>
-              {t("onb.personal.legalLastName")} <span className={styles.required}>*</span>
-            </label>
-            <div className={styles.inputWrapper}>
-              <span className={styles.inputIcon}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </span>
-              <input
-                type="text"
-                className={styles.input}
-                placeholder={t("onb.personal.lastNameEg")}
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>
+                {t("onb.personal.legalLastName")} <span className={styles.required}>*</span>
+              </label>
+              <div className={styles.inputWrapper}>
+                <span className={styles.inputIcon}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <input
+                  type="text"
+                  className={styles.input}
+                  placeholder={t("onb.personal.lastNameEg")}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
@@ -257,48 +213,12 @@ export default function PersonalInformationPage() {
             </div>
           </div>
 
-          {/* Date of Birth */}
-          <div className={styles.fieldGroup}>
-            <label className={styles.label}>
-              {t("onb.personal.dob")} <span className={styles.required}>*</span>
-            </label>
-            <div className={styles.inputWrapper}>
-              <span className={styles.inputIcon}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              </span>
-              <input
-                type="text"
-                readOnly
-                className={`${styles.input} ${styles.inputWithRightIcon}`}
-                placeholder={t("onb.personal.dobPlaceholder")}
-                value={formatDobDisplay(dateOfBirth)}
-                onClick={() => setShowCalendar(true)}
-              />
-              <button
-                type="button"
-                className={styles.inputIconRightBtn}
-                onClick={() => setShowCalendar(true)}
-                aria-label="Open date picker"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              </button>
-            </div>
-          </div>
-
-          {showCalendar && (
-            <CalendarPicker
-              singleOnly
-              value={dateOfBirth || todayKey}
-              maxDate={todayKey}
-              minDate="1900-01-01"
-              onChange={(dateKey) => {
-                setDateOfBirth(dateKey);
-                setShowCalendar(false);
-              }}
-              onRangeChange={() => {}}
-              onClose={() => setShowCalendar(false)}
-            />
-          )}
+          {/* Date of birth is not asked here. It is asked on the next step,
+              as part of the TFN declaration, where it is required and where
+              it is the ATO's question rather than ours — and asking for it
+              twice in two screens is how you end up with two answers. That
+              step writes it to the same place this one used to, so the
+              employee record and the owner's review are unchanged. */}
 
           {/* Gender */}
           <div className={styles.fieldGroup}>

@@ -19,32 +19,47 @@ import Splash from "@/components/Splash";
 import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
-/** Friday, as a JS day-of-week. */
-const FRIDAY = 5;
+/**
+ * When payroll closes: 1pm on a Thursday, as a JS day-of-week and an hour.
+ *
+ * The hour is half the deadline, not decoration. Paperwork that arrives at
+ * 6pm on the Thursday misses the week as surely as paperwork that arrives on
+ * the Friday, so a cut-off printed as a bare date quietly tells somebody they
+ * have nine hours they do not have.
+ */
+const PAYROLL_CUTOFF_DOW = 4;
+const PAYROLL_CUTOFF_HOUR = 13;
 
 /**
- * The payroll cut-off: this coming Friday.
+ * The payroll cut-off: this coming Thursday.
  *
  * It used to be derived from the employee's start date — the Friday of the
  * week after they joined — so it was a fixed date that went stale the moment
  * that week passed, and someone still finishing their paperwork a fortnight
  * in was being shown a deadline that had already gone. The cut-off is a
  * weekly deadline, not a fact about when someone started, so it rolls: on a
- * Friday it is today, and from Saturday it moves to the Friday after.
+ * Thursday it is today, and from Friday it moves to the Thursday after.
  *
  * Sydney's date rather than the device's, so someone filling this in from
  * overseas — or just before midnight — sees the deadline the restaurant
  * actually runs on.
  */
-function upcomingFridayKey(): string {
+function upcomingCutoffKey(): string {
   const today = sydneyTodayKey();
-  return addDaysISO(today, (FRIDAY - dowOfDateKey(today) + 7) % 7);
+  return addDaysISO(today, (PAYROLL_CUTOFF_DOW - dowOfDateKey(today) + 7) % 7);
 }
 
-/** Midday, so formatting can never tip a date over a day boundary. */
-function dateFromKey(key: string): Date {
+/**
+ * A date key as a Date, at `hour` on it.
+ *
+ * Midday by default, so formatting can never tip a date over a day boundary.
+ * Built in the device's zone and formatted in the device's zone, which is
+ * what makes the cut-off read as the wall-clock time the restaurant means —
+ * 1pm is 1pm on the roster whichever country the phone is in.
+ */
+function dateFromKey(key: string, hour = 12): Date {
   const [y, m, d] = key.split("-").map(Number);
-  return new Date(y, m - 1, d, 12);
+  return new Date(y, m - 1, d, hour);
 }
 
 function fmtDate(d: Date): string {
@@ -54,6 +69,19 @@ function fmtDate(d: Date): string {
     month: "short",
     year: "numeric",
   });
+}
+
+/** Upper-cased because en-AU gives "1:00 pm" and the design asks for PM. */
+function fmtTime(d: Date): string {
+  return d
+    .toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })
+    .toUpperCase();
+}
+
+/** The cut-off is the only date on this page that carries a time. Both halves
+ *  come off the same Date, so they cannot disagree about which day it is. */
+function fmtDateTime(d: Date): string {
+  return `${fmtDate(d)} · ${fmtTime(d)}`;
 }
 
 const TOTAL_STEPS = 7;
@@ -149,7 +177,7 @@ export default function OnboardingPage() {
   const continueStep = ALL_STEPS[inProgressStep] ?? nextStep;
   const remainingSteps = ALL_STEPS.slice(nextStepIndex + 1);
 
-  const payrollCutoff = dateFromKey(upcomingFridayKey());
+  const payrollCutoff = dateFromKey(upcomingCutoffKey(), PAYROLL_CUTOFF_HOUR);
 
   /**
    * The step the owner has sent back, if the employee is sitting on one.
@@ -227,7 +255,7 @@ export default function OnboardingPage() {
               <span className={styles.dateIcon}>🕐</span>
               <div>
                 <p className={styles.dateLabel}>{t("onb.payrollCutoff")}</p>
-                <p className={styles.dateValue}>{fmtDate(payrollCutoff)}</p>
+                <p className={styles.dateValue}>{fmtDateTime(payrollCutoff)}</p>
                 <p className={styles.dateSub}>{t("onb.payrollCutoffHelp")}</p>
               </div>
             </div>
