@@ -245,7 +245,7 @@ const EN: Dict = {
   "onb.pol.hb.s3.p1": "Project YURICA is YURICA's official staff communication and scheduling platform.",
   "onb.pol.hb.s3.p2": "Employees are responsible for checking Project YURICA regularly.",
   "onb.pol.hb.s3.p3Before": "Any request to change availability or request holiday leave must be submitted through Project YURICA at least ",
-  "onb.pol.hb.s3.p3Strong": "3 weeks in advance",
+  "onb.pol.hb.s3.p3Strong": "2 weeks in advance",
   "onb.pol.hb.s3.p3After": " whenever possible.",
   "onb.pol.hb.s3.p4": "Submitting a request does not mean it has been approved.",
   "onb.pol.hb.s3.p5": "All requests require management approval through Project YURICA.",
@@ -443,14 +443,12 @@ const EN: Dict = {
   // Request Holiday
   "rh.title": "Holiday Request",
   "rh.notice": "Notice",
-  "rh.noticeLongBefore": "3 or more consecutive days:",
-  "rh.noticeLongBody": " Please submit at least ",
-  "rh.noticeLongWeeks": "3 weeks",
-  "rh.noticeLongAfter": " in advance.",
-  "rh.noticeShortBefore": "Less than 3 consecutive days:",
-  "rh.noticeShortBody": " Please submit at least ",
-  "rh.noticeShortWeeks": "2 weeks",
-  "rh.noticeShortAfter": " in advance.",
+  // One rule, so one sentence. These used to be two — three weeks for a
+  // holiday of three days or more, two for anything shorter — and with both
+  // tiers now at two weeks the box would have stated the same rule twice.
+  "rh.noticeBefore": "Please submit all holiday requests at least ",
+  "rh.noticeWeeks": "2 weeks",
+  "rh.noticeAfter": " in advance.",
   "rh.startDate": "Start Date",
   "rh.endDate": "End Date",
   "rh.reason": "Reason",
@@ -478,7 +476,7 @@ const EN: Dict = {
 
   // Availability Change
   "ac.title": "Availability Change",
-  "ac.notice": "Availability changes require at least 3 weeks notice.",
+  "ac.notice": "Availability changes require at least 2 weeks notice.",
   "ac.effectiveFrom": "Effective From",
   "ac.subjectApproval": "Subject to approval",
   "ac.effectiveNote": "Your new availability will apply from this date if approved by management.",
@@ -758,7 +756,7 @@ const JA: Dict = {
   "onb.pol.hb.s3.p1": "Project YURICA は YURICA の公式スタッフ連絡・シフト管理プラットフォームです。",
   "onb.pol.hb.s3.p2": "従業員は Project YURICA を定期的に確認する責任があります。",
   "onb.pol.hb.s3.p3Before": "勤務可能日の変更や休暇申請は、可能な限り ",
-  "onb.pol.hb.s3.p3Strong": "3週間前まで",
+  "onb.pol.hb.s3.p3Strong": "2週間前まで",
   "onb.pol.hb.s3.p3After": " に Project YURICA から提出してください。",
   "onb.pol.hb.s3.p4": "申請の提出は承認を意味するものではありません。",
   "onb.pol.hb.s3.p5": "すべての申請には Project YURICA 上での経営陣の承認が必要です。",
@@ -951,14 +949,9 @@ const JA: Dict = {
   // Request Holiday
   "rh.title": "休暇申請",
   "rh.notice": "お知らせ",
-  "rh.noticeLongBefore": "連続3日以上の休暇：",
-  "rh.noticeLongBody": " 少なくとも ",
-  "rh.noticeLongWeeks": "3週間前",
-  "rh.noticeLongAfter": " までにご提出ください。",
-  "rh.noticeShortBefore": "連続3日未満の休暇：",
-  "rh.noticeShortBody": " 少なくとも ",
-  "rh.noticeShortWeeks": "2週間前",
-  "rh.noticeShortAfter": " までにご提出ください。",
+  "rh.noticeBefore": "休暇申請は、すべて少なくとも ",
+  "rh.noticeWeeks": "2週間前",
+  "rh.noticeAfter": " までにご提出ください。",
   "rh.startDate": "開始日",
   "rh.endDate": "終了日",
   "rh.reason": "理由",
@@ -986,7 +979,7 @@ const JA: Dict = {
 
   // Availability Change
   "ac.title": "勤務可能日の変更",
-  "ac.notice": "勤務可能日の変更には、少なくとも3週間前の申請が必要です。",
+  "ac.notice": "勤務可能日の変更には、少なくとも2週間前の申請が必要です。",
   "ac.effectiveFrom": "適用開始日",
   "ac.subjectApproval": "承認待ち",
   "ac.effectiveNote": "承認されると、この日から新しい勤務可能日が適用されます。",

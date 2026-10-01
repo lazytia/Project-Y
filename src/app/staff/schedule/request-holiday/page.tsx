@@ -63,11 +63,17 @@ function daysFromToday(key: string): number {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function durationDays(startKey: string, endKey: string): number {
-  const s = keyToDate(startKey);
-  const e = keyToDate(endKey);
-  return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-}
+/**
+ * How much notice a holiday request needs.
+ *
+ * One figure, not two. The rule used to turn on how long the holiday was —
+ * three weeks for three days or more, two for anything shorter — which is why
+ * the length of the request was worked out at all. It is a flat two weeks
+ * now, matching the employment agreement and the handbook, so the length no
+ * longer decides anything and `durationDays` went with it.
+ */
+const NOTICE_WEEKS = 2;
+const NOTICE_DAYS = NOTICE_WEEKS * 7;
 
 function keyToDate(key: string): Date {
   const [y, m, d] = key.split("-").map(Number);
@@ -161,22 +167,21 @@ export default function RequestHolidayPage() {
   }, [user]);
 
   const todayK = useMemo(todayKey, []);
-  // Block the calendar to dates at least 14 days out — staff cannot request
-  // holidays inside the 2-week notice window. Longer requests still need
-  // the 3-week notice check at submit (noticeRule below).
-  const minStartKey = useMemo(() => addDays(todayK, 14), [todayK]);
+  // Block the calendar to the notice window, so an impossible start date is
+  // not offered in the first place.
+  const minStartKey = useMemo(() => addDays(todayK, NOTICE_DAYS), [todayK]);
 
-  const noticeRule = useMemo((): { weeks: number; met: boolean } | null => {
+  // Checked again here rather than left to the calendar: the picker's floor
+  // is worked out once on mount, so a page left open overnight would still
+  // be offering yesterday's earliest date.
+  const noticeMet = useMemo((): boolean | null => {
     if (!startKey || !endKey) return null;
-    const dur = durationDays(startKey, endKey);
-    const notice = daysFromToday(startKey);
-    if (dur >= 3) return { weeks: 3, met: notice >= 21 };
-    return { weeks: 2, met: notice >= 14 };
+    return daysFromToday(startKey) >= NOTICE_DAYS;
   }, [startKey, endKey]);
 
   const canSubmit = Boolean(
     user && startKey && endKey && reason.trim() && !submitting &&
-    endKey >= startKey && (noticeRule?.met ?? false),
+    endKey >= startKey && (noticeMet ?? false),
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -186,8 +191,8 @@ export default function RequestHolidayPage() {
       setError(t("rh.endBeforeStart"));
       return;
     }
-    if (noticeRule && !noticeRule.met) {
-      setError(t("rh.needsWeeksNotice").replace("{n}", String(noticeRule.weeks)));
+    if (noticeMet === false) {
+      setError(t("rh.needsWeeksNotice").replace("{n}", String(NOTICE_WEEKS)));
       return;
     }
     setSubmitting(true);
@@ -264,20 +269,8 @@ export default function RequestHolidayPage() {
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
           <p className={styles.noticeText}>
-            <strong>{t("rh.noticeLongBefore")}</strong>{t("rh.noticeLongBody")}
-            <span className={styles.noticeAccent}>{t("rh.noticeLongWeeks")}</span>{t("rh.noticeLongAfter")}
-          </p>
-        </div>
-        <div className={styles.noticeRow}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
-          <p className={styles.noticeText}>
-            <strong>{t("rh.noticeShortBefore")}</strong>{t("rh.noticeShortBody")}
-            <span className={styles.noticeAccent}>{t("rh.noticeShortWeeks")}</span>{t("rh.noticeShortAfter")}
+            {t("rh.noticeBefore")}
+            <span className={styles.noticeAccent}>{t("rh.noticeWeeks")}</span>{t("rh.noticeAfter")}
           </p>
         </div>
       </div>
@@ -325,8 +318,8 @@ export default function RequestHolidayPage() {
           placeholder={t("rh.reasonPlaceholder")}
         />
 
-        {noticeRule && (
-          <div className={`${styles.ruleHint} ${noticeRule.met ? styles.ruleHintOk : styles.ruleHintWarn}`}>
+        {noticeMet !== null && (
+          <div className={`${styles.ruleHint} ${noticeMet ? styles.ruleHintOk : styles.ruleHintWarn}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="16" x2="12" y2="12" />
@@ -335,8 +328,8 @@ export default function RequestHolidayPage() {
             <span className={styles.ruleHintText}>
               <span>
                 {t("rh.ruleRequires")}
-                <strong>{noticeRule.weeks}{t("rh.ruleWeeksSuffix")}</strong>{t("rh.ruleNotice")}
-                {!noticeRule.met && t("rh.rulePickLater")}
+                <strong>{NOTICE_WEEKS}{t("rh.ruleWeeksSuffix")}</strong>{t("rh.ruleNotice")}
+                {!noticeMet && t("rh.rulePickLater")}
               </span>
               <span className={styles.ruleHintFooter}>
                 {t("rh.ruleUrgentNote")}
