@@ -9,6 +9,22 @@ import Toast from "@/components/Toast";
 import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
+/**
+ * The seven steps, as the row of circles across the top. Kept identical to
+ * the copy every other step carries so the header reads the same all the way
+ * through — the row's whole job is telling somebody mid-form how much of it
+ * is left, and it can only do that if it does not change shape between steps.
+ */
+const STEPS = [
+  { num: 1, label: "Personal\nInformation" },
+  { num: 2, label: "TFN\nDeclaration" },
+  { num: 3, label: "Bank & Super\nDetails" },
+  { num: 4, label: "Documents" },
+  { num: 5, label: "Policies" },
+  { num: 6, label: "Review &\nSign" },
+  { num: 7, label: "Complete" },
+];
+
 const CURRENT_STEP = 1;
 const TOTAL_STEPS = 7;
 const PERCENT = Math.round((CURRENT_STEP / TOTAL_STEPS) * 100);
@@ -117,33 +133,52 @@ export default function PersonalInformationPage() {
 
   return (
     <div className={styles.page}>
-      {/* Header. No back arrow: every way out of this step is at the bottom
-          of the form, and the one at the top went back without saving — a
-          chevron that silently discards a half-filled form is a trap, and
-          "Save & Exit" is the same journey with the work kept. */}
+      {/* Header */}
       <div className={styles.header}>
+        <button
+          type="button"
+          className={styles.backBtn}
+          onClick={() => router.push("/onboarding")}
+          aria-label="Back to onboarding"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <p className={styles.stepLabel}>{t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}</p>
         <h1 className={styles.title}>{t("onb.personal.title")}</h1>
+      </div>
 
-        {/* Where you are, said once. "Step 1 of 7", the bar and the
-            percentage are three readings of the same number, so they sit
-            together. They replace a row of seven numbered circles whose
-            labels were set at 8px — small enough that the row was really
-            just decoration, and it cost the top third of the first screen
-            of the form somebody was sent here to fill in. */}
-        <div className={styles.progressSection}>
-          <div className={styles.progressMeta}>
-            <span className={styles.stepLabel}>
-              {t("onb.stepPrefix")} {CURRENT_STEP} {t("onb.stepOf")} {TOTAL_STEPS}
-            </span>
-            <span className={styles.progressText}>{PERCENT}{t("onb.percentComplete")}</span>
+      {/* Step Indicators */}
+      <div className={styles.stepsContainer}>
+        {STEPS.map((step, idx) => (
+          <div key={step.num} className={styles.stepItem}>
+            {idx > 0 && <div className={styles.connector} />}
+            <div className={styles.stepCircleWrap}>
+              <div
+                className={
+                  step.num === CURRENT_STEP
+                    ? `${styles.stepCircle} ${styles.stepCircleActive}`
+                    : styles.stepCircle
+                }
+              >
+                {step.num}
+              </div>
+              <span className={styles.stepItemLabel}>{step.label}</span>
+            </div>
           </div>
-          <div className={styles.progressBarTrack}>
-            <div
-              className={styles.progressBarFill}
-              style={{ width: `${PERCENT}%` }}
-            />
-          </div>
+        ))}
+      </div>
+
+      {/* Progress Bar */}
+      <div className={styles.progressSection}>
+        <div className={styles.progressBarTrack}>
+          <div
+            className={styles.progressBarFill}
+            style={{ width: `${PERCENT}%` }}
+          />
         </div>
+        <span className={styles.progressText}>{PERCENT}{t("onb.percentComplete")}</span>
       </div>
 
       {/* Form Card */}

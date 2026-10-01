@@ -15,6 +15,25 @@
   gap: var(--space-1);
 }
 
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full, 50%);
+  border: none;
+  background: var(--color-bg-alt);
+  color: var(--color-fg);
+  cursor: pointer;
+  margin-bottom: var(--space-2);
+  transition: background 0.15s;
+}
+
+.backBtn:hover {
+  background: var(--color-border);
+}
+
 .stepLabel {
   margin: 0;
   font-size: var(--font-size-sm);
@@ -30,20 +49,76 @@
   line-height: 1.2;
 }
 
+/* Step Indicators */
+.stepsContainer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+}
+
+.stepItem {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  position: relative;
+}
+
+.stepItem:first-child {
+  flex: 0 0 auto;
+}
+
+.connector {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+  margin-top: 12px;
+  min-width: 8px;
+}
+
+.stepCircleWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.stepCircle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg-muted);
+  background: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.stepCircleActive {
+  background: var(--color-warm);
+  border-color: var(--color-warm);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.stepItemLabel {
+  font-size: 8px;
+  color: var(--color-fg-muted);
+  text-align: center;
+  line-height: 1.3;
+  white-space: pre-line;
+  max-width: 40px;
+}
+
 /* Progress Bar */
 .progressSection {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* The step count and the percentage are the two ends of the same line, with
-   the bar under both. Baseline-aligned rather than centred because they are
-   different sizes and it is the text that has to line up, not the boxes. */
-.progressMeta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: var(--space-3);
 }
 
