@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { markRosterWeekSeen } from "@/lib/roster-seen";
 import { positionLabelOf } from "@/lib/staff-display";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -146,6 +147,20 @@ export default function StaffRosterPage() {
   useEffect(() => {
     if (!authLoading) load();
   }, [authLoading, load]);
+
+  /**
+   * Reading a week here is what clears its "Roster published" notice off the
+   * dashboard. Recorded for whichever week is on screen, so paging forward to
+   * next week counts as having seen next week — that is the week the notice
+   * is usually about.
+   */
+  const seenWeeks = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (loading || !user) return;
+    if (seenWeeks.current.has(weekStartISO)) return;
+    seenWeeks.current.add(weekStartISO);
+    void markRosterWeekSeen(user.uid, weekStartISO);
+  }, [loading, user, weekStartISO]);
 
   const rosterDoc = rosterMap[weekStartISO] ?? null;
 

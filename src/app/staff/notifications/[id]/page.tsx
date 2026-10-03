@@ -5,6 +5,7 @@ import { useRouter, notFound } from "next/navigation";
 import { doc, getDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { markRosterWeekSeen, ROSTER_PUBLISHED_KIND } from "@/lib/roster-seen";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -211,6 +212,13 @@ export default function NotificationDetailPage({
         const isHol = kind.startsWith("holiday");
         const isAv = kind.startsWith("availability");
         const notifMs = tsDate(n?.createdAt)?.getTime() ?? 0;
+
+        // This screen lists the week's shifts in full, so opening it is
+        // reading the roster — it clears the dashboard notice just as
+        // opening the roster page itself does.
+        if (kind === ROSTER_PUBLISHED_KIND && n?.weekStartISO) {
+          void markRosterWeekSeen(user.uid, n.weekStartISO);
+        }
 
         if (isHol) {
           const list = (data.holidayRequests ?? []) as HolidayRequest[];
