@@ -173,29 +173,25 @@ export const MANAGER_NAV: NavGroup[] = shiftLeadNav([
 
 export const CHEF_NAV: NavGroup[] = shiftLeadNav(TEAM_ADMIN_LINKS);
 
+/**
+ * Staff menu for the SSR shell paint.
+ *
+ * Must stay in step with the `staffNav` memo in Sidebar.tsx, which is what
+ * replaces this once the client has hydrated — the two differ only in that
+ * the live one runs the labels through `t()`. This copy had drifted badly: it
+ * still led with an "Onboarding" group the client menu dropped some time ago,
+ * so staff were served a menu for a thing they had finished and watched it
+ * rearrange itself under them a moment later.
+ *
+ * Flat on purpose. Every row is a destination, and NavGroupBlock renders a
+ * group with an `href` and no `children` as a plain link with no chevron.
+ */
 export const STAFF_NAV: NavGroup[] = [
   { icon: "🏠", label: "Home", href: "/staff" },
-  {
-    icon: "📋",
-    label: "Onboarding",
-    children: [
-      { label: "Overview", href: "/onboarding" },
-      { label: "Staff Handbook", href: "/staff/handbook" },
-      TRAINING_MANUAL,
-    ],
-  },
-  {
-    icon: "📅",
-    label: "Schedule",
-    children: [
-      { label: "Roster", href: "/staff/schedule/roster" },
-      { label: "Request Holiday", href: "/staff/schedule/request-holiday" },
-      { label: "Availability Change", href: "/staff/schedule/availability-change" },
-    ],
-  },
+  { icon: "📅", label: "Schedule", href: "/staff/schedule/roster" },
   { icon: "💰", label: "Payslips", href: "/staff/payslips" },
-  { icon: "📄", label: "My Documents", href: "/staff/documents" },
-  { icon: "⚙️", label: "Settings", href: "/staff/settings" },
+  { icon: "📚", label: "Documents & Training", href: "/staff/documents" },
+  { icon: "✍️", label: "Requests", href: "/staff/requests" },
 ];
 
 /** Nav tree for SSR shell paint based on the session role cookie. */

@@ -30,6 +30,8 @@ const EN: Dict = {
   "nav.availabilityChange": "Availability Change",
   "nav.payslips": "Payslips",
   "nav.myDocuments": "My Documents",
+  "nav.documentsTraining": "Documents & Training",
+  "nav.requests": "Requests",
   "nav.settings": "Settings",
   "nav.signOut": "Sign out",
 
@@ -439,6 +441,12 @@ const EN: Dict = {
   "docs.uploading": "Uploading…",
   "docs.reviewA": "Your new document will be reviewed by an administrator.",
   "docs.reviewB": "You will be notified once it has been approved.",
+  "docs.trainingTitle": "Training",
+  "docs.trainingSubtitle": "Reference material, open any time.",
+
+  // Requests
+  "req.title": "Requests",
+  "req.subtitle": "Ask for time off, or tell us when your availability changes.",
 
   // Request Holiday
   "rh.title": "Holiday Request",
@@ -543,6 +551,8 @@ const JA: Dict = {
   "nav.availabilityChange": "勤務可能日変更",
   "nav.payslips": "給与明細",
   "nav.myDocuments": "マイドキュメント",
+  "nav.documentsTraining": "書類と研修",
+  "nav.requests": "申請",
   "nav.settings": "設定",
   "nav.signOut": "ログアウト",
 
@@ -945,6 +955,12 @@ const JA: Dict = {
   "docs.uploading": "アップロード中…",
   "docs.reviewA": "アップロードした書類は管理者が確認します。",
   "docs.reviewB": "承認され次第、通知でお知らせします。",
+  "docs.trainingTitle": "研修",
+  "docs.trainingSubtitle": "いつでも見返せる資料です。",
+
+  // Requests
+  "req.title": "申請",
+  "req.subtitle": "休暇の申請や、勤務可能日の変更はこちらから。",
 
   // Request Holiday
   "rh.title": "休暇申請",

@@ -24,7 +24,7 @@
   line-height: 1.6;
 }
 
-/* ?€?€ Document card (full-width, stacked) ?€?€ */
+/* ?ï¿½?ï¿½ Document card (full-width, stacked) ?ï¿½?ï¿½ */
 .docCard {
   display: flex;
   flex-direction: column;
@@ -115,7 +115,7 @@
   color: var(--color-fg-muted);
 }
 
-/* ?€?€ Divider + action row ?€?€ */
+/* ?ï¿½?ï¿½ Divider + action row ?ï¿½?ï¿½ */
 .divider {
   height: 1px;
   background: var(--color-border);
@@ -180,7 +180,69 @@
   font-size: 14px;
 }
 
-/* ?€?€ Info box ?€?€ */
+/* â”€â”€ Training â”€â”€
+   Rows, not cards: these are opened and read, while the documents above are
+   uploaded and have a state worth a badge. Matches the dashboard's quick
+   actions so the two lists of taps read the same way. */
+.trainingSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.trainingTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.trainingSubtitle {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+  line-height: 1.6;
+}
+
+.trainingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: var(--color-fg);
+  transition: border-color 0.15s;
+}
+
+.trainingRow:hover { border-color: var(--color-warm); }
+
+.trainingIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-fg);
+  flex-shrink: 0;
+}
+
+.trainingLabel {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.trainingChevron {
+  font-size: 22px;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+/* ?ï¿½?ï¿½ Info box ?ï¿½?ï¿½ */
 .infoBox {
   display: flex;
   align-items: flex-start;

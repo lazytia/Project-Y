@@ -7,7 +7,6 @@ import type { User } from "firebase/auth";
 import { useAuth } from "./AuthProvider";
 import { useLang } from "./LanguageProvider";
 import LanguageToggle from "./LanguageToggle";
-import { CLOCK_IN_GUIDE_HREF } from "@/lib/clock-in-guide";
 import { emailToUsername } from "@/lib/username";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import { readClientDashboardHint } from "@/lib/client-session-hint";
@@ -327,42 +326,29 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     [userIsStrictOwner],
   );
 
-  // Staff sidebar — the day-to-day rows first, then the reference material.
+  // Staff sidebar — five rows, every one of them a destination.
   // Built here rather than inside the staff branch below so the open-group
   // effect can see the same tree the staff member is looking at.
   //
-  // The three documents used to hang off an "Onboarding" group, with the beer
-  // guide indented under the training manual. Onboarding is over by the time
-  // this menu appears, so the group was named for something the reader had
-  // already finished, and the nesting buried the beer guide two taps deep —
-  // it is the one they are asked to come back and sign.
+  // Deliberately flat: no `children`, which is what makes NavGroupBlock render
+  // each row as a plain link with no disclosure chevron. The accordion was
+  // costing two taps for every reference page and hiding the destinations
+  // behind a label — Schedule and Handbook & Training were headings you could
+  // press that went nowhere on their own.
+  //
+  // What the two groups used to hold now lives on the page itself: the roster
+  // is Schedule, and the handbook, training manual, beer guide and clock-in
+  // guide are a Training section on Documents & Training. The clock-in guide
+  // in particular needs that home — the dashboard only promotes it for the
+  // first fortnight after activation, so the menu was the only thing keeping
+  // it reachable afterwards.
   const staffNav: NavGroup[] = useMemo(
     () => [
       { icon: "🏠", label: t("nav.home"), href: "/staff" },
-      {
-        icon: "📅",
-        label: t("nav.schedule"),
-        children: [
-          { label: t("nav.roster"), href: "/staff/schedule/roster" },
-          // Second, under the roster it belongs to. The dashboard only
-          // promotes it for a fortnight; this is where it lives after that.
-          { label: t("nav.clockInGuide"), href: CLOCK_IN_GUIDE_HREF },
-          { label: t("nav.requestHoliday"), href: "/staff/schedule/request-holiday" },
-          { label: t("nav.availabilityChange"), href: "/staff/schedule/availability-change" },
-        ],
-      },
+      { icon: "📅", label: t("nav.schedule"), href: "/staff/schedule/roster" },
       { icon: "💰", label: t("nav.payslips"), href: "/staff/payslips" },
-      {
-        icon: "📚",
-        label: t("nav.handbookTraining"),
-        children: [
-          { label: t("nav.staffHandbook"), href: "/staff/handbook" },
-          { label: t("nav.trainingManual"), href: "/staff/training-manual" },
-          { label: t("nav.beerGuide"), href: "/staff/beer-guide" },
-        ],
-      },
-      { icon: "📄", label: t("nav.myDocuments"), href: "/staff/documents" },
-      { icon: "⚙️", label: t("nav.settings"), href: "/staff/settings" },
+      { icon: "📚", label: t("nav.documentsTraining"), href: "/staff/documents" },
+      { icon: "✍️", label: t("nav.requests"), href: "/staff/requests" },
     ],
     [t],
   );

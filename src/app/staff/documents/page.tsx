@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getDb } from "@/lib/firebase";
@@ -8,8 +9,74 @@ import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
 import { needsRsaCertificate } from "@/lib/staff-display";
+import { CLOCK_IN_GUIDE_HREF } from "@/lib/clock-in-guide";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
+
+/** Shared geometry for the training row icons, so one edit moves all four. */
+const ICON_PROPS = {
+  width: 20,
+  height: 20,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+} as const;
+
+/**
+ * The reading this page offers, in the order it is handed out: handbook on
+ * day one, training manual alongside it, beer guide to sign, clock-in guide
+ * to come back to.
+ *
+ * Labels reuse the `nav.*` keys they had in the sidebar — the rows are the
+ * same destinations, so a translation fix only has to land once.
+ */
+const TRAINING_LINKS: readonly { href: string; labelKey: string; icon: React.ReactNode }[] = [
+  {
+    href: "/staff/handbook",
+    labelKey: "nav.staffHandbook",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/staff/training-manual",
+    labelKey: "nav.trainingManual",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/staff/beer-guide",
+    labelKey: "nav.beerGuide",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M17 11h1a3 3 0 0 1 0 6h-1" />
+        <path d="M9 12v6M13 12v6" />
+        <path d="M14 7.5a3.5 3.5 0 0 0-7 0" />
+        <path d="M5 8h12v10a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z" />
+      </svg>
+    ),
+  },
+  {
+    href: CLOCK_IN_GUIDE_HREF,
+    labelKey: "nav.clockInGuide",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <circle cx="12" cy="12" r="9" />
+        <polyline points="12 7 12 12 15.5 14" />
+      </svg>
+    ),
+  },
+];
 
 type StaffDocs = {
   visaUrl?: string | null;
@@ -109,7 +176,9 @@ export default function MyDocumentsPage() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>{t("docs.title")}</h1>
+      {/* Named from the nav key that leads here, so the row you press and the
+          heading you land on cannot drift apart. */}
+      <h1 className={styles.title}>{t("nav.documentsTraining")}</h1>
       <p className={styles.subtitle}>
         {t("docs.subtitleA")}<br />
         {t("docs.subtitleB")}
@@ -239,6 +308,34 @@ export default function MyDocumentsPage() {
       )}
 
       {error && <p className={styles.error}>{error}</p>}
+
+      {/* ── Training ──
+          The reference reading, which used to be a "Handbook & Training"
+          group in the sidebar. It sits on this page because the menu is flat
+          now, and here rather than anywhere else because these are documents
+          too — the difference is only that these are read and signed while
+          the cards above are uploaded.
+
+          The clock-in guide is included on purpose. The dashboard promotes it
+          for the first fortnight after activation and then drops it, so
+          without a row here it would become unreachable for everybody who has
+          been on the team longer than two weeks. */}
+      <section className={styles.trainingSection}>
+        <h2 className={styles.trainingTitle}>{t("docs.trainingTitle")}</h2>
+        <p className={styles.trainingSubtitle}>{t("docs.trainingSubtitle")}</p>
+
+        {TRAINING_LINKS.map(({ href, labelKey, icon }) => (
+          <Link href={href} key={href} className={styles.trainingRow}>
+            <span className={styles.trainingIcon} aria-hidden="true">
+              {icon}
+            </span>
+            <span className={styles.trainingLabel}>{t(labelKey)}</span>
+            <span className={styles.trainingChevron} aria-hidden="true">
+              ›
+            </span>
+          </Link>
+        ))}
+      </section>
 
       <div className={styles.infoBox}>
         <span className={styles.infoIcon} aria-hidden="true">
