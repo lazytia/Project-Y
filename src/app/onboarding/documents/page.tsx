@@ -264,6 +264,11 @@ export default function DocumentsPage() {
     const missing: string[] = [];
     if (passportDocs.length === 0) missing.push("Passport / Photo ID");
     if (visaDocs.length === 0) missing.push("Visa");
+    // Required, but only of the people who are actually shown it. Checked
+    // against `wantsRsa` rather than the section list so the kitchen is never
+    // held on a document it has no slot to upload — the same reason the
+    // section is dropped for them rather than marked optional.
+    if (wantsRsa && rsaDocs.length === 0) missing.push("RSA Certificate");
 
     if (missing.length > 0) {
       setErrorTitle("Required Documents Missing");

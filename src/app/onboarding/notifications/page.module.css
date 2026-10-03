@@ -127,16 +127,6 @@
   height: calc(var(--reason-icon) * 0.45);
 }
 
-/* Pushed to the end of the row by the auto margin rather than by a spacer,
-   so a label that wraps takes the width it needs and the chevron stays put. */
-.reasonGo {
-  margin-left: auto;
-  width: 16px;
-  height: 16px;
-  color: var(--color-fg-subtle);
-  flex-shrink: 0;
-}
-
 .langRow {
   display: flex;
   justify-content: center;

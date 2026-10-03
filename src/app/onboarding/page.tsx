@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
-import { addDaysISO, dowOfDateKey, sydneyTodayKey } from "@/lib/sydney-date";
+import { addDaysISO, dowOfDateKey, sydneyHourNow, sydneyTodayKey } from "@/lib/sydney-date";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
 import {
   readRejections,
@@ -20,33 +20,41 @@ import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
 /**
- * When payroll closes: 1pm on a Thursday, as a JS day-of-week and an hour.
+ * When payroll closes: 12pm on a Thursday, as a JS day-of-week and an hour.
  *
  * The hour is half the deadline, not decoration. Paperwork that arrives at
  * 6pm on the Thursday misses the week as surely as paperwork that arrives on
  * the Friday, so a cut-off printed as a bare date quietly tells somebody they
- * have nine hours they do not have.
+ * have hours they do not have.
  */
 const PAYROLL_CUTOFF_DOW = 4;
-const PAYROLL_CUTOFF_HOUR = 13;
+const PAYROLL_CUTOFF_HOUR = 12;
 
 /**
- * The payroll cut-off: this coming Thursday.
+ * The payroll cut-off: the next one that has not already gone.
  *
  * It used to be derived from the employee's start date — the Friday of the
  * week after they joined — so it was a fixed date that went stale the moment
  * that week passed, and someone still finishing their paperwork a fortnight
  * in was being shown a deadline that had already gone. The cut-off is a
- * weekly deadline, not a fact about when someone started, so it rolls: on a
- * Thursday it is today, and from Friday it moves to the Thursday after.
+ * weekly deadline, not a fact about when someone started, so it rolls.
  *
- * Sydney's date rather than the device's, so someone filling this in from
+ * The hour rolls it too, which is the part that was missing. Keying only off
+ * the day meant that all Thursday afternoon and evening the page kept naming
+ * a deadline that had passed at lunchtime — the one stretch of the week when
+ * being wrong about it actually costs somebody a pay run. Past the hour on
+ * the day itself, the answer is next Thursday.
+ *
+ * Sydney's clock rather than the device's, so someone filling this in from
  * overseas — or just before midnight — sees the deadline the restaurant
  * actually runs on.
  */
 function upcomingCutoffKey(): string {
   const today = sydneyTodayKey();
-  return addDaysISO(today, (PAYROLL_CUTOFF_DOW - dowOfDateKey(today) + 7) % 7);
+  const untilCutoffDay = (PAYROLL_CUTOFF_DOW - dowOfDateKey(today) + 7) % 7;
+  const goneForThisWeek =
+    untilCutoffDay === 0 && sydneyHourNow() >= PAYROLL_CUTOFF_HOUR;
+  return addDaysISO(today, goneForThisWeek ? 7 : untilCutoffDay);
 }
 
 /**
@@ -55,7 +63,7 @@ function upcomingCutoffKey(): string {
  * Midday by default, so formatting can never tip a date over a day boundary.
  * Built in the device's zone and formatted in the device's zone, which is
  * what makes the cut-off read as the wall-clock time the restaurant means —
- * 1pm is 1pm on the roster whichever country the phone is in.
+ * 12pm is 12pm on the roster whichever country the phone is in.
  */
 function dateFromKey(key: string, hour = 12): Date {
   const [y, m, d] = key.split("-").map(Number);

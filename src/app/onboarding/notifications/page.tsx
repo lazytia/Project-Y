@@ -220,15 +220,11 @@ export default function NotificationsPromptPage() {
             <span className={styles.reasonIcon} aria-hidden="true">
               {reason.icon}
             </span>
+            {/* No chevron. It was decoration standing in for a control — a
+                row that looks tappable and goes nowhere, because none of
+                these lead anywhere until the permission this screen asks for
+                has been given. */}
             <span>{t(reason.labelKey)}</span>
-            {/* Decoration, not a control: the rows are a list of what will be
-                sent, and there is nowhere for any of them to lead until the
-                permission this screen is asking for has been given. It is
-                here because it makes the card read as a list of things rather
-                than a wall of text, which is what the design asks of it. */}
-            <svg {...ICON_PROPS} className={styles.reasonGo} aria-hidden="true">
-              <polyline points="9 6 15 12 9 18" />
-            </svg>
           </li>
         ))}
       </ul>

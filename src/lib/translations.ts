@@ -197,7 +197,7 @@ const EN: Dict = {
   "onb.docs.passportHelp": "We need a clear photo of your passport or either government-issued photo ID.",
   "onb.docs.visaTitle": "2. Visa *",
   "onb.docs.visaHelp": "We need a copy of your current visa.",
-  "onb.docs.rsaTitle": "3. RSA Certificate",
+  "onb.docs.rsaTitle": "3. RSA Certificate *",
   "onb.docs.rsaHelp": "Upload your valid RSA certificate (required for all hall staff).",
 
   // Onboarding — policies index & pages
@@ -706,7 +706,7 @@ const JA: Dict = {
   "onb.docs.passportHelp": "パスポートまたは政府発行の写真付き身分証の鮮明な写真が必要です。",
   "onb.docs.visaTitle": "2. ビザ *",
   "onb.docs.visaHelp": "現在有効なビザのコピーを提出してください。",
-  "onb.docs.rsaTitle": "3. RSA 資格証",
+  "onb.docs.rsaTitle": "3. RSA 資格証 *",
   "onb.docs.rsaHelp": "有効な RSA 資格証をアップロードしてください（ホールスタッフは必須）。",
 
   // Onboarding — policies index & pages
