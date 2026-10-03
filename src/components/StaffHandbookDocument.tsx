@@ -10,6 +10,11 @@ export default function StaffHandbookDocument() {
 
   return (
     <article className={styles.doc}>
+      {/* English-only disclaimer — this document is not translated, to
+          avoid AI-translation ambiguity. Same banner the Employment
+          Agreement and Privacy Policy carry. */}
+      <p className={styles.englishOnlyBanner}>{t("onb.pol.englishOnlyBanner")}</p>
+
       <section className={styles.coverSection}>
         <h1 className={styles.coverTitle}>
           YURICA<br />
