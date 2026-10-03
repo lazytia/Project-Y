@@ -19,14 +19,13 @@
 
 .subtitle {
   margin: 0 0 var(--space-2);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--color-fg-muted);
+  text-align: center;
   line-height: 1.6;
 }
 
-/* Rows match the dashboard's quick actions — these are the same two
-   destinations, so pressing them should feel like the same control. */
-.row {
+.card {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -39,26 +38,68 @@
   transition: border-color 0.15s;
 }
 
-.row:hover { border-color: var(--color-warm); }
+.card:hover { border-color: var(--color-warm); }
 
-.rowIcon {
+.cardIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  color: var(--color-fg);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(234, 88, 12, 0.10);
+  color: var(--color-warm);
   flex-shrink: 0;
 }
 
-.rowLabel {
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   flex: 1;
-  font-size: 15px;
-  font-weight: 600;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.cardDesc {
+  font-size: 14px;
+  color: var(--color-fg-muted);
+  line-height: 1.45;
 }
 
 .chevron {
-  font-size: 22px;
+  font-size: 24px;
   color: var(--color-fg-muted);
   flex-shrink: 0;
+}
+
+/* ── Note ── */
+.infoBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-4);
+}
+
+.infoIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.infoBody {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+  line-height: 1.55;
 }

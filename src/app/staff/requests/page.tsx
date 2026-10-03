@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useLang } from "@/components/LanguageProvider";
 import styles from "./page.module.css";
 
-/** Shared geometry for the row icons, so one edit moves both. */
+/** Shared geometry for the card icons, so one edit moves both. */
 const ICON_PROPS = {
-  width: 20,
-  height: 20,
+  width: 22,
+  height: 22,
   viewBox: "0 0 24 24",
   fill: "none",
   stroke: "currentColor",
-  strokeWidth: 2,
+  strokeWidth: 1.8,
   strokeLinecap: "round",
   strokeLinejoin: "round",
 } as const;
@@ -19,15 +19,20 @@ const ICON_PROPS = {
 /**
  * The two things a staff member can ask the owner for.
  *
- * Both forms already existed and already had a home under the sidebar's
- * Schedule group; this page is what replaces that group now the menu is flat.
- * Labels reuse the `nav.*` keys the rows carried there, so the wording only
- * has to be corrected in one place.
+ * Both forms already existed and hung off the sidebar's Schedule group; this
+ * page is what replaced that group when the menu went flat. Titles reuse the
+ * `nav.*` keys the rows carried there, so the wording is corrected once.
  */
-const REQUEST_LINKS: readonly { href: string; labelKey: string; icon: React.ReactNode }[] = [
+const REQUEST_CARDS: readonly {
+  href: string;
+  titleKey: string;
+  descKey: string;
+  icon: React.ReactNode;
+}[] = [
   {
     href: "/staff/schedule/request-holiday",
-    labelKey: "nav.requestHoliday",
+    titleKey: "nav.requestHoliday",
+    descKey: "req.holidayDesc",
     icon: (
       <svg {...ICON_PROPS}>
         <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -39,11 +44,12 @@ const REQUEST_LINKS: readonly { href: string; labelKey: string; icon: React.Reac
   },
   {
     href: "/staff/schedule/availability-change",
-    labelKey: "nav.availabilityChange",
+    titleKey: "nav.availabilityChange",
+    descKey: "req.availabilityDesc",
     icon: (
       <svg {...ICON_PROPS}>
-        <path d="M12 20h9" />
-        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+        <circle cx="12" cy="12" r="9" />
+        <polyline points="12 7 12 12 15.5 14" />
       </svg>
     ),
   },
@@ -57,17 +63,31 @@ export default function StaffRequestsPage() {
       <h1 className={styles.title}>{t("req.title")}</h1>
       <p className={styles.subtitle}>{t("req.subtitle")}</p>
 
-      {REQUEST_LINKS.map(({ href, labelKey, icon }) => (
-        <Link href={href} key={href} className={styles.row}>
-          <span className={styles.rowIcon} aria-hidden="true">
+      {REQUEST_CARDS.map(({ href, titleKey, descKey, icon }) => (
+        <Link href={href} key={href} className={styles.card}>
+          <span className={styles.cardIcon} aria-hidden="true">
             {icon}
           </span>
-          <span className={styles.rowLabel}>{t(labelKey)}</span>
+          <span className={styles.cardBody}>
+            <span className={styles.cardTitle}>{t(titleKey)}</span>
+            <span className={styles.cardDesc}>{t(descKey)}</span>
+          </span>
           <span className={styles.chevron} aria-hidden="true">
             ›
           </span>
         </Link>
       ))}
+
+      <div className={styles.infoBox}>
+        <span className={styles.infoIcon} aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+        </span>
+        <p className={styles.infoBody}>{t("req.note")}</p>
+      </div>
     </div>
   );
 }

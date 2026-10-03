@@ -441,12 +441,30 @@ const EN: Dict = {
   "docs.uploading": "Uploading…",
   "docs.reviewA": "Your new document will be reviewed by an administrator.",
   "docs.reviewB": "You will be notified once it has been approved.",
-  "docs.trainingTitle": "Training",
-  "docs.trainingSubtitle": "Reference material, open any time.",
+  // Documents & Training hub
+  "docs.hub.title": "Documents",
+  "docs.hub.subtitle": "Your workplace guides and training materials.",
+  "docs.hub.noticeA": "Please read and keep these documents for your records.",
+  "docs.hub.noticeB":
+    "We will notify you if any documents are updated or require your acknowledgement.",
+  "docs.hub.handbookDesc": "Company handbook and workplace standards.",
+  "docs.hub.beerDesc": "Beer training video and guide.",
+  "docs.hub.foodSafety": "Food Safety & Hygiene",
+  "docs.hub.foodSafetyDesc": "Food safety basics and hygiene standards.",
+  "docs.hub.otherTraining": "Other Training Materials",
+  "docs.hub.otherTrainingDesc": "Additional workplace guides and resources.",
+  "docs.hub.myDocsDesc": "Your visa and certificates.",
+  "docs.materials.manualDesc": "The training manual for your role.",
+  "docs.materials.clockInDesc": "How to clock in and out on the POS.",
+  "docs.foodSafety.handbookNote": "These rules are also part of the",
 
   // Requests
   "req.title": "Requests",
-  "req.subtitle": "Ask for time off, or tell us when your availability changes.",
+  "req.subtitle": "Manage your requests.",
+  "req.holidayDesc": "Submit a request for annual leave or personal leave.",
+  "req.availabilityDesc": "Let us know when your availability changes.",
+  "req.note":
+    "Please communicate important changes with management and submit all requests through Project YURICA.",
 
   // Request Holiday
   "rh.title": "Holiday Request",
@@ -955,12 +973,29 @@ const JA: Dict = {
   "docs.uploading": "アップロード中…",
   "docs.reviewA": "アップロードした書類は管理者が確認します。",
   "docs.reviewB": "承認され次第、通知でお知らせします。",
-  "docs.trainingTitle": "研修",
-  "docs.trainingSubtitle": "いつでも見返せる資料です。",
+  // Documents & Training hub
+  "docs.hub.title": "書類",
+  "docs.hub.subtitle": "職場のガイドと研修資料です。",
+  "docs.hub.noticeA": "これらの書類は必ず読み、手元に保管してください。",
+  "docs.hub.noticeB": "書類が更新された場合や確認が必要な場合は、通知でお知らせします。",
+  "docs.hub.handbookDesc": "会社のハンドブックと職場の基準。",
+  "docs.hub.beerDesc": "ビールの研修動画とガイド。",
+  "docs.hub.foodSafety": "食品安全と衛生",
+  "docs.hub.foodSafetyDesc": "食品安全の基本と衛生基準。",
+  "docs.hub.otherTraining": "その他の研修資料",
+  "docs.hub.otherTrainingDesc": "その他の職場ガイドと資料。",
+  "docs.hub.myDocsDesc": "ビザと資格証。",
+  "docs.materials.manualDesc": "担当業務のトレーニングマニュアル。",
+  "docs.materials.clockInDesc": "POS での出退勤の打刻方法。",
+  "docs.foodSafety.handbookNote": "これらのルールは次の資料にも含まれています：",
 
   // Requests
   "req.title": "申請",
-  "req.subtitle": "休暇の申請や、勤務可能日の変更はこちらから。",
+  "req.subtitle": "申請の管理はこちらから。",
+  "req.holidayDesc": "年次休暇や私用休暇を申請します。",
+  "req.availabilityDesc": "勤務可能日が変わったらお知らせください。",
+  "req.note":
+    "重要な変更は必ず管理者に伝え、申請はすべて Project YURICA から提出してください。",
 
   // Request Holiday
   "rh.title": "休暇申請",

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { doc, getDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { positionLabelOf } from "@/lib/staff-display";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -12,6 +13,10 @@ import styles from "./page.module.css";
  * user's staff_onboarding doc at roster.{weekStartISO}. The manager
  * writes this via publishStaffRoster() when they hit the Publish button
  * on /scheduling/roster.
+ *
+ * The whole `roster` map is read once rather than a single week, because
+ * the arrows below move between weeks and a round trip per tap would make
+ * them feel broken on a phone.
  * ──────────────────────────────────────────────────────────────────── */
 
 type StoredShift = { iso: string; meal: "lunch" | "dinner"; start: string };
@@ -28,8 +33,9 @@ type DayEntry = {
   shifts: StoredShift[];
 };
 
-const DAYS_IN_WEEK = 6; // Mon–Sat (restaurant schedule)
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** Mon–Sun. The restaurant rarely rosters a Sunday, but it is part of the
+ *  week and leaving it off made the strip end on an unexplained Saturday. */
+const DAYS_IN_WEEK = 7;
 
 /* ── helpers ── */
 
@@ -54,63 +60,38 @@ function isoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function fmtDayShort(d: Date): string {
-  return d.toLocaleDateString("en-AU", {
+function fmtWeekRange(start: Date, end: Date): string {
+  const opts: Intl.DateTimeFormatOptions = {
     weekday: "short",
     day: "numeric",
     month: "short",
-  });
+  };
+  return `${start.toLocaleDateString("en-AU", opts)} – ${end.toLocaleDateString("en-AU", opts)}`;
 }
 
-function fmtWeekRange(start: Date, end: Date): string {
-  const sameMonth =
-    start.getFullYear() === end.getFullYear() &&
-    start.getMonth() === end.getMonth();
-  const left = start.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: sameMonth ? undefined : "short",
-  });
-  const right = end.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-  return `${left} – ${right}`;
-}
-
+/** "10:00am" — lowercase and unspaced, as the shift rows render it. */
 function fmtTime12h(t: string): string {
   if (!/^\d{1,2}:\d{2}$/.test(t)) return t;
   const [hStr, mStr] = t.split(":");
   let h = parseInt(hStr, 10);
-  const period = h >= 12 ? "PM" : "AM";
+  const period = h >= 12 ? "pm" : "am";
   h = h % 12;
   if (h === 0) h = 12;
-  return `${h}:${mStr} ${period}`;
+  return `${h}:${mStr}${period}`;
 }
 
-function fmtRelative(target: Date): string {
-  const now = new Date();
-  const diffMs = target.getTime() - now.getTime();
-  if (diffMs <= 0) return "In progress";
-  const minutes = Math.round(diffMs / 60000);
-  if (minutes < 60) return `Starts in ${minutes} min${minutes === 1 ? "" : "s"}`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `Starts in ${hours} hour${hours === 1 ? "" : "s"}`;
-  const days = Math.round(hours / 24);
-  return `Starts in ${days} day${days === 1 ? "" : "s"}`;
-}
-
-function tsDate(v: unknown): Date | null {
-  if (!v) return null;
-  if (v instanceof Date) return v;
-  if (typeof v === "object" && v !== null && "toDate" in (v as object)) {
-    try { return (v as Timestamp).toDate(); } catch { return null; }
-  }
-  return null;
-}
-
-function mealLabel(meal: "lunch" | "dinner"): string {
-  return meal === "lunch" ? "Lunch" : "Dinner";
+/**
+ * Hall or Kitchen, taken from the employee's own position.
+ *
+ * The roster stores a day, a meal and a start time — there is no section on
+ * a shift — so this is the same on every row for a given person. Printing
+ * their department is still worth the line: it is what the shift is, and a
+ * kitchen hand and a waiter reading the same screen should not have to infer
+ * it. If sections ever need to vary per shift, the manager's roster grid has
+ * to grow the field first.
+ */
+function departmentOf(raw: Record<string, unknown>): string {
+  return positionLabelOf(raw).replace(/\s*Staff$/, "");
 }
 
 /* ── page ── */
@@ -118,7 +99,8 @@ function mealLabel(meal: "lunch" | "dinner"): string {
 export default function StaffRosterPage() {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [rosterDoc, setRosterDoc] = useState<RosterDoc | null>(null);
+  const [rosterMap, setRosterMap] = useState<Record<string, RosterDoc>>({});
+  const [department, setDepartment] = useState("");
 
   const [today, setTodayDate] = useState<Date>(() => {
     const d = new Date(0);
@@ -126,12 +108,20 @@ export default function StaffRosterPage() {
     return d;
   });
 
+  /** How many weeks away from the current one the user has paged. */
+  const [weekOffset, setWeekOffset] = useState(0);
+
   useEffect(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     setTodayDate(d);
   }, []);
-  const weekStart = useMemo(() => startOfWeek(today), [today]);
+
+  const currentWeekStart = useMemo(() => startOfWeek(today), [today]);
+  const weekStart = useMemo(
+    () => addDays(currentWeekStart, weekOffset * DAYS_IN_WEEK),
+    [currentWeekStart, weekOffset],
+  );
   const weekStartISO = useMemo(() => isoDate(weekStart), [weekStart]);
   const weekEnd = useMemo(() => addDays(weekStart, DAYS_IN_WEEK - 1), [weekStart]);
   const weekDays = useMemo(
@@ -144,18 +134,20 @@ export default function StaffRosterPage() {
     try {
       const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
       const data = snap.data() ?? {};
-      const roster = data.roster?.[weekStartISO] as RosterDoc | undefined;
-      setRosterDoc(roster ?? null);
+      setRosterMap((data.roster ?? {}) as Record<string, RosterDoc>);
+      setDepartment(departmentOf(data as Record<string, unknown>));
     } catch (err) {
       console.error("[staff-roster] load failed", err);
     } finally {
       setLoading(false);
     }
-  }, [user, weekStartISO]);
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading) load();
   }, [authLoading, load]);
+
+  const rosterDoc = rosterMap[weekStartISO] ?? null;
 
   const dayEntries: DayEntry[] = useMemo(() => {
     const shifts = rosterDoc?.shifts ?? [];
@@ -168,153 +160,140 @@ export default function StaffRosterPage() {
     });
   }, [rosterDoc, weekDays]);
 
-  const nextShift = useMemo(() => {
-    if (!today.getTime()) return null;
-    const now = today;
-    const allShifts = dayEntries.flatMap((de) =>
-      de.shifts.map((s) => {
-        const [h, m] = s.start.split(":").map(Number);
-        const dt = new Date(de.date);
-        dt.setHours(h, m, 0, 0);
-        return { ...s, date: de.date, startDate: dt };
-      }),
-    );
-    const upcoming = allShifts
-      .filter((s) => s.startDate.getTime() >= now.getTime())
-      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-    return upcoming[0] ?? allShifts.sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0] ?? null;
-  }, [dayEntries, today]);
-
-  const totalShifts = useMemo(
-    () => dayEntries.reduce((sum, de) => sum + de.shifts.length, 0),
+  /** Every shift in the week, flattened into the order they are worked. */
+  const weekShifts = useMemo(
+    () => dayEntries.flatMap((de) => de.shifts.map((s) => ({ ...s, date: de.date }))),
     [dayEntries],
   );
 
-  const publishedAt = rosterDoc ? tsDate(rosterDoc.publishedAt) : null;
-
   if (authLoading || loading) return <Splash />;
 
+  const todayISO = isoDate(today);
   const notPublished = !rosterDoc;
+
+  /**
+   * Named relative to now, because "This Week" stops being true the moment
+   * the arrows are used. Anything further out than a week either side is
+   * read off the dates instead of invented a name for.
+   */
+  const weekTitle =
+    weekOffset === 0 ? "This Week" : weekOffset === 1 ? "Next Week" : weekOffset === -1 ? "Last Week" : "Roster";
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Roster</h1>
+      <h1 className={styles.title}>{weekTitle}</h1>
 
-      {/* This Week label */}
-      <div className={styles.weekLabel}>
-        <p className={styles.weekTitle}>This Week</p>
+      {/* Week range + paging */}
+      <div className={styles.weekBar}>
         <p className={styles.weekRange}>{fmtWeekRange(weekStart, weekEnd)}</p>
+        <div className={styles.weekNav}>
+          {weekOffset !== 0 && (
+            <button
+              type="button"
+              className={styles.todayPill}
+              onClick={() => setWeekOffset(0)}
+            >
+              Today
+            </button>
+          )}
+          <button
+            type="button"
+            className={styles.navBtn}
+            onClick={() => setWeekOffset((w) => w - 1)}
+            aria-label="Previous week"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className={styles.navBtn}
+            onClick={() => setWeekOffset((w) => w + 1)}
+            aria-label="Next week"
+          >
+            ›
+          </button>
+        </div>
       </div>
+
+      {/* Day strip. The dot under a day means there is a shift on it — it is
+          the one glance that answers "when am I in this week", so it carries
+          information rather than sitting under every day as decoration. */}
+      <ul className={styles.dayStrip}>
+        {dayEntries.map((de) => {
+          const isToday = de.iso === todayISO;
+          const worked = de.shifts.length > 0;
+          return (
+            <li
+              key={de.iso}
+              className={`${styles.dayCell} ${isToday ? styles.dayCellToday : ""}`}
+            >
+              <span className={styles.dayName}>
+                {de.date.toLocaleDateString("en-AU", { weekday: "short" })}
+              </span>
+              <span className={styles.dayNum}>{de.date.getDate()}</span>
+              <span
+                className={`${styles.dayDot} ${worked ? styles.dayDotOn : ""}`}
+                aria-hidden="true"
+              />
+            </li>
+          );
+        })}
+      </ul>
 
       {notPublished ? (
         <p className={styles.emptyText}>
-          The roster for this week hasn't been published yet.
+          The roster for this week hasn&apos;t been published yet.
         </p>
+      ) : weekShifts.length === 0 ? (
+        <p className={styles.emptyText}>No shifts scheduled this week.</p>
       ) : (
         <>
-          {/* Next Shift hero */}
-          {nextShift ? (
-            <section className={styles.nextCard}>
-              <div className={styles.nextHeader}>
-                <div>
-                  <p className={styles.nextLabel}>Next Shift</p>
-                  <p className={styles.nextDate}>{fmtDayShort(nextShift.date)}</p>
-                  <p className={styles.nextTime}>{fmtTime12h(nextShift.start)}</p>
-                  <p className={styles.nextTimeKicker}>START</p>
+          <h2 className={styles.countTitle}>
+            {weekShifts.length} {weekShifts.length === 1 ? "Shift" : "Shifts"}
+          </h2>
+
+          {/* No chevron on these rows: a shift has no detail screen to open,
+              and a row that looks tappable and goes nowhere is a control in
+              name only. */}
+          <ul className={styles.shiftList}>
+            {weekShifts.map((s, i) => (
+              <li key={`${s.iso}-${s.start}-${i}`} className={styles.shiftRow}>
+                <div className={styles.shiftDate}>
+                  <span className={styles.shiftDow}>
+                    {s.date.toLocaleDateString("en-AU", { weekday: "short" })}
+                  </span>
+                  <span className={styles.shiftDay}>
+                    {s.date.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                  </span>
                 </div>
-              </div>
-
-              <div className={styles.nextDivider} />
-
-              <p className={styles.nextShiftName}>{mealLabel(nextShift.meal)} Shift</p>
-
-              <p className={styles.nextRelative}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                {fmtRelative(nextShift.startDate)}
-              </p>
-            </section>
-          ) : (
-            <p className={styles.emptyText}>No shifts scheduled this week.</p>
-          )}
-
-          {/* Week breakdown */}
-          <h2 className={styles.sectionTitle}>This Week</h2>
-          <ul className={styles.weekList}>
-            {dayEntries.map((de, idx) => (
-              <li key={de.iso} className={styles.weekRow}>
-                <span className={styles.weekDay}>{fmtDayShort(de.date)}</span>
-                {de.shifts.length === 0 ? (
-                  <span className={styles.offBadge}>OFF</span>
-                ) : (
-                  <div className={styles.weekShift}>
-                    {de.shifts.map((s, i) => (
-                      <span key={i} className={styles.weekStart}>
-                        {mealLabel(s.meal)} · {fmtTime12h(s.start)} Start
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <div className={styles.shiftDivider} />
+                <div className={styles.shiftBody}>
+                  <p className={styles.shiftStart}>{fmtTime12h(s.start)} start</p>
+                  {department && <p className={styles.shiftDept}>{department}</p>}
+                </div>
               </li>
             ))}
           </ul>
-
-          {/* Totals */}
-          <div className={styles.statsCard}>
-            <div className={styles.statBlock}>
-              <span className={styles.statIcon} aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-              </span>
-              <p className={styles.statValue}>{totalShifts}</p>
-              <p className={styles.statLabel}>Shifts</p>
-            </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statBlock}>
-              <span className={styles.statIcon} aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-              </span>
-              <p className={styles.statValue}>{DAYS_IN_WEEK - dayEntries.filter((d) => d.shifts.length === 0).length}</p>
-              <p className={styles.statLabel}>Days On</p>
-            </div>
-          </div>
-
-          {/* Roster published */}
-          {publishedAt && (
-            <div className={styles.publishedCard}>
-              <span className={styles.publishedIcon} aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-              </span>
-              <div className={styles.publishedBody}>
-                <p className={styles.publishedTitle}>Roster Published</p>
-                <p className={styles.publishedDate}>
-                  {publishedAt.toLocaleDateString("en-AU", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-            </div>
-          )}
         </>
       )}
+
+      {/* Notes */}
+      <h2 className={styles.notesTitle}>Notes</h2>
+      <div className={styles.notesCard}>
+        <span className={styles.notesIcon} aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="7" y1="8" x2="17" y2="8" />
+            <line x1="7" y1="12" x2="17" y2="12" />
+            <line x1="7" y1="16" x2="13" y2="16" />
+          </svg>
+        </span>
+        <ul className={styles.notesList}>
+          <li>Finish times may vary depending on service and operational needs.</li>
+          <li>Check your notifications for any updates.</li>
+          <li>If you are unsure, please speak to your manager.</li>
+        </ul>
+      </div>
     </div>
   );
 }
