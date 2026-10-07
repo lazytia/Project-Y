@@ -15,7 +15,8 @@
  * somebody else's login.
  */
 
-import { useBackToDashboard } from "@/hooks/useBackToDashboard";
+import { useBackTo } from "@/hooks/useBackTo";
+import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
 /* ── the sketches ── */
@@ -121,7 +122,15 @@ const REMINDERS = [
 /* ── page ── */
 
 export default function ClockInGuidePage() {
-  const goBack = useBackToDashboard();
+  /**
+   * Back goes to Other Training Materials, which is where this is listed.
+   *
+   * The dashboard also promotes this guide for a new starter's first fortnight,
+   * so Back is not always a retreat along the way in — but it is always the
+   * list this document belongs to, and the dashboard is one tap from there.
+   * The alternative is the odd one out among the training documents.
+   */
+  const goBack = useBackTo(ROUTES.staffTrainingMaterials);
 
   return (
     <div className={styles.page}>

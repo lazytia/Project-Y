@@ -155,6 +155,8 @@ export function AuthProvider({
     let authReady = false;
     let authReadySent = false;
     let unsub: (() => void) | undefined;
+    /** The uid this observer has already seeded state for. See below. */
+    let seededUid: string | null = null;
 
     const emitAuthReady = () => {
       if (authReadySent || typeof window === "undefined") return;
@@ -191,20 +193,47 @@ export function AuthProvider({
             setStaffActivated(true);
             setStaffProfileConfirmed(true);
           } else {
+            /*
+             * Seed from the session cache the first time we see a uid — and
+             * only then.
+             *
+             * Firebase re-emits this observer for the *same* user whenever it
+             * refreshes the ID token, which is exactly what happens when a
+             * backgrounded app is brought back to the foreground. Re-seeding
+             * on that second emit is what left the app frozen: when there is
+             * no cache to read — a relaunched PWA, private browsing, a uid
+             * that has rotated — `staffCompletedStep` went back to null, and
+             * AppShell keeps the placeholder chrome up for exactly as long as
+             * it stays null. The placeholder has no handlers on it, so the
+             * app looked open while the hamburger and the bell did nothing.
+             *
+             * After the first sight the cache may only fill a gap, never
+             * reopen one: what is already in memory is at least as fresh as
+             * sessionStorage, and the Firestore subscription below is what
+             * keeps it true from there.
+             */
+            const firstSight = seededUid !== u.uid;
+            seededUid = u.uid;
             const cached = readStaffStepCache(u.uid);
-            setStaffCompletedStep(cached?.step ?? null);
-            setStaffActivated(cached?.activated ?? null);
-            if (cached && cached.step >= TOTAL_ONBOARDING_STEPS) {
-              setStaffProfileConfirmed(true);
-              setNotificationsPromptSeen(true);
+            if (firstSight) {
+              setStaffCompletedStep(cached?.step ?? null);
+              setStaffActivated(cached?.activated ?? null);
+              if (cached && cached.step >= TOTAL_ONBOARDING_STEPS) {
+                setStaffProfileConfirmed(true);
+                setNotificationsPromptSeen(true);
+              } else {
+                setNotificationsPromptSeen(null);
+                setStaffProfileConfirmed(false);
+              }
             } else {
-              setNotificationsPromptSeen(null);
-              setStaffProfileConfirmed(false);
+              setStaffCompletedStep((prev) => prev ?? cached?.step ?? null);
+              setStaffActivated((prev) => prev ?? cached?.activated ?? null);
             }
           }
           return;
         }
         if (authReady) {
+          seededUid = null;
           setStaffCompletedStep(null);
           setStaffActivated(null);
           setNotificationsPromptSeen(null);

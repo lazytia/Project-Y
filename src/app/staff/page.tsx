@@ -555,35 +555,6 @@ export default function StaffDashboardPage() {
         </section>
       )}
 
-      {/* Quick Actions */}
-      <section className={styles.quickSection}>
-        <h2 className={styles.quickTitle}>{t("staff.quickActions")}</h2>
-
-        <Link href="/staff/schedule/request-holiday" className={styles.quickRow}>
-          <span className={styles.quickIcon} aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-          </span>
-          <span className={styles.quickLabel}>{t("staff.requestHoliday")}</span>
-          <span className={styles.chevron} aria-hidden="true">›</span>
-        </Link>
-
-        <Link href="/staff/schedule/availability-change" className={styles.quickRow}>
-          <span className={styles.quickIcon} aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-            </svg>
-          </span>
-          <span className={styles.quickLabel}>{t("staff.availabilityChange")}</span>
-          <span className={styles.chevron} aria-hidden="true">›</span>
-        </Link>
-      </section>
-
       {notifOpen && (
         <div
           className={styles.modalBackdrop}

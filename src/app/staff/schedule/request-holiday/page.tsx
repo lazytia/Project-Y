@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   doc,
   getDoc,
@@ -14,6 +13,9 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
 import CalendarPicker from "@/components/CalendarPicker";
+import RequestSubmitted from "@/components/RequestSubmitted";
+import { useBackTo } from "@/hooks/useBackTo";
+import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
 type HolidayRequest = {
@@ -89,6 +91,29 @@ function fmtKey(key: string | null): string {
   });
 }
 
+/** With the weekday, for the confirmation — the day of the week is the part
+ *  somebody checks when they are reading back a holiday they just booked. */
+function fmtKeyWithWeekday(key: string): string {
+  return keyToDate(key).toLocaleDateString("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/**
+ * How many days the holiday covers, counting both ends.
+ *
+ * Display only — the notice rule is a flat two weeks and no longer turns on
+ * length. Safe across a daylight-saving boundary because keyToDate anchors
+ * every date at local noon, so the difference is never 23 or 25 hours.
+ */
+function durationDays(startKey: string, endKey: string): number {
+  const ms = keyToDate(endKey).getTime() - keyToDate(startKey).getTime();
+  return Math.round(ms / (1000 * 60 * 60 * 24)) + 1;
+}
+
 function fmtRange(a: Date, b: Date): string {
   const sameYear = a.getFullYear() === b.getFullYear();
   const sameMonth = sameYear && a.getMonth() === b.getMonth();
@@ -123,9 +148,11 @@ function statusLabelKey(status: HolidayRequest["status"]): string {
 }
 
 export default function RequestHolidayPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const { t } = useLang();
+  // Requests is the list this form is opened from, so it is both where Back
+  // returns to and where Done lands once the request has gone in.
+  const goToRequests = useBackTo(ROUTES.staffRequests);
 
   const [startKey, setStartKey] = useState<string>("");
   const [endKey, setEndKey] = useState<string>("");
@@ -134,7 +161,10 @@ export default function RequestHolidayPage() {
   const [error, setError] = useState<string | null>(null);
   const [requests, setRequests] = useState<HolidayRequest[]>([]);
   const [pickerOpen, setPickerOpen] = useState<null | "start" | "end">(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  /** What was just filed, kept so the confirmation can read it back. */
+  const [submitted, setSubmitted] = useState<
+    null | { startKey: string; endKey: string; reason: string }
+  >(null);
 
   useEffect(() => {
     if (!user) return;
@@ -226,10 +256,10 @@ export default function RequestHolidayPage() {
         },
         ...prev,
       ]);
+      setSubmitted({ startKey, endKey, reason: reason.trim() });
       setStartKey("");
       setEndKey("");
       setReason("");
-      setConfirmOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit.");
     } finally {
@@ -237,12 +267,42 @@ export default function RequestHolidayPage() {
     }
   }
 
+  if (submitted) {
+    const days = durationDays(submitted.startKey, submitted.endKey);
+    // One date when the holiday is a single day, so it is not printed twice.
+    const dates =
+      submitted.startKey === submitted.endKey
+        ? [fmtKeyWithWeekday(submitted.startKey)]
+        : [fmtKeyWithWeekday(submitted.startKey), fmtKeyWithWeekday(submitted.endKey)];
+    return (
+      <RequestSubmitted
+        highlightLabel={t("rh.sub.dates")}
+        highlightValues={dates}
+        sections={[
+          {
+            title: t("rh.sub.summary"),
+            rows: [
+              {
+                label: t("rh.sub.duration"),
+                value: t(days === 1 ? "rh.sub.durationDay" : "rh.sub.durationDays")
+                  .replace("{n}", String(days)),
+              },
+              { label: t("rh.reason"), value: submitted.reason },
+            ],
+          },
+        ]}
+        onDone={goToRequests}
+      />
+    );
+  }
+
   return (
     <div className={styles.page}>
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => router.push("/staff")}
+        onClick={goToRequests}
+        aria-label={t("common.back")}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />
@@ -412,37 +472,6 @@ export default function RequestHolidayPage() {
           onRangeChange={() => { /* unused — singleOnly */ }}
           onClose={() => setPickerOpen(null)}
         />
-      )}
-
-      {confirmOpen && (
-        <div
-          className={styles.confirmBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Request submitted"
-          onClick={(e) => { if (e.target === e.currentTarget) setConfirmOpen(false); }}
-        >
-          <div className={styles.confirmModal}>
-            <div className={styles.confirmIcon} aria-hidden="true">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="9 12 11 14 15 10" />
-              </svg>
-            </div>
-            <p className={styles.confirmBody}>
-              {t("rh.confirmBody1")}<br />
-              {t("rh.confirmBody2")}
-            </p>
-            <button
-              type="button"
-              className={styles.confirmBtn}
-              onClick={() => setConfirmOpen(false)}
-              autoFocus
-            >
-              {t("rh.ok")}
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );

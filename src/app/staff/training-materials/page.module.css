@@ -8,6 +8,23 @@
   gap: var(--space-3);
 }
 
+/* Same Back control the documents in this list carry — Other Training Materials
+   is itself one level under Documents & Training, so it needs the way out too. */
+.backBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: transparent;
+  border: none;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--color-fg);
+}
+
 .title {
   margin: 0;
   font-size: var(--page-title-size);

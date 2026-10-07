@@ -68,8 +68,38 @@ export default function AppShell({
     hasClientSessionHint() ||
     sessionVerified === true ||
     (loading && initialHasSession);
-  const awaitingStaffStep =
+
+  /*
+   * How long the placeholder chrome may stand in for the real thing.
+   *
+   * Waiting on the onboarding step is normally a few hundred milliseconds of
+   * Firestore round-trip, and the placeholder exists so the header does not
+   * visibly rebuild underneath that. But the wait has no floor: if the socket
+   * carrying the step is dead — which is the state an app resumes into after
+   * a long spell in the background — neither the success nor the error
+   * callback ever runs, and nothing else was going to clear this. The app then
+   * sits there looking open while every tap lands on chrome that has no
+   * handlers attached, which reads to the user as a freeze.
+   *
+   * So the wait is bounded. Past the deadline the real chrome goes up with the
+   * step still unknown; the sidebar and the bell do no harm on their own, and
+   * the routing gate that actually depends on the step is separate from this.
+   */
+  const STEP_WAIT_MS = 4000;
+  const [stepWaitExpired, setStepWaitExpired] = useState(false);
+  const stepPending =
     !!user && !isOwner(user) && !isChef(user) && staffCompletedStep === null;
+
+  useEffect(() => {
+    if (!stepPending) {
+      setStepWaitExpired(false);
+      return;
+    }
+    const id = window.setTimeout(() => setStepWaitExpired(true), STEP_WAIT_MS);
+    return () => window.clearTimeout(id);
+  }, [stepPending]);
+
+  const awaitingStaffStep = stepPending && !stepWaitExpired;
   const shellInteractive =
     (!!user && !awaitingStaffStep) || (hasSessionGuess && !isPublic);
   const usePlaceholderChrome =

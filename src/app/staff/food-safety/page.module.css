@@ -8,6 +8,23 @@
   gap: var(--space-4);
 }
 
+/* Same Back control the handbook and the beer guide carry — this is one of the
+   documents in the same list, so it reads and sits identically. */
+.backBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: transparent;
+  border: none;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--color-fg);
+}
+
 .titleWrap {
   display: flex;
   align-items: center;

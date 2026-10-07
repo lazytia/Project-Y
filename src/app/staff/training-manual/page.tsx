@@ -9,11 +9,14 @@
  * manual when it is written.
  */
 
-import { useBackToDashboard } from "@/hooks/useBackToDashboard";
+import { useBackTo } from "@/hooks/useBackTo";
+import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
 export default function TrainingManualPage() {
-  const goBack = useBackToDashboard();
+  // Other Training Materials is the list this is listed on, so it is what Back
+  // returns to — not the dashboard two levels up.
+  const goBack = useBackTo(ROUTES.staffTrainingMaterials);
 
   return (
     <div className={styles.page}>

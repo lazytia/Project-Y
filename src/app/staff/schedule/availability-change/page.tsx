@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   doc,
   getDoc,
@@ -13,6 +12,9 @@ import {
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
+import RequestSubmitted from "@/components/RequestSubmitted";
+import { useBackTo } from "@/hooks/useBackTo";
+import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
 type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -103,10 +105,44 @@ function fmtEffective(d: Date): string {
   });
 }
 
+function sameAvailability(a: Availability, b: Availability): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "partial" && b.kind === "partial") {
+    return a.from === b.from && a.until === b.until;
+  }
+  return true;
+}
+
+/**
+ * Neighbouring days that ask for the same thing, collapsed into one line.
+ *
+ * The confirmation is there to be checked at a glance, and seven rows of
+ * mostly "All Day" is harder to check than "Mon – Fri / All Day". Only runs of
+ * identical availability are joined, so a week with one odd day still shows
+ * that day on its own — the exception is the part worth seeing.
+ */
+function availabilityRuns(
+  map: AvailabilityMap,
+): { fromKey: DayKey; toKey: DayKey; value: Availability }[] {
+  const runs: { fromKey: DayKey; toKey: DayKey; value: Availability }[] = [];
+  for (const { key } of DAYS) {
+    const last = runs[runs.length - 1];
+    if (last && sameAvailability(last.value, map[key])) last.toKey = key;
+    else runs.push({ fromKey: key, toKey: key, value: map[key] });
+  }
+  return runs;
+}
+
+function dayShortKey(key: DayKey): string {
+  return DAYS.find((d) => d.key === key)?.shortKey ?? "ac.day.mon";
+}
+
 export default function AvailabilityChangePage() {
-  const router = useRouter();
   const { user } = useAuth();
   const { t } = useLang();
+  // Requests is the list this form is opened from, so it is both where Back
+  // returns to and where Done lands once the request has gone in.
+  const goToRequests = useBackTo(ROUTES.staffRequests);
   const [effectiveDate, setEffectiveDate] = useState<Date>(() => {
     const d = new Date(0);
     d.setHours(0, 0, 0, 0);
@@ -124,6 +160,10 @@ export default function AvailabilityChangePage() {
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [editingDay, setEditingDay] = useState<DayKey | null>(null);
+  /** What was just filed, kept so the confirmation can read it back. */
+  const [submitted, setSubmitted] = useState<
+    null | { requested: AvailabilityMap; reason: string }
+  >(null);
 
   useEffect(() => {
     if (!user) return;
@@ -180,11 +220,43 @@ export default function AvailabilityChangePage() {
         },
         { merge: true },
       );
-      router.push("/staff");
+      setSubmitted({ requested: proposed, reason: reason.trim() });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit.");
+    } finally {
       setSubmitting(false);
     }
+  }
+
+  if (submitted) {
+    const runs = availabilityRuns(submitted.requested);
+    return (
+      <RequestSubmitted
+        highlightLabel={t("ac.effectiveFrom")}
+        highlightValues={[fmtEffective(effectiveDate)]}
+        sections={[
+          {
+            title: t("ac.sub.requested"),
+            rows: runs.map((run) => ({
+              label:
+                run.fromKey === run.toKey
+                  ? t(dayShortKey(run.fromKey))
+                  : `${t(dayShortKey(run.fromKey))} – ${t(dayShortKey(run.toKey))}`,
+              value:
+                run.value.kind === "available"
+                  ? t("ac.allDay")
+                  : run.value.kind === "unavailable"
+                    ? t("ac.unavailable")
+                    : t("ac.sub.partial")
+                        .replace("{from}", fmtTime12h(run.value.from))
+                        .replace("{until}", fmtTime12h(run.value.until)),
+            })),
+          },
+        ]}
+        reason={submitted.reason ? { label: t("ac.reason"), value: submitted.reason } : null}
+        onDone={goToRequests}
+      />
+    );
   }
 
   return (
@@ -192,7 +264,8 @@ export default function AvailabilityChangePage() {
       <button
         type="button"
         className={styles.backBtn}
-        onClick={() => router.push("/staff")}
+        onClick={goToRequests}
+        aria-label={t("common.back")}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />

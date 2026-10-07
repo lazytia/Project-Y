@@ -16,8 +16,12 @@ export const ROUTES = {
   staffScheduleAvailability: "/staff/schedule/availability-change",
   staffPayslips: "/staff/payslips",
   staffDocuments: "/staff/documents",
+  staffDocumentUploads: "/staff/documents/uploads",
+  staffRequests: "/staff/requests",
   staffHandbook: "/staff/handbook",
   staffBeerGuide: "/staff/beer-guide",
+  staffFoodSafety: "/staff/food-safety",
+  staffTrainingMaterials: "/staff/training-materials",
   reservations: "/operations/reservations",
   setupGuide: "/guide_link",
 } as const;

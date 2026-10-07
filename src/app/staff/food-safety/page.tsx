@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useLang } from "@/components/LanguageProvider";
+import { useBackTo } from "@/hooks/useBackTo";
+import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
 /**
@@ -27,9 +29,23 @@ const RULE_KEYS = [
 
 export default function FoodSafetyPage() {
   const { t } = useLang();
+  // Back to the list this was opened from, not the dashboard — see useBackTo.
+  const goBack = useBackTo(ROUTES.staffDocuments);
 
   return (
     <div className={styles.page}>
+      <button
+        type="button"
+        className={styles.backBtn}
+        onClick={goBack}
+        aria-label={t("common.back")}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        <span>{t("common.back")}</span>
+      </button>
+
       <div className={styles.titleWrap}>
         <span className={styles.titleIcon} aria-hidden="true">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

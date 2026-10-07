@@ -3,12 +3,14 @@
 import { useLang } from "@/components/LanguageProvider";
 import BeerGuideDocument from "@/components/BeerGuideDocument";
 import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
-import { useBackToDashboard } from "@/hooks/useBackToDashboard";
+import { useBackTo } from "@/hooks/useBackTo";
 import { BEER_GUIDE_UPDATED, BEER_GUIDE_VERSION } from "@/lib/hr-documents";
+import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
 export default function BeerGuidePage() {
-  const goBack = useBackToDashboard();
+  // Back to the list this was opened from, not the dashboard — see useBackTo.
+  const goBack = useBackTo(ROUTES.staffDocuments);
   const { t } = useLang();
 
   return (

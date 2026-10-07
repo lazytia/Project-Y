@@ -3,13 +3,15 @@
 import { useLang } from "@/components/LanguageProvider";
 import DocumentAcknowledgement from "@/components/DocumentAcknowledgement";
 import StaffHandbookDocument from "@/components/StaffHandbookDocument";
-import { useBackToDashboard } from "@/hooks/useBackToDashboard";
+import { useBackTo } from "@/hooks/useBackTo";
 import { HANDBOOK_UPDATED, HANDBOOK_VERSION } from "@/lib/hr-documents";
+import { ROUTES } from "@/lib/routes";
 import handbookStyles from "@/app/onboarding/policies/staff-handbook/page.module.css";
 import styles from "./page.module.css";
 
 export default function StaffHandbookPage() {
-  const goBack = useBackToDashboard();
+  // Back to the list this was opened from, not the dashboard — see useBackTo.
+  const goBack = useBackTo(ROUTES.staffDocuments);
   const { t } = useLang();
 
   return (
