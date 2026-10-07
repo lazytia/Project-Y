@@ -335,27 +335,25 @@ export default function ChefDashboard({
 
   const fetchLive = useCallback(async () => {
     const monday = isoMondayOf(todayKey);
-    const [sales, reservations, cateringToday, soldOutCount, week, scheduleRequests] =
-      await Promise.allSettled([
-        fetch(`/api/square/today-sales-brief?date=${encodeURIComponent(todayKey)}`).then(
-          async (res) => {
-            if (!res.ok) return null;
-            const d = await res.json();
-            return typeof d.todaySales === "number" ? d.todaySales : null;
-          },
-        ),
-        fetchReservationsForDate(user, todayKey, "northsydney"),
-        fetchTodayCatering(user, todayKey),
-        fetchSoldOutCount(todayKey),
-        fetch(`/api/square/weekly-daily?weekStart=${encodeURIComponent(monday)}`).then(
-          async (res) => {
-            if (!res.ok) return null;
-            const d = (await res.json()) as { thisWeek?: { daily?: number[] } };
-            return Array.isArray(d.thisWeek?.daily) ? d.thisWeek.daily : null;
-          },
-        ),
-        fetchScheduleRequests(),
-      ]);
+    const [sales, reservations, cateringToday, soldOutCount, week] = await Promise.allSettled([
+      fetch(`/api/square/today-sales-brief?date=${encodeURIComponent(todayKey)}`).then(
+        async (res) => {
+          if (!res.ok) return null;
+          const d = await res.json();
+          return typeof d.todaySales === "number" ? d.todaySales : null;
+        },
+      ),
+      fetchReservationsForDate(user, todayKey, "northsydney"),
+      fetchTodayCatering(user, todayKey),
+      fetchSoldOutCount(todayKey),
+      fetch(`/api/square/weekly-daily?weekStart=${encodeURIComponent(monday)}`).then(
+        async (res) => {
+          if (!res.ok) return null;
+          const d = (await res.json()) as { thisWeek?: { daily?: number[] } };
+          return Array.isArray(d.thisWeek?.daily) ? d.thisWeek.daily : null;
+        },
+      ),
+    ]);
 
     let sold: number | null = null;
     if (sales.status === "fulfilled") {
@@ -377,7 +375,6 @@ export default function ChefDashboard({
     if (cateringToday.status === "fulfilled") setCatering(cateringToday.value);
     if (soldOutCount.status === "fulfilled") setSoldOut(soldOutCount.value);
     if (week.status === "fulfilled") setWeekDaily(week.value);
-    if (scheduleRequests.status === "fulfilled") setRequests(scheduleRequests.value);
 
     // Only the fields this screen is the live source for. The rest of the
     // manager cache is left as the snapshot wrote it rather than overwritten
@@ -402,6 +399,26 @@ export default function ChefDashboard({
     const id = setInterval(fetchLive, 60_000);
     return () => clearInterval(id);
   }, [fetchLive, todayKey, user]);
+
+  // Read once, not on the minute with the rest. This enumerates the whole
+  // staff collection to count two kinds of pending request — one read per
+  // employee — and a request submitted while the kitchen screen happens to be
+  // open is not worth paying that every sixty seconds. Same cadence as the
+  // manager's screen, which counts the same queue.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const counts = await fetchScheduleRequests();
+        if (!cancelled) setRequests(counts);
+      } catch {
+        // Leave the card at "—" rather than claiming an empty queue.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
