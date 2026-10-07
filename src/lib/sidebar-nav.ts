@@ -112,66 +112,128 @@ const TEAM_ADMIN_LINKS: NavItem[] = [
   { label: "Cash Payments", href: "/people/cash-payments" },
 ];
 
-// The two shift leads — chef (Chuck) and store manager (Yurina) — run the
-// same menu: Dashboard, Operations, Team, Training, Scheduling, Payslip,
-// in that order. Spec approved by owner.
+// The store manager's menu: Dashboard, Operations, Team, Training,
+// Scheduling, Payslip, in that order. Spec approved by owner.
 //
 // Reference material (Staff Handbook, and the Training Manual with the Beer
 // Guide under it) sits in its own Training group rather than under Team,
 // which is purely people admin. Payslip is a single page, so it is a plain
 // link rather than a group wrapping one child.
 //
-// Built by a factory rather than written twice: the two menus differ by
-// exactly one Team link (Action Required, manager only), and two 45-line
-// copies would only invite one of them to be edited alone. The difference
-// is passed in, so it stays visible at each call site instead of turning
-// into a role flag buried in the tree — flags are what made the earlier
-// shared version awkward to read.
-function shiftLeadNav(teamChildren: NavItem[]): NavGroup[] {
-  return [
-    { icon: "🏠", label: "Dashboard", href: "/" },
-    {
-      icon: "🍽",
-      label: "Operations",
-      children: [
-        { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
-        { label: "Reservations", href: "/operations/reservations" },
-        { label: "Catering Orders", href: "/operations/catering-orders" },
-      ],
-    },
-    {
-      icon: "👥",
-      label: "Team",
-      children: teamChildren,
-    },
-    {
-      icon: "📚",
-      label: "Training",
-      children: [
-        { label: "Staff Handbook", href: "/staff/handbook" },
-        TRAINING_MANUAL,
-      ],
-    },
-    {
-      icon: "📅",
-      label: "Scheduling",
-      children: [
-        { label: "Roster", href: "/scheduling/roster" },
-        { label: "Roster Insights", href: "/scheduling/insights" },
-      ],
-    },
-    { icon: "💰", label: "Payslip", href: "/payslips" },
-  ];
+// Was a factory shared with the chef, who ran the same six groups with one
+// Team link fewer. The kitchen menu has since been re-specced into five
+// groups in a different order with different children, so there is nothing
+// left for the two to share and the parameter has gone with it.
+export const MANAGER_NAV: NavGroup[] = [
+  { icon: "🏠", label: "Dashboard", href: "/" },
+  {
+    icon: "🍽",
+    label: "Operations",
+    children: [
+      { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
+      { label: "Reservations", href: "/operations/reservations" },
+      { label: "Catering Orders", href: "/operations/catering-orders" },
+    ],
+  },
+  {
+    icon: "👥",
+    label: "Team",
+    // The manager triages the request queue, so Action Required leads his
+    // Team group; the chef has no equivalent entry.
+    children: [
+      { label: "Action Required", href: "/attention-required" },
+      ...TEAM_ADMIN_LINKS,
+    ],
+  },
+  {
+    icon: "📚",
+    label: "Training",
+    children: [
+      { label: "Staff Handbook", href: "/staff/handbook" },
+      TRAINING_MANUAL,
+    ],
+  },
+  {
+    icon: "📅",
+    label: "Scheduling",
+    children: [
+      { label: "Roster", href: "/scheduling/roster" },
+      { label: "Roster Insights", href: "/scheduling/insights" },
+    ],
+  },
+  { icon: "💰", label: "Payslip", href: "/payslips" },
+];
+
+/**
+ * The kitchen menu. Five groups, owner-specced, and deliberately not the
+ * manager's with rows removed.
+ *
+ * No Dashboard row: the dashboard is what the YURICA wordmark in the header
+ * already returns to, and the chef's dashboard lists these same five entries
+ * under Quick Access — a menu row for the screen you are standing on was the
+ * one row that could never take you anywhere new.
+ *
+ * Operations leads because it is what the kitchen opens the app for. Payslips
+ * and Documents & Training are single pages, so they are plain links; an
+ * accordion wrapping one child only adds a tap.
+ *
+ * The /people hrefs are load-bearing beyond navigation — useNavChangeBadges
+ * matches on them by exact path to hang the "+N since you last looked" badge,
+ * so New Staff and Leaving Staff must keep pointing at /people/onboarding and
+ * /people/notice-given.
+ */
+export const CHEF_NAV: NavGroup[] = [
+  {
+    icon: "🍽",
+    label: "Operations",
+    children: [
+      { label: "Sold Out Today", href: "/operations/daily-sold-out" },
+      { label: "Reservations", href: "/operations/reservations" },
+      { label: "Catering Orders", href: "/operations/catering-orders" },
+    ],
+  },
+  {
+    icon: "📅",
+    label: "Scheduling",
+    children: [
+      { label: "Roster", href: "/scheduling/roster" },
+      { label: "Roster Insights", href: "/scheduling/insights" },
+      // The same queue the manager reaches through Action Required, opened
+      // on the one tab the kitchen is asked about.
+      { label: "Availability Requests", href: "/attention-required?filter=availability" },
+    ],
+  },
+  {
+    icon: "👥",
+    label: "Team",
+    children: [
+      { label: "New Staff", href: "/people/onboarding" },
+      { label: "Leaving Staff", href: "/people/notice-given" },
+      { label: "Cash Payments", href: "/people/cash-payments" },
+    ],
+  },
+  { icon: "💰", label: "Payslips", href: "/payslips" },
+  { icon: "📚", label: "Documents & Training", href: "/staff/documents" },
+];
+
+/**
+ * The top level of a menu as flat {label, href} rows.
+ *
+ * For the dashboard shortcut lists, which are the same destinations as the
+ * menu and were going to be typed out a second time beside it. A group with
+ * no href of its own resolves to its first child, because none of
+ * Operations, Scheduling or Team is a page — they are headings over pages,
+ * and the first child is what tapping the heading already opens.
+ *
+ * Groups with neither an href nor children are dropped rather than rendered
+ * as a dead row.
+ */
+export function navShortcuts(nav: NavGroup[]): { label: string; href: string }[] {
+  return nav.flatMap((group) => {
+    const href = group.href ?? group.children?.[0]?.href;
+    return href ? [{ label: group.label, href }] : [];
+  });
 }
-
-// The manager triages the request queue; the chef doesn't, so his Team group
-// is the plain admin list.
-export const MANAGER_NAV: NavGroup[] = shiftLeadNav([
-  { label: "Action Required", href: "/attention-required" },
-  ...TEAM_ADMIN_LINKS,
-]);
-
-export const CHEF_NAV: NavGroup[] = shiftLeadNav(TEAM_ADMIN_LINKS);
 
 /**
  * Staff menu for the SSR shell paint.

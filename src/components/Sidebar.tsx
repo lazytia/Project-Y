@@ -40,9 +40,15 @@ type Props = {
 };
 
 function isNavChildActive(pathname: string, href: string): boolean {
-  if (pathname === href) return true;
-  if (href === "/onboarding" && pathname.startsWith("/onboarding")) return true;
-  return pathname.startsWith(`${href}/`);
+  // usePathname() never carries a query string, so a nav href that opens a
+  // page on a particular tab — /attention-required?filter=availability — could
+  // never match the path it lands on. It highlighted nothing, and worse left
+  // groupOwningPath unable to find the group holding it, so the accordion
+  // collapsed the moment that row was used.
+  const path = href.split("?")[0];
+  if (pathname === path) return true;
+  if (path === "/onboarding" && pathname.startsWith("/onboarding")) return true;
+  return pathname.startsWith(`${path}/`);
 }
 
 /**

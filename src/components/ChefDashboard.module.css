@@ -1,0 +1,361 @@
+/* The kitchen dashboard. Same 480px column and same tokens as the manager's
+   screen next door, but its own card shapes — three numbers across the top,
+   one dark sales card with two rows, then two lists. */
+
+.page {
+  font-family: var(--font-sans);
+  max-width: 480px;
+  margin: 0;
+  padding: var(--space-4) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Greeting ── */
+.greeting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-2) 0 0;
+}
+
+.greetingTitle {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.greetingRole {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+/* ── Section heads ── */
+.sectionLabel {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-fg);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.sectionHead .sectionLabel {
+  margin: 0;
+}
+
+.sectionBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-warm);
+  color: #fff;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+/* ── Today ── */
+.todayRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.todayCard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+
+.todayCard:hover { border-color: var(--color-warm); }
+
+.todayHead {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* The pale round badge the icon sits in. Fixed size so three of them line
+   up across the row whatever the label beside them does. */
+.todayIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+.todayLabel {
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-fg);
+  line-height: 1.2;
+}
+
+.todayChev {
+  margin-left: auto;
+  font-size: var(--font-size-md);
+  line-height: 1;
+  color: var(--color-fg-muted);
+}
+
+.todayValue {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  color: var(--color-warm);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.todaySub {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+}
+
+/* ── Sales ── */
+.salesCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-fg);
+  border-radius: var(--radius-lg);
+}
+
+.salesRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.salesRowTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.salesIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.salesBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.salesLabel {
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.64);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.salesValue {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.salesValueAccent { color: var(--color-warm); }
+
+.salesDivider {
+  width: 1px;
+  align-self: stretch;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.salesPctBlock {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.salesPct {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.salesPctAccent { color: var(--color-warm); }
+
+.salesPctLabel {
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.64);
+  white-space: nowrap;
+}
+
+.salesTrack {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.salesFill {
+  width: var(--sales-progress, 0%);
+  height: 100%;
+  background: var(--color-warm);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.salesHairline {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Needs Attention ── */
+.attentionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.attentionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+
+.attentionCard:hover { border-color: var(--color-warm); }
+
+.attentionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.attentionLabel {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-fg);
+  line-height: 1.2;
+}
+
+.attentionChev {
+  margin-left: auto;
+  font-size: var(--font-size-md);
+  line-height: 1;
+  color: var(--color-fg-muted);
+}
+
+.attentionValue {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  color: var(--color-warm);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.attentionSub {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-muted);
+  line-height: 1.3;
+}
+
+/* ── Quick Access ── */
+.quickList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.quickRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.quickRow:hover {
+  border-color: var(--color-warm);
+  background: var(--color-surface);
+}
+
+.quickIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+.quickLabel {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.quickChev {
+  margin-left: auto;
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  color: var(--color-fg-muted);
+}

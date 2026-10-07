@@ -7,13 +7,13 @@ import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
 import DashboardReadyMarker from "@/components/DashboardReadyMarker";
 import ManagerDashboard from "@/components/ManagerDashboard";
+import ChefDashboard from "@/components/ChefDashboard";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isStrictOwner, isChef } from "@/lib/permissions";
 import {
   resolveDashboardKind,
 } from "@/lib/resolve-dashboard-kind";
-import { isManagerDashboardKind } from "@/lib/session-dashboard";
-import { hasClientSessionHint, readClientDashboardHint } from "@/lib/client-session-hint";
+import { readClientDashboardHint } from "@/lib/client-session-hint";
 import {
   readDashCache,
   writeDashCache,
@@ -25,10 +25,10 @@ import type { DashboardKind } from "@/lib/session-dashboard";
 import dynamic from "next/dynamic";
 import {
   addDaysISO,
-  dowOfDateKey,
   isoMondayOf,
   sydneyTodayKey,
 } from "@/lib/sydney-date";
+import { dailySalesTarget, WEEKLY_SALES_TARGET } from "@/lib/sales-targets";
 import {
   type Reservation,
   fetchReservationsForDate,
@@ -48,19 +48,6 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
 const DashboardAttention = dynamic(() => import("@/components/DashboardAttention"), {
   ssr: false,
 });
-
-const WEEKLY_TARGET = 31_500;
-
-/** Weekly-sales-derived daily targets (0=Sun … 6=Sat). Sunday is closed. */
-const DAILY_TARGETS: Record<number, number> = {
-  0: 0,
-  1: 4_000,
-  2: 5_500,
-  3: 6_000,
-  4: 6_000,
-  5: 6_000,
-  6: 4_000,
-};
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -129,51 +116,33 @@ export default function DashboardPageClient({
       : null;
   const dashKind = effectiveDashboard ?? hintedDash;
 
-  const managerProps = {
-    // Holiday requests, availability changes and visa expiries are the
-    // store manager's queue, not the kitchen's — the chef can neither
-    // approve nor action any of them, so the block is hidden for Chuck.
-    hideAttention: dashKind === "chef",
-    roleLabel: dashKind === "chef" ? "Head Chef" : "Store Manager",
-    displayName: dashKind === "chef" ? "Chuck" : undefined,
-    sessionDashboard: isManagerDashboardKind(dashKind) ? dashKind : effectiveDashboard,
-    initialCache: initialManagerCache,
-  };
-
-  const showOwnerDash = dashKind === "owner";
-  const showManagerDash = isManagerDashboardKind(dashKind);
-
   if (loading || !user) {
-    if (showOwnerDash) {
+    if (dashKind === "owner") {
       return <OwnerDashboard sessionDashboard={dashKind} initialCache={initialOwnerCache} />;
     }
-    if (showManagerDash || hasClientSessionHint()) {
-      return (
-        <ManagerDashboard
-          {...managerProps}
-          sessionDashboard={
-            isManagerDashboardKind(dashKind)
-              ? dashKind
-              : hintedDash === "chef"
-                ? "chef"
-                : "manager"
-          }
-        />
-      );
+    // Before Firebase Auth settles, the role is only what the session cookie
+    // and the client hint say. Guessing wrong here means watching one dashboard
+    // swap out for another a second later, so the chef is answered specifically
+    // rather than being folded into the shift-lead default below.
+    if (dashKind === "chef") {
+      return <ChefDashboard initialCache={initialManagerCache} />;
     }
     return <ManagerDashboard sessionDashboard="manager" initialCache={initialManagerCache} />;
   }
 
-  const userIsChef = isChef(user);
-  const userIsManager = (isOwner(user) && !isStrictOwner(user)) || userIsChef;
+  // The kitchen runs its own screen. It was the manager's dashboard with the
+  // scheduling queue switched off for a while, but the two have since grown
+  // apart far enough — different cards, different order, different shortcuts —
+  // that sharing one component only meant more flags.
+  if (isChef(user)) {
+    return <ChefDashboard initialCache={initialManagerCache} />;
+  }
 
-  if (userIsManager) {
+  if (isOwner(user) && !isStrictOwner(user)) {
     return (
       <ManagerDashboard
-        hideAttention={userIsChef}
-        roleLabel={userIsChef ? "Head Chef" : "Store Manager"}
-        displayName={userIsChef ? "Chuck" : undefined}
-        sessionDashboard={userIsChef ? "chef" : "manager"}
+        roleLabel="Store Manager"
+        sessionDashboard="manager"
         initialCache={initialManagerCache}
       />
     );
@@ -313,7 +282,7 @@ function OwnerDashboard({
   }, []);
 
   const isToday = !!selectedDate && selectedDate === todayKey;
-  const dailyTarget = selectedDate ? DAILY_TARGETS[dowOfDateKey(selectedDate)] ?? 0 : 0;
+  const dailyTarget = dailySalesTarget(selectedDate);
   const weekMondayISO = selectedDate ? isoMondayOf(selectedDate) : "";
 
   const seedSales =
@@ -979,8 +948,8 @@ function OwnerDashboard({
             <p className={styles.weekAmount}>
               {shownWeeklySales !== null ? fmtCurrency(shownWeeklySales) : "—"}
             </p>
-            <p className={styles.targetSubOnDark}>Weekly Target {fmtCurrencyWhole(WEEKLY_TARGET)}</p>
-            <Progress value={shownWeeklySales ?? 0} max={WEEKLY_TARGET} pctRight tone="onDark" />
+            <p className={styles.targetSubOnDark}>Weekly Target {fmtCurrencyWhole(WEEKLY_SALES_TARGET)}</p>
+            <Progress value={shownWeeklySales ?? 0} max={WEEKLY_SALES_TARGET} pctRight tone="onDark" />
           </div>
           <div className={styles.weekDivider} aria-hidden="true" />
           <div className={styles.weekRight}>

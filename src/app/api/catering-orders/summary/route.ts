@@ -20,6 +20,23 @@ function isoDateToMonday(dateKey: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/**
+ * "11:30 AM" → 690, for ordering. Sorting the labels as text puts 11:30 AM
+ * before 9:00 AM, which would name the wrong job as the first of the day.
+ * Unparseable labels (Square prints "—" when an order has no slot) sort last
+ * rather than first, so a missing time never masquerades as midnight.
+ */
+function minutesOfDay(label: string): number {
+  const m = /^(\d{1,2}):(\d{2})\s*([AaPp])\.?[Mm]?\.?$/.exec(label.trim());
+  if (m) {
+    const hour = (parseInt(m[1], 10) % 12) + (m[3].toLowerCase() === "p" ? 12 : 0);
+    return hour * 60 + parseInt(m[2], 10);
+  }
+  const h24 = /^(\d{1,2}):(\d{2})$/.exec(label.trim());
+  if (h24) return parseInt(h24[1], 10) * 60 + parseInt(h24[2], 10);
+  return Number.MAX_SAFE_INTEGER;
+}
+
 async function verifyAuth(req: NextRequest) {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!idToken) return { ok: false as const, status: 401, error: "Missing bearer token." };
@@ -100,9 +117,28 @@ export async function GET(req: NextRequest) {
         o.status !== "CANCELLED",
     ).length;
 
-    return NextResponse.json({ nextOrder, weekCount });
+    // Just the jobs leaving the kitchen today, and the earliest pickup among
+    // them. The manager's card counts the week and names the next job whenever
+    // it falls; the chef's counts the shift he is standing in. Same orders,
+    // different question, so both are answered here rather than making the
+    // kitchen screen re-fetch and re-filter the whole Square list itself.
+    const todayOrders = orders
+      .filter((o) => o.deliveryDateISO === todayKey && o.status !== "CANCELLED")
+      .sort((a, b) => minutesOfDay(a.deliveryTime) - minutesOfDay(b.deliveryTime));
+
+    return NextResponse.json({
+      nextOrder,
+      weekCount,
+      todayCount: todayOrders.length,
+      todayFirstTime: todayOrders[0]?.deliveryTime ?? null,
+    });
   } catch (err) {
     console.error("[catering-orders/summary]", err);
-    return NextResponse.json({ nextOrder: null, weekCount: 0 });
+    return NextResponse.json({
+      nextOrder: null,
+      weekCount: 0,
+      todayCount: 0,
+      todayFirstTime: null,
+    });
   }
 }
