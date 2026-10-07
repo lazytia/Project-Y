@@ -18,7 +18,7 @@ import type { ManagerDashServerSnapshot } from "@/lib/manager-dash-server";
 import { isoMondayOf, sydneyTodayKey } from "@/lib/sydney-date";
 import { dailySalesTarget, targetPct, WEEKLY_SALES_TARGET } from "@/lib/sales-targets";
 import { fetchDocumentSignatures, SIGNABLE_DOCUMENT_KEYS } from "@/lib/document-signatures";
-import { CHEF_NAV, navShortcuts } from "@/lib/sidebar-nav";
+import { CHEF_NAV, navShortcuts, type NavIcon } from "@/lib/sidebar-nav";
 import { ROUTES } from "@/lib/routes";
 import styles from "./ChefDashboard.module.css";
 
@@ -121,21 +121,30 @@ async function fetchScheduleRequests(): Promise<{ holiday: number; availability:
 }
 
 /**
- * Icons for the Quick Access rows, keyed by the menu label they belong to.
+ * The sidebar's icons as line art, keyed by the same NavIcon id the sidebar
+ * draws its emoji from.
  *
- * Keyed by label rather than by index so re-ordering the menu cannot silently
- * hand Payslips the calendar. A label with no entry here falls back to the
- * generic chevron-only row rather than breaking the list.
+ * This map used to be keyed by menu label, which quietly made every label in
+ * sidebar-nav.ts load-bearing: re-word "Payslips" and this row lost its icon,
+ * with nothing to catch it. Keyed by icon id, and typed as a total Record, the
+ * compiler now refuses the build if a menu group ever wants a picture that is
+ * not drawn here — including ids no chef group uses today.
  */
-const QUICK_ICONS: Record<string, ReactNode> = {
-  Operations: (
+const NAV_ICONS: Record<NavIcon, ReactNode> = {
+  home: (
+    <>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V21h14V9.5" />
+    </>
+  ),
+  food: (
     <>
       <path d="M3 2v7a3 3 0 0 0 3 3 3 3 0 0 0 3-3V2" />
       <line x1="6" y1="12" x2="6" y2="22" />
       <path d="M17 2c-1.7 1.2-2.5 3-2.5 5.5S15.3 12 17 13v9" />
     </>
   ),
-  Scheduling: (
+  calendar: (
     <>
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <line x1="16" y1="2" x2="16" y2="6" />
@@ -143,24 +152,44 @@ const QUICK_ICONS: Record<string, ReactNode> = {
       <line x1="3" y1="10" x2="21" y2="10" />
     </>
   ),
-  Team: (
+  people: (
     <>
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
     </>
   ),
-  Payslips: (
+  money: (
     <>
       <rect x="2" y="6" width="20" height="13" rx="2" />
       <path d="M2 11h20" />
       <circle cx="12" cy="15" r="1.5" />
     </>
   ),
-  "Documents & Training": (
+  book: (
     <>
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </>
+  ),
+  clipboard: (
+    <>
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M8 12h8" />
+      <path d="M8 16h5" />
+    </>
+  ),
+  gear: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15H4.5a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 6 9.4a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 11 4.6V4.5a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 2.82 1.17l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 11h.1a2 2 0 1 1 0 4h-.1z" />
+    </>
+  ),
+  pen: (
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
     </>
   ),
 };
@@ -584,11 +613,11 @@ export default function ChefDashboard({
         <section>
           <p className={styles.sectionLabel}>QUICK ACCESS</p>
           <nav className={styles.quickList}>
-            {QUICK_ACCESS.map(({ label, href }) => (
+            {QUICK_ACCESS.map(({ icon, label, href }) => (
               <Link key={label} href={href} className={styles.quickRow}>
                 <span className={styles.quickIcon} aria-hidden="true">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    {QUICK_ICONS[label]}
+                    {NAV_ICONS[icon]}
                   </svg>
                 </span>
                 <span className={styles.quickLabel}>{label}</span>

@@ -13,7 +13,7 @@ import { readClientDashboardHint } from "@/lib/client-session-hint";
 import type { DashboardKind } from "@/lib/session-dashboard";
 import { prefetchOwnerMoneySummaries } from "@/lib/owner-money-prefetch";
 import { runWhenIdle } from "@/lib/run-when-idle";
-import { CHEF_NAV, MANAGER_NAV, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
+import { CHEF_NAV, MANAGER_NAV, NAV_ICON_GLYPH, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import {
   NAV_BADGE_HREFS,
   navBadgeDelta,
@@ -171,7 +171,7 @@ function NavGroupBlock({
             className={`${styles.groupHeader} ${pathname === group.href ? styles.active : ""}`}
             onClick={onNavigate}
           >
-            <span className={styles.icon}>{group.icon}</span>
+            <span className={styles.icon}>{NAV_ICON_GLYPH[group.icon]}</span>
             <span className={styles.groupLabel}>{group.label}</span>
           </Link>
           {group.children && (
@@ -193,7 +193,7 @@ function NavGroupBlock({
           onClick={onToggle}
           aria-expanded={expanded}
         >
-          <span className={styles.icon}>{group.icon}</span>
+          <span className={styles.icon}>{NAV_ICON_GLYPH[group.icon]}</span>
           <span className={styles.groupLabel}>{group.label}</span>
           {chevron}
         </button>
@@ -350,11 +350,11 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
   // it reachable afterwards.
   const staffNav: NavGroup[] = useMemo(
     () => [
-      { icon: "🏠", label: t("nav.home"), href: "/staff" },
-      { icon: "📅", label: t("nav.schedule"), href: "/staff/schedule/roster" },
-      { icon: "💰", label: t("nav.payslips"), href: "/staff/payslips" },
-      { icon: "📚", label: t("nav.documentsTraining"), href: "/staff/documents" },
-      { icon: "✍️", label: t("nav.requests"), href: "/staff/requests" },
+      { icon: "home", label: t("nav.home"), href: "/staff" },
+      { icon: "calendar", label: t("nav.schedule"), href: "/staff/schedule/roster" },
+      { icon: "money", label: t("nav.payslips"), href: "/staff/payslips" },
+      { icon: "book", label: t("nav.documentsTraining"), href: "/staff/documents" },
+      { icon: "pen", label: t("nav.requests"), href: "/staff/requests" },
     ],
     [t],
   );

@@ -7,8 +7,40 @@ export type NavItem = {
   children?: NavItem[];
 };
 
+/**
+ * Which picture a menu group shows, named after the picture rather than after
+ * the group that happens to use it: labels get re-worded, but the payslip row
+ * still wants the banknote.
+ *
+ * Two surfaces draw these — the sidebar as emoji (NAV_ICON_GLYPH below), the
+ * chef dashboard as line art for Quick Access. Both key off this id, so
+ * renaming a group can no longer silently drop its icon on one of them.
+ */
+export type NavIcon =
+  | "home"
+  | "food"
+  | "money"
+  | "people"
+  | "calendar"
+  | "book"
+  | "clipboard"
+  | "gear"
+  | "pen";
+
+export const NAV_ICON_GLYPH: Record<NavIcon, string> = {
+  home: "🏠",
+  food: "🍽",
+  money: "💰",
+  people: "👥",
+  calendar: "📅",
+  book: "📚",
+  clipboard: "📋",
+  gear: "⚙️",
+  pen: "✍️",
+};
+
 export type NavGroup = {
-  icon: string;
+  icon: NavIcon;
   label: string;
   href?: string;
   children?: NavItem[];
@@ -33,9 +65,9 @@ const TRAINING_MANUAL: NavItem = {
 };
 
 export const OWNER_NAV: NavGroup[] = [
-  { icon: "🏠", label: "Dashboard", href: "/" },
+  { icon: "home", label: "Dashboard", href: "/" },
   {
-    icon: "🍽",
+    icon: "food",
     label: "Operations",
     children: [
       { label: "Reservations", href: "/operations/reservations" },
@@ -50,7 +82,7 @@ export const OWNER_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "💰",
+    icon: "money",
     label: "Money",
     children: [
       { label: "Sales Overview", href: "/money/sales" },
@@ -59,7 +91,7 @@ export const OWNER_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "👥",
+    icon: "people",
     label: "People",
     children: [
       // The four staff lists first, in lifecycle order, because that is what
@@ -85,7 +117,7 @@ export const OWNER_NAV: NavGroup[] = [
     // the group header. The header did both jobs — navigate on the label,
     // expand on a separate chevron — so the one entry in this section that is
     // a page of its own was also the only one you could not see listed.
-    icon: "📋",
+    icon: "clipboard",
     label: "HR Records",
     children: [
       { label: "Staff Compliance", href: "/hr-records" },
@@ -95,7 +127,7 @@ export const OWNER_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "⚙️",
+    icon: "gear",
     label: "System",
     children: [
       { label: "Settings", href: "/system/settings" },
@@ -125,9 +157,9 @@ const TEAM_ADMIN_LINKS: NavItem[] = [
 // groups in a different order with different children, so there is nothing
 // left for the two to share and the parameter has gone with it.
 export const MANAGER_NAV: NavGroup[] = [
-  { icon: "🏠", label: "Dashboard", href: "/" },
+  { icon: "home", label: "Dashboard", href: "/" },
   {
-    icon: "🍽",
+    icon: "food",
     label: "Operations",
     children: [
       { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
@@ -136,7 +168,7 @@ export const MANAGER_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "👥",
+    icon: "people",
     label: "Team",
     // The manager triages the request queue, so Action Required leads his
     // Team group; the chef has no equivalent entry.
@@ -146,7 +178,7 @@ export const MANAGER_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "📚",
+    icon: "book",
     label: "Training",
     children: [
       { label: "Staff Handbook", href: "/staff/handbook" },
@@ -154,14 +186,14 @@ export const MANAGER_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "📅",
+    icon: "calendar",
     label: "Scheduling",
     children: [
       { label: "Roster", href: "/scheduling/roster" },
       { label: "Roster Insights", href: "/scheduling/insights" },
     ],
   },
-  { icon: "💰", label: "Payslip", href: "/payslips" },
+  { icon: "money", label: "Payslip", href: "/payslips" },
 ];
 
 /**
@@ -174,9 +206,8 @@ export const MANAGER_NAV: NavGroup[] = [
  * groups below it and drops this row, since it is already there.
  *
  * Operations leads the work groups because it is what the kitchen opens the
- * app for. Payslips
- * and Documents & Training are single pages, so they are plain links; an
- * accordion wrapping one child only adds a tap.
+ * app for. Payslips and Documents & Training are single pages, so they are
+ * plain links; an accordion wrapping one child only adds a tap.
  *
  * The /people hrefs are load-bearing beyond navigation — useNavChangeBadges
  * matches on them by exact path to hang the "+N since you last looked" badge,
@@ -184,9 +215,9 @@ export const MANAGER_NAV: NavGroup[] = [
  * /people/notice-given.
  */
 export const CHEF_NAV: NavGroup[] = [
-  { icon: "🏠", label: "Dashboard", href: "/" },
+  { icon: "home", label: "Dashboard", href: "/" },
   {
-    icon: "🍽",
+    icon: "food",
     label: "Operations",
     children: [
       { label: "Sold Out Today", href: "/operations/daily-sold-out" },
@@ -195,7 +226,7 @@ export const CHEF_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "📅",
+    icon: "calendar",
     label: "Scheduling",
     children: [
       { label: "Roster", href: "/scheduling/roster" },
@@ -206,7 +237,7 @@ export const CHEF_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "👥",
+    icon: "people",
     label: "Team",
     children: [
       { label: "New Staff", href: "/people/onboarding" },
@@ -214,12 +245,12 @@ export const CHEF_NAV: NavGroup[] = [
       { label: "Cash Payments", href: "/people/cash-payments" },
     ],
   },
-  { icon: "💰", label: "Payslips", href: "/payslips" },
-  { icon: "📚", label: "Documents & Training", href: "/staff/documents" },
+  { icon: "money", label: "Payslips", href: "/payslips" },
+  { icon: "book", label: "Documents & Training", href: "/staff/documents" },
 ];
 
 /**
- * The top level of a menu as flat {label, href} rows.
+ * The top level of a menu as flat {icon, label, href} rows.
  *
  * For the dashboard shortcut lists, which are the same destinations as the
  * menu and were going to be typed out a second time beside it. A group with
@@ -227,13 +258,16 @@ export const CHEF_NAV: NavGroup[] = [
  * Operations, Scheduling or Team is a page — they are headings over pages,
  * and the first child is what tapping the heading already opens.
  *
- * Groups with neither an href nor children are dropped rather than rendered
- * as a dead row.
+ * The icon travels with the row so the shortcut list has nothing left to look
+ * up by label. Groups with neither an href nor children are dropped rather
+ * than rendered as a dead row.
  */
-export function navShortcuts(nav: NavGroup[]): { label: string; href: string }[] {
+export function navShortcuts(
+  nav: NavGroup[],
+): { icon: NavIcon; label: string; href: string }[] {
   return nav.flatMap((group) => {
     const href = group.href ?? group.children?.[0]?.href;
-    return href ? [{ label: group.label, href }] : [];
+    return href ? [{ icon: group.icon, label: group.label, href }] : [];
   });
 }
 
@@ -251,11 +285,11 @@ export function navShortcuts(nav: NavGroup[]): { label: string; href: string }[]
  * group with an `href` and no `children` as a plain link with no chevron.
  */
 export const STAFF_NAV: NavGroup[] = [
-  { icon: "🏠", label: "Home", href: "/staff" },
-  { icon: "📅", label: "Schedule", href: "/staff/schedule/roster" },
-  { icon: "💰", label: "Payslips", href: "/staff/payslips" },
-  { icon: "📚", label: "Documents & Training", href: "/staff/documents" },
-  { icon: "✍️", label: "Requests", href: "/staff/requests" },
+  { icon: "home", label: "Home", href: "/staff" },
+  { icon: "calendar", label: "Schedule", href: "/staff/schedule/roster" },
+  { icon: "money", label: "Payslips", href: "/staff/payslips" },
+  { icon: "book", label: "Documents & Training", href: "/staff/documents" },
+  { icon: "pen", label: "Requests", href: "/staff/requests" },
 ];
 
 /** Nav tree for SSR shell paint based on the session role cookie. */

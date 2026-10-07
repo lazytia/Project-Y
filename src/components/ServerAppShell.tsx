@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ServerSession } from "@/lib/dashboard-session";
-import { navForSessionRole, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
+import { NAV_ICON_GLYPH, navForSessionRole, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
 import shellStyles from "./AppShell.module.css";
 import sidebarStyles from "./Sidebar.module.css";
 
@@ -27,7 +27,7 @@ function ServerNavGroup({ group }: { group: NavGroup }) {
     return (
       <div className={sidebarStyles.group}>
         <Link href={group.href} className={sidebarStyles.groupHeader}>
-          <span className={sidebarStyles.icon}>{group.icon}</span>
+          <span className={sidebarStyles.icon}>{NAV_ICON_GLYPH[group.icon]}</span>
           <span>{group.label}</span>
         </Link>
       </div>
@@ -42,7 +42,7 @@ function ServerNavGroup({ group }: { group: NavGroup }) {
   return (
     <div className={sidebarStyles.group}>
       <button type="button" className={sidebarStyles.groupHeader}>
-        <span className={sidebarStyles.icon}>{group.icon}</span>
+        <span className={sidebarStyles.icon}>{NAV_ICON_GLYPH[group.icon]}</span>
         <span className={sidebarStyles.groupLabel}>{group.label}</span>
         <span className={sidebarStyles.chevron}>›</span>
       </button>
