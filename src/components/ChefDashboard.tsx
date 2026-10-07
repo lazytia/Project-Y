@@ -19,6 +19,7 @@ import { isoMondayOf, sydneyTodayKey } from "@/lib/sydney-date";
 import { dailySalesTarget, targetPct, WEEKLY_SALES_TARGET } from "@/lib/sales-targets";
 import { fetchDocumentSignatures, SIGNABLE_DOCUMENT_KEYS } from "@/lib/document-signatures";
 import { CHEF_NAV, navShortcuts } from "@/lib/sidebar-nav";
+import { ROUTES } from "@/lib/routes";
 import styles from "./ChefDashboard.module.css";
 
 /**
@@ -164,8 +165,11 @@ const QUICK_ICONS: Record<string, ReactNode> = {
   ),
 };
 
-/** The five menu groups, so the shortcuts and the menu cannot drift apart. */
-const QUICK_ACCESS = navShortcuts(CHEF_NAV);
+/**
+ * The menu groups, so the shortcuts and the menu cannot drift apart — minus the
+ * menu's Dashboard row, which from here would only reload the screen you are on.
+ */
+const QUICK_ACCESS = navShortcuts(CHEF_NAV).filter(({ href }) => href !== ROUTES.home);
 
 function TodayCard({
   href,

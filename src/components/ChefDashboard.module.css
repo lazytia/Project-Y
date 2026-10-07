@@ -159,8 +159,18 @@
   gap: var(--space-3);
 }
 
+/*
+ * Icon | today | hairline | target | percentage.
+ *
+ * Grid rather than flex: the money blocks sized themselves to their own text,
+ * so a four-digit figure ran into the divider and the second row's labels
+ * never lined up with the first row's. Equal fr halves put the divider at the
+ * midpoint of the space between the icon and the percentage and hold both
+ * rows to the same columns.
+ */
 .salesRowTop {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 1px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
 }
@@ -209,7 +219,7 @@
 }
 
 .salesPctBlock {
-  margin-left: auto;
+  justify-self: end;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

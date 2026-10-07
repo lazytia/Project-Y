@@ -165,15 +165,16 @@ export const MANAGER_NAV: NavGroup[] = [
 ];
 
 /**
- * The kitchen menu. Five groups, owner-specced, and deliberately not the
+ * The kitchen menu. Six groups, owner-specced, and deliberately not the
  * manager's with rows removed.
  *
- * No Dashboard row: the dashboard is what the YURICA wordmark in the header
- * already returns to, and the chef's dashboard lists these same five entries
- * under Quick Access — a menu row for the screen you are standing on was the
- * one row that could never take you anywhere new.
+ * Dashboard leads, as it does for the owner and the manager: the wordmark in
+ * the header goes home too, but a menu that opens over the screen you are on
+ * needs a visible way back to it. Quick Access on the dashboard mirrors the
+ * groups below it and drops this row, since it is already there.
  *
- * Operations leads because it is what the kitchen opens the app for. Payslips
+ * Operations leads the work groups because it is what the kitchen opens the
+ * app for. Payslips
  * and Documents & Training are single pages, so they are plain links; an
  * accordion wrapping one child only adds a tap.
  *
@@ -183,6 +184,7 @@ export const MANAGER_NAV: NavGroup[] = [
  * /people/notice-given.
  */
 export const CHEF_NAV: NavGroup[] = [
+  { icon: "🏠", label: "Dashboard", href: "/" },
   {
     icon: "🍽",
     label: "Operations",
