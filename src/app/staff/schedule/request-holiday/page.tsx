@@ -15,6 +15,7 @@ import { useLang } from "@/components/LanguageProvider";
 import CalendarPicker from "@/components/CalendarPicker";
 import RequestSubmitted from "@/components/RequestSubmitted";
 import { useBackTo } from "@/hooks/useBackTo";
+import { NOTICE_DAYS, NOTICE_WEEKS } from "@/lib/notice-period";
 import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
@@ -65,17 +66,13 @@ function daysFromToday(key: string): number {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-/**
- * How much notice a holiday request needs.
- *
- * One figure, not two. The rule used to turn on how long the holiday was —
- * three weeks for three days or more, two for anything shorter — which is why
- * the length of the request was worked out at all. It is a flat two weeks
- * now, matching the employment agreement and the handbook, so the length no
- * longer decides anything and `durationDays` went with it.
+/*
+ * The notice a holiday request needs is NOTICE_WEEKS, shared with the
+ * availability form. It used to turn on how long the holiday was — three weeks
+ * for three days or more, two for anything shorter — which is why the length
+ * of the request was worked out at all. It is a flat figure now, so the length
+ * no longer decides anything and `durationDays` went with it.
  */
-const NOTICE_WEEKS = 2;
-const NOTICE_DAYS = NOTICE_WEEKS * 7;
 
 function keyToDate(key: string): Date {
   const [y, m, d] = key.split("-").map(Number);

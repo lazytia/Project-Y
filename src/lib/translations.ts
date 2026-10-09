@@ -501,7 +501,8 @@ const EN: Dict = {
 
   // Availability Change
   "ac.title": "Availability Change",
-  "ac.notice": "Availability changes require at least 2 weeks notice.",
+  // {n} is NOTICE_WEEKS (lib/notice-period), filled in by the page.
+  "ac.notice": "Availability changes require at least {n} weeks notice.",
   "ac.effectiveFrom": "Effective From",
   "ac.subjectApproval": "Subject to approval",
   "ac.effectiveNote": "Your new availability will apply from this date if approved by management.",
@@ -933,7 +934,7 @@ const JA: Dict = {
 
   // Availability Change
   "ac.title": "勤務可能日の変更",
-  "ac.notice": "勤務可能日の変更には、少なくとも2週間前の申請が必要です。",
+  "ac.notice": "勤務可能日の変更には、少なくとも{n}週間前の申請が必要です。",
   "ac.effectiveFrom": "適用開始日",
   "ac.subjectApproval": "承認待ち",
   "ac.effectiveNote": "承認されると、この日から新しい勤務可能日が適用されます。",

@@ -14,6 +14,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
 import RequestSubmitted from "@/components/RequestSubmitted";
 import { useBackTo } from "@/hooks/useBackTo";
+import { NOTICE_DAYS, NOTICE_WEEKS } from "@/lib/notice-period";
 import { ROUTES } from "@/lib/routes";
 import styles from "./page.module.css";
 
@@ -86,11 +87,15 @@ function fmtTime12h(t: string): string {
   return `${h}:${m} ${period}`;
 }
 
-/** Returns the Monday that is at least 21 days from today. */
-function nextMondayAfter3Weeks(): Date {
+/**
+ * The first Monday that is at least NOTICE_DAYS from today — the earliest a
+ * new availability can start once the notice has been given. Changes start on
+ * a Monday so a roster week is never split between the old pattern and the new.
+ */
+function firstMondayAfterNotice(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 21);
+  d.setDate(d.getDate() + NOTICE_DAYS);
   const dow = d.getDay(); // 0=Sun…6=Sat
   if (dow !== 1) d.setDate(d.getDate() + ((1 + 7 - dow) % 7 || 7));
   return d;
@@ -150,7 +155,7 @@ export default function AvailabilityChangePage() {
   });
 
   useEffect(() => {
-    setEffectiveDate(nextMondayAfter3Weeks());
+    setEffectiveDate(firstMondayAfterNotice());
   }, []);
 
   const [current, setCurrent] = useState<AvailabilityMap>(DEFAULT_AVAILABILITY);
@@ -283,7 +288,7 @@ export default function AvailabilityChangePage() {
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
         </span>
-        <p className={styles.infoBody}>{t("ac.notice")}</p>
+        <p className={styles.infoBody}>{t("ac.notice").replace("{n}", String(NOTICE_WEEKS))}</p>
       </div>
 
       {/* Effective From card */}
