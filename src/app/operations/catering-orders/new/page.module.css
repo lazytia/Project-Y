@@ -714,20 +714,60 @@
   border-top: 1px solid var(--color-border);
 }
 
+/*
+ * Name | price | Add, on one line that never runs past the sheet.
+ *
+ * min-width: 0 is the point. An <input> will not shrink below its default
+ * width (about 150px) inside a flex row, so two of them plus the button were
+ * wider than a phone and the button — the last item — was pushed off the right
+ * edge, leaving no way to add a custom item. The name takes the slack, the
+ * price is a fixed narrow column and the button keeps its size.
+ */
 .customForm {
   flex: 1;
+  min-width: 0;
   display: flex;
   gap: 6px;
 }
 
 .customForm input {
-  flex: 1;
+  min-width: 0;
   font: inherit;
   font-size: 13px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   background: var(--color-surface);
+  box-sizing: border-box;
+}
+
+.customName {
+  flex: 1 1 0;
+}
+
+.customPrice {
+  flex: 0 0 84px;
+  width: 84px;
+}
+
+.customAddBtn {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-sm);
+  background: var(--color-warm);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.customAddBtn:disabled {
+  background: none;
+  color: var(--color-warm);
+  opacity: 0.45;
+  cursor: default;
 }
 
 .customHint {

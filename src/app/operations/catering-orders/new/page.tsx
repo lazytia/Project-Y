@@ -678,8 +678,10 @@ function AddItemModal({
     return menu.filter((i) => i.name.toLowerCase().includes(q)).slice(0, 50);
   }, [menu, query]);
 
+  const customValid = customName.trim() !== "" && customPrice !== "" && customPrice > 0;
+
   function pickCustom() {
-    if (!customName.trim() || customPrice === "" || customPrice <= 0) return;
+    if (!customValid) return;
     onPick(customName.trim(), Math.round(customPrice * 100));
     setCustomName("");
     setCustomPrice("");
@@ -741,18 +743,30 @@ function AddItemModal({
           {customOpen ? (
             <div className={styles.customForm}>
               <input
+                className={styles.customName}
                 placeholder="Item name"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
               />
               <input
+                className={styles.customPrice}
                 type="number"
+                inputMode="decimal"
                 placeholder="Price ($)"
                 value={customPrice}
                 onChange={(e) => setCustomPrice(e.target.value === "" ? "" : parseFloat(e.target.value))}
               />
-              <button type="button" className={styles.menuAdd} onClick={pickCustom} aria-label="Add custom item">
-                <PlusIcon />
+              {/* Labelled, and dimmed until there is a name and a price: the
+                  bare "+" it replaced was the first thing pushed off the edge
+                  of a phone, and did nothing at all when a field was empty. */}
+              <button
+                type="button"
+                className={styles.customAddBtn}
+                onClick={pickCustom}
+                disabled={!customValid}
+                aria-label="Add custom item"
+              >
+                Add
               </button>
             </div>
           ) : (
