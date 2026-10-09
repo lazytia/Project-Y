@@ -1,24 +1,28 @@
+/* Sized to fit one phone screen without scrolling: the title, next pay date,
+   latest payslip and the list of earlier ones all sit above the fold. Gaps are
+   tight and the type is a step smaller than the other staff pages — the
+   latest-payslip card carries the figure that matters, so that stays largest. */
 .page {
   font-family: var(--font-sans);
   max-width: 480px;
   margin: 0;
-  padding: var(--space-4) var(--space-5) var(--space-7);
+  padding: 0 var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 10px;
 }
 
 .title {
   margin: 0;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
 }
 
 .sectionTitle {
-  margin: var(--space-3) 0 0;
-  font-size: 18px;
+  margin: var(--space-1) 0 calc(-1 * var(--space-1));
+  font-size: 14px;
   font-weight: 700;
   color: var(--color-fg);
 }
@@ -27,8 +31,8 @@
 .nextPayCard {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-3);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -38,40 +42,45 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: rgba(234, 88, 12, 0.10);
   color: var(--color-warm);
   flex-shrink: 0;
 }
 
+.payIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
 .nextPayBody {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   flex: 1;
   min-width: 0;
 }
 
 .nextPayLabel {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--color-fg-muted);
   font-weight: 500;
 }
 
 .nextPayDate {
   margin: 0;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
 }
 
 .nextPaySub {
-  margin: 4px 0 0;
-  font-size: 13px;
+  margin: 2px 0 0;
+  font-size: 12px;
   color: var(--color-fg-muted);
 }
 
@@ -79,11 +88,11 @@
 .latestCard {
   display: flex;
   flex-direction: column;
-  padding: var(--space-4);
+  padding: var(--space-3);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .latestHeader {
@@ -96,30 +105,35 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: rgba(234, 88, 12, 0.10);
   color: var(--color-warm);
   flex-shrink: 0;
 }
 
+.latestIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
 .latestHeading {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .latestMeta {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--color-fg-muted);
   font-weight: 500;
 }
 
 .latestPeriod {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--color-fg);
 }
@@ -127,19 +141,21 @@
 .latestDivider {
   height: 1px;
   background: var(--color-border);
-  margin: 4px calc(-1 * var(--space-4));
+  margin: 0 calc(-1 * var(--space-3));
 }
 
+/* Lined up under the period text, past the icon — the icon is 36px and the
+   header's gap is --space-3. */
 .latestSection {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-left: calc(44px + var(--space-3));
+  gap: 2px;
+  padding-left: calc(36px + var(--space-3));
 }
 
 .latestAmount {
   margin: 0;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--color-fg);
   letter-spacing: -0.01em;
@@ -147,26 +163,31 @@
 
 .latestPaidDate {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--color-fg);
 }
 
 .viewBtn {
-  margin-top: var(--space-3);
+  margin-top: var(--space-1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
-  height: 52px;
+  gap: var(--space-2);
+  height: 38px;
   background: var(--color-warm);
   color: #ffffff;
   border-radius: var(--radius-md);
   text-decoration: none;
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   transition: opacity 0.15s;
+}
+
+.viewBtn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .viewBtn:hover { opacity: 0.92; }
@@ -179,17 +200,17 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 0 var(--space-4) 6px;
-  font-size: 12px;
+  padding: 0 var(--space-3) 2px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--color-fg-muted);
   text-transform: none;
 }
 .prevHeaderDate {
-  /* 18px SVG + gap in .prevRow — pad by the same amount so the
+  /* 16px SVG + gap in .prevRow — pad by the same amount so the
      header sits above the date column, not above the icon. */
-  padding-left: calc(18px + var(--space-3));
+  padding-left: calc(16px + var(--space-3));
   flex: 1;
 }
 .prevHeaderAmount {
@@ -213,7 +234,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: 7px var(--space-3);
   border-bottom: 1px solid var(--color-border);
   text-decoration: none;
   color: inherit;
@@ -231,15 +252,20 @@
   flex-shrink: 0;
 }
 
+.prevIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .prevDate {
   flex: 1;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-fg);
 }
 
 .prevAmount {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-fg);
   white-space: nowrap;
@@ -247,15 +273,16 @@
 
 .prevChevron {
   font-size: 20px;
+  line-height: 1;
   color: var(--color-fg-muted);
   flex-shrink: 0;
 }
 
 /* ── Info box ── */
 .emptyHint {
-  margin: var(--space-2) 0 0;
-  padding: var(--space-4);
-  font-size: 14px;
+  margin: 0;
+  padding: var(--space-3);
+  font-size: 13px;
   color: var(--color-fg-muted);
   text-align: center;
   border: 1px dashed var(--color-border);
@@ -266,8 +293,8 @@
 .infoBox {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
   border-radius: var(--radius-lg);
 }
@@ -276,12 +303,17 @@
   display: flex;
   color: var(--color-fg-muted);
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
+}
+
+.infoIcon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .infoBody {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: var(--color-fg);
-  line-height: 1.55;
+  line-height: 1.45;
 }
