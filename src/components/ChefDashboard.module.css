@@ -93,7 +93,9 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  padding: var(--space-3) var(--space-2);
+  /* 6px rather than --space-2: the label is 12px, and "Reservations" needs the
+     extra 4px of width to stay on one line on a 375px phone. */
+  padding: var(--space-3) 6px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -128,13 +130,19 @@
 .todayLabel {
   min-width: 0;
   margin-top: var(--space-2);
-  font-size: var(--font-size-xs);
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-fg);
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Below ~370px even 6px of padding can't fit "Reservations" at 12px, and an
+   ellipsis there would cut the word — so the smallest phones keep 11px. */
+@media (max-width: 370px) {
+  .todayLabel { font-size: var(--font-size-xs); }
 }
 
 .todayChev {
@@ -282,17 +290,22 @@
 }
 
 /* ── Needs Attention ── */
+/* Same 8px gap as the Today row above it, and minmax(0, 1fr) for the same
+   reason: the two cards stay equal however long a label is. */
 .attentionRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
 }
 
 .attentionCard {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-3) var(--space-4);
+  /* 8px a side: at a 12px label, "Signatures Required" plus its chevron is
+     wider than 16px of padding left room for and wrapped to two lines, which
+     also pushed the two numbers out of line with each other. */
+  padding: var(--space-3) var(--space-2);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -310,10 +323,17 @@
 }
 
 .attentionLabel {
-  font-size: var(--font-size-xs);
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-fg);
   line-height: 1.2;
+}
+
+/* "Signatures Required" and its chevron need ~386px of screen to stay on one
+   line at 12px; narrower, it wraps and the two cards' numbers fall out of line,
+   so those phones keep 11px. After the rule above so it wins. */
+@media (max-width: 385px) {
+  .attentionLabel { font-size: var(--font-size-xs); }
 }
 
 .attentionChev {
