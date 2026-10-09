@@ -72,9 +72,19 @@
 }
 
 /* ── Today ── */
+/*
+ * Three equal columns, and minmax(0, 1fr) rather than 1fr. A bare 1fr is
+ * minmax(auto, 1fr): the column will not go narrower than its content, so the
+ * one-word "Reservations" label pushed its column wide and squeezed the other
+ * two, and on a phone the third card ran off the right edge of the screen.
+ * With a zero minimum the three always split the row evenly.
+ *
+ * The icon and chevron share the top line and the label sits under them,
+ * because icon + label + chevron side by side cannot fit in a third of a phone.
+ */
 .todayRow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
@@ -82,7 +92,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) var(--space-2);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -96,7 +107,7 @@
 .todayHead {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: space-between;
   min-width: 0;
 }
 
@@ -116,21 +127,24 @@
 
 .todayLabel {
   min-width: 0;
+  margin-top: var(--space-2);
   font-size: var(--font-size-xs);
   font-weight: 600;
   color: var(--color-fg);
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .todayChev {
-  margin-left: auto;
   font-size: var(--font-size-md);
   line-height: 1;
   color: var(--color-fg-muted);
 }
 
 .todayValue {
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   font-size: var(--font-size-2xl);
   font-weight: 800;
   color: var(--color-warm);
@@ -144,10 +158,14 @@
 }
 
 /* ── Sales ── */
+/* Wider than the column it sits in: the negative margin lets the card reach
+   into the page's side padding, which gives the two money figures and the
+   percentage beside them the room they were short of. */
 .salesCard {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  margin-inline: calc(-1 * var(--space-3));
   padding: var(--space-4);
   background: var(--color-fg);
   border-radius: var(--radius-lg);
@@ -172,7 +190,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 1px minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .salesIcon {

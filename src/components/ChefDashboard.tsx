@@ -221,9 +221,9 @@ function TodayCard({
             {children}
           </svg>
         </span>
-        <span className={styles.todayLabel}>{label}</span>
         <span className={styles.todayChev} aria-hidden="true">›</span>
       </span>
+      <span className={styles.todayLabel}>{label}</span>
       <span className={styles.todayValue}>{value}</span>
       <span className={styles.todaySub}>{sub}</span>
     </Link>
