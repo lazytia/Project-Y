@@ -1,3 +1,7 @@
+import { CLOCK_IN_GUIDE_HREF } from "./clock-in-guide";
+import { ROUTES } from "./routes";
+import { translate } from "./translations";
+
 export type NavItem = {
   label: string;
   href: string;
@@ -25,7 +29,7 @@ export type NavIcon =
   | "book"
   | "clipboard"
   | "gear"
-  | "pen";
+  | "file";
 
 export const NAV_ICON_GLYPH: Record<NavIcon, string> = {
   home: "🏠",
@@ -36,7 +40,7 @@ export const NAV_ICON_GLYPH: Record<NavIcon, string> = {
   book: "📚",
   clipboard: "📋",
   gear: "⚙️",
-  pen: "✍️",
+  file: "📄",
 };
 
 export type NavGroup = {
@@ -272,25 +276,53 @@ export function navShortcuts(
 }
 
 /**
- * Staff menu for the SSR shell paint.
+ * The staff menu: Home, Schedule, Payslips, Handbook & Training, My Documents,
+ * Settings.
  *
- * Must stay in step with the `staffNav` memo in Sidebar.tsx, which is what
- * replaces this once the client has hydrated — the two differ only in that
- * the live one runs the labels through `t()`. This copy had drifted badly: it
- * still led with an "Onboarding" group the client menu dropped some time ago,
- * so staff were served a menu for a thing they had finished and watched it
- * rearrange itself under them a moment later.
+ * Written once, with every label passed through `label`, because it is drawn
+ * twice and the two copies have drifted before: the live Sidebar runs the keys
+ * through `t()` so the Japanese crew read their own language, and the
+ * server-rendered shell that paints ahead of hydration wants the same tree in
+ * English. When they were two hand-written arrays the shell kept serving an
+ * "Onboarding" group the live menu had dropped, and staff watched their menu
+ * rearrange itself a moment after load.
  *
- * Flat on purpose. Every row is a destination, and NavGroupBlock renders a
- * group with an `href` and no `children` as a plain link with no chevron.
+ * Schedule holds the roster and everything you do about your own hours, with
+ * the clock-in guide second — the dashboard only promotes it for a new starter's
+ * first fortnight, and this is where it lives after that. Handbook & Training
+ * keeps the beer guide as a sibling of the training manual rather than nested
+ * under it, so the thing they are asked to come back and sign is one tap away.
  */
-export const STAFF_NAV: NavGroup[] = [
-  { icon: "home", label: "Home", href: "/staff" },
-  { icon: "calendar", label: "Schedule", href: "/staff/schedule/roster" },
-  { icon: "money", label: "Payslips", href: "/staff/payslips" },
-  { icon: "book", label: "Documents & Training", href: "/staff/documents" },
-  { icon: "pen", label: "Requests", href: "/staff/requests" },
-];
+export function buildStaffNav(label: (key: string) => string): NavGroup[] {
+  return [
+    { icon: "home", label: label("nav.home"), href: ROUTES.staffHome },
+    {
+      icon: "calendar",
+      label: label("nav.schedule"),
+      children: [
+        { label: label("nav.roster"), href: ROUTES.staffScheduleRoster },
+        { label: label("nav.clockInGuide"), href: CLOCK_IN_GUIDE_HREF },
+        { label: label("nav.requestHoliday"), href: ROUTES.staffScheduleRequestHoliday },
+        { label: label("nav.availabilityChange"), href: ROUTES.staffScheduleAvailability },
+      ],
+    },
+    { icon: "money", label: label("nav.payslips"), href: ROUTES.staffPayslips },
+    {
+      icon: "book",
+      label: label("nav.handbookTraining"),
+      children: [
+        { label: label("nav.staffHandbook"), href: ROUTES.staffHandbook },
+        { label: label("nav.trainingManual"), href: ROUTES.staffTrainingManual },
+        { label: label("nav.beerGuide"), href: ROUTES.staffBeerGuide },
+      ],
+    },
+    { icon: "file", label: label("nav.myDocuments"), href: ROUTES.staffDocuments },
+    { icon: "gear", label: label("nav.settings"), href: ROUTES.staffSettings },
+  ];
+}
+
+/** Staff menu for the SSR shell paint — the same tree, in English. */
+export const STAFF_NAV: NavGroup[] = buildStaffNav((key) => translate("en", key));
 
 /** Nav tree for SSR shell paint based on the session role cookie. */
 export function navForSessionRole(

@@ -13,7 +13,15 @@ import { readClientDashboardHint } from "@/lib/client-session-hint";
 import type { DashboardKind } from "@/lib/session-dashboard";
 import { prefetchOwnerMoneySummaries } from "@/lib/owner-money-prefetch";
 import { runWhenIdle } from "@/lib/run-when-idle";
-import { CHEF_NAV, MANAGER_NAV, NAV_ICON_GLYPH, OWNER_NAV, type NavGroup, type NavItem } from "@/lib/sidebar-nav";
+import {
+  buildStaffNav,
+  CHEF_NAV,
+  MANAGER_NAV,
+  NAV_ICON_GLYPH,
+  OWNER_NAV,
+  type NavGroup,
+  type NavItem,
+} from "@/lib/sidebar-nav";
 import {
   NAV_BADGE_HREFS,
   navBadgeDelta,
@@ -332,32 +340,11 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
     [userIsStrictOwner],
   );
 
-  // Staff sidebar — five rows, every one of them a destination.
-  // Built here rather than inside the staff branch below so the open-group
-  // effect can see the same tree the staff member is looking at.
-  //
-  // Deliberately flat: no `children`, which is what makes NavGroupBlock render
-  // each row as a plain link with no disclosure chevron. The accordion was
-  // costing two taps for every reference page and hiding the destinations
-  // behind a label — Schedule and Handbook & Training were headings you could
-  // press that went nowhere on their own.
-  //
-  // What the two groups used to hold now lives on the page itself: the roster
-  // is Schedule, and the handbook, training manual, beer guide and clock-in
-  // guide are a Training section on Documents & Training. The clock-in guide
-  // in particular needs that home — the dashboard only promotes it for the
-  // first fortnight after activation, so the menu was the only thing keeping
-  // it reachable afterwards.
-  const staffNav: NavGroup[] = useMemo(
-    () => [
-      { icon: "home", label: t("nav.home"), href: "/staff" },
-      { icon: "calendar", label: t("nav.schedule"), href: "/staff/schedule/roster" },
-      { icon: "money", label: t("nav.payslips"), href: "/staff/payslips" },
-      { icon: "book", label: t("nav.documentsTraining"), href: "/staff/documents" },
-      { icon: "pen", label: t("nav.requests"), href: "/staff/requests" },
-    ],
-    [t],
-  );
+  // Staff sidebar. Built here rather than inside the staff branch below so the
+  // open-group effect can see the same tree the staff member is looking at.
+  // The tree itself lives in sidebar-nav.ts, shared with the server-rendered
+  // shell so the two cannot drift; this only supplies the translator.
+  const staffNav: NavGroup[] = useMemo(() => buildStaffNav(t), [t]);
 
   // Chef and manager run the same menu apart from one Team link — the
   // manager triages Action Required, the chef doesn't — so the two trees
