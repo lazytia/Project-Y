@@ -37,16 +37,18 @@ service cloud.firestore {
         || (request.auth != null && request.auth.uid == uid);
     }
 
-    // Published rosters: weekly docs keyed by Monday ISO date. Manager
-    // notes and per-day shift counts live here. Staff need read access
-    // so the staff roster page can display the same data.
+    // Published rosters: weekly docs keyed by Monday ISO date. Shift
+    // assignments, per-day counts, notes and the publish stamp live here.
+    // Staff need read access so the staff roster page can display the same
+    // data.
+    //
+    // The head chef builds and publishes the roster, so a chef writes it the
+    // same way an owner does. Chefs used to be held to the `notes` field only,
+    // which let them annotate a week but not staff or publish it. Deleting a
+    // week stays with the owners: no screen deletes one.
     match /rosters_published/{weekStartISO} {
       allow read: if request.auth != null;
-      allow create: if isOwner()
-        || (isChef() && request.resource.data.keys().hasOnly(["notes"]));
-      allow update: if isOwner()
-        || (isChef()
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["notes"]));
+      allow create, update: if isOwner() || isChef();
       allow delete: if isOwner();
     }
 

@@ -971,16 +971,14 @@ export default function ManagerRosterPage() {
           <h1 className={styles.title}>Roster</h1>
           <p className={styles.subtitle}>{fmtRange(weekStart, weekEnd)}</p>
         </div>
-        {!isChefUser && (
-          <button
-            type="button"
-            className={styles.publishBtn}
-            onClick={publishWeek}
-            disabled={publishing}
-          >
-            {publishing ? "Publishing…" : "Publish"}
-          </button>
-        )}
+        <button
+          type="button"
+          className={styles.publishBtn}
+          onClick={publishWeek}
+          disabled={publishing}
+        >
+          {publishing ? "Publishing…" : "Publish"}
+        </button>
       </header>
 
       {/* ── Current week strip ── */}
@@ -1006,30 +1004,6 @@ export default function ManagerRosterPage() {
           {weekDays.map((d, i) => {
             const iso = isoDate(d);
             const n = assignmentCount(weekDoc, iso, "lunch");
-            if (isChefUser) {
-              if (n > 0) {
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    className={styles.gridCell}
-                    onClick={() => setChefStaffModal({
-                      label: `${DAY_LABELS_FULL[i]} Lunch`,
-                      iso,
-                      meal: "lunch",
-                      weekKey: "current",
-                    })}
-                  >
-                    <DotCount n={n} />
-                  </button>
-                );
-              }
-              return (
-                <div key={i} className={styles.gridCellReadOnly}>
-                  <DotCount n={n} />
-                </div>
-              );
-            }
             return (
               <button
                 key={i}
@@ -1052,30 +1026,6 @@ export default function ManagerRosterPage() {
           {weekDays.map((d, i) => {
             const iso = isoDate(d);
             const n = assignmentCount(weekDoc, iso, "dinner");
-            if (isChefUser) {
-              if (n > 0) {
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    className={styles.gridCell}
-                    onClick={() => setChefStaffModal({
-                      label: `${DAY_LABELS_FULL[i]} Dinner`,
-                      iso,
-                      meal: "dinner",
-                      weekKey: "current",
-                    })}
-                  >
-                    <DotCount n={n} />
-                  </button>
-                );
-              }
-              return (
-                <div key={i} className={styles.gridCellReadOnly}>
-                  <DotCount n={n} />
-                </div>
-              );
-            }
             return (
               <button
                 key={i}
@@ -1147,30 +1097,6 @@ export default function ManagerRosterPage() {
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
               const n = assignmentCount(nextWeekDoc, iso, "lunch");
-              if (isChefUser) {
-                if (n > 0) {
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      className={styles.gridCell}
-                      onClick={() => setChefStaffModal({
-                        label: `${DAY_LABELS_FULL[i]} Lunch`,
-                        iso,
-                        meal: "lunch",
-                        weekKey: "next",
-                      })}
-                    >
-                      <DotCount n={n} />
-                    </button>
-                  );
-                }
-                return (
-                  <div key={i} className={styles.gridCellReadOnly}>
-                    <DotCount n={n} />
-                  </div>
-                );
-              }
               return (
                 <button
                   key={i}
@@ -1191,30 +1117,6 @@ export default function ManagerRosterPage() {
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
               const n = assignmentCount(nextWeekDoc, iso, "dinner");
-              if (isChefUser) {
-                if (n > 0) {
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      className={styles.gridCell}
-                      onClick={() => setChefStaffModal({
-                        label: `${DAY_LABELS_FULL[i]} Dinner`,
-                        iso,
-                        meal: "dinner",
-                        weekKey: "next",
-                      })}
-                    >
-                      <DotCount n={n} />
-                    </button>
-                  );
-                }
-                return (
-                  <div key={i} className={styles.gridCellReadOnly}>
-                    <DotCount n={n} />
-                  </div>
-                );
-              }
               return (
                 <button
                   key={i}
@@ -1378,8 +1280,8 @@ export default function ManagerRosterPage() {
         )}
       </section>
 
-      {/* ── Holiday Requests — hidden for chef ── */}
-      {!isChefUser && <section className={styles.card}>
+      {/* ── Holiday Requests ── */}
+      <section className={styles.card}>
         <div className={styles.cardHead}>
           <span className={styles.cardIcon}><CalIcon /></span>
           <p className={styles.cardTitle}>Holiday Requests</p>
@@ -1427,10 +1329,10 @@ export default function ManagerRosterPage() {
             ))}
           </ul>
         )}
-      </section>}
+      </section>
 
-      {/* ── Availability Change Requests — hidden for chef ── */}
-      {!isChefUser && <section className={styles.card}>
+      {/* ── Availability Change Requests ── */}
+      <section className={styles.card}>
         <div className={styles.cardHead}>
           <span className={styles.cardIcon}><CalIcon /></span>
           <p className={styles.cardTitle}>Availability Change Requests</p>
@@ -1477,7 +1379,7 @@ export default function ManagerRosterPage() {
             ))}
           </ul>
         )}
-      </section>}
+      </section>
 
       {/* ═══════════════════════════════════════════════════════
           Notes modal — centered dialog
@@ -1605,9 +1507,9 @@ export default function ManagerRosterPage() {
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          Day-meal assignment modal — hidden for chef
+          Day-meal assignment modal
           ═══════════════════════════════════════════════════════ */}
-      {!isChefUser && modalCell && (() => {
+      {modalCell && (() => {
         const cellDate = (() => {
           const [y, m, d] = modalCell.iso.split("-").map(Number);
           return new Date(y, m - 1, d);
@@ -1951,8 +1853,8 @@ export default function ManagerRosterPage() {
         </div>
       )}
 
-      {/* ── Availability Overview — hidden for chef ── */}
-      {!isChefUser && <section className={styles.card}>
+      {/* ── Availability Overview ── */}
+      <section className={styles.card}>
         <button
           type="button"
           className={styles.cardHeadBtn}
@@ -2000,7 +1902,7 @@ export default function ManagerRosterPage() {
             </ul>
           )
         )}
-      </section>}
+      </section>
     </div>
   );
 }
