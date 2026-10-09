@@ -6,6 +6,7 @@ import { collection, getDocs, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { VISA_WINDOW_DAYS, VISA_EXPIRED_GRACE_DAYS } from "@/lib/hr-windows";
 import { useAuth } from "@/components/AuthProvider";
+import { isChef } from "@/lib/permissions";
 import {
   decideHolidayRequest,
   decideAvailabilityRequest,
@@ -222,6 +223,9 @@ const FILTER_LABEL: Record<Filter, string> = {
   compliance: "Visa Expiring Soon",
 };
 
+/** Chip order. The kitchen's view leaves the visa chip off — see below. */
+const FILTERS: Filter[] = ["all", "holiday", "availability", "compliance"];
+
 function parseFilter(v: string | null): Filter {
   if (v === "holiday" || v === "availability" || v === "compliance") {
     return v;
@@ -235,8 +239,16 @@ function parseFilter(v: string | null): Filter {
 export default function AttentionRequiredPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const filter = parseFilter(searchParams.get("filter"));
   const { user } = useAuth();
+  // Visa expiry is the one thing on this page that is not a request to decide,
+  // and the head chef has no part in chasing it: it is the manager's and the
+  // owner's, who still see the chip and the section. For a chef both are
+  // dropped, and so are the items from the count in the heading, so the number
+  // matches what is on screen. An old ?filter=compliance link falls back to All.
+  const canSeeCompliance = !isChef(user);
+  const filters = canSeeCompliance ? FILTERS : FILTERS.filter((k) => k !== "compliance");
+  const requestedFilter = parseFilter(searchParams.get("filter"));
+  const filter = filters.includes(requestedFilter) ? requestedFilter : "all";
   const [loading, setLoading] = useState(true);
   const [staffDocs, setStaffDocs] = useState<StaffDoc[]>([]);
   const [busy, setBusy] = useState<string | null>(null); // request id being decided
@@ -321,13 +333,13 @@ export default function AttentionRequiredPage() {
     return { requests, compliance };
   }, [staffDocs]);
 
-  const total = requests.length + compliance.length;
+  const total = requests.length + (canSeeCompliance ? compliance.length : 0);
 
   // Filter-derived visibility flags. The "requests" section is split into
   // two virtual filters (holiday / availability) by the chip row.
   const showHoliday = filter === "all" || filter === "holiday";
   const showAvailability = filter === "all" || filter === "availability";
-  const showCompliance = filter === "all" || filter === "compliance";
+  const showCompliance = canSeeCompliance && (filter === "all" || filter === "compliance");
   const filteredRequests = requests.filter(
     (r) => (r.kind === "holiday" && showHoliday) || (r.kind === "availability" && showAvailability),
   );
@@ -387,7 +399,7 @@ export default function AttentionRequiredPage() {
 
       {/* Filter chips */}
       <div className={styles.filterRow} role="tablist" aria-label="Filter">
-        {(["all", "holiday", "availability", "compliance"] as Filter[]).map((k) => (
+        {filters.map((k) => (
           <button
             key={k}
             type="button"

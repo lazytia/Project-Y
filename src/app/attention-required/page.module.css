@@ -1,15 +1,21 @@
+/* No top padding of its own: the app shell already pads the top of the page,
+   so this one was stacking a second 16px on top of it above the back arrow. */
 .page {
   font-family: var(--font-sans);
   max-width: 520px;
   margin: 0;
-  padding: var(--space-4) var(--space-5) var(--space-7);
+  padding: 0 var(--space-5) var(--space-7);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
 
+/* The negative bottom margin pulls the heading up under the arrow: the arrow
+   is a 36px tap target with empty space below the glyph, and the page's
+   24px gap on top of that left the title floating well below it. */
 .backBtn {
   align-self: flex-start;
+  margin-bottom: calc(-1 * var(--space-3));
   width: 36px;
   height: 36px;
   display: flex;
