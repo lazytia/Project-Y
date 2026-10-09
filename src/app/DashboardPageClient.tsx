@@ -29,6 +29,7 @@ import {
   sydneyTodayKey,
 } from "@/lib/sydney-date";
 import { dailySalesTarget, WEEKLY_SALES_TARGET } from "@/lib/sales-targets";
+import type { PaymentSplit } from "@/lib/payment-split";
 import {
   type Reservation,
   fetchReservationsForDate,
@@ -95,6 +96,31 @@ function Progress({ value, max, pctRight, tone = "orange" }: { value: number; ma
   );
 }
 
+/** One payment method's share of the day: its icon, name, amount and percent. */
+function PaymentTile({
+  icon,
+  label,
+  amount,
+  pct,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  /** Null while the figure is not in yet. */
+  amount: number | null;
+  pct: number | null;
+}) {
+  return (
+    <div className={styles.paymentTile}>
+      <span className={styles.paymentIcon} aria-hidden="true">{icon}</span>
+      <div className={styles.paymentText}>
+        <p className={styles.paymentLabel}>{label}</p>
+        <p className={styles.paymentAmount}>{amount !== null ? fmtCurrency(amount) : "—"}</p>
+        <p className={styles.paymentPct}>{pct !== null ? `${pct.toFixed(1)}%` : "—"}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPageClient({
   sessionDashboard = null,
   initialManagerCache = null,
@@ -156,6 +182,8 @@ type Stats = {
   /** Same money as todaySales, cut at 3:00 PM. Null until Square answers. */
   lunchSales: number | null;
   dinnerSales: number | null;
+  /** How todaySales was paid. Null when no order has a payment yet. */
+  paymentSplit?: PaymentSplit | null;
   transactions: number;
   avgSpendPerTable: number;
   peakHour: string | null;
@@ -168,6 +196,7 @@ function emptyStats(sales = 0): Stats {
     todaySales: sales,
     lunchSales: null,
     dinnerSales: null,
+    paymentSplit: null,
     transactions: 0,
     avgSpendPerTable: 0,
     peakHour: null,
@@ -774,6 +803,11 @@ function OwnerDashboard({
     metricsReady.sales && typeof stats?.lunchSales === "number" ? stats.lunchSales : null;
   const shownDinnerSales =
     metricsReady.sales && typeof stats?.dinnerSales === "number" ? stats.dinnerSales : null;
+  // The payment split is never cached: it arrives with the live numbers and
+  // is shown with them. While they are in flight the block holds its place
+  // with "—", so the cards below do not jump when it appears.
+  const paymentSplitPending = !metricsReady.sales;
+  const shownPaymentSplit = paymentSplitPending ? null : (stats?.paymentSplit ?? null);
   const shownResCounts = metricsReady.reservations ? resCounts : null;
   const shownWeeklySales = metricsReady.week ? weeklySales : null;
   const shownLastWeekToDate = metricsReady.week ? lastWeekToDate : null;
@@ -928,6 +962,47 @@ function OwnerDashboard({
             </div>
           </div>
         </div>
+
+        {/* PAYMENT METHOD - the same sales, cut by how they were paid. Hidden
+            once the numbers are in if nothing has been paid for yet. */}
+        {(paymentSplitPending || shownPaymentSplit) && (
+          <div className={styles.paymentBlock}>
+            <p className={styles.miniLabel}>PAYMENT METHOD</p>
+            <div className={styles.paymentRow}>
+              <PaymentTile
+                icon={
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="6" width="20" height="12" rx="2" />
+                    <circle cx="12" cy="12" r="2.5" />
+                    <path d="M6 12h.01M18 12h.01" />
+                  </svg>
+                }
+                label="CASH"
+                amount={shownPaymentSplit?.cash.amount ?? null}
+                pct={shownPaymentSplit?.cash.pct ?? null}
+              />
+              <PaymentTile
+                icon={
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    <line x1="2" y1="10" x2="22" y2="10" />
+                  </svg>
+                }
+                label="CARD"
+                amount={shownPaymentSplit?.card.amount ?? null}
+                pct={shownPaymentSplit?.card.pct ?? null}
+              />
+            </div>
+            {/* Gift cards, wallets and the like: not a third tile, which would
+                not fit a phone, but never left out either. */}
+            {shownPaymentSplit && shownPaymentSplit.other.amount > 0 && (
+              <p className={styles.paymentOther}>
+                Other <span className={styles.strong}>{fmtCurrency(shownPaymentSplit.other.amount)}</span>
+                {" · "}{shownPaymentSplit.other.pct.toFixed(1)}%
+              </p>
+            )}
+          </div>
+        )}
         {statsError && metricsReady.sales && <p className={styles.errorBadge}>Square 연결 오류</p>}
         {lastUpdated && !statsError && metricsReady.sales && (
           <p className={styles.updatedTiny}>

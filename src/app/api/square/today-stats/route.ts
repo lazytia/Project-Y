@@ -13,6 +13,7 @@ import {
   SALES_DAY_START_HOUR,
   SALES_DAY_END_HOUR,
 } from "@/lib/square";
+import { splitSalesByTender } from "@/lib/payment-split";
 
 /**
  * Every figure below is derived from ONE day of orders plus that day's
@@ -112,6 +113,15 @@ export async function GET(req: NextRequest) {
     const lunchSales  = serviceSales("lunch");
     const dinnerSales = serviceSales("dinner");
 
+    // How that same money was paid — cash, card, other. Read off the orders
+    // already in hand (each carries its tenders), so it costs no extra Square
+    // call, and scaled to todaySales so the three always add up to it.
+    const paymentSplit = splitSalesByTender(
+      todayOrdersWindow,
+      squareGrossSalesCents,
+      todaySales,
+    );
+
     // Avg net spend
     const restaurantNet = sumDollars(todayOrders, netAmountCents);
     const avgSpend =
@@ -155,6 +165,7 @@ export async function GET(req: NextRequest) {
       todaySales,
       lunchSales,
       dinnerSales,
+      paymentSplit,
       transactions,
       avgSpendPerTable: avgSpend,
       peakHour,

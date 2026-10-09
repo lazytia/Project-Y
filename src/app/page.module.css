@@ -156,6 +156,74 @@
 }
 .mealSub { font-size: 12px; color: var(--color-fg-muted); margin: 0; display: flex; align-items: center; gap: 4px; }
 
+/* ── PAYMENT METHOD (inside the TODAY card) ── */
+.paymentBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.paymentBlock .miniLabel { margin: 0; }
+
+/* minmax(0, 1fr): the two tiles stay equal however long an amount is. */
+.paymentRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+/* Sized so a five-figure amount still fits on a 360px phone: 6px of side
+   padding, a 32px icon and 16px figures leave $12,547.50 about 6px to spare. */
+.paymentTile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--space-3) 6px;
+  background: var(--color-surface);
+  border-radius: 12px;
+}
+
+.paymentIcon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.paymentIcon svg { width: 16px; height: 16px; }
+
+.paymentText { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+.paymentLabel {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+  margin: 0;
+}
+
+.paymentAmount {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-fg);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.paymentPct { font-size: 12px; color: var(--color-fg-muted); margin: 0; }
+
+.paymentOther { font-size: 12px; color: var(--color-fg-muted); margin: 0; }
+
 .errorBadge {
   align-self: flex-start;
   font-size: 11px;
