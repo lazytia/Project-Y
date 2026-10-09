@@ -190,6 +190,8 @@
   color: var(--color-fg-muted);
 }
 
+/* These editor styles are shared: the pickup/delivery card, the contact card
+   and the utensils row all open the same inline form. */
 .scheduleEditor {
   display: flex;
   flex-direction: column;
@@ -202,12 +204,52 @@
   gap: var(--space-2);
 }
 
+/* A multi-line field: the label lines up with the first line, not the middle. */
+.scheduleFieldTop {
+  align-items: flex-start;
+}
+
+.scheduleFieldTop .scheduleFieldLabel {
+  padding-top: 10px;
+}
+
 .scheduleFieldLabel {
   flex: none;
-  width: 44px;
+  width: 64px;
   font-size: 12px;
   font-weight: 700;
   color: var(--color-fg-muted);
+}
+
+.scheduleTextarea {
+  resize: vertical;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* Pickup | Delivery */
+.segment {
+  display: flex;
+  gap: 6px;
+}
+
+.segmentBtn {
+  flex: 1;
+  padding: 8px 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.segmentBtnActive {
+  background: var(--color-fg);
+  border-color: var(--color-fg);
+  color: var(--color-bg);
 }
 
 .scheduleInput {
@@ -288,28 +330,65 @@
   color: var(--color-fg);
 }
 
-.contactCompany {
-  margin: 2px 0 0 0;
-  font-size: 12px;
-  color: var(--color-fg-muted);
-}
-
-.contactRight {
+/* ── Labelled facts: Company / Phone / Email / Ready by / Address / Utensils ──
+   Always drawn, "Not set" when empty, so a missing fact is visible. */
+.detailRows {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  align-items: flex-end;
-  flex-shrink: 0;
-  max-width: 60%;
+  margin-top: var(--space-2);
 }
 
-.contactLine {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.detailRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+
+.detailLabel {
+  flex: none;
+  width: 64px;
   font-size: 12px;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+}
+
+.detailValue {
+  min-width: 0;
   color: var(--color-fg);
+  font-weight: 600;
   text-decoration: none;
+  /* An address is typed on two lines; keep them. */
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+a.detailValue {
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 3px;
+}
+
+.detailEmpty {
+  color: var(--color-fg-subtle);
+  font-size: 13px;
+}
+
+/* Under the order total, with an Edit button at the end of the row. */
+.utensilsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.utensilsRow .detailRow {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ── Payment Status ── */

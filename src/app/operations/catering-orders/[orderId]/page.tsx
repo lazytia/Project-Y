@@ -7,12 +7,15 @@ import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isStrictOwner } from "@/lib/permissions";
 import {
+  type CateringDetailsPatch,
+  type CateringFulfillmentType,
   type CateringOrder,
   clearCateringSchedule,
   daysUntil,
   fetchCateringOrder,
   fetchCateringSchedule,
   fetchOwnerNote,
+  saveCateringDetails,
   saveCateringSchedule,
   saveOwnerNote,
   toTimeInputValue,
@@ -31,6 +34,9 @@ function fmtDate(iso: string): string {
   const dt = new Date(y, m - 1, d);
   return `${d} ${MONTH_SHORT[m - 1]} ${y} (${WEEKDAY_SHORT[dt.getDay()]})`;
 }
+
+/** Which of the owner-only inline editors is open (the schedule one is separate). */
+type DetailsEditor = "contact" | "utensils";
 
 function prettyPayment(s: string | undefined): string {
   switch (s) {
@@ -59,6 +65,38 @@ function GlobeIcon() {
 }
 function DotsIcon() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>;
+}
+
+/**
+ * One labelled fact on the order — "Ready by", "Phone", "Address".
+ *
+ * Always drawn, with "Not set" when there is nothing, so the owner can see what
+ * is missing (and the kitchen can see it is not just hidden). A `href` makes
+ * the value a tel:/mailto: link; a value with line breaks keeps them.
+ */
+function DetailRow({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value?: string | null;
+  href?: string;
+}) {
+  return (
+    <div className={styles.detailRow}>
+      <span className={styles.detailLabel}>{label}</span>
+      {value ? (
+        href ? (
+          <a href={href} className={styles.detailValue}>{value}</a>
+        ) : (
+          <span className={styles.detailValue}>{value}</span>
+        )
+      ) : (
+        <span className={styles.detailEmpty}>Not set</span>
+      )}
+    </div>
+  );
 }
 
 function methodIconFor(m: string | undefined) {
@@ -130,6 +168,24 @@ export default function CateringOrderDetailPage() {
   const [draftTime, setDraftTime] = useState("");
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  // The same inline editor also carries the other kitchen facts that live on
+  // that card: pickup or delivery, the ready-by time and the delivery address.
+  const [draftFulfillment, setDraftFulfillment] = useState<CateringFulfillmentType>("PICKUP");
+  const [draftReadyBy, setDraftReadyBy] = useState("");
+  const [draftAddress, setDraftAddress] = useState("");
+
+  // Owner-only order details — who the customer is and how to reach them, and
+  // the utensils count. Stored in our Firestore only, like the schedule; the
+  // server refuses anyone but a strict owner, this just hides the buttons.
+  const canEditDetails = isStrictOwner(user);
+  const [detailsEditing, setDetailsEditing] = useState<DetailsEditor | null>(null);
+  const [detailsSaving, setDetailsSaving] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [draftCompany, setDraftCompany] = useState("");
+  const [draftPhone, setDraftPhone] = useState("");
+  const [draftEmail, setDraftEmail] = useState("");
+  const [draftUtensils, setDraftUtensils] = useState("");
 
   useEffect(() => {
     if (!params?.orderId || !user) return;
@@ -158,11 +214,14 @@ export default function CateringOrderDetailPage() {
 
   async function handleCancel() {
     if (!user || !params?.orderId || cancelling) return;
-    const label = order?.clientName
-      ? `${order.clientName}'s order`
+    // Name, slot and total, not just the name: two orders for the same
+    // customer on the same day are exactly when a duplicate gets hidden, and
+    // the name alone doesn't say which of them this is.
+    const label = order
+      ? `${order.clientName}\n${fmtDate(order.deliveryDateISO)} · ${order.deliveryTime} · ${fmtMoney(order.totalAmount)}`
       : "this order";
     const ok = window.confirm(
-      `Hide ${label} from the calendar?\n\nThe order stays in Square untouched — this only removes it from our app's calendar. Use for test or duplicate rows.`,
+      `Hide this order from the calendar?\n\n${label}\n\nThe order stays in Square untouched — this only removes it from our app's calendar. Use for test or duplicate rows.`,
     );
     if (!ok) return;
     setCancelling(true);
@@ -200,11 +259,29 @@ export default function CateringOrderDetailPage() {
     }
   }
 
+  /**
+   * Re-read the order after an edit. The server owns how an override is
+   * overlaid on Square's order — and what a cleared field falls back to — so
+   * the page asks again rather than guessing from what it just sent.
+   */
+  async function refreshOrder() {
+    if (!user || !params?.orderId) return;
+    const [fresh, schedule] = await Promise.all([
+      fetchCateringOrder(user, params.orderId),
+      fetchCateringSchedule(user, params.orderId),
+    ]);
+    if (fresh) setOrder(fresh);
+    setScheduleOverridden(schedule !== null);
+  }
+
   /** Open the inline editor seeded with whatever is on screen right now. */
   function startScheduleEdit() {
     if (!order) return;
     setDraftDate(order.deliveryDateISO);
     setDraftTime(toTimeInputValue(order.deliveryTime));
+    setDraftFulfillment(order.fulfillmentType ?? "PICKUP");
+    setDraftReadyBy(toTimeInputValue(order.readyByTime));
+    setDraftAddress(order.deliveryAddressLines.join("\n"));
     setScheduleError(null);
     setScheduleEditing(true);
   }
@@ -215,21 +292,114 @@ export default function CateringOrderDetailPage() {
       setScheduleError("Pick both a date and a time.");
       return;
     }
+
+    // Send only what actually changed: a slot override marks the order
+    // "Edited in app", and that should not appear for a change of address.
+    const slotChanged =
+      draftDate !== order.deliveryDateISO || draftTime !== toTimeInputValue(order.deliveryTime);
+    const patch: CateringDetailsPatch = {};
+    if (draftFulfillment !== (order.fulfillmentType ?? "PICKUP")) {
+      patch.fulfillmentType = draftFulfillment;
+    }
+    if (draftReadyBy !== toTimeInputValue(order.readyByTime)) {
+      patch.readyByTime = draftReadyBy || null;
+    }
+    if (
+      draftFulfillment === "DELIVERY" &&
+      draftAddress.trim() !== order.deliveryAddressLines.join("\n")
+    ) {
+      patch.deliveryAddress = draftAddress.trim() || null;
+    }
+    if (!slotChanged && Object.keys(patch).length === 0) {
+      setScheduleEditing(false);
+      return;
+    }
+
     setScheduleSaving(true);
     setScheduleError(null);
     try {
-      const saved = await saveCateringSchedule(user, params.orderId, {
-        deliveryDateISO: draftDate,
-        deliveryTime: draftTime,
-      });
-      setOrder({ ...order, ...saved });
-      setScheduleOverridden(true);
+      if (slotChanged) {
+        await saveCateringSchedule(user, params.orderId, {
+          deliveryDateISO: draftDate,
+          deliveryTime: draftTime,
+        });
+      }
+      if (Object.keys(patch).length > 0) {
+        await saveCateringDetails(user, params.orderId, patch);
+      }
+      await refreshOrder();
       setScheduleEditing(false);
     } catch (err) {
       setScheduleError(err instanceof Error ? err.message : "Failed to save.");
+      // The slot and the details are two writes. If the second failed the
+      // first is already stored, so show what is really saved.
+      await refreshOrder().catch(() => {});
     } finally {
       setScheduleSaving(false);
     }
+  }
+
+  /** Save a details patch for the contact or utensils editor, then re-read. */
+  async function saveDetails(patch: CateringDetailsPatch) {
+    if (!user || !params?.orderId || detailsSaving) return;
+    if (Object.keys(patch).length === 0) {
+      setDetailsEditing(null);
+      return;
+    }
+    setDetailsSaving(true);
+    setDetailsError(null);
+    try {
+      await saveCateringDetails(user, params.orderId, patch);
+      await refreshOrder();
+      setDetailsEditing(null);
+    } catch (err) {
+      setDetailsError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setDetailsSaving(false);
+    }
+  }
+
+  function startContactEdit() {
+    if (!order) return;
+    setDraftName(order.contactName || order.clientName);
+    setDraftCompany(order.companyName ?? "");
+    setDraftPhone(order.contactPhone ?? "");
+    setDraftEmail(order.contactEmail ?? "");
+    setDetailsError(null);
+    setDetailsEditing("contact");
+  }
+
+  function handleSaveContact() {
+    if (!order) return;
+    const patch: CateringDetailsPatch = {};
+    if (draftName.trim() !== (order.contactName || order.clientName)) {
+      patch.clientName = draftName.trim() || null;
+    }
+    if (draftCompany.trim() !== (order.companyName ?? "")) {
+      patch.companyName = draftCompany.trim() || null;
+    }
+    if (draftPhone.trim() !== (order.contactPhone ?? "")) {
+      patch.contactPhone = draftPhone.trim() || null;
+    }
+    if (draftEmail.trim() !== (order.contactEmail ?? "")) {
+      patch.contactEmail = draftEmail.trim() || null;
+    }
+    void saveDetails(patch);
+  }
+
+  function startUtensilsEdit() {
+    if (!order) return;
+    setDraftUtensils(order.utensilsCount === undefined ? "" : String(order.utensilsCount));
+    setDetailsError(null);
+    setDetailsEditing("utensils");
+  }
+
+  function handleSaveUtensils() {
+    if (!order) return;
+    const current = order.utensilsCount === undefined ? "" : String(order.utensilsCount);
+    const next = draftUtensils.trim();
+    // Empty means "use Square's count", which is what clearing the override does.
+    void saveDetails(next === current ? {} : { utensilsCount: next === "" ? null : Number(next) });
   }
 
   /** Drop our override so the order shows Square's own slot again. */
@@ -320,6 +490,19 @@ export default function CateringOrderDetailPage() {
 
           {scheduleEditing ? (
             <div className={styles.scheduleEditor}>
+              <div className={styles.segment} role="group" aria-label="Pickup or delivery">
+                {(["PICKUP", "DELIVERY"] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className={`${styles.segmentBtn} ${draftFulfillment === kind ? styles.segmentBtnActive : ""}`}
+                    aria-pressed={draftFulfillment === kind}
+                    onClick={() => setDraftFulfillment(kind)}
+                  >
+                    {kind === "PICKUP" ? "Pickup" : "Delivery"}
+                  </button>
+                ))}
+              </div>
               <label className={styles.scheduleField}>
                 <span className={styles.scheduleFieldLabel}>Date</span>
                 <input
@@ -338,6 +521,28 @@ export default function CateringOrderDetailPage() {
                   onChange={(e) => setDraftTime(e.target.value)}
                 />
               </label>
+              <label className={styles.scheduleField}>
+                <span className={styles.scheduleFieldLabel}>Ready by</span>
+                <input
+                  type="time"
+                  className={styles.scheduleInput}
+                  value={draftReadyBy}
+                  onChange={(e) => setDraftReadyBy(e.target.value)}
+                />
+              </label>
+              {draftFulfillment === "DELIVERY" && (
+                <label className={`${styles.scheduleField} ${styles.scheduleFieldTop}`}>
+                  <span className={styles.scheduleFieldLabel}>Address</span>
+                  <textarea
+                    className={`${styles.scheduleInput} ${styles.scheduleTextarea}`}
+                    rows={3}
+                    maxLength={300}
+                    placeholder={"Street address\nSuburb, state, postcode"}
+                    value={draftAddress}
+                    onChange={(e) => setDraftAddress(e.target.value)}
+                  />
+                </label>
+              )}
               {scheduleError && <p className={styles.scheduleError}>{scheduleError}</p>}
               <div className={styles.scheduleActions}>
                 <button
@@ -368,7 +573,8 @@ export default function CateringOrderDetailPage() {
                 )}
               </div>
               <p className={styles.scheduleHint}>
-                Saved in our app only — the Square order is never changed.
+                Saved in our app only — the Square order is never changed. A field left
+                empty falls back to Square.
               </p>
             </div>
           ) : (
@@ -378,6 +584,12 @@ export default function CateringOrderDetailPage() {
               {scheduleOverridden && (
                 <p className={styles.scheduleBadge}>Edited in app · Square unchanged</p>
               )}
+              <div className={styles.detailRows}>
+                <DetailRow label="Ready by" value={order.readyByTime} />
+                {isDelivery && (
+                  <DetailRow label="Address" value={order.deliveryAddressLines.join("\n")} />
+                )}
+              </div>
             </>
           )}
         </div>
@@ -387,23 +599,101 @@ export default function CateringOrderDetailPage() {
       <section className={styles.section}>
         <div className={styles.sectionIcon}><UserIcon /></div>
         <div className={styles.sectionBody}>
-          <p className={styles.sectionTitle}>CONTACT</p>
-          <p className={styles.contactName}>{order.contactName || order.clientName}</p>
-          {order.companyName ? <p className={styles.contactCompany}>{order.companyName}</p> : null}
-        </div>
-        <div className={styles.contactRight}>
-          {order.contactPhone ? (
-            <a href={`tel:${order.contactPhone}`} className={styles.contactLine}>
-              <PhoneIcon />
-              <span>{order.contactPhone}</span>
-            </a>
-          ) : null}
-          {order.contactEmail ? (
-            <a href={`mailto:${order.contactEmail}`} className={styles.contactLine}>
-              <MailIcon />
-              <span>{order.contactEmail}</span>
-            </a>
-          ) : null}
+          <div className={styles.scheduleHead}>
+            <p className={styles.sectionTitle}>CONTACT</p>
+            {canEditDetails && detailsEditing !== "contact" && (
+              <button type="button" className={styles.scheduleEditBtn} onClick={startContactEdit}>
+                <EditIcon /> Edit
+              </button>
+            )}
+          </div>
+
+          {detailsEditing === "contact" ? (
+            <div className={styles.scheduleEditor}>
+              <label className={styles.scheduleField}>
+                <span className={styles.scheduleFieldLabel}>Name</span>
+                <input
+                  className={styles.scheduleInput}
+                  value={draftName}
+                  maxLength={120}
+                  autoComplete="off"
+                  onChange={(e) => setDraftName(e.target.value)}
+                />
+              </label>
+              <label className={styles.scheduleField}>
+                <span className={styles.scheduleFieldLabel}>Company</span>
+                <input
+                  className={styles.scheduleInput}
+                  value={draftCompany}
+                  maxLength={120}
+                  autoComplete="off"
+                  onChange={(e) => setDraftCompany(e.target.value)}
+                />
+              </label>
+              <label className={styles.scheduleField}>
+                <span className={styles.scheduleFieldLabel}>Phone</span>
+                <input
+                  type="tel"
+                  className={styles.scheduleInput}
+                  value={draftPhone}
+                  maxLength={40}
+                  autoComplete="off"
+                  onChange={(e) => setDraftPhone(e.target.value)}
+                />
+              </label>
+              <label className={styles.scheduleField}>
+                <span className={styles.scheduleFieldLabel}>Email</span>
+                <input
+                  type="email"
+                  className={styles.scheduleInput}
+                  value={draftEmail}
+                  maxLength={120}
+                  autoComplete="off"
+                  onChange={(e) => setDraftEmail(e.target.value)}
+                />
+              </label>
+              {detailsError && <p className={styles.scheduleError}>{detailsError}</p>}
+              <div className={styles.scheduleActions}>
+                <button
+                  type="button"
+                  className={styles.scheduleSaveBtn}
+                  disabled={detailsSaving}
+                  onClick={handleSaveContact}
+                >
+                  {detailsSaving ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.scheduleCancelBtn}
+                  disabled={detailsSaving}
+                  onClick={() => { setDetailsEditing(null); setDetailsError(null); }}
+                >
+                  Cancel
+                </button>
+              </div>
+              <p className={styles.scheduleHint}>
+                Saved in our app only — the Square order is never changed. A field left
+                empty falls back to Square.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className={styles.contactName}>{order.contactName || order.clientName}</p>
+              <div className={styles.detailRows}>
+                <DetailRow label="Company" value={order.companyName} />
+                <DetailRow
+                  label="Phone"
+                  value={order.contactPhone}
+                  href={order.contactPhone ? `tel:${order.contactPhone}` : undefined}
+                />
+                <DetailRow
+                  label="Email"
+                  value={order.contactEmail}
+                  href={order.contactEmail ? `mailto:${order.contactEmail}` : undefined}
+                />
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -439,13 +729,6 @@ export default function CateringOrderDetailPage() {
                 <span className={styles.itemQty}>x {m.qty}</span>
               </li>
             ))}
-            {(order.utensilsCount ?? 0) > 0 &&
-              !order.menu.some((m) => /utensil|cutlery/i.test(m.name)) && (
-              <li className={styles.itemLine}>
-                <span className={styles.itemName}>Utensil Set</span>
-                <span className={styles.itemQty}>x {order.utensilsCount}</span>
-              </li>
-            )}
           </ul>
           <div className={styles.orderTotalRow}>
             <span className={styles.orderTotalLabel}>
@@ -453,6 +736,58 @@ export default function CateringOrderDetailPage() {
             </span>
             <span className={styles.orderTotalValue}>{fmtMoney(order.totalAmount)}</span>
           </div>
+
+          {/* Utensils are a count the kitchen packs for, not a priced line, so
+              they sit under the total rather than in the item list — which also
+              keeps them visible when Square has no utensil line to show. */}
+          {detailsEditing === "utensils" ? (
+            <div className={styles.scheduleEditor}>
+              <label className={styles.scheduleField}>
+                <span className={styles.scheduleFieldLabel}>Utensils</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={9999}
+                  step={1}
+                  className={styles.scheduleInput}
+                  value={draftUtensils}
+                  onChange={(e) => setDraftUtensils(e.target.value)}
+                />
+              </label>
+              {detailsError && <p className={styles.scheduleError}>{detailsError}</p>}
+              <div className={styles.scheduleActions}>
+                <button
+                  type="button"
+                  className={styles.scheduleSaveBtn}
+                  disabled={detailsSaving}
+                  onClick={handleSaveUtensils}
+                >
+                  {detailsSaving ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.scheduleCancelBtn}
+                  disabled={detailsSaving}
+                  onClick={() => { setDetailsEditing(null); setDetailsError(null); }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.utensilsRow}>
+              <DetailRow
+                label="Utensils"
+                value={order.utensilsCount === undefined ? null : String(order.utensilsCount)}
+              />
+              {canEditDetails && (
+                <button type="button" className={styles.scheduleEditBtn} onClick={startUtensilsEdit}>
+                  <EditIcon /> Edit
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

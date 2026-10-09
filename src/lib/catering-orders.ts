@@ -67,6 +67,76 @@ export type CateringOrder = {
   readyByTime?: string;
 };
 
+/**
+ * Fields an owner can fill in or correct in our app on top of what Square
+ * holds. Orders that arrive through a Square payment link carry only a name
+ * and a time, so this is how the kitchen's other facts get onto them.
+ *
+ * Sent as a patch: a key that is left out is not touched, and `null` (or an
+ * empty string) drops that field's override so the order falls back to Square.
+ */
+export type CateringDetailsPatch = {
+  clientName?: string | null;
+  companyName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  fulfillmentType?: CateringFulfillmentType | null;
+  /** Free text, one address line per line. */
+  deliveryAddress?: string | null;
+  utensilsCount?: number | null;
+  /** 24h "HH:MM" from <input type="time">; the server turns it into the label. */
+  readyByTime?: string | null;
+};
+
+/** What is stored: the same fields, with a human label for the ready-by time. */
+export type CateringDetailsOverride = Omit<CateringDetailsPatch, "readyByTime"> & {
+  /** Human label, e.g. "10:45 AM". */
+  readyByTime?: string | null;
+};
+
+/** The keys a details override may carry — one list for the route and the store. */
+export const CATERING_DETAILS_KEYS = [
+  "clientName",
+  "companyName",
+  "contactPhone",
+  "contactEmail",
+  "fulfillmentType",
+  "deliveryAddress",
+  "utensilsCount",
+  "readyByTime",
+] as const satisfies readonly (keyof CateringDetailsPatch)[];
+
+/**
+ * Overlay an owner's details onto a Square order. Pure — safe to call with
+ * null. Only fields the owner set are replaced, so everything Square does know
+ * still shows through.
+ */
+export function applyDetailsOverride(
+  order: CateringOrder,
+  override: CateringDetailsOverride | null | undefined,
+): CateringOrder {
+  if (!override) return order;
+  const next: CateringOrder = { ...order };
+  if (override.clientName) {
+    // The name is shown as the title and again under Contact, so both move.
+    next.clientName = override.clientName;
+    next.contactName = override.clientName;
+  }
+  if (override.companyName) next.companyName = override.companyName;
+  if (override.contactPhone) next.contactPhone = override.contactPhone;
+  if (override.contactEmail) next.contactEmail = override.contactEmail;
+  if (override.fulfillmentType) next.fulfillmentType = override.fulfillmentType;
+  if (override.deliveryAddress) {
+    next.deliveryAddressLines = override.deliveryAddress
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+  if (typeof override.utensilsCount === "number") next.utensilsCount = override.utensilsCount;
+  if (override.readyByTime) next.readyByTime = override.readyByTime;
+  return next;
+}
+
 async function authHeader(user: User | null | undefined): Promise<HeadersInit> {
   if (!user) return {};
   const idToken = await user.getIdToken();
@@ -178,6 +248,29 @@ export async function saveCateringSchedule(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
   return data.schedule as CateringSchedule;
+}
+
+/**
+ * Owner-only details override (Firestore only — Square is never mutated).
+ * Resolves with the override as stored, so the caller can tell what stuck.
+ */
+export async function saveCateringDetails(
+  user: User | null | undefined,
+  orderId: string,
+  patch: CateringDetailsPatch,
+): Promise<CateringDetailsOverride> {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(await authHeader(user)),
+  };
+  const res = await fetch(`/api/catering-orders/${encodeURIComponent(orderId)}/details`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(patch),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`);
+  return (data.details ?? {}) as CateringDetailsOverride;
 }
 
 /** Drop the override so the order falls back to Square's own date/time. */

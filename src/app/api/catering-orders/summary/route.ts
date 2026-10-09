@@ -3,10 +3,12 @@ import { adminAuth } from "@/lib/firebase-admin";
 import { listPlatterCateringOrders } from "@/lib/catering-square";
 import {
   applyScheduleOverride,
+  fetchDetailsOverrides,
   fetchHiddenOrderIds,
   fetchScheduleOverrides,
   syncOrdersToFirestore,
 } from "@/lib/catering-firestore";
+import { applyDetailsOverride } from "@/lib/catering-orders";
 
 export const dynamic = "force-dynamic";
 
@@ -78,19 +80,26 @@ export async function GET(req: NextRequest) {
   const sundayKey = new Date(Date.UTC(my, mm - 1, md + 6)).toISOString().slice(0, 10);
 
   try {
-    const [ordersRaw, hiddenIds, schedules] = await Promise.all([
+    const [ordersRaw, hiddenIds, schedules, details] = await Promise.all([
       listPlatterCateringOrders(),
       fetchHiddenOrderIds(),
       fetchScheduleOverrides(),
+      fetchDetailsOverrides(),
     ]);
     const visible =
       hiddenIds.size > 0 ? ordersRaw.filter((o) => !hiddenIds.has(o.id)) : ordersRaw;
     // Owner-corrected slots must win here too, otherwise the dashboard's
     // "next job" and week count would disagree with the calendar.
-    const orders =
+    const withSchedule =
       schedules.size > 0
         ? visible.map((o) => applyScheduleOverride(o, schedules.get(o.id)))
         : visible;
+    // The owner's details too, so a renamed order is named the same here as on
+    // the calendar.
+    const orders =
+      details.size > 0
+        ? withSchedule.map((o) => applyDetailsOverride(o, details.get(o.id)))
+        : withSchedule;
     syncOrdersToFirestore(orders);
 
     const upcoming = orders

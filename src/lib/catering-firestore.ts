@@ -10,7 +10,11 @@
  */
 import { FieldValue, type DocumentData } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
-import type { CateringOrder } from "@/lib/catering-orders";
+import {
+  CATERING_DETAILS_KEYS,
+  type CateringDetailsOverride,
+  type CateringOrder,
+} from "@/lib/catering-orders";
 
 const COLLECTION = "catering_orders";
 
@@ -256,6 +260,94 @@ export async function fetchScheduleOverrides(): Promise<Map<string, CateringSche
     }
   } catch (err) {
     console.warn("[catering-firestore] schedule bulk lookup failed:", err);
+  }
+  return map;
+}
+
+const DETAILS_COLLECTION = "catering_details";
+
+/**
+ * Owner-supplied order details — name, company, phone, email, pickup or
+ * delivery, delivery address, utensils and the ready-by time.
+ *
+ * Same pattern as `catering_hidden` and `catering_schedule`: Square is the
+ * source of truth and is never mutated, so what the owner enters is stored
+ * here and overlaid on the Square order on read (see applyDetailsOverride in
+ * lib/catering-orders). A document holds only the fields the owner has set.
+ */
+function toDetailsOverride(data: DocumentData | undefined): CateringDetailsOverride | null {
+  if (!data) return null;
+  const out: CateringDetailsOverride = {};
+  for (const key of ["clientName", "companyName", "contactPhone", "contactEmail", "deliveryAddress", "readyByTime"] as const) {
+    const v = data[key];
+    if (typeof v === "string" && v.trim()) out[key] = v;
+  }
+  if (data.fulfillmentType === "PICKUP" || data.fulfillmentType === "DELIVERY") {
+    out.fulfillmentType = data.fulfillmentType;
+  }
+  if (typeof data.utensilsCount === "number" && Number.isFinite(data.utensilsCount)) {
+    out.utensilsCount = data.utensilsCount;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * Save a details patch + append it to the order's history. A `null` value
+ * removes that field's override; a key that is absent is left as it was.
+ * Resolves with the override as it now stands.
+ */
+export async function saveDetailsOverride(
+  orderId: string,
+  patch: CateringDetailsOverride,
+  updatedBy: string | null,
+): Promise<CateringDetailsOverride | null> {
+  const db = adminDb();
+  const payload: Record<string, unknown> = {
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: updatedBy ?? null,
+  };
+  for (const key of CATERING_DETAILS_KEYS) {
+    if (!(key in patch)) continue;
+    const value = patch[key];
+    payload[key] = value === null || value === undefined ? FieldValue.delete() : value;
+  }
+  const ref = db.collection(DETAILS_COLLECTION).doc(orderId);
+  await ref.set(payload, { merge: true });
+
+  await db.collection(COLLECTION).doc(orderId).collection("history").add({
+    action: "details_overridden",
+    patch,
+    updatedBy: updatedBy ?? null,
+    timestamp: FieldValue.serverTimestamp(),
+  });
+
+  return toDetailsOverride((await ref.get()).data());
+}
+
+/** Read one order's details override, or null when the owner hasn't set any. */
+export async function getDetailsOverride(
+  orderId: string,
+): Promise<CateringDetailsOverride | null> {
+  try {
+    const snap = await adminDb().collection(DETAILS_COLLECTION).doc(orderId).get();
+    return snap.exists ? toDetailsOverride(snap.data()) : null;
+  } catch (err) {
+    console.warn("[catering-firestore] details lookup failed:", err);
+    return null;
+  }
+}
+
+/** Read every details override at once (used by the list and summary endpoints). */
+export async function fetchDetailsOverrides(): Promise<Map<string, CateringDetailsOverride>> {
+  const map = new Map<string, CateringDetailsOverride>();
+  try {
+    const snap = await adminDb().collection(DETAILS_COLLECTION).get();
+    for (const doc of snap.docs) {
+      const override = toDetailsOverride(doc.data());
+      if (override) map.set(doc.id, override);
+    }
+  } catch (err) {
+    console.warn("[catering-firestore] details bulk lookup failed:", err);
   }
   return map;
 }

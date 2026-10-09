@@ -7,12 +7,13 @@ import {
 } from "@/lib/catering-square";
 import {
   applyScheduleOverride,
+  fetchDetailsOverrides,
   fetchHiddenOrderIds,
   fetchScheduleOverrides,
   syncOrderToFirestore,
   syncOrdersToFirestore,
 } from "@/lib/catering-firestore";
-import type { CateringOrderForm } from "@/lib/catering-orders";
+import { applyDetailsOverride, type CateringOrderForm } from "@/lib/catering-orders";
 import { isStrictOwnerEmail } from "@/lib/permissions";
 
 /**
@@ -45,10 +46,11 @@ export async function GET(req: NextRequest) {
   const auth = await verifyAuth(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   try {
-    const [orders, hiddenIds, schedules] = await Promise.all([
+    const [orders, hiddenIds, schedules, details] = await Promise.all([
       listPlatterCateringOrders(),
       fetchHiddenOrderIds(),
       fetchScheduleOverrides(),
+      fetchDetailsOverrides(),
     ]);
     // Filter out orders the owner has hidden in our app (Square is
     // the source of truth and stays untouched — we only skip these
@@ -61,8 +63,13 @@ export async function GET(req: NextRequest) {
     const withSchedule = schedules.size > 0
       ? visible.map((o) => applyScheduleOverride(o, schedules.get(o.id)))
       : visible;
-    syncOrdersToFirestore(withSchedule);
-    return NextResponse.json({ orders: withSchedule });
+    // Then the owner's details (name, pickup/delivery, address, utensils, ...),
+    // so the calendar's P/D letter and names match the detail page.
+    const withDetails = details.size > 0
+      ? withSchedule.map((o) => applyDetailsOverride(o, details.get(o.id)))
+      : withSchedule;
+    syncOrdersToFirestore(withDetails);
+    return NextResponse.json({ orders: withDetails });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load Square orders.";
     return NextResponse.json({ error: msg }, { status: 500 });
