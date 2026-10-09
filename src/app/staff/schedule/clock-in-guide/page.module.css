@@ -63,9 +63,17 @@
   gap: var(--space-3);
 }
 
+/*
+ * Sketch | words, as two columns rather than a fixed-width sketch beside
+ * flexible text. The login and keypad sketches have a row of their own inside
+ * them — a wordmark next to a button, a keypad over a button — and at the old
+ * fixed 132px those rows had nowhere to go. The sketch keeps the larger share
+ * because it is the part being pointed at.
+ */
 .step {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4);
@@ -118,8 +126,7 @@
 
 /* ── the POS sketches ── */
 .panel {
-  flex-shrink: 0;
-  width: 132px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -128,6 +135,53 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+}
+
+/* The POS header: wordmark left, the control step 1 names right. Kept on one
+   line at a deliberately tiny size — wrapped, it stops reading as a header
+   bar and starts reading as two more fields. */
+.panelTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.panelBrand {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--color-fg);
+  white-space: nowrap;
+}
+
+.panelPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--color-warm-bg);
+  color: var(--color-fg);
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.panelField {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 6px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-fg-subtle);
+  font-size: 9px;
+  font-weight: 500;
 }
 
 .panelCaption {
@@ -289,4 +343,19 @@
   flex-shrink: 0;
   color: var(--color-warm);
   font-weight: 800;
+}
+
+/* Separates the two rules from the fallback below them: the rules are what to
+   do, the fallback is what to do when the clock already got it wrong. */
+.rememberRule {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-1) 0;
+}
+
+.rememberNote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  line-height: 1.45;
 }

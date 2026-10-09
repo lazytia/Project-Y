@@ -24,22 +24,42 @@ import styles from "./page.module.css";
 function LoginPanel() {
   return (
     <div className={styles.panel}>
-      <p className={styles.panelCaption}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      {/* The "View time clock" control is what step 1 is pointing at, so the
+          sketch has to show where on the screen it sits — top right, above
+          the two fields — rather than just name it. */}
+      <div className={styles.panelTopRow}>
+        <span className={styles.panelBrand}>YURICA</span>
+        <span className={styles.panelPill}>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          View time clock
+        </span>
+      </div>
+      <p className={styles.panelField}>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+        Staff ID
+      </p>
+      <p className={styles.panelField}>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <rect x="4" y="11" width="16" height="10" rx="2" />
           <path d="M8 11V7a4 4 0 0 1 8 0v4" />
         </svg>
-        Log in
+        Passcode
       </p>
-      <p className={styles.panelBtnDark}>View time clock</p>
+      <p className={styles.panelBtnDark}>Log in</p>
     </div>
   );
 }
 
-function PasscodePanel() {
+function StaffIdPanel() {
   return (
     <div className={styles.panel}>
-      <p className={styles.panelCaption}>Enter passcode</p>
+      <p className={styles.panelCaption}>Enter Staff ID</p>
       <p className={styles.dots} aria-hidden="true">
         <span /><span /><span /><span />
       </p>
@@ -57,6 +77,10 @@ function PasscodePanel() {
           </svg>
         </span>
       </div>
+      {/* Typing the ID is only half of step 2 — the keypad has its own Clock
+          in button under it, and leaving it out was what made people stop at
+          the four dots and wait for something to happen. */}
+      <p className={styles.panelBtnDark}>Clock in</p>
     </div>
   );
 }
@@ -95,12 +119,12 @@ const STEPS = [
   {
     panel: <LoginPanel />,
     title: "Tap View Time Clock",
-    body: "On the POS login screen, tap View time clock.",
+    body: "On the POS login screen, tap “View time clock” in the top right corner.",
   },
   {
-    panel: <PasscodePanel />,
-    title: "Enter your Clock In ID",
-    body: "Type your 4-digit Clock In ID to continue.",
+    panel: <StaffIdPanel />,
+    title: "Enter your Staff ID",
+    body: "Enter your 4-digit Staff ID, then tap Clock in.",
   },
   {
     panel: <ClockedInPanel />,
@@ -109,14 +133,27 @@ const STEPS = [
   },
   {
     panel: <ClockOutPanel />,
-    title: "To finish, repeat and tap Clock out",
-    body: "Use Add notes if needed.",
+    title: "Tap Clock Out",
+    body: "Clock out when you finish work, and always clock out before any break or lunch.",
   },
 ];
 
 const REMINDERS = [
   "Clock in when you start work.",
-  "Always clock out before break time / lunch.",
+  "Always clock out before any break or lunch.",
+];
+
+/**
+ * What to do when the clock does not match the day you actually worked.
+ *
+ * Under the two rules rather than as a fifth step: it is not part of clocking
+ * in, it is the fallback for every way that can go wrong, and the last line is
+ * the point of the whole page — nobody reconciles a timesheet on the staff
+ * member's behalf.
+ */
+const NOTES_FALLBACK = [
+  "If you forgot to clock in or out, clocked in late, or worked differently from your rostered time, tap Add Notes and leave a note.",
+  "This is your responsibility to help make sure you are paid correctly.",
 ];
 
 /* ── page ── */
@@ -183,6 +220,10 @@ export default function ClockInGuidePage() {
               </li>
             ))}
           </ol>
+          <span className={styles.rememberRule} aria-hidden="true" />
+          {NOTES_FALLBACK.map((line) => (
+            <p key={line} className={styles.rememberNote}>{line}</p>
+          ))}
         </div>
       </section>
     </div>
