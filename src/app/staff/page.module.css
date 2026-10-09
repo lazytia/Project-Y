@@ -89,6 +89,115 @@
   color: var(--color-fg-muted);
 }
 
+/* ── Next Catering ──
+   White with a hairline border, unlike the shift card above it: the shift is
+   about you, this is about the kitchen. A link when there is a job to open,
+   plain when there is not. */
+.cateringCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: inherit;
+}
+
+a.cateringCard:hover { border-color: var(--color-warm); }
+
+.cateringTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cateringIcon {
+  display: inline-flex;
+  color: var(--color-fg-muted);
+}
+
+.cateringLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+.cateringMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cateringText { min-width: 0; }
+
+.cateringWhen {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-fg);
+}
+
+.cateringMeta {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--color-fg-muted);
+}
+
+.cateringChev {
+  flex: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--color-fg-muted);
+}
+
+.cateringRule {
+  height: 1px;
+  background: var(--color-border);
+}
+
+.cateringItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--color-fg);
+}
+
+.cateringItemIcon {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-fg-muted);
+}
+
+.cateringItemName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cateringMore {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.cateringEmpty {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
 /* ── At-a-glance tiles ── */
 .tileRow {
   display: grid;

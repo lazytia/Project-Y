@@ -60,6 +60,12 @@ type SummaryOrder = {
   status: string;
   deliveryDateISO: string;
   deliveryTime: string;
+  /** What the staff dashboard's "Next Catering" card shows. No prices here. */
+  guestsCount: number;
+  fulfillmentType: "PICKUP" | "DELIVERY" | null;
+  /** The first line of the order and how many more follow it. */
+  firstItem: { name: string; qty: number } | null;
+  moreItems: number;
 };
 
 /**
@@ -107,15 +113,27 @@ export async function GET(req: NextRequest) {
         (o) =>
           (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey,
       )
-      .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
+      // Earliest first within a day too: two jobs on one date used to come back
+      // in whatever order Square listed them, so the "next" one could be the
+      // later pickup.
+      .sort(
+        (a, b) =>
+          a.deliveryDateISO.localeCompare(b.deliveryDateISO) ||
+          minutesOfDay(a.deliveryTime) - minutesOfDay(b.deliveryTime),
+      );
 
-    const nextOrder: SummaryOrder | null = upcoming[0]
+    const next = upcoming[0];
+    const nextOrder: SummaryOrder | null = next
       ? {
-          id: upcoming[0].id,
-          clientName: upcoming[0].clientName,
-          status: upcoming[0].status,
-          deliveryDateISO: upcoming[0].deliveryDateISO,
-          deliveryTime: upcoming[0].deliveryTime,
+          id: next.id,
+          clientName: next.clientName,
+          status: next.status,
+          deliveryDateISO: next.deliveryDateISO,
+          deliveryTime: next.deliveryTime,
+          guestsCount: next.guestsCount,
+          fulfillmentType: next.fulfillmentType ?? null,
+          firstItem: next.menu[0] ? { name: next.menu[0].name, qty: next.menu[0].qty } : null,
+          moreItems: Math.max(0, next.menu.length - 1),
         }
       : null;
 

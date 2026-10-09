@@ -65,7 +65,27 @@ export type CateringOrder = {
   utensilsCount?: number;
   dietaryNotes?: string;
   readyByTime?: string;
+  /**
+   * Set by the server when the caller may not see prices: `totalAmount` is 0
+   * and no line has a `unitPrice`. The page reads this rather than guessing
+   * from the user, so the figures are gone from the response itself and not
+   * merely left off the screen.
+   */
+  pricesHidden?: boolean;
 };
+
+/**
+ * The order as a caller who may not see prices should get it. Everything else
+ * — items, quantities, contact, addresses, times — is left exactly as it was.
+ */
+export function redactCateringPrices(order: CateringOrder): CateringOrder {
+  return {
+    ...order,
+    totalAmount: 0,
+    menu: order.menu.map((line) => ({ ...line, unitPrice: undefined })),
+    pricesHidden: true,
+  };
+}
 
 /**
  * Fields an owner can fill in or correct in our app on top of what Square

@@ -53,6 +53,19 @@ export function isStrictOwnerEmail(email: string | null | undefined): boolean {
   return STRICT_OWNER_USERNAMES.has(emailToUsername(email).toLowerCase());
 }
 
+/**
+ * Server-side: may this caller see what the kitchen's work is worth?
+ *
+ * Owners (the manager is owner-tier) and the chef. Everyone else on the staff
+ * sees an order's contents but not its price. Takes the email from the verified
+ * Firebase ID token, never from anything the client sent.
+ */
+export function isOwnerOrChefEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const username = emailToUsername(email).toLowerCase();
+  return OWNER_USERNAMES.has(username) || CHEF_USERNAMES.has(username);
+}
+
 /** Store manager (yurina) — owner UI tier but not a strict business owner. */
 export function isManager(user: User | null | undefined): boolean {
   return isOwner(user) && !isStrictOwner(user) && !isChef(user);

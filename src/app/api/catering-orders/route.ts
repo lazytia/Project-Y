@@ -13,8 +13,12 @@ import {
   syncOrderToFirestore,
   syncOrdersToFirestore,
 } from "@/lib/catering-firestore";
-import { applyDetailsOverride, type CateringOrderForm } from "@/lib/catering-orders";
-import { isStrictOwnerEmail } from "@/lib/permissions";
+import {
+  applyDetailsOverride,
+  redactCateringPrices,
+  type CateringOrderForm,
+} from "@/lib/catering-orders";
+import { isOwnerOrChefEmail, isStrictOwnerEmail } from "@/lib/permissions";
 
 /**
  * GET /api/catering-orders
@@ -68,8 +72,14 @@ export async function GET(req: NextRequest) {
     const withDetails = details.size > 0
       ? withSchedule.map((o) => applyDetailsOverride(o, details.get(o.id)))
       : withSchedule;
+    // The mirror is written from the full orders; only the response is redacted.
     syncOrdersToFirestore(withDetails);
-    return NextResponse.json({ orders: withDetails });
+    // Prices go to owners and the chef. Everyone else gets the same orders
+    // with the money taken out, so a price cannot be read off the network tab.
+    const response = isOwnerOrChefEmail(auth.email)
+      ? withDetails
+      : withDetails.map(redactCateringPrices);
+    return NextResponse.json({ orders: response });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load Square orders.";
     return NextResponse.json({ error: msg }, { status: 500 });

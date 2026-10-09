@@ -25,8 +25,29 @@ export const ROUTES = {
   staffFoodSafety: "/staff/food-safety",
   staffTrainingMaterials: "/staff/training-materials",
   reservations: "/operations/reservations",
+  cateringOrders: "/operations/catering-orders",
   setupGuide: "/guide_link",
 } as const;
+
+/** One catering job's page. */
+export function cateringOrderRoute(orderId: string): string {
+  return `${ROUTES.cateringOrders}/${encodeURIComponent(orderId)}`;
+}
+
+/**
+ * Is this one catering job's own page — and not the calendar above it or the
+ * new-order form beside it?
+ *
+ * Staff open a job from the "Next Catering" card on their dashboard, so these
+ * pages are theirs to read. The calendar and `/new` stay with the owner side.
+ * `new` has to be ruled out by name: it sits at the same depth as an order id.
+ */
+export function isCateringOrderPath(pathname: string): boolean {
+  const prefix = `${ROUTES.cateringOrders}/`;
+  if (!pathname.startsWith(prefix)) return false;
+  const rest = pathname.slice(prefix.length);
+  return rest !== "" && rest !== "new" && !rest.includes("/");
+}
 
 export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([ROUTES.login]);
 
@@ -130,6 +151,7 @@ export function isStaffAllowedPath(pathname: string): boolean {
     pathname.startsWith(ROUTES.staffHandbook) ||
     pathname.startsWith(ROUTES.staffBeerGuide) ||
     pathname.startsWith(ROUTES.chefHome) ||
-    pathname.startsWith(ROUTES.reservations)
+    pathname.startsWith(ROUTES.reservations) ||
+    isCateringOrderPath(pathname)
   );
 }

@@ -714,7 +714,12 @@ export default function CateringOrderDetailPage() {
             {prettyPayment(order.paymentStatus)}
           </span>
         </div>
-        <span className={styles.paymentAmount}>{fmtMoney(order.totalAmount)}</span>
+        {/* The status stays for everyone — whether it is paid is something the
+            kitchen needs — but the amount is only for owners and the chef. The
+            server leaves it out of the response for anyone else. */}
+        {!order.pricesHidden && (
+          <span className={styles.paymentAmount}>{fmtMoney(order.totalAmount)}</span>
+        )}
       </section>
 
       {/* Order Details */}
@@ -731,10 +736,19 @@ export default function CateringOrderDetailPage() {
             ))}
           </ul>
           <div className={styles.orderTotalRow}>
-            <span className={styles.orderTotalLabel}>
-              Total <span className={styles.orderTotalItems}>({totalMeals} items)</span>
-            </span>
-            <span className={styles.orderTotalValue}>{fmtMoney(order.totalAmount)}</span>
+            {order.pricesHidden ? (
+              // No price to total, so the row just counts what is in the order.
+              <span className={styles.orderTotalLabel}>
+                {totalMeals} {totalMeals === 1 ? "item" : "items"}
+              </span>
+            ) : (
+              <>
+                <span className={styles.orderTotalLabel}>
+                  Total <span className={styles.orderTotalItems}>({totalMeals} items)</span>
+                </span>
+                <span className={styles.orderTotalValue}>{fmtMoney(order.totalAmount)}</span>
+              </>
+            )}
           </div>
 
           {/* Utensils are a count the kitchen packs for, not a priced line, so

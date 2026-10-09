@@ -18,6 +18,7 @@ import {
   ROSTER_SEEN_FIELD,
   type RosterSeenMap,
 } from "@/lib/roster-seen";
+import { cateringOrderRoute } from "@/lib/routes";
 import { needsRsaCertificate } from "@/lib/staff-display";
 import styles from "./page.module.css";
 
@@ -56,6 +57,21 @@ type NextShiftInfo = {
   startDate: Date;
 };
 
+/**
+ * The next catering job, as /api/catering-orders/summary describes it. There is
+ * no price in it on purpose: the card is shown to every employee, and what a job
+ * is worth is for the owners and the chef (the order page enforces the same).
+ */
+type NextCatering = {
+  id: string;
+  deliveryDateISO: string;
+  deliveryTime: string;
+  guestsCount: number;
+  fulfillmentType: "PICKUP" | "DELIVERY" | null;
+  firstItem: { name: string; qty: number } | null;
+  moreItems: number;
+};
+
 /* ── helpers ── */
 
 function startOfWeek(d: Date): Date {
@@ -85,6 +101,12 @@ function fmtShiftDate(d: Date): string {
     day: "numeric",
     month: "short",
   });
+}
+
+/** "2026-10-16" -> that day, read as a local date (not UTC midnight). */
+function dateFromISO(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function fmtTime12h(t: string): string {
@@ -191,6 +213,10 @@ export default function StaffDashboardPage() {
   // into the POS. Both feed the Getting Started card and nothing else.
   const [activatedAt, setActivatedAt] = useState<Date | null>(null);
   const [staffId, setStaffId] = useState("");
+  // The next catering job. "error" drops the card rather than saying there is
+  // no catering when the truth is that we could not find out.
+  const [nextCatering, setNextCatering] = useState<NextCatering | null>(null);
+  const [cateringState, setCateringState] = useState<"loading" | "ready" | "error">("loading");
 
   const [today, setTodayDate] = useState<Date>(() => {
     const d = new Date(0);
@@ -302,6 +328,29 @@ export default function StaffDashboardPage() {
     void loadTraining();
   }, [user, loadTraining]);
 
+  const loadCatering = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch("/api/catering-orders/summary", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { nextOrder?: NextCatering | null };
+      setNextCatering(data.nextOrder ?? null);
+      setCateringState("ready");
+    } catch {
+      // Keep what is already on screen if there was something; otherwise show
+      // no card at all.
+      setCateringState((prev) => (prev === "ready" ? prev : "error"));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    void loadCatering();
+  }, [user, loadCatering]);
+
   // Re-fetch data when the app becomes visible (e.g. after tapping a push
   // notification, or on returning from the beer guide in a standalone PWA
   // where the dashboard is resumed rather than re-mounted).
@@ -310,10 +359,11 @@ export default function StaffDashboardPage() {
       if (document.visibilityState !== "visible") return;
       loadData();
       void loadTraining();
+      void loadCatering();
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [loadData, loadTraining]);
+  }, [loadData, loadTraining, loadCatering]);
 
   // Lock body scroll while the modal is open.
   useEffect(() => {
@@ -452,6 +502,77 @@ export default function StaffDashboardPage() {
           <p className={styles.shiftDate}>{t("staff.noUpcoming")}</p>
         )}
       </Link>
+
+      {/* Next Catering - a job the kitchen is cooking for. Opens that job's own
+          page, where everything but the price is shown to every employee. With
+          nothing booked it is plain text: the calendar is not theirs to open. */}
+      {cateringState !== "error" && (
+        nextCatering ? (
+          <Link href={cateringOrderRoute(nextCatering.id)} className={styles.cateringCard}>
+            <div className={styles.cateringTop}>
+              <span className={styles.cateringIcon} aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 19h18" />
+                  <path d="M5 19a7 7 0 0 1 14 0" />
+                  <path d="M12 12V9.5" />
+                </svg>
+              </span>
+              <span className={styles.cateringLabel}>{t("staff.nextCatering")}</span>
+            </div>
+            <div className={styles.cateringMain}>
+              <div className={styles.cateringText}>
+                <p className={styles.cateringWhen}>
+                  {fmtShiftDate(dateFromISO(nextCatering.deliveryDateISO))} · {nextCatering.deliveryTime}
+                </p>
+                <p className={styles.cateringMeta}>
+                  {nextCatering.guestsCount} {t("staff.catering.pax")} ·{" "}
+                  {t(nextCatering.fulfillmentType === "DELIVERY" ? "staff.catering.delivery" : "staff.catering.pickup")}
+                </p>
+              </div>
+              <span className={styles.cateringChev} aria-hidden="true">›</span>
+            </div>
+            {nextCatering.firstItem && (
+              <>
+                <div className={styles.cateringRule} />
+                <p className={styles.cateringItem}>
+                  <span className={styles.cateringItemIcon} aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="8" y1="13" x2="16" y2="13" />
+                      <line x1="8" y1="17" x2="13" y2="17" />
+                    </svg>
+                  </span>
+                  <span className={styles.cateringItemName}>
+                    {nextCatering.firstItem.name} ×{nextCatering.firstItem.qty}
+                  </span>
+                  {nextCatering.moreItems > 0 && (
+                    <span className={styles.cateringMore}>
+                      {t("staff.catering.more").replace("{n}", String(nextCatering.moreItems))}
+                    </span>
+                  )}
+                </p>
+              </>
+            )}
+          </Link>
+        ) : (
+          <div className={styles.cateringCard}>
+            <div className={styles.cateringTop}>
+              <span className={styles.cateringIcon} aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 19h18" />
+                  <path d="M5 19a7 7 0 0 1 14 0" />
+                  <path d="M12 12V9.5" />
+                </svg>
+              </span>
+              <span className={styles.cateringLabel}>{t("staff.nextCatering")}</span>
+            </div>
+            <p className={styles.cateringEmpty}>
+              {cateringState === "loading" ? t("staff.loading") : t("staff.catering.none")}
+            </p>
+          </div>
+        )
+      )}
 
       {/* At-a-glance tiles */}
       <div className={styles.tileRow}>
