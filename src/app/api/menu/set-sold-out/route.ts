@@ -1,26 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
-import { OWNER_USERNAMES } from "@/lib/permissions";
-import { emailToUsername } from "@/lib/username";
+import { isOwnerOrChefEmail } from "@/lib/permissions";
 import { setCategoryPresence } from "@/lib/sold-out-square";
 
 /**
  * POST /api/menu/set-sold-out
- * Body: { categoryId: "snapper" | "trevally" | "tuna",
+ * Body: { categoryId: a SOLD_OUT_CATEGORIES id (lib/sold-out-square),
  *         soldOut: boolean }
  *
- * Owner-only — verified via the Firebase ID token in
+ * Owners and chefs only — verified via the Firebase ID token in
  * Authorization: Bearer <idToken>. Marks every Square catalog item in the
  * category sold out (or available) via the variation trackInventory flag.
  */
-async function verifyOwner(req: NextRequest): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+async function verifyOwnerOrChef(req: NextRequest): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!idToken) return { ok: false, status: 401, error: "Missing bearer token." };
   try {
     const decoded = await adminAuth().verifyIdToken(idToken);
-    const username = emailToUsername(decoded.email ?? "").toLowerCase();
-    if (!OWNER_USERNAMES.has(username)) {
-      return { ok: false, status: 403, error: "Forbidden — owner only." };
+    if (!isOwnerOrChefEmail(decoded.email)) {
+      return { ok: false, status: 403, error: "Forbidden — owner or chef only." };
     }
     return { ok: true };
   } catch (err) {
@@ -33,7 +31,7 @@ async function verifyOwner(req: NextRequest): Promise<{ ok: true } | { ok: false
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await verifyOwner(req);
+  const auth = await verifyOwnerOrChef(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   let body: { categoryId?: string; soldOut?: boolean };
