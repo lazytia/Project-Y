@@ -17,6 +17,12 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { getDb } from "./firebase";
+import {
+  classifyRosterChange,
+  rosterChangeNotifies,
+  rosterNotice,
+  type RosterChange,
+} from "./roster-publish";
 
 export type Decision = "approved" | "declined";
 
@@ -197,43 +203,84 @@ export type PublishShift = {
 };
 
 /**
+ * What each person was last shown for a week, set against what is about to be
+ * published, so the publish can tell who it concerns (see lib/roster-publish).
+ *
+ * Read from each person's own document rather than from the copy of it the
+ * roster page loaded earlier: that is what they actually see, and the page's
+ * copy is as old as the time it was opened.
+ */
+export async function planRosterPublish(
+  weekStartISO: string,
+  nextByStaff: ReadonlyMap<string, PublishShift[]>,
+): Promise<Map<string, RosterChange>> {
+  const plan = new Map<string, RosterChange>();
+  await Promise.all(
+    [...nextByStaff].map(async ([uid, next]) => {
+      const snap = await getDoc(doc(getDb(), "staff_onboarding", uid));
+      const week = (snap.data()?.roster ?? {})[weekStartISO] as { shifts?: PublishShift[] } | undefined;
+      // No copy at all is not the same as a copy with no shifts in it.
+      const previous = week ? (Array.isArray(week.shifts) ? week.shifts : []) : null;
+      plan.set(uid, classifyRosterChange(previous, next));
+    }),
+  );
+  return plan;
+}
+
+/**
  * Publish one staff member's week: writes their shift list under
- * roster.{weekStartISO} on their staff_onboarding doc and appends a
- * notification so they're told their work dates. Best-effort FCM push,
- * same as decideRequest.
+ * roster.{weekStartISO} on their staff_onboarding doc, and — only when
+ * `change` says their week actually concerns them — appends a notification
+ * and sends a push so they're told. Best-effort FCM push, same as
+ * decideRequest.
+ *
+ * `change` comes from planRosterPublish. A person whose week is unchanged is
+ * left exactly as they were; one who has never been published this week and
+ * has nothing in it gets the empty copy written (so their screen says "no
+ * shifts" rather than "not published") but is not told anything.
  */
 export async function publishStaffRoster(
   staffUid: string,
   weekStartISO: string,
   weekRangeLabel: string,
   shifts: PublishShift[],
+  change: RosterChange,
 ): Promise<void> {
+  if (change === "unchanged") return;
+
   const ref = doc(getDb(), "staff_onboarding", staffUid);
+  const copy = {
+    [`roster.${weekStartISO}`]: {
+      weekStartISO,
+      publishedAt: Timestamp.now(),
+      shifts,
+    },
+    updatedAt: serverTimestamp(),
+  };
+
+  if (!rosterChangeNotifies(change)) {
+    await updateDoc(ref, copy);
+    return;
+  }
+
+  const { title, detail } = rosterNotice(change, weekRangeLabel, shifts.length);
   const id = `n_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const count = shifts.length;
   const notification = {
     id,
+    // Every publish writes this kind, an update included: it is what clears the
+    // notice off the dashboard once the week has been opened (lib/roster-seen).
     kind: "roster-published",
-    title: "Roster published",
-    detail:
-      count > 0
-        ? `Your roster for ${weekRangeLabel} is ready — ${count} shift${count === 1 ? "" : "s"} this week.`
-        : `The roster for ${weekRangeLabel} has been published. You have no shifts this week.`,
+    title,
+    detail,
+    // Lets the notice page say "updated" rather than "published".
+    change,
     createdAt: Timestamp.now(),
     requestType: "roster",
     weekStartISO,
     shifts,
   };
 
-  await updateDoc(ref, {
-    [`roster.${weekStartISO}`]: {
-      weekStartISO,
-      publishedAt: Timestamp.now(),
-      shifts,
-    },
-    notifications: arrayUnion(notification),
-    updatedAt: serverTimestamp(),
-  });
+  await updateDoc(ref, { ...copy, notifications: arrayUnion(notification) });
 
   try {
     void fetch("/api/staff/notify", {

@@ -34,6 +34,8 @@ type StoredNotification = {
   previousAvailability?: Record<string, DayAvailability>;
   // Roster-published fields stored inline
   weekStartISO?: string;
+  /** Set on roster notices written after re-publishing; absent on older ones. */
+  change?: "new" | "updated" | "removed";
   shifts?: Array<{ iso: string; meal: "lunch" | "dinner"; start: string }>;
 };
 
@@ -274,6 +276,8 @@ export default function NotificationDetailPage({
       })
       .sort((a, b) => a.date.getTime() - b.date.getTime());
     const publishedAt = tsDate(notification.createdAt);
+    // A re-publish says so, rather than announcing the roster as new again.
+    const isUpdate = notification.change === "updated" || notification.change === "removed";
 
     return (
       <div className={styles.page}>
@@ -306,19 +310,23 @@ export default function NotificationDetailPage({
           <div className={styles.heroBody}>
             <p className={`${styles.heroPill} ${styles.heroPillOk}`}>
               <span className={styles.heroPillDot} aria-hidden="true" />
-              Published
+              {isUpdate ? "Updated" : "Published"}
             </p>
-            <h1 className={styles.heroTitle}>Roster Published</h1>
+            <h1 className={styles.heroTitle}>{isUpdate ? "Roster Updated" : "Roster Published"}</h1>
             <p className={styles.heroSub}>
               {shifts.length > 0
-                ? "Here are your shifts for the week."
-                : "You have no shifts rostered this week."}
+                ? isUpdate
+                  ? "Your shifts for the week have changed. Here they are."
+                  : "Here are your shifts for the week."
+                : isUpdate
+                  ? "Your shifts for this week have been removed."
+                  : "You have no shifts rostered this week."}
             </p>
           </div>
         </header>
 
         <section className={styles.card}>
-          <Row icon={<CalIcon />} label="Published on" value={fmtDateTime(publishedAt)} />
+          <Row icon={<CalIcon />} label={isUpdate ? "Updated on" : "Published on"} value={fmtDateTime(publishedAt)} />
           <Divider />
           <div className={styles.row}>
             <span className={styles.rowIcon}><CaseIcon /></span>

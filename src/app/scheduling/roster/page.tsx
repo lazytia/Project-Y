@@ -8,10 +8,12 @@ import { readRosterCache, writeRosterCache } from "@/lib/roster-cache";
 import {
   decideHolidayRequest,
   decideAvailabilityRequest,
+  planRosterPublish,
   publishStaffRoster,
   type Decision,
   type PublishShift,
 } from "@/lib/manager-actions";
+import { rosterChangeNotifies, type RosterChange } from "@/lib/roster-publish";
 import { isTeamMember, onboardingProgressPatch, type StaffOnboardingFlags } from "@/lib/staff-active";
 import {
   CHEF_USERNAMES,
@@ -901,24 +903,38 @@ export default function ManagerRosterPage() {
       }
     }
 
-    // staffDocs is already the team, so this is everyone who should be told.
-    // The old role filter here was the one that mattered most: it decided who
-    // got the text, so the manager was rostered and then not notified.
+    // staffDocs is already the team, so every one of them is looked at. The old
+    // role filter here was the one that mattered most: it decided who got the
+    // text, so the manager was rostered and then not notified.
     const recipients = staffDocs;
-    const total = recipients.length;
-    const withShifts = recipients.filter((s) => (byStaff.get(s.uid)?.length ?? 0) > 0).length;
-
-    const ok = window.confirm(
-      `Publish the roster for ${rangeLabel}?\n\n` +
-        `${withShifts} of ${total} staff will be notified of their shifts.`,
-    );
-    if (!ok) return;
 
     setPublishing(true);
     try {
+      // Who this publish concerns: each person's week against what they were
+      // last shown. Only they are told; everyone else is left as they were.
+      const plan = await planRosterPublish(
+        weekStartISO,
+        new Map(recipients.map((s) => [s.uid, byStaff.get(s.uid) ?? []])),
+      );
+      const changeOf = (uid: string): RosterChange => plan.get(uid) ?? "unchanged";
+      const count = (c: RosterChange) => recipients.filter((s) => changeOf(s.uid) === c).length;
+      const toTell = recipients.filter((s) => rosterChangeNotifies(changeOf(s.uid))).length;
+
+      const lines = [
+        count("new") > 0 && `${count("new")} with new shifts`,
+        count("updated") > 0 && `${count("updated")} with changed shifts`,
+        count("removed") > 0 && `${count("removed")} with shifts removed`,
+      ].filter(Boolean);
+      const summary =
+        toTell === 0
+          ? "No one's shifts have changed since the last publish, so no one will be notified."
+          : `${toTell} staff will be notified:\n${lines.map((l) => `• ${l}`).join("\n")}`;
+
+      if (!window.confirm(`Publish the roster for ${rangeLabel}?\n\n${summary}`)) return;
+
       await Promise.all(
         recipients.map((s) =>
-          publishStaffRoster(s.uid, weekStartISO, rangeLabel, byStaff.get(s.uid) ?? []),
+          publishStaffRoster(s.uid, weekStartISO, rangeLabel, byStaff.get(s.uid) ?? [], changeOf(s.uid)),
         ),
       );
       await setDoc(
@@ -926,7 +942,11 @@ export default function ManagerRosterPage() {
         { publishedAt: new Date() },
         { merge: true },
       );
-      alert(`Roster published. ${total} staff notified.`);
+      alert(
+        toTell === 0
+          ? "Roster published. No one's shifts had changed, so no one was notified."
+          : `Roster published. ${toTell} staff notified.`,
+      );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to publish roster.");
     } finally {
