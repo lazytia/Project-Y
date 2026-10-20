@@ -103,3 +103,101 @@
   color: var(--color-fg);
   line-height: 1.55;
 }
+
+/* ── History ── */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.historyTitle {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.historyNote {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.historyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.historyRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.historyRow:last-child { border-bottom: none; }
+
+.historyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.historyBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.historyMain {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.historyDates {
+  font-size: var(--font-size-md);
+  color: var(--color-fg);
+}
+
+.historySub {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.badge {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.statusApproved {
+  background: color-mix(in srgb, var(--color-positive) 12%, transparent);
+  color: var(--color-positive);
+}
+
+.statusPending {
+  background: var(--color-surface-hover);
+  color: var(--color-fg);
+}
+
+.statusDeclined {
+  background: color-mix(in srgb, var(--color-negative) 12%, transparent);
+  color: var(--color-negative);
+}

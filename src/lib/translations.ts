@@ -491,6 +491,13 @@ const EN: Dict = {
   "req.availabilityDesc": "Let us know when your availability changes.",
   "req.note":
     "Please communicate important changes with management and submit all requests through Project YURICA.",
+  "req.history.title": "Request History",
+  "req.history.empty": "No requests yet.",
+  "req.history.error": "Couldn’t load your requests.",
+  "req.history.holiday": "Holiday",
+  "req.history.availability": "Availability Change",
+  "req.history.effective": "From {date}",
+  "req.history.submitted": "Submitted {date}",
 
   // Request Holiday
   "rh.title": "Holiday Request",
@@ -957,6 +964,13 @@ const JA: Dict = {
   "req.availabilityDesc": "勤務可能日が変わったらお知らせください。",
   "req.note":
     "重要な変更は必ず管理者に伝え、申請はすべて Project YURICA から提出してください。",
+  "req.history.title": "申請履歴",
+  "req.history.empty": "まだ申請はありません。",
+  "req.history.error": "申請を読み込めませんでした。",
+  "req.history.holiday": "休暇",
+  "req.history.availability": "勤務可能日変更",
+  "req.history.effective": "{date}から",
+  "req.history.submitted": "{date}に申請",
 
   // Request Holiday
   "rh.title": "休暇申請",

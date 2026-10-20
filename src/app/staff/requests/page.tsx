@@ -1,10 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
+import {
+  fetchOwnRequests,
+  type RequestRecord,
+  type RequestStatus,
+} from "@/lib/staff-requests";
 import styles from "./page.module.css";
 
-/** Shared geometry for the card icons, so one edit moves both. */
+/** Shared geometry for the icons, so one edit moves them all. */
 const ICON_PROPS = {
   width: 22,
   height: 22,
@@ -16,6 +23,26 @@ const ICON_PROPS = {
   strokeLinejoin: "round",
 } as const;
 
+type RequestKind = RequestRecord["kind"];
+
+/** One drawing per kind of request, shared by the card that files it and the rows that record it. */
+const KIND_ICONS: Record<RequestKind, React.ReactNode> = {
+  holiday: (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </>
+  ),
+  availability: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7 12 12 15.5 14" />
+    </>
+  ),
+};
+
 /**
  * The two things a staff member can ask the owner for.
  *
@@ -24,49 +51,112 @@ const ICON_PROPS = {
  * `nav.*` keys the rows carried there, so the wording is corrected once.
  */
 const REQUEST_CARDS: readonly {
+  kind: RequestKind;
   href: string;
   titleKey: string;
   descKey: string;
-  icon: React.ReactNode;
 }[] = [
   {
+    kind: "holiday",
     href: "/staff/schedule/request-holiday",
     titleKey: "nav.requestHoliday",
     descKey: "req.holidayDesc",
-    icon: (
-      <svg {...ICON_PROPS}>
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    ),
   },
   {
+    kind: "availability",
     href: "/staff/schedule/availability-change",
     titleKey: "nav.availabilityChange",
     descKey: "req.availabilityDesc",
-    icon: (
-      <svg {...ICON_PROPS}>
-        <circle cx="12" cy="12" r="9" />
-        <polyline points="12 7 12 12 15.5 14" />
-      </svg>
-    ),
   },
 ];
 
+const KIND_LABEL_KEYS: Record<RequestKind, string> = {
+  holiday: "req.history.holiday",
+  availability: "req.history.availability",
+};
+
+const STATUS_LABEL_KEYS: Record<RequestStatus, string> = {
+  pending: "rh.status.pending",
+  approved: "rh.status.approved",
+  declined: "rh.status.declined",
+};
+
+const STATUS_CLASSES: Record<RequestStatus, string> = {
+  pending: styles.statusPending,
+  approved: styles.statusApproved,
+  declined: styles.statusDeclined,
+};
+
+function fmtDay(d: Date, locale: string, withYear = true): string {
+  return d.toLocaleDateString(locale, {
+    day: "numeric",
+    month: "short",
+    year: withYear ? "numeric" : undefined,
+  });
+}
+
+/** "12 – 15 Nov 2026"; one date when the holiday is a single day. */
+function fmtRange(a: Date, b: Date, locale: string): string {
+  if (a.toDateString() === b.toDateString()) return fmtDay(a, locale);
+  const sameYear = a.getFullYear() === b.getFullYear();
+  const sameMonth = sameYear && a.getMonth() === b.getMonth();
+  if (sameMonth) return `${a.getDate()} – ${fmtDay(b, locale)}`;
+  return `${fmtDay(a, locale, !sameYear)} – ${fmtDay(b, locale)}`;
+}
+
 export default function StaffRequestsPage() {
-  const { t } = useLang();
+  const { user } = useAuth();
+  const { t, lang } = useLang();
+  const locale = lang === "ja" ? "ja-JP" : "en-AU";
+
+  // null until the first read lands, so "no requests" is never claimed for a
+  // list that has simply not arrived yet.
+  const [records, setRecords] = useState<RequestRecord[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    try {
+      setRecords(await fetchOwnRequests(user.uid));
+      setLoadFailed(false);
+    } catch {
+      setLoadFailed(true);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // A request is decided while the app sits open in the background, so read
+  // again on return rather than showing it as pending until the next visit.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") void load();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [load]);
+
+  /** The dates the request is about: the holiday's span, or when the availability starts. */
+  function datesLine(r: RequestRecord): string {
+    if (r.kind === "holiday") {
+      return r.startDate && r.endDate ? fmtRange(r.startDate, r.endDate, locale) : "—";
+    }
+    return r.effectiveDate
+      ? t("req.history.effective").replace("{date}", fmtDay(r.effectiveDate, locale))
+      : "—";
+  }
 
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>{t("req.title")}</h1>
       <p className={styles.subtitle}>{t("req.subtitle")}</p>
 
-      {REQUEST_CARDS.map(({ href, titleKey, descKey, icon }) => (
+      {REQUEST_CARDS.map(({ kind, href, titleKey, descKey }) => (
         <Link href={href} key={href} className={styles.card}>
           <span className={styles.cardIcon} aria-hidden="true">
-            {icon}
+            <svg {...ICON_PROPS}>{KIND_ICONS[kind]}</svg>
           </span>
           <span className={styles.cardBody}>
             <span className={styles.cardTitle}>{t(titleKey)}</span>
@@ -77,6 +167,42 @@ export default function StaffRequestsPage() {
           </span>
         </Link>
       ))}
+
+      <section className={styles.history}>
+        <h2 className={styles.historyTitle}>{t("req.history.title")}</h2>
+
+        {records === null ? (
+          <p className={styles.historyNote}>
+            {loadFailed ? t("req.history.error") : t("staff.loading")}
+          </p>
+        ) : records.length === 0 ? (
+          <p className={styles.historyNote}>{t("req.history.empty")}</p>
+        ) : (
+          <ul className={styles.historyList}>
+            {records.map((r) => (
+              <li key={`${r.kind}:${r.id}`} className={styles.historyRow}>
+                <span className={styles.historyIcon} aria-hidden="true">
+                  <svg {...ICON_PROPS} width={18} height={18}>
+                    {KIND_ICONS[r.kind]}
+                  </svg>
+                </span>
+                <span className={styles.historyBody}>
+                  <span className={styles.historyMain}>{t(KIND_LABEL_KEYS[r.kind])}</span>
+                  <span className={styles.historyDates}>{datesLine(r)}</span>
+                  {r.createdAt && (
+                    <span className={styles.historySub}>
+                      {t("req.history.submitted").replace("{date}", fmtDay(r.createdAt, locale))}
+                    </span>
+                  )}
+                </span>
+                <span className={`${styles.badge} ${STATUS_CLASSES[r.status]}`}>
+                  {t(STATUS_LABEL_KEYS[r.status])}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className={styles.infoBox}>
         <span className={styles.infoIcon} aria-hidden="true">
