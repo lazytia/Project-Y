@@ -27,9 +27,10 @@ import styles from "./ChefDashboard.module.css";
  *
  * Was the store manager's screen with the scheduling queue switched off by a
  * prop. The two have since been specced apart — the kitchen leads with the
- * three numbers that decide a service (covers booked, catering leaving today,
- * categories off the menu) and carries its own shortcut list — so it is its
- * own component and the flag is gone from the manager's.
+ * numbers that decide a service (covers booked, categories off the menu) and
+ * the one it plans ahead by (catering across the week), and carries its own
+ * shortcut list — so it is its own component and the flag is gone from the
+ * manager's.
  *
  * It still shares the manager's cache and server snapshot, because the two
  * screens open on the same day's sales and the same reservation count, and a
@@ -75,22 +76,52 @@ type StaffDoc = {
   availabilityRequests?: StoredRequest[];
 };
 
-type TodayCatering = { count: number; firstTime: string | null };
+/** This week's catering: how many jobs, and the first one still to come. */
+type WeekCatering = {
+  count: number;
+  next: { dateISO: string; time: string } | null;
+};
 
-async function fetchTodayCatering(
+async function fetchWeekCatering(
   user: User | null | undefined,
   dateKey: string,
-): Promise<TodayCatering> {
+): Promise<WeekCatering> {
   const res = await fetch(`/api/catering-orders/summary?date=${encodeURIComponent(dateKey)}`, {
     cache: "no-store",
     headers: await authHeader(user),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) return { count: 0, firstTime: null };
+  if (!res.ok) return { count: 0, next: null };
+  const next = data.weekNext;
   return {
-    count: typeof data.todayCount === "number" ? data.todayCount : 0,
-    firstTime: typeof data.todayFirstTime === "string" ? data.todayFirstTime : null,
+    count: typeof data.weekCount === "number" ? data.weekCount : 0,
+    next:
+      next && typeof next.dateISO === "string" && typeof next.time === "string"
+        ? { dateISO: next.dateISO, time: next.time }
+        : null,
   };
+}
+
+/**
+ * What the Catering card says under its number: when the next job leaves.
+ *
+ * "Today 11:30 AM", or the weekday for a later day — it is always inside this
+ * week, so the weekday is enough to place it. Square prints "—" for an order
+ * with no slot; the day then stands alone rather than carrying a dash.
+ */
+function weekCateringSub(catering: WeekCatering | null, todayKey: string): string {
+  if (!catering) return "pickup";
+  if (catering.count === 0) return "no pickup";
+  // Jobs this week, but every one of them already behind us.
+  if (!catering.next) return "none left";
+  const { dateISO, time } = catering.next;
+  const day =
+    dateISO === todayKey
+      ? "Today"
+      : new Intl.DateTimeFormat("en-AU", { weekday: "short", timeZone: "UTC" }).format(
+          new Date(`${dateISO}T12:00:00Z`),
+        );
+  return /\d/.test(time) ? `${day} ${time}` : day;
 }
 
 /**
@@ -332,7 +363,7 @@ export default function ChefDashboard({
       ? { pax: initialCache.totalPax, bookings: initialCache.totalBookings }
       : null,
   );
-  const [catering, setCatering] = useState<TodayCatering | null>(null);
+  const [catering, setCatering] = useState<WeekCatering | null>(null);
   const [soldOut, setSoldOut] = useState<number | null>(null);
   const [weekDaily, setWeekDaily] = useState<number[] | null>(null);
   const [requests, setRequests] = useState<{ holiday: number; availability: number } | null>(null);
@@ -368,7 +399,7 @@ export default function ChefDashboard({
 
   const fetchLive = useCallback(async () => {
     const monday = isoMondayOf(todayKey);
-    const [sales, reservations, cateringToday, soldOutCount, week] = await Promise.allSettled([
+    const [sales, reservations, cateringWeek, soldOutCount, week] = await Promise.allSettled([
       fetch(`/api/square/today-sales-brief?date=${encodeURIComponent(todayKey)}`).then(
         async (res) => {
           if (!res.ok) return null;
@@ -377,7 +408,7 @@ export default function ChefDashboard({
         },
       ),
       fetchReservationsForDate(user, todayKey, "northsydney"),
-      fetchTodayCatering(user, todayKey),
+      fetchWeekCatering(user, todayKey),
       fetchSoldOutCount(todayKey),
       fetch(`/api/square/weekly-daily?weekStart=${encodeURIComponent(monday)}`).then(
         async (res) => {
@@ -405,7 +436,7 @@ export default function ChefDashboard({
       setResCounts({ pax, bookings });
     }
 
-    if (cateringToday.status === "fulfilled") setCatering(cateringToday.value);
+    if (cateringWeek.status === "fulfilled") setCatering(cateringWeek.value);
     if (soldOutCount.status === "fulfilled") setSoldOut(soldOutCount.value);
     if (week.status === "fulfilled") setWeekDaily(week.value);
 
@@ -513,45 +544,48 @@ export default function ChefDashboard({
           <p className={styles.greetingRole}>Head Chef</p>
         </header>
 
-        <section>
-          <p className={styles.sectionLabel}>TODAY</p>
-          <div className={styles.todayRow}>
-            <TodayCard
-              href="/operations/reservations"
-              label="Reservations"
-              value={resCounts ? resCounts.bookings : "—"}
-              sub={resCounts ? `${resCounts.pax} pax` : "pax"}
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </TodayCard>
+        <section className={styles.todayWeek}>
+          <p className={`${styles.sectionLabel} ${styles.todayHeading}`}>TODAY</p>
+          <p className={`${styles.sectionLabel} ${styles.weekHeading}`}>THIS WEEK</p>
+          <span className={styles.groupDivider} aria-hidden="true" />
 
-            <TodayCard
-              href="/operations/catering-orders"
-              label="Catering"
-              value={catering ? catering.count : "—"}
-              sub={catering?.firstTime ? `${catering.firstTime} pickup` : "no pickup"}
-            >
-              <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <path d="M16 10a4 4 0 0 1-8 0" />
-            </TodayCard>
+          <TodayCard
+            href="/operations/reservations"
+            label="Reservations"
+            value={resCounts ? resCounts.bookings : "—"}
+            sub={resCounts ? `${resCounts.pax} pax` : "pax"}
+          >
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </TodayCard>
 
-            <TodayCard
-              href="/operations/daily-sold-out"
-              label="Sold Out"
-              value={soldOut === null ? "—" : soldOut}
-              /* The collection holds category ids, not item ids — the page this
-                 links to counts them as categories, so this card says the same
-                 thing rather than promising a number of dishes. */
-              sub="categories"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <line x1="5.6" y1="5.6" x2="18.4" y2="18.4" />
-            </TodayCard>
-          </div>
+          <TodayCard
+            href="/operations/daily-sold-out"
+            label="Sold Out"
+            value={soldOut === null ? "—" : soldOut}
+            /* The collection holds category ids, not item ids — the page this
+               links to counts them as categories, so this card says the same
+               thing rather than promising a number of dishes. */
+            sub="categories"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <line x1="5.6" y1="5.6" x2="18.4" y2="18.4" />
+          </TodayCard>
+
+          {/* Opens the catering calendar: the week is for planning ahead, and the
+              calendar is where the jobs beyond it can be looked at too. */}
+          <TodayCard
+            href="/operations/catering-orders"
+            label="Catering"
+            value={catering ? catering.count : "—"}
+            sub={weekCateringSub(catering, todayKey)}
+          >
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <path d="M16 10a4 4 0 0 1-8 0" />
+          </TodayCard>
         </section>
 
         <section>

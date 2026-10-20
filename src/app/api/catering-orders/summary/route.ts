@@ -108,19 +108,19 @@ export async function GET(req: NextRequest) {
         : withSchedule;
     syncOrdersToFirestore(orders);
 
+    // Earliest first within a day too: two jobs on one date used to come back
+    // in whatever order Square listed them, so the "next" one could be the
+    // later pickup.
+    const byDateThenTime = (a: (typeof orders)[number], b: (typeof orders)[number]) =>
+      a.deliveryDateISO.localeCompare(b.deliveryDateISO) ||
+      minutesOfDay(a.deliveryTime) - minutesOfDay(b.deliveryTime);
+
     const upcoming = orders
       .filter(
         (o) =>
           (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey,
       )
-      // Earliest first within a day too: two jobs on one date used to come back
-      // in whatever order Square listed them, so the "next" one could be the
-      // later pickup.
-      .sort(
-        (a, b) =>
-          a.deliveryDateISO.localeCompare(b.deliveryDateISO) ||
-          minutesOfDay(a.deliveryTime) - minutesOfDay(b.deliveryTime),
-      );
+      .sort(byDateThenTime);
 
     const next = upcoming[0];
     const nextOrder: SummaryOrder | null = next
@@ -137,35 +137,36 @@ export async function GET(req: NextRequest) {
         }
       : null;
 
-    const weekCount = orders.filter(
+    const weekOrders = orders.filter(
       (o) =>
         o.deliveryDateISO >= mondayKey &&
         o.deliveryDateISO <= sundayKey &&
         o.status !== "CANCELLED",
-    ).length;
+    );
+    const weekCount = weekOrders.length;
 
-    // Just the jobs leaving the kitchen today, and the earliest pickup among
-    // them. The manager's card counts the week and names the next job whenever
-    // it falls; the chef's counts the shift he is standing in. Same orders,
-    // different question, so both are answered here rather than making the
-    // kitchen screen re-fetch and re-filter the whole Square list itself.
-    const todayOrders = orders
-      .filter((o) => o.deliveryDateISO === todayKey && o.status !== "CANCELLED")
-      .sort((a, b) => minutesOfDay(a.deliveryTime) - minutesOfDay(b.deliveryTime));
+    // The first job still to come this week, today included. The manager's card
+    // names the next job whenever it falls; the chef plans the week, so his names
+    // the next one inside it. Same orders, different question, so it is answered
+    // here rather than making the kitchen screen re-fetch and re-filter the whole
+    // Square list itself.
+    const weekNextOrder = weekOrders
+      .filter((o) => o.deliveryDateISO >= todayKey)
+      .sort(byDateThenTime)[0];
 
     return NextResponse.json({
       nextOrder,
       weekCount,
-      todayCount: todayOrders.length,
-      todayFirstTime: todayOrders[0]?.deliveryTime ?? null,
+      weekNext: weekNextOrder
+        ? { dateISO: weekNextOrder.deliveryDateISO, time: weekNextOrder.deliveryTime }
+        : null,
     });
   } catch (err) {
     console.error("[catering-orders/summary]", err);
     return NextResponse.json({
       nextOrder: null,
       weekCount: 0,
-      todayCount: 0,
-      todayFirstTime: null,
+      weekNext: null,
     });
   }
 }

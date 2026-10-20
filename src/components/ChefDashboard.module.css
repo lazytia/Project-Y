@@ -71,21 +71,48 @@
   font-weight: 700;
 }
 
-/* ── Today ── */
+/* ── Today and this week ── */
 /*
- * Three equal columns, and minmax(0, 1fr) rather than 1fr. A bare 1fr is
- * minmax(auto, 1fr): the column will not go narrower than its content, so the
- * one-word "Reservations" label pushed its column wide and squeezed the other
- * two, and on a phone the third card ran off the right edge of the screen.
- * With a zero minimum the three always split the row evenly.
+ * One grid for both groups, so the three cards are the same width: TODAY's two
+ * cards, a hairline, then THIS WEEK's one. The headings sit on the first row
+ * (TODAY across the first two columns) and the hairline runs the full height
+ * of both rows, between the groups.
+ *
+ * minmax(0, 1fr) rather than 1fr. A bare 1fr is minmax(auto, 1fr): the column
+ * will not go narrower than its content, so the one-word "Reservations" label
+ * pushed its column wide and squeezed the others, and on a phone the last card
+ * ran off the right edge of the screen. With a zero minimum the three always
+ * split the row evenly.
  *
  * The icon and chevron share the top line and the label sits under them,
  * because icon + label + chevron side by side cannot fit in a third of a phone.
  */
-.todayRow {
+.todayWeek {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr)) 1px minmax(0, 1fr);
+  column-gap: var(--space-2);
+}
+
+/* On the smallest phones the gaps are what the cards can least spare: at 320px
+   the wider ones clip "Reservations" mid-word. */
+@media (max-width: 340px) {
+  .todayWeek { column-gap: var(--space-1); }
+}
+
+.todayHeading {
+  grid-column: 1 / span 2;
+  grid-row: 1;
+}
+
+.weekHeading {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+.groupDivider {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  background: var(--color-border);
 }
 
 .todayCard {
