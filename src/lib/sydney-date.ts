@@ -36,6 +36,12 @@ export function isoMondayOf(dateKey: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/** The first Monday on or after `dateKey`; a Monday is its own answer. */
+export function mondayOnOrAfter(dateKey: string): string {
+  // Days to add by weekday (Sun=0): Sun 1, Mon 0, Tue 6, ... Sat 2.
+  return addDaysISO(dateKey, (8 - dowOfDateKey(dateKey)) % 7);
+}
+
 export function addDaysISO(iso: string, n: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));

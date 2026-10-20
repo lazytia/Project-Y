@@ -14,8 +14,10 @@ import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
 import RequestSubmitted from "@/components/RequestSubmitted";
 import { useBackTo } from "@/hooks/useBackTo";
+import InlineCalendar from "@/components/InlineCalendar";
 import { NOTICE_DAYS, NOTICE_WEEKS } from "@/lib/notice-period";
 import { ROUTES } from "@/lib/routes";
+import { addDaysISO, mondayOnOrAfter, sydneyTodayKey } from "@/lib/sydney-date";
 import styles from "./page.module.css";
 
 type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -88,23 +90,28 @@ function fmtTime12h(t: string): string {
 }
 
 /**
- * The first Monday that is at least NOTICE_DAYS from today — the earliest a
- * new availability can start once the notice has been given. Changes start on
- * a Monday so a roster week is never split between the old pattern and the new.
+ * The earliest day a change can start: the notice period from today, counted
+ * in Sydney. Any day from here on can be picked — a change does not have to
+ * start on a Monday — so someone applying three weeks ahead can ask for the
+ * date they actually want.
  */
-function firstMondayAfterNotice(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + NOTICE_DAYS);
-  const dow = d.getDay(); // 0=Sun…6=Sat
-  if (dow !== 1) d.setDate(d.getDate() + ((1 + 7 - dow) % 7 || 7));
-  return d;
+function earliestEffectiveKey(): string {
+  return addDaysISO(sydneyTodayKey(), NOTICE_DAYS);
+}
+
+/** How far ahead a change can be dated, from the earliest day it can start. */
+const EFFECTIVE_HORIZON_DAYS = 365;
+
+/** A YYYY-MM-DD day as local midnight, which is what the request is stored against. */
+function dateFromKey(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function fmtEffective(d: Date): string {
   return d.toLocaleDateString("en-AU", {
     weekday: "short",
-    day: "2-digit",
+    day: "numeric",
     month: "short",
     year: "numeric",
   });
@@ -144,18 +151,23 @@ function dayShortKey(key: DayKey): string {
 
 export default function AvailabilityChangePage() {
   const { user } = useAuth();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   // Requests is the list this form is opened from, so it is both where Back
   // returns to and where Done lands once the request has gone in.
   const goToRequests = useBackTo(ROUTES.staffRequests);
-  const [effectiveDate, setEffectiveDate] = useState<Date>(() => {
-    const d = new Date(0);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
+
+  // Empty until mounted: "today" is the one thing the server cannot know, and a
+  // date worked out there could disagree with the first client render.
+  const [minKey, setMinKey] = useState("");
+  const [effectiveKey, setEffectiveKey] = useState("");
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
-    setEffectiveDate(firstMondayAfterNotice());
+    const earliest = earliestEffectiveKey();
+    setMinKey(earliest);
+    // Offered as the default: the first Monday from then, which keeps a roster
+    // week whole. It is only a starting point — the field can be changed.
+    setEffectiveKey(mondayOnOrAfter(earliest));
   }, []);
 
   const [current, setCurrent] = useState<AvailabilityMap>(DEFAULT_AVAILABILITY);
@@ -198,13 +210,22 @@ export default function AvailabilityChangePage() {
   }
 
   const canSubmit = useMemo(() => {
-    if (submitting) return false;
+    if (submitting || !effectiveKey) return false;
     return JSON.stringify(current) !== JSON.stringify(proposed);
-  }, [submitting, current, proposed]);
+  }, [submitting, effectiveKey, current, proposed]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !canSubmit) return;
+    // Checked again here rather than left to the calendar: its floor was worked
+    // out once on mount, so a page left open overnight would still be offering
+    // yesterday's earliest date.
+    const earliest = earliestEffectiveKey();
+    if (effectiveKey < earliest) {
+      setMinKey(earliest);
+      setError(t("ac.dateTooSoon").replace("{n}", String(NOTICE_WEEKS)));
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -217,7 +238,7 @@ export default function AvailabilityChangePage() {
             requested: proposed,
             previousAvailability: current,
             reason: reason.trim() || null,
-            effectiveDate: Timestamp.fromDate(effectiveDate),
+            effectiveDate: Timestamp.fromDate(dateFromKey(effectiveKey)),
             status: "pending",
             createdAt: Timestamp.now(),
           }),
@@ -238,7 +259,7 @@ export default function AvailabilityChangePage() {
     return (
       <RequestSubmitted
         highlightLabel={t("ac.effectiveFrom")}
-        highlightValues={[fmtEffective(effectiveDate)]}
+        highlightValues={[fmtEffective(dateFromKey(effectiveKey))]}
         sections={[
           {
             title: t("ac.sub.requested"),
@@ -291,23 +312,56 @@ export default function AvailabilityChangePage() {
         <p className={styles.infoBody}>{t("ac.notice").replace("{n}", String(NOTICE_WEEKS))}</p>
       </div>
 
-      {/* Effective From card */}
-      <div className={styles.effectiveCard}>
-        <div className={styles.effectiveIconWrap} aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Effective from — the day the new availability starts. The earliest
+          choice is the notice period from today; there is no latest worth
+          drawing, so the calendar stops a year after that. */}
+      <section className={styles.effectiveSection}>
+        <h2 className={styles.effectiveTitle}>{t("ac.effective.title")}</h2>
+        <p className={styles.effectiveHelp}>{t("ac.effective.help")}</p>
+        <button
+          type="button"
+          className={`${styles.dateField} ${!effectiveKey ? styles.dateFieldEmpty : ""}`}
+          aria-expanded={calendarOpen}
+          disabled={!minKey}
+          onClick={() => setCalendarOpen((open) => !open)}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="3" y="4" width="18" height="18" rx="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
             <line x1="8" y1="2" x2="8" y2="6" />
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
-        </div>
-        <div className={styles.effectiveBody}>
-          <p className={styles.effectiveLabel}>{t("ac.effectiveFrom")}</p>
-          <p className={styles.effectiveDate}>{fmtEffective(effectiveDate)}</p>
-          <span className={styles.effectiveBadge}>{t("ac.subjectApproval")}</span>
-          <p className={styles.effectiveNote}>{t("ac.effectiveNote")}</p>
-        </div>
-      </div>
+          <span className={styles.dateFieldText}>
+            {effectiveKey ? fmtEffective(dateFromKey(effectiveKey)) : t("ac.effective.select")}
+          </span>
+          <svg
+            className={`${styles.dateChevron} ${calendarOpen ? styles.dateChevronOpen : ""}`}
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        {calendarOpen && minKey && (
+          <InlineCalendar
+            value={effectiveKey}
+            minDate={minKey}
+            maxDate={addDaysISO(minKey, EFFECTIVE_HORIZON_DAYS)}
+            locale={lang === "ja" ? "ja-JP" : "en-AU"}
+            onChange={(key) => {
+              setEffectiveKey(key);
+              setCalendarOpen(false);
+            }}
+          />
+        )}
+      </section>
 
       {/* Availability */}
       <h2 className={styles.sectionTitle}>{t("ac.section")}</h2>

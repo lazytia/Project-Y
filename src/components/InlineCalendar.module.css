@@ -1,0 +1,86 @@
+.card {
+  padding: var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+}
+
+/* Month on the left, the two arrows together on the right. */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.monthTitle {
+  flex: 1;
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.navBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-fg);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.navBtn:not(:disabled):hover { background: var(--color-surface); }
+.navBtn:disabled { color: var(--color-fg-subtle); cursor: default; }
+
+.weekRow,
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.weekRow { margin-bottom: var(--space-1); }
+
+.weekLabel {
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.grid { row-gap: var(--space-1); }
+
+.day {
+  justify-self: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+.day:not(:disabled):hover { background: var(--color-surface); }
+
+/* Days outside the window are still drawn, so the calendar keeps its shape and
+   it is plain why a day cannot be picked. */
+.day:disabled {
+  color: var(--color-fg-subtle);
+  cursor: default;
+}
+
+.daySelected,
+.daySelected:not(:disabled):hover {
+  background: var(--color-positive);
+  color: var(--color-bg);
+  font-weight: 700;
+}

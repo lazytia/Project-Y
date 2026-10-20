@@ -80,70 +80,65 @@
   line-height: 1.55;
 }
 
-/* ── Effective From card ── */
-.effectiveCard {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  background: rgba(34, 139, 95, 0.06);
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(34, 139, 95, 0.18);
-}
-
-.effectiveIconWrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-md);
-  background: rgba(34, 139, 95, 0.10);
-  color: #228b5f;
-  flex-shrink: 0;
-}
-
-.effectiveBody {
+/* ── Effective from ── */
+.effectiveSection {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-2);
 }
 
-.effectiveLabel {
+.effectiveTitle {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.effectiveHelp {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #228b5f;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.effectiveDate {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  color: #228b5f;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-
-.effectiveBadge {
-  display: inline-block;
-  padding: 3px 10px;
-  background: rgba(34, 139, 95, 0.12);
-  color: #228b5f;
-  border-radius: 99px;
-  font-size: 12px;
-  font-weight: 600;
-  width: fit-content;
-}
-
-.effectiveNote {
-  margin: 4px 0 0;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   color: var(--color-fg-muted);
-  line-height: 1.5;
 }
+
+/* The field that opens the calendar. Same shape as the date fields on the
+   holiday request, so the two forms ask for a date the same way. */
+.dateField {
+  width: 100%;
+  height: 56px;
+  padding: 0 var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-lg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.dateField:hover:not(:disabled),
+.dateField:focus-visible,
+.dateField[aria-expanded="true"] {
+  border-color: var(--color-fg);
+  outline: none;
+}
+
+.dateField:disabled { cursor: default; }
+.dateFieldEmpty { color: var(--color-fg-muted); }
+
+.dateFieldText { flex: 1; min-width: 0; }
+
+.dateChevron {
+  flex: none;
+  color: var(--color-fg-muted);
+  transition: transform 0.15s;
+}
+
+.dateChevronOpen { transform: rotate(180deg); }
 
 /* ── Current Availability list ── */
 .currentList {
