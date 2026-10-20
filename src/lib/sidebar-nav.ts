@@ -250,7 +250,7 @@ export const CHEF_NAV: NavGroup[] = [
     ],
   },
   { icon: "money", label: "Payslips", href: "/payslips" },
-  { icon: "book", label: "Documents & Training", href: "/staff/documents" },
+  { icon: "book", label: "Documents & Training", href: ROUTES.staffHandbookTraining },
 ];
 
 /**
@@ -289,9 +289,12 @@ export function navShortcuts(
  *
  * Schedule holds the roster and everything you do about your own hours, with
  * the clock-in guide second — the dashboard only promotes it for a new starter's
- * first fortnight, and this is where it lives after that. Handbook & Training
- * keeps the beer guide as a sibling of the training manual rather than nested
- * under it, so the thing they are asked to come back and sign is one tap away.
+ * first fortnight, and this is where it lives after that.
+ *
+ * Handbook & Training and My Documents are plain links, each to its own page:
+ * the first opens a hub listing the handbook, the menu, the service guides and
+ * the beer guide; the second goes straight to where a visa or RSA is uploaded.
+ * Neither carries a sub-menu, so there is nothing to open before getting there.
  */
 export function buildStaffNav(label: (key: string) => string): NavGroup[] {
   return [
@@ -307,16 +310,8 @@ export function buildStaffNav(label: (key: string) => string): NavGroup[] {
       ],
     },
     { icon: "money", label: label("nav.payslips"), href: ROUTES.staffPayslips },
-    {
-      icon: "book",
-      label: label("nav.handbookTraining"),
-      children: [
-        { label: label("nav.staffHandbook"), href: ROUTES.staffHandbook },
-        { label: label("nav.trainingManual"), href: ROUTES.staffTrainingManual },
-        { label: label("nav.beerGuide"), href: ROUTES.staffBeerGuide },
-      ],
-    },
-    { icon: "file", label: label("nav.myDocuments"), href: ROUTES.staffDocuments },
+    { icon: "book", label: label("nav.handbookTraining"), href: ROUTES.staffHandbookTraining },
+    { icon: "file", label: label("nav.myDocuments"), href: ROUTES.staffDocumentUploads },
     { icon: "gear", label: label("nav.settings"), href: ROUTES.staffSettings },
   ];
 }

@@ -30,7 +30,7 @@ const RULE_KEYS = [
 export default function FoodSafetyPage() {
   const { t } = useLang();
   // Back to the list this was opened from, not the dashboard — see useBackTo.
-  const goBack = useBackTo(ROUTES.staffDocuments);
+  const goBack = useBackTo(ROUTES.staffHandbookTraining);
 
   return (
     <div className={styles.page}>

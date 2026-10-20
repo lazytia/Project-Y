@@ -1,0 +1,238 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 480px;
+  margin: 0;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.backBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: transparent;
+  border: none;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--color-fg);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--page-title-size);
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-1);
+  font-size: var(--font-size-lg);
+  color: var(--color-fg-muted);
+}
+
+.loading {
+  margin: var(--space-4) 0;
+  text-align: center;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-md);
+}
+
+/* ── Hall / Kitchen ── */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+.tab {
+  padding: var(--space-3) var(--space-2);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabActive {
+  background: var(--color-warm-bg);
+  color: var(--color-fg);
+  font-weight: 700;
+  box-shadow: var(--shadow-popover);
+}
+
+/* The other group's tab: still drawn, so it is plain there is a second set,
+   but greyed out and not pressable. */
+.tab:disabled {
+  color: var(--color-fg-subtle);
+  cursor: not-allowed;
+}
+
+/* ── Guideline cards ── */
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 104px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-warm-bg);
+  color: var(--color-fg);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+}
+
+.cardText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-fg);
+  line-height: 1.25;
+}
+
+.cardBody {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+  line-height: 1.45;
+}
+
+.cardArt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-height: 96px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+}
+
+.cardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Acknowledge ── */
+.ack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-warm-bg);
+  border-radius: var(--radius-lg);
+}
+
+.ackRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.ackBox {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  accent-color: var(--color-warm);
+  cursor: pointer;
+}
+
+.ackBtn {
+  height: 52px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-warm);
+  color: var(--color-bg);
+  font-family: inherit;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ackBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ackError {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-negative);
+}
+
+.ackDone {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-positive);
+}
+
+/* ── Kitchen: coming soon ── */
+.soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--color-fg-muted);
+}
+
+.soonArt {
+  width: 160px;
+  height: auto;
+  margin-bottom: var(--space-3);
+}
+
+.soonTitle {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.soonBody {
+  margin: 0;
+  max-width: 28ch;
+  font-size: var(--font-size-lg);
+  line-height: 1.5;
+}

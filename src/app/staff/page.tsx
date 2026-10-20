@@ -18,7 +18,7 @@ import {
   ROSTER_SEEN_FIELD,
   type RosterSeenMap,
 } from "@/lib/roster-seen";
-import { cateringOrderRoute } from "@/lib/routes";
+import { cateringOrderRoute, ROUTES } from "@/lib/routes";
 import { needsRsaCertificate } from "@/lib/staff-display";
 import styles from "./page.module.css";
 
@@ -592,7 +592,7 @@ export default function StaffDashboardPage() {
           <span className={styles.tileSub}>{t("staff.nextPay")}</span>
         </Link>
 
-        <Link href="/staff/documents" className={styles.tile}>
+        <Link href={ROUTES.staffDocumentUploads} className={styles.tile}>
           <span className={styles.tileLabel}>{t("staff.tile.documents")}</span>
           <span className={styles.tileValueSmall}>
             {missingUploads === null

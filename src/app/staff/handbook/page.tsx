@@ -11,7 +11,7 @@ import styles from "./page.module.css";
 
 export default function StaffHandbookPage() {
   // Back to the list this was opened from, not the dashboard — see useBackTo.
-  const goBack = useBackTo(ROUTES.staffDocuments);
+  const goBack = useBackTo(ROUTES.staffHandbookTraining);
   const { t } = useLang();
 
   return (

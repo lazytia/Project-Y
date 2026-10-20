@@ -602,7 +602,7 @@ export default function ChefDashboard({
               }
             />
             <AttentionCard
-              href="/staff/documents"
+              href={ROUTES.staffHandbookTraining}
               label="Signatures Required"
               value={unsignedCount === null ? "—" : unsignedCount}
               sub="Training / Documents"

@@ -62,8 +62,9 @@ const MATERIAL_LINKS: readonly {
 
 export default function TrainingMaterialsPage() {
   const { t } = useLang();
-  // Back to Documents & Training — this list is one of its five rows.
-  const goBack = useBackTo(ROUTES.staffDocuments);
+  // Back to Handbook & Training, the page that replaced the Documents list this
+  // used to be a row of. Nothing links here from that page now.
+  const goBack = useBackTo(ROUTES.staffHandbookTraining);
 
   return (
     <div className={styles.page}>

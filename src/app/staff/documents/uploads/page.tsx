@@ -7,9 +7,8 @@ import { getDb } from "@/lib/firebase";
 import { getStorage } from "@/lib/firebase-storage";
 import { useAuth } from "@/components/AuthProvider";
 import { useLang } from "@/components/LanguageProvider";
-import { useBackTo } from "@/hooks/useBackTo";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { needsRsaCertificate } from "@/lib/staff-display";
-import { ROUTES } from "@/lib/routes";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -44,8 +43,8 @@ type DocKey = "visa" | "rsa";
 export default function MyDocumentsPage() {
   const { user } = useAuth();
   const { t } = useLang();
-  // Back to Documents & Training — this is the "My Documents" row on that list.
-  const goBack = useBackTo(ROUTES.staffDocuments);
+  // Opened from the menu's My Documents row, which sits under the dashboard.
+  const goBack = useBackToDashboard();
   const [loading, setLoading] = useState(true);
   const [docs, setDocs] = useState<StaffDocs>({});
   /** Whether this employee is asked for an RSA at all — hall staff only. */

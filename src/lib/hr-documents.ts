@@ -24,6 +24,11 @@ export const HANDBOOK_UPDATED = "June 2026";
 export const BEER_GUIDE_VERSION = "1.0";
 export const BEER_GUIDE_UPDATED = "June 2026";
 
+/** The wording of the hall staff's Service Essentials a person ticked "I have
+ *  read and understood" against. Bump it when the guidelines change, so an old
+ *  acknowledgement is not mistaken for one of the new text. */
+export const SERVICE_ESSENTIALS_VERSION = "1.0";
+
 /** The version the onboarding form signs against. It lives here rather than
  *  beside the policy text so the server can tell a current signature from one
  *  taken against an earlier wording. */

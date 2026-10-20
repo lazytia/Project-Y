@@ -23,6 +23,15 @@ const nextConfig: NextConfig = {
         destination: "/manifest.webmanifest",
         permanent: true,
       },
+      // The Documents & Training page is gone: its Handbook & Training half is
+      // a page of its own now and My Documents is the upload page. An old
+      // bookmark or notification opens the one people were most likely after.
+      // Not permanent — the destination may well change again.
+      {
+        source: "/staff/documents",
+        destination: "/staff/documents/uploads",
+        permanent: false,
+      },
     ];
   },
 };
