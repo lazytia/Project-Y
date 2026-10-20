@@ -12,7 +12,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { FIRST_LOGIN_FIELD, isFirstLoginRecent } from "@/lib/first-login";
 import { TOTAL_ONBOARDING_STEPS } from "@/lib/onboarding-steps";
-import { isOwner } from "@/lib/permissions";
+import { isChef, isOwner } from "@/lib/permissions";
 
 const VISA_EXPIRING_WINDOW_DAYS = 60;
 
@@ -79,6 +79,24 @@ function nameOf(d: Record<string, unknown>, uid: string): string {
   return uid.slice(0, 6);
 }
 
+/** The notices announced to one employee, as stored on their own staff_onboarding doc. */
+function ownNotificationItems(me: Record<string, unknown>): BellItem[] {
+  const notifs = (Array.isArray(me.notifications)
+    ? me.notifications
+    : []) as { id?: string; title?: string; detail?: string; createdAt?: Timestamp }[];
+  return notifs.map((n) => {
+    const at = tsDate(n.createdAt);
+    return {
+      id: String(n.id ?? at?.getTime() ?? Math.random()),
+      title: n.title ?? "Notification",
+      detail: n.detail ?? "",
+      ago: fmtRelative(at),
+      href: n.id ? `/staff/notifications/${n.id}` : undefined,
+      occurredAt: at,
+    };
+  });
+}
+
 /**
  * Bell-inbox items + read state for the signed-in user.
  *
@@ -86,6 +104,12 @@ function nameOf(d: Record<string, unknown>, uid: string): string {
  * - Manager / Owner: every pending item across the staff_onboarding
  *   collection (pending requests, submitted onboarding, visa expiring
  *   within 60 days).
+ * - Chef: the pending holiday and availability requests, which are what the
+ *   chef's dashboard counts and Action Required lists for them, plus their
+ *   own notifications. Not the owner's other items: a visa expiring is the
+ *   manager's and the owner's to chase (Action Required hides it from the
+ *   chef too), and a hire's first sign-in or submitted application is news
+ *   for the owner.
  *
  * `bellSeenAt` lives on the user's own staff_onboarding doc and is what
  * the red dot is gated by — items with occurredAt > bellSeenAt are "new".
@@ -126,7 +150,11 @@ export function useBellInbox(options?: { enabled?: boolean }): {
         const seenAt = tsDate(meData.bellSeenAt);
         if (!cancelled) setBellSeenAt(seenAt);
 
-        if (isOwner(user)) {
+        // The head chef is not an owner, so this used to fall through to the
+        // staff inbox below — their own (empty) notices — while their dashboard
+        // was counting the same pending requests the owners are told about.
+        const chef = isChef(user);
+        if (isOwner(user) || chef) {
           const snap = await getDocs(collection(getDb(), "staff_onboarding"));
           const out: BellItem[] = [];
           for (const d of snap.docs) {
@@ -173,7 +201,7 @@ export function useBellInbox(options?: { enabled?: boolean }): {
             // News rather than a task — nothing here has to be approved — so
             // it expires by age instead of waiting to be cleared.
             const firstLogin = tsDate(data[FIRST_LOGIN_FIELD]);
-            if (isFirstLoginRecent(firstLogin)) {
+            if (!chef && isFirstLoginRecent(firstLogin)) {
               out.push({
                 id: `fl_${d.id}`,
                 title: `${who} — First Sign-In`,
@@ -185,7 +213,7 @@ export function useBellInbox(options?: { enabled?: boolean }): {
             }
 
             const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
-            if (completed >= TOTAL_ONBOARDING_STEPS && data.status === "complete") {
+            if (!chef && completed >= TOTAL_ONBOARDING_STEPS && data.status === "complete") {
               const at =
                 tsDate((data as { completedAt?: Timestamp }).completedAt) ??
                 tsDate((data as { updatedAt?: Timestamp }).updatedAt);
@@ -206,7 +234,7 @@ export function useBellInbox(options?: { enabled?: boolean }): {
 
             const docs = data.documents as { visaExpiry?: Timestamp } | undefined;
             const visaExp = tsDate(docs?.visaExpiry);
-            if (visaExp) {
+            if (!chef && visaExp) {
               const days = (visaExp.getTime() - Date.now()) / 86400000;
               if (days <= VISA_EXPIRING_WINDOW_DAYS && days >= -3) {
                 // "Occurred" at the moment the visa entered the 60-day window.
@@ -224,27 +252,17 @@ export function useBellInbox(options?: { enabled?: boolean }): {
               }
             }
           }
+          // The chef is staff as well: what has been announced to them still
+          // lands in the same bell.
+          if (chef) out.push(...ownNotificationItems(meData));
           // Newest first.
           out.sort((a, b) => (b.occurredAt?.getTime() ?? 0) - (a.occurredAt?.getTime() ?? 0));
           if (!cancelled) setItems(out);
         } else {
           // Staff inbox = their own notifications array.
-          const notifs = (Array.isArray(meData.notifications)
-            ? meData.notifications
-            : []) as { id?: string; title?: string; detail?: string; createdAt?: Timestamp }[];
-          const out: BellItem[] = notifs
-            .map((n) => {
-              const at = tsDate(n.createdAt);
-              return {
-                id: String(n.id ?? at?.getTime() ?? Math.random()),
-                title: n.title ?? "Notification",
-                detail: n.detail ?? "",
-                ago: fmtRelative(at),
-                href: n.id ? `/staff/notifications/${n.id}` : undefined,
-                occurredAt: at,
-              };
-            })
-            .sort((a, b) => (b.occurredAt?.getTime() ?? 0) - (a.occurredAt?.getTime() ?? 0));
+          const out = ownNotificationItems(meData).sort(
+            (a, b) => (b.occurredAt?.getTime() ?? 0) - (a.occurredAt?.getTime() ?? 0),
+          );
           if (!cancelled) setItems(out);
         }
       } catch {
