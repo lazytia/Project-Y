@@ -19,6 +19,8 @@ type CategoryConfig = {
   fallbackItems?: string[];
 };
 
+// Same ids and patterns as SOLD_OUT_CATEGORIES in lib/sold-out-square.ts, which
+// is what flips them in Square — keep the two lists in step.
 const CONFIG: CategoryConfig[] = [
   { id: "snapper", displayName: "Snapper", match: /\bsnapper\b/i },
   { id: "trevally", displayName: "Trevally", match: /\btrevally\b/i },
@@ -29,6 +31,9 @@ const CONFIG: CategoryConfig[] = [
     match: /\bsalmon[\s-]*belly\b/i,
     fallbackItems: ["Salmon Belly Sushi", "Salmon Belly Aburi"],
   },
+  { id: "blue-grouper", displayName: "Blue Grouper", match: /\bblue[\s-]*grou?per\b/i },
+  { id: "ruby-fish", displayName: "Ruby Fish", match: /\bruby[\s-]*fish\b/i },
+  { id: "gurnard", displayName: "Gurnard", match: /\bgurnard\b/i },
 ];
 
 type CatalogObject = {

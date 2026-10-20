@@ -6,7 +6,10 @@ import {
 } from "@/lib/sold-out-catalog";
 
 const CACHE_DOC = "catalog";
-export const SOLD_OUT_CATALOG_COMPUTE_VERSION = 4;
+// Bump whenever the category list or its matching changes, so the copy cached
+// in Firestore is recomputed rather than served for up to an hour with the old
+// list.
+export const SOLD_OUT_CATALOG_COMPUTE_VERSION = 5;
 
 /** After this age we return cached data instantly but refresh Square in the background. */
 export const FRESH_TTL_MS = 60 * 60 * 1000;

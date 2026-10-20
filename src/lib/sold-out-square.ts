@@ -29,11 +29,19 @@ export type CategoryDef = {
   match: RegExp;
 };
 
+// Every id here needs its card in CONFIG (lib/sold-out-catalog.ts), which is
+// what the Daily Sold Out page lists; a category in only one of the two lists
+// either never shows up or cannot be switched.
 export const SOLD_OUT_CATEGORIES: CategoryDef[] = [
   { id: "snapper", match: /\bsnapper\b/i },
   { id: "trevally", match: /\btrevally\b/i },
   { id: "tuna", match: /\btuna\b/i },
   { id: "salmon-belly", match: /\bsalmon[\s-]*belly\b/i },
+  // Square spells it "Grouper"; "Groper" is the Australian spelling and the one
+  // a person is as likely to type, so either finds the three items.
+  { id: "blue-grouper", match: /\bblue[\s-]*grou?per\b/i },
+  { id: "ruby-fish", match: /\bruby[\s-]*fish\b/i },
+  { id: "gurnard", match: /\bgurnard\b/i },
 ];
 
 /**

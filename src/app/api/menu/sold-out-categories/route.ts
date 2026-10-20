@@ -10,8 +10,8 @@ import {
 /**
  * GET /api/menu/sold-out-categories
  *
- * Returns the manageable sold-out categories (Snapper, Trevally, Tuna, Salmon Belly).
- * first (~200 ms) so cold App Hosting instances don't walk the full Square
+ * Returns the manageable sold-out categories (CONFIG in lib/sold-out-catalog),
+ * from the cache first (~200 ms) so cold App Hosting instances don't walk the full Square
  * catalog on every page open; stale cache is served instantly while Square
  * refreshes in the background.
  */
