@@ -13,6 +13,7 @@ import {
   type SignableDocumentKey,
 } from "@/lib/document-signatures";
 import { CLOCK_IN_GUIDE_HREF, isWithinGettingStarted } from "@/lib/clock-in-guide";
+import { seenNotificationIds } from "@/lib/notification-seen";
 import {
   isRosterAnnouncementSeen,
   ROSTER_SEEN_FIELD,
@@ -276,13 +277,15 @@ export default function StaffDashboardPage() {
       setWeekShiftCount(thisRoster?.shifts?.length ?? 0);
       setShiftLoaded(true);
 
-      // Notifications. A published roster drops off this card once the week
-      // it announces has actually been opened — see lib/roster-seen. The bell
-      // inbox is the history and still lists every one of them.
+      // Notifications. One drops off this card once it has been opened — see
+      // lib/notification-seen — and a published roster also once the week it
+      // announces has been opened, see lib/roster-seen. The bell inbox is the
+      // history and still lists every one of them.
       const seenWeeks = (data[ROSTER_SEEN_FIELD] ?? {}) as RosterSeenMap;
+      const seenIds = seenNotificationIds(data);
       const arr = (data.notifications ?? []) as StoredNotification[];
       const parsed: Notification[] = arr
-        .filter((n) => !isRosterAnnouncementSeen(n, seenWeeks))
+        .filter((n) => !seenIds.has(n.id) && !isRosterAnnouncementSeen(n, seenWeeks))
         .map((n) => {
           const d = tsToDate(n.createdAt);
           return {

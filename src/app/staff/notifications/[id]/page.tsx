@@ -5,6 +5,7 @@ import { useRouter, notFound } from "next/navigation";
 import { doc, getDoc, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import { markNotificationSeen } from "@/lib/notification-seen";
 import { markRosterWeekSeen, ROSTER_PUBLISHED_KIND } from "@/lib/roster-seen";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
@@ -212,6 +213,10 @@ export default function NotificationDetailPage({
         const isHol = kind.startsWith("holiday");
         const isAv = kind.startsWith("availability");
         const notifMs = tsDate(n?.createdAt)?.getTime() ?? 0;
+
+        // Opening a notice is reading it: it comes off the dashboard's Needs
+        // Your Attention card (the bell inbox still lists it).
+        if (n) void markNotificationSeen(user.uid, n.id);
 
         // This screen lists the week's shifts in full, so opening it is
         // reading the roster — it clears the dashboard notice just as

@@ -86,9 +86,10 @@ function latestSeen(seen: RosterSeenMap): Date | null {
 /**
  * True once the week a "Roster published" notice announces has been opened.
  *
- * Anything that is not a roster notice is never hidden by this — holiday and
- * availability decisions are read and kept, and the bell inbox keeps the
- * full history of all of them either way.
+ * Anything that is not a roster notice is never hidden by this — a holiday or
+ * availability decision clears when its own page is opened instead (see
+ * lib/notification-seen), and the bell inbox keeps the full history of all of
+ * them either way.
  */
 export function isRosterAnnouncementSeen(
   n: RosterAnnouncement,
