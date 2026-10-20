@@ -64,13 +64,16 @@
 
 .infoText {
   margin: 0;
-  font-size: var(--font-size-sm);
+  /* Halfway between xs and sm: at sm the bold lead line is two pixels too long for
+     a 393px phone and drops its last word onto a line of its own. */
+  font-size: calc((var(--font-size-xs) + var(--font-size-sm)) / 2);
   color: var(--color-fg);
   line-height: 1.55;
 }
 
-.infoWarm {
-  color: var(--color-warm);
+/* The one-line ask that leads the box; the detail runs on under it. */
+.infoLead {
+  display: block;
   font-weight: 700;
 }
 

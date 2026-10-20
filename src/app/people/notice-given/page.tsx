@@ -399,12 +399,12 @@ function ManagerNoticeGivenList({ notices }: { notices: Notice[] }) {
     <div className={styles.page}>
       <header className={styles.header}>
         <span className={styles.headerSpacer} />
-        <h1 className={styles.title}>Notice Given</h1>
+        <h1 className={styles.title}>Staff Departures</h1>
         <button
           type="button"
           className={styles.iconBtn}
           onClick={() => router.push("/people/notice-given/new")}
-          aria-label="Add notice given"
+          aria-label="Record departure"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
@@ -420,8 +420,9 @@ function ManagerNoticeGivenList({ notices }: { notices: Notice[] }) {
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
         <p className={styles.infoText}>
-          Employees who have given notice to leave. They will move to{" "}
-          <span className={styles.infoWarm}>Terminated</span> after their last working day.
+          <strong className={styles.infoLead}>Please record all staff departures accurately.</strong>
+          Include the reason for leaving and the employee&rsquo;s final working day to ensure
+          accurate records and final payroll processing.
         </p>
       </div>
 
@@ -506,7 +507,7 @@ function ManagerNoticeGivenList({ notices }: { notices: Notice[] }) {
           className={styles.ctaBtn}
           onClick={() => router.push("/people/notice-given/new")}
         >
-          + Add Notice Given
+          + Record Departure
         </button>
       </div>
     </div>
