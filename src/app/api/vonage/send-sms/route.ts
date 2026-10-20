@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { OWNER_USERNAMES } from "@/lib/permissions";
+import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import { emailToUsername } from "@/lib/username";
 
 /**
@@ -88,6 +89,15 @@ function normaliseAuMobile(raw: string): string {
 export async function POST(req: NextRequest) {
   const auth = await verifyOwner(req);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  // Checked here, before anything is read or sent, so no caller can get a text
+  // out while the switch is off — whatever version of the app it is running.
+  if (!SMS_INVITES_ENABLED) {
+    return NextResponse.json(
+      { error: "Text messages are switched off, so nothing was sent.", disabled: true },
+      { status: 503 },
+    );
+  }
 
   const apiKey = process.env.VONAGE_API_KEY;
   const apiSecret = process.env.VONAGE_API_SECRET;

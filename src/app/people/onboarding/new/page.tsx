@@ -7,6 +7,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isManager, isOwnerOrChef, submitterRoleForUser } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import { emailToUsername } from "@/lib/username";
 import {
   DEFAULT_TRAINING_PERIOD,
@@ -260,8 +261,9 @@ export default function NewEmployeePage() {
       <div className={styles.infoBox}>
         <InfoIcon className={styles.infoIcon} />
         <p className={styles.infoText}>
-          Please enter the correct mobile number. Their Clock In ID and the link
-          to Project YURICA are sent there by SMS.
+          {SMS_INVITES_ENABLED
+            ? "Please enter the correct mobile number. Their Clock In ID and the link to Project YURICA are sent there by SMS."
+            : "Please enter the correct mobile number. Text messages are switched off for now, so nothing is sent to it yet."}
         </p>
       </div>
 
@@ -395,7 +397,9 @@ export default function NewEmployeePage() {
       {/* Submit. The caption is here rather than in the info box above because
           it describes what the button is about to do, not what the field
           beside it is for. */}
-      <p className={styles.smsNote}>SMS invite sent automatically.</p>
+      <p className={styles.smsNote}>
+        {SMS_INVITES_ENABLED ? "SMS invite sent automatically." : "SMS invites are switched off for now."}
+      </p>
       <button
         type="button"
         className={styles.submitBtn}

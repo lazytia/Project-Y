@@ -14,6 +14,7 @@ import {
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
+import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
@@ -424,7 +425,9 @@ export default function OwnerRequestDetail() {
               </button>
               <p className={styles.footerNote}>
                 <InfoIcon />
-                Approving will create the employee profile and send login details via SMS.
+                {SMS_INVITES_ENABLED
+                  ? "Approving will create the employee profile and send login details via SMS."
+                  : "Approving will create the employee profile. Text messages are switched off, so no login details are sent."}
               </p>
             </>
           ) : (

@@ -17,6 +17,7 @@ import { actorNameOf, isStrictOwner } from "@/lib/permissions";
 import { shouldActivatePayrollReminder } from "@/lib/payroll-attention";
 import { onboardingProgressPatch } from "@/lib/staff-active";
 import { ROUTES, publicUrl } from "@/lib/routes";
+import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import { createStaffAccount } from "@/lib/staff-admin";
 import { emailToUsername, usernameToEmail, validateUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
@@ -180,8 +181,12 @@ export default function CreateLoginDetailsPage() {
 
   const canSubmit = blocker === null;
 
-  async function persist(invite: boolean) {
+  async function persist(inviteRequested: boolean) {
     if (!request || !rawRequest || !canSubmit || busy) return;
+    // With texting switched off (lib/sms-invites) the account is saved and
+    // nobody is texted, whichever button got here; `invite` below is what
+    // decides both the text and what the record says was done.
+    const invite = inviteRequested && SMS_INVITES_ENABLED;
     setBusy(true);
     setError(null);
     try {
@@ -434,7 +439,9 @@ export default function CreateLoginDetailsPage() {
         <h2 className={styles.cardTitle}>EMPLOYEE MOBILE NUMBER</h2>
         <p className={styles.hintRow}>
           <PhoneIcon />
-          We&apos;ll send the login details via SMS.
+          {SMS_INVITES_ENABLED
+            ? "We'll send the login details via SMS."
+            : "Text messages are switched off for now, so nothing will be sent. Give the employee their login details yourself."}
         </p>
         <div className={styles.mobileWrap}>
           <span className={styles.countryCode}>+61</span>
@@ -459,18 +466,21 @@ export default function CreateLoginDetailsPage() {
             {blocker}
           </p>
         )}
+        {SMS_INVITES_ENABLED && (
+          <button
+            type="button"
+            className={styles.inviteBtn}
+            disabled={!canSubmit || busy}
+            onClick={() => void persist(true)}
+          >
+            <SendIcon />
+            {busy ? "Saving…" : "Invite the employee by text"}
+          </button>
+        )}
+        {/* The only button while texting is off, so it takes the primary look. */}
         <button
           type="button"
-          className={styles.inviteBtn}
-          disabled={!canSubmit || busy}
-          onClick={() => void persist(true)}
-        >
-          <SendIcon />
-          {busy ? "Saving…" : "Invite the employee by text"}
-        </button>
-        <button
-          type="button"
-          className={styles.saveBtn}
+          className={SMS_INVITES_ENABLED ? styles.saveBtn : styles.inviteBtn}
           disabled={!canSubmit || busy}
           onClick={() => void persist(false)}
         >
@@ -478,7 +488,9 @@ export default function CreateLoginDetailsPage() {
         </button>
         <p className={styles.footerNote}>
           <InfoIcon />
-          The employee will receive their Staff ID and Project YURICA login details via SMS.
+          {SMS_INVITES_ENABLED
+            ? "The employee will receive their Staff ID and Project YURICA login details via SMS."
+            : "The employee is not texted: pass on their Staff ID and Project YURICA login details yourself."}
         </p>
         <button
           type="button"

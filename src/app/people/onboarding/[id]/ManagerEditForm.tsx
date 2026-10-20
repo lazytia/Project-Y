@@ -15,6 +15,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import {
   DEFAULT_TRAINING_PERIOD,
   TRAINING_PERIODS,
@@ -296,8 +297,9 @@ export default function ManagerEditForm() {
       <div className={styles.infoBox}>
         <InfoIcon className={styles.infoIcon} />
         <p className={styles.infoText}>
-          Mobile number is required. We will send the employee their Clock In ID
-          and Project YURICA login details via SMS.
+          {SMS_INVITES_ENABLED
+            ? "Mobile number is required. We will send the employee their Clock In ID and Project YURICA login details via SMS."
+            : "Mobile number is required and kept on record. Text messages are switched off for now, so nothing is sent to it."}
         </p>
       </div>
 
