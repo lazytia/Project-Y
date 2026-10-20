@@ -9,6 +9,7 @@ import ServerAppShell from "@/components/ServerAppShell";
 import { readServerSession } from "@/lib/dashboard-session";
 import { BOOT_SPLASH_HEAD_HINT_SCRIPT, bootSplashEarlyDismissScript } from "@/lib/client-session-hint";
 import { BOOT_SPLASH_MARKUP } from "@/lib/boot-splash";
+import { BOOT_WATCHDOG_SCRIPT } from "@/lib/boot-watchdog";
 import { APP_NAME, HOME_SCREEN_NAME } from "@/lib/brand";
 import { SPLASH_SCREENS, splashMediaQuery } from "@/lib/splash-screens";
 import { SPLASH_TRACE_SCRIPT } from "@/lib/splash-trace";
@@ -151,6 +152,11 @@ export default async function RootLayout({
             the banner that needs it loads too late to hear it. See the note on
             INSTALL_PROMPT_CAPTURE_SCRIPT. */}
         <script dangerouslySetInnerHTML={{ __html: INSTALL_PROMPT_CAPTURE_SCRIPT }} />
+        {/* Reloads a launch that has stopped on its way up (white screen, or a
+            logo that never lifts), at most twice. Inline because it must keep
+            running when the app's own scripts are what did not. See the note
+            on lib/boot-watchdog. */}
+        <script dangerouslySetInnerHTML={{ __html: BOOT_WATCHDOG_SCRIPT }} />
       </head>
       <body className="appBody">
         <div
