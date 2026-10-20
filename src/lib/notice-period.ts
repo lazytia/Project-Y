@@ -12,5 +12,8 @@
  * together. The written policy in the agreement and handbook text is prose and
  * has to be edited by hand.
  */
-export const NOTICE_WEEKS = 2;
+// TEMPORARILY 0, so a request can be dated today while the roster's handling of
+// holidays and unavailable days is tried out. The policy is two weeks: put this
+// back to 2 afterwards. At 0 the two forms still print "0 weeks notice".
+export const NOTICE_WEEKS = 0;
 export const NOTICE_DAYS = NOTICE_WEEKS * 7;
