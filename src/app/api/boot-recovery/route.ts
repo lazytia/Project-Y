@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  */
 
 const MAX_BODY_CHARS = 1_000;
-const KINDS = new Set(["boot", "splash"]);
+const KINDS = new Set(["boot", "splash", "blank"]);
 
 export async function POST(req: NextRequest) {
   try {
