@@ -298,7 +298,7 @@ function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pat
 
 export default function Sidebar({ open, onClose, initialDashboard = null }: Props) {
   const pathname = usePathname();
-  const { user, signOut, staffNeedsOnboarding, staffAwaitingActivation } = useAuth();
+  const { user, signOut, staffAppLocked } = useAuth();
   const { t, canChooseLanguage } = useLang();
   // Firebase Auth hydrates a second or two after paint, and until it does
   // every isOwner/isChef check reads false — which sent owners and chefs
@@ -384,7 +384,10 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
   // owner has activated yet — get a stripped sidebar: no nav links, just
   // brand + sign out. AuthProvider keeps both locked to a single screen, so
   // destinations they aren't allowed to reach yet would just look broken.
-  if (!userIsOwner && (staffNeedsOnboarding || staffAwaitingActivation)) {
+  //
+  // Also while their record has not answered yet: the menu used to show in full
+  // for those first moments, which is exactly when nobody knows they are cleared.
+  if (staffAppLocked) {
     // Mid-onboarding staff can only reach /onboarding/*, so we don't
     // show any nav links — but we DO drop the EN/JA toggle straight
     // into the sidebar. Owner asked for this so the staff can flip

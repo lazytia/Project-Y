@@ -12,6 +12,7 @@ import { ROUTES, isPublicPath, isStaffAllowedPath, postLoginRoute } from "@/lib/
 import { isOwner, isChef } from "@/lib/permissions";
 import { dashboardKindFromEmail } from "@/lib/session-dashboard";
 import { TOTAL_ONBOARDING_STEPS } from "@/lib/onboarding-steps";
+import { isStaffAppLocked } from "@/lib/staff-gate";
 import { emailToUsername } from "@/lib/username";
 
 const STAFF_STEP_CACHE_KEY = "y.staffStep";
@@ -88,6 +89,14 @@ type AuthContextValue = {
    */
   staffAwaitingActivation: boolean;
   /**
+   * Is this employee kept out of the staff app — the dashboard and the menu —
+   * for now? True unless they are *known* to have finished every step and been
+   * activated, so it also holds while their record has not answered yet. The
+   * two flags above only fire once the state is known, which left a gap: the
+   * dashboard showed until the record arrived. See lib/staff-gate.
+   */
+  staffAppLocked: boolean;
+  /**
    * Has an owner signed this employee off yet?
    *
    * `null` until the server document has answered — the same three-way the
@@ -104,6 +113,7 @@ const AuthContext = createContext<AuthContextValue>({
   staffCompletedStep: null,
   staffNeedsOnboarding: false,
   staffAwaitingActivation: false,
+  staffAppLocked: false,
   staffActivated: null,
 });
 
@@ -394,6 +404,15 @@ export function AuthProvider({
     staffCompletedStep >= TOTAL_ONBOARDING_STEPS &&
     staffActivated === false;
 
+  // Holds the content back without navigating anywhere: the redirects above stay
+  // as careful about "not known yet" as they were, because bouncing a cleared
+  // employee on a slow start is worse than waiting. Waiting is all this does.
+  const staffAppLocked = isStaffAppLocked({
+    isStaff: !!user && !userIsOwner && !userIsChef,
+    completedStep: staffCompletedStep,
+    activated: staffActivated,
+  });
+
   useEffect(() => {
     const isPublic = isPublicPath(pathname);
 
@@ -499,6 +518,23 @@ export function AuthProvider({
       return;
     }
 
+    // Activated while sitting on the "under review" screen: take them into the
+    // app. That screen has nothing to press and says "under review", which stops
+    // being true the moment an owner presses Activate Employee — the employee
+    // would otherwise have to find the menu to get in.
+    if (
+      user &&
+      !userIsOwnerNow &&
+      !userIsChefNow &&
+      staffCompletedStep !== null &&
+      staffCompletedStep >= TOTAL_ONBOARDING_STEPS &&
+      staffActivated === true &&
+      pathname === ROUTES.staffOnboardingComplete
+    ) {
+      router.replace(ROUTES.staffHome);
+      return;
+    }
+
     // Chefs skip onboarding wizard steps — overview + handbook/beer guide stay reachable.
     if (
       user &&
@@ -515,7 +551,7 @@ export function AuthProvider({
     if (user && !userIsOwnerNow && !userIsChefNow && !isStaffAllowedPath(pathname)) {
       router.replace(ROUTES.staffHome);
     }
-  }, [user, authRestored, pathname, router, staffCompletedStep, staffNeedsOnboarding, staffAwaitingActivation, notificationsPromptSeen, staffProfileConfirmed]);
+  }, [user, authRestored, pathname, router, staffCompletedStep, staffActivated, staffNeedsOnboarding, staffAwaitingActivation, notificationsPromptSeen, staffProfileConfirmed]);
 
   /**
    * Sign out on the first press.
@@ -607,6 +643,7 @@ export function AuthProvider({
         staffCompletedStep,
         staffNeedsOnboarding,
         staffAwaitingActivation,
+        staffAppLocked,
         staffActivated,
       }}
     >

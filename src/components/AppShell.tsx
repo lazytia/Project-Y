@@ -7,6 +7,8 @@ import Splash from "./Splash";
 import AppReadyMarker from "./AppReadyMarker";
 import { useAuth } from "./AuthProvider";
 import { isPublicPath } from "@/lib/routes";
+import { isLockedStaffPath } from "@/lib/staff-gate";
+import Loading from "@/app/loading";
 import type { DashboardKind } from "@/lib/session-dashboard";
 import { isOwner, isChef } from "@/lib/permissions";
 import { fetchSessionHint } from "@/lib/auth-session-client";
@@ -180,7 +182,16 @@ function AuthenticatedShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const pathname = usePathname();
+  const { user, staffAppLocked } = useAuth();
+  // An employee who has not finished onboarding and been activated sees none of
+  // the staff app: not the dashboard, not any other page, and not while their
+  // record is still on its way either (until it has answered nobody can say they
+  // are cleared). They get a waiting indicator in its place, on any page except
+  // the onboarding screens and the language settings. The session cookie's role
+  // stands in while Firebase has not yet said who is signed in.
+  const staffHeldBack =
+    (staffAppLocked || (!user && initialDashboard === "staff")) && !isLockedStaffPath(pathname);
   const [bellFetchEnabled, setBellFetchEnabled] = useState(false);
 
   useEffect(() => {
@@ -273,7 +284,7 @@ function AuthenticatedShell({
       ) : (
         <PlaceholderChrome />
       )}
-      <main className={styles.main}>{children}</main>
+      <main className={styles.main}>{staffHeldBack ? <Loading /> : children}</main>
 
       {interactive && bellOpen && (
         <div
