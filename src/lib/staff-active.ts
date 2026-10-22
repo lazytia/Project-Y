@@ -127,6 +127,23 @@ export function isActivated(raw: StaffOnboardingFlags): boolean {
 }
 
 /**
+ * Has this employee finished onboarding, signatures included?
+ *
+ * Every step is done once `completedStep` reaches the last one, and the owner's
+ * sign-off (`activatedAt`) settles it either way. A row with no marker at all
+ * predates the form — the established team — and counts as finished, for the
+ * same reason isOnboardingListEmployee gives for them.
+ *
+ * This is the Active Employees list's rule, kept apart from isActiveEmployee on
+ * purpose: that one answers "does this person have a login" and the HR
+ * acknowledgements chase still needs it to include people mid-onboarding.
+ */
+export function hasFinishedOnboarding(raw: StaffOnboardingFlags): boolean {
+  if (isActivated(raw)) return true;
+  return typeof raw.completedStep !== "number" || raw.completedStep >= TOTAL_ONBOARDING_STEPS;
+}
+
+/**
  * Who belongs on New Employees.
  *
  * The list used to be "everyone who is not active yet", and active began the
