@@ -14,7 +14,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
-import { hasFinishedOnboarding, isActiveEmployee, isTeamMember } from "@/lib/staff-active";
+import { isActiveEmployee, isPastOnboarding, isTeamMember } from "@/lib/staff-active";
 import { VISA_WINDOW_DAYS, BIRTHDAY_WINDOW_DAYS } from "@/lib/hr-windows";
 import { readStaffRates, type StaffRates } from "@/lib/staff-rates";
 import {
@@ -203,9 +203,9 @@ export default function ActiveEmployeesPage() {
             const raw = d.data() as StoredStaff;
             if (!isTeamMember(raw)) return null;
             if (!isActiveEmployee(raw)) return null;
-            // Someone still working through onboarding is on New Employees; they
-            // join this list once every step, the signatures included, is done.
-            if (!hasFinishedOnboarding(raw)) return null;
+            // Someone still on New Employees — working through the form, or finished
+            // and waiting for the owner — is not listed here until they are activated.
+            if (!isPastOnboarding(raw)) return null;
             const { kind, label } = positionOf(raw);
             return {
               uid: d.id,

@@ -127,20 +127,23 @@ export function isActivated(raw: StaffOnboardingFlags): boolean {
 }
 
 /**
- * Has this employee finished onboarding, signatures included?
+ * Is this person past onboarding — off the New Employees list?
  *
- * Every step is done once `completedStep` reaches the last one, and the owner's
- * sign-off (`activatedAt`) settles it either way. A row with no marker at all
- * predates the form — the established team — and counts as finished, for the
- * same reason isOnboardingListEmployee gives for them.
+ * This is the Active Employees list's rule, and it is simply the other side of
+ * New Employees: somebody is on one list or the other, never both. An employee
+ * who has signed everything and is waiting on the owner is on New Employees as
+ * "Ready for Review", and moves to Active the moment Activate Employee is
+ * pressed. The owners, the manager and the chefs, who never go through
+ * onboarding, and the established team from before the form existed, are past
+ * it by definition — which is why this asks that list rather than repeating
+ * its conditions.
  *
- * This is the Active Employees list's rule, kept apart from isActiveEmployee on
- * purpose: that one answers "does this person have a login" and the HR
- * acknowledgements chase still needs it to include people mid-onboarding.
+ * Kept apart from isActiveEmployee on purpose: that one answers "does this
+ * person have a login", and the HR acknowledgements chase still needs it to
+ * include people who are mid-onboarding.
  */
-export function hasFinishedOnboarding(raw: StaffOnboardingFlags): boolean {
-  if (isActivated(raw)) return true;
-  return typeof raw.completedStep !== "number" || raw.completedStep >= TOTAL_ONBOARDING_STEPS;
+export function isPastOnboarding(raw: StaffOnboardingFlags): boolean {
+  return !isOnboardingListEmployee(raw);
 }
 
 /**
@@ -159,9 +162,9 @@ export function hasFinishedOnboarding(raw: StaffOnboardingFlags): boolean {
  * counts as done. Anyone else with a login is still working through the form,
  * or has finished it and is waiting to be reviewed.
  *
- * Nobody is taken off Active Employees by this: that list still keys on
- * having a login, so an employee mid-onboarding appears on both, which is
- * what they are — employed, and not finished.
+ * The Active Employees list is the other half of this one — it shows whoever
+ * is not here (isPastOnboarding) — so a new hire is on this list until the
+ * owner activates them, and on that one from then on.
  */
 export function isOnboardingListEmployee(raw: StaffOnboardingFlags): boolean {
   if (isLeadershipAccount(raw)) return false;
