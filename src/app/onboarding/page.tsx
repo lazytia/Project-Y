@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, getDocFromServer, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
@@ -111,6 +111,33 @@ const ALL_STEPS = [
 const R = 44;
 const CIRC = 2 * Math.PI * R;
 
+/**
+ * Stamp "now" as the start date, but only once the server has said there is
+ * none.
+ *
+ * The read that decides this is the page's own, and it can be answered from
+ * the local copy of the document. On a sign-in that copy is little more than
+ * what the app itself wrote a moment earlier — uid, username, a timestamp — so
+ * the date the owner entered looks absent, and an employee who had been
+ * activated for days had it replaced by the second they signed in. A date the
+ * owner chose is worth more than a missing one is, so the write waits for an
+ * answer from the server, and stays unwritten when there is none.
+ *
+ * `createIfMissing` is for the no-document case, where the uid is written too.
+ */
+async function persistTodayAsStartDate(uid: string, createIfMissing: boolean): Promise<void> {
+  const ref = doc(getDb(), "staff_onboarding", uid);
+  const confirmed = await getDocFromServer(ref).catch(() => null);
+  if (!confirmed) return;
+  if (tsToDate(confirmed.data()?.startDate)) return;
+  if (!confirmed.exists() && !createIfMissing) return;
+  await setDoc(
+    ref,
+    createIfMissing ? { uid, startDate: serverTimestamp() } : { startDate: serverTimestamp() },
+    { merge: true },
+  );
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -148,20 +175,12 @@ export default function OnboardingPage() {
           } else {
             // First visit — persist today as the start date
             setStartDate(today);
-            await setDoc(
-              doc(getDb(), "staff_onboarding", user.uid),
-              { startDate: serverTimestamp() },
-              { merge: true }
-            );
+            await persistTodayAsStartDate(user.uid, false);
           }
         } else {
           // No document yet — persist today as the start date
           setStartDate(today);
-          await setDoc(
-            doc(getDb(), "staff_onboarding", user.uid),
-            { uid: user.uid, startDate: serverTimestamp() },
-            { merge: true }
-          );
+          await persistTodayAsStartDate(user.uid, true);
         }
       } catch {
         // silently ignore — default to today
