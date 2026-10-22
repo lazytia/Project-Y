@@ -220,6 +220,10 @@ export default function CreateLoginDetailsPage() {
         doc(getDb(), "staff_onboarding", uid),
         {
           ...rawRequest,
+          // After the spread, which carries the request's start date as the string it
+          // was typed as and would otherwise replace the Timestamp createStaffAccount
+          // just wrote.
+          startDate,
           uid,
           username: finalUsername,
           email: usernameToEmail(finalUsername),

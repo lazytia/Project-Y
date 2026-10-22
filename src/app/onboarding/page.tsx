@@ -6,6 +6,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { emailToUsername } from "@/lib/username";
+import { tsToDate } from "@/lib/staff-display";
 import { addDaysISO, dowOfDateKey, sydneyHourNow, sydneyTodayKey } from "@/lib/sydney-date";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
 import {
@@ -137,9 +138,13 @@ export default function OnboardingPage() {
           setCompletedStep(completed);
           setInProgressStep(Math.max(completed, inProgress - 1));
           setRejections(readRejections(data as Record<string, unknown>));
-          // Use saved startDate or fall back to today
-          if (data.startDate?.toDate) {
-            setStartDate(data.startDate.toDate());
+          // Use saved startDate or fall back to today. The owner's start date can
+          // be stored as a "YYYY-MM-DD" string as well as a Timestamp, and reading
+          // only the Timestamp took a string for "never saved": the first visit then
+          // replaced the date the owner entered with the moment of that visit.
+          const savedStart = tsToDate(data.startDate);
+          if (savedStart) {
+            setStartDate(savedStart);
           } else {
             // First visit — persist today as the start date
             setStartDate(today);
