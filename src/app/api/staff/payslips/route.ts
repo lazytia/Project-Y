@@ -38,8 +38,8 @@ import { emailToUsername } from "@/lib/username";
  *     tax: number,
  *     super: number,
  *     netPay: number,
- *     weekdayHours: number | null,   // sheet "Weekday Payslip", null when absent
- *     saturdayHours: number | null,  // sheet "Sat Payslip", null when absent
+ *     weekdayHours: number | null,   // sheet "Weekday Banking", null when absent
+ *     saturdayHours: number | null,  // sheet "Sat Banking", null when absent
  *   }, ...]
  * }
  */

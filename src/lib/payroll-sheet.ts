@@ -42,12 +42,12 @@ export type EmployeePayRow = {
   superAnn: number;
   cashPay: number;
   totalIncSuper: number;
-  /** Hours behind the payslip — the sheet's "Weekday Payslip" / "Sat Payslip"
-   *  columns, which hold the part of the week that is paid through the
-   *  payslip rather than in cash. Blocks written before those columns existed
-   *  fall back to "Week Hour" / "Sat Hours" (everything worked, cash included).
-   *  Null when neither is present, which is different from a genuine zero and
-   *  must not be shown as one. */
+  /** Hours behind the payslip — the sheet's "Weekday Banking" / "Sat Banking"
+   *  columns, which hold the part of the week that is paid through the bank
+   *  rather than in cash. Where those cells are blank the cash hours are taken
+   *  off the hours worked, so cash never leaks into a payslip. Null when there
+   *  are no hours to go on, which is different from a genuine zero and must not
+   *  be shown as one. */
   weekdayHours: number | null;
   saturdayHours: number | null;
 };
@@ -166,26 +166,41 @@ type MoneyCols = {
   totalIncCol: number;
   weekHoursCol: number;
   satHoursCol: number;
-  weekdayPayslipCol: number;
-  satPayslipCol: number;
+  weekdayBankCol: number;
+  satBankCol: number;
+  weekdayCashCol: number;
+  satCashCol: number;
 };
 
 /**
- * Hours for a row, preferring the payslip split over the hours worked.
+ * Hours for a row: the ones paid through the bank, never the ones paid in cash.
  *
- * The sheet carries both: "Week Hour"/"Sat Hours" are everything the person
- * worked, then "Weekday Cash Pay"/"Sat Cash Pay" and "Weekday Payslip"/
- * "Sat Payslip" divide that between cash and the payslip. A payslip must
- * show its own half, or it claims to cover hours it never paid for. Blocks
- * from before the split was added only have the worked hours, so those stay
- * as the fallback rather than reading as zero.
+ * The sheet carries three figures: "Week Hour"/"Sat Hours" are everything the
+ * person worked, and "Weekday Cash Pay"/"Sat Cash Pay" and "Weekday Banking"/
+ * "Sat Banking" divide that between cash and the bank. A payslip must show
+ * its own half, or it claims hours it never paid for and shows that some of
+ * the week was paid in cash.
+ *
+ * The banking cell wins. Where it is still blank the week has not been split
+ * by hand, so the cash hours are taken off the hours worked, which is what
+ * the banking cell holds once it is filled in. With no cash hours either,
+ * everything worked went through the bank. Blocks from before the split was
+ * added have only the worked hours, and those stay as they are.
  */
-function payslipHours(r: unknown[], payslipCol: number, workedCol: number): number | null {
-  if (payslipCol >= 0) {
-    const v = parseMoney(r[payslipCol]);
-    if (v !== null) return v;
+function payslipHours(
+  r: unknown[],
+  bankCol: number,
+  cashCol: number,
+  workedCol: number,
+): number | null {
+  if (bankCol >= 0) {
+    const banked = parseMoney(r[bankCol]);
+    if (banked !== null) return banked;
   }
-  return workedCol >= 0 ? parseMoney(r[workedCol]) : null;
+  const worked = workedCol >= 0 ? parseMoney(r[workedCol]) : null;
+  if (worked === null) return null;
+  const cash = cashCol >= 0 ? parseMoney(r[cashCol]) ?? 0 : 0;
+  return Math.max(0, Math.round((worked - cash) * 100) / 100);
 }
 
 function resolveMoneyCols(cols: unknown[]): MoneyCols {
@@ -232,22 +247,32 @@ function resolveMoneyCols(cols: unknown[]): MoneyCols {
     /sat(urday)?\s*hours?/i,
   );
 
-  // Anchored on purpose: "Weekday Payslip" sits next to "Weekday Cash Pay",
-  // and a loose /week.*pay/ would take whichever came first.
-  const weekdayPayslipCol = findCol(
+  // Anchored on purpose: "Weekday Banking" sits next to "Weekday Cash Pay",
+  // and a loose /week.*pay/ would take whichever came first. The sheet called
+  // these "Weekday Payslip" / "Sat Payslip" before it called them Banking, so
+  // both spellings are read.
+  const weekdayBankCol = findCol(
+    /^\s*week(day)?s?\s*bank(ing)?\s*(hours?)?\s*$/i,
     /^\s*week(day)?s?\s*payslip\s*(hours?)?\s*$/i,
-    /^\s*payslip\s*week(day)?s?\s*(hours?)?\s*$/i,
+    /^\s*(bank(ing)?|payslip)\s*week(day)?s?\s*(hours?)?\s*$/i,
   );
-  const satPayslipCol = findCol(
+  const satBankCol = findCol(
+    /^\s*sat(urday)?\s*bank(ing)?\s*(hours?)?\s*$/i,
     /^\s*sat(urday)?\s*payslip\s*(hours?)?\s*$/i,
-    /^\s*payslip\s*sat(urday)?\s*(hours?)?\s*$/i,
+    /^\s*(bank(ing)?|payslip)\s*sat(urday)?\s*(hours?)?\s*$/i,
   );
+  // The cash half of the same split, in hours, to take off the hours worked
+  // where the banking cell has not been filled in yet.
+  const weekdayCashCol = findCol(/^\s*week(day)?s?\s*cash(\s*pay|\s*hours?)?\s*$/i);
+  const satCashCol = findCol(/^\s*sat(urday)?\s*cash(\s*pay|\s*hours?)?\s*$/i);
 
   return {
     weekHoursCol,
     satHoursCol,
-    weekdayPayslipCol,
-    satPayslipCol,
+    weekdayBankCol,
+    satBankCol,
+    weekdayCashCol,
+    satCashCol,
     employeeCol: findCol(/^\s*employee\s*$/i, /^\s*staff\s*$/i, /^\s*name\s*$/i, /employee|staff|name/i),
     grossPayCol: findCol(/^\s*gross\s*pay\s*$/i, /gross\s*pay/i, /gross\s*earnings/i),
     netPayCol: findCol(
@@ -262,10 +287,16 @@ function resolveMoneyCols(cols: unknown[]): MoneyCols {
   };
 }
 
-/** Payslip "Gross Pay" — sheet column I, else net + tax + cash (excludes super). */
-export function employeeGrossPay(e: Pick<EmployeePayRow, "grossPay" | "netPay" | "tax" | "cashPay">): number {
+/**
+ * Payslip "Gross Pay" — sheet column I, else net + tax (excludes super).
+ *
+ * Never cash. This is what a payslip shows, and a payslip covers only what was
+ * paid through the bank: adding cash pay here would put a cash-only week's
+ * wages on it as if they were taxed wages.
+ */
+export function employeeGrossPay(e: Pick<EmployeePayRow, "grossPay" | "netPay" | "tax">): number {
   if (e.grossPay > 0) return e.grossPay;
-  return Math.round((e.netPay + e.tax + e.cashPay) * 100) / 100;
+  return Math.round((e.netPay + e.tax) * 100) / 100;
 }
 
 function totalsFromMoneyRow(
@@ -428,8 +459,10 @@ export function parseWeekPayrollDetailFromRows(
       totalIncCol,
       weekHoursCol,
       satHoursCol,
-      weekdayPayslipCol,
-      satPayslipCol,
+      weekdayBankCol,
+      satBankCol,
+      weekdayCashCol,
+      satCashCol,
     } = moneyCols;
 
     if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
@@ -483,7 +516,6 @@ export function parseWeekPayrollDetailFromRows(
         grossPay: grossPayRaw,
         netPay,
         tax,
-        cashPay,
       });
 
       if (netPay === 0 && tax === 0 && superAnn === 0 && cashPay === 0 && totalIncSuper === 0) {
@@ -492,8 +524,8 @@ export function parseWeekPayrollDetailFromRows(
 
       // A blank hours cell means the block predates the timesheet push, not
       // that the employee worked nothing — keep the two cases apart.
-      const weekdayHours = payslipHours(r, weekdayPayslipCol, weekHoursCol);
-      const saturdayHours = payslipHours(r, satPayslipCol, satHoursCol);
+      const weekdayHours = payslipHours(r, weekdayBankCol, weekdayCashCol, weekHoursCol);
+      const saturdayHours = payslipHours(r, satBankCol, satCashCol, satHoursCol);
 
       employees.push({
         name,
