@@ -5,21 +5,11 @@ import Link from "next/link";
 import {
   addDoc,
   collection,
-  doc,
-  getDocs,
   serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner } from "@/lib/permissions";
-import {
-  buildPayrollAttentionItems,
-  trainingEndStatusLabel,
-  shouldActivatePayrollReminder,
-  type PayrollAttentionItem,
-  type PayrollStaffRecord,
-} from "@/lib/payroll-attention";
 import { readTimesheetsCache, writeTimesheetsCache } from "@/lib/timesheets-cache";
 import { sortShiftsByServiceThenStart } from "@/lib/timesheet-sort";
 import { ROUNDING_STEP_SECONDS } from "@/lib/timesheet-rounding";
@@ -187,29 +177,6 @@ function nameOfTeamMember(id: string, tm: TeamMemberFromApi | undefined): string
   return id.slice(0, 6);
 }
 
-function fmtRateHr(n: number): string {
-  return `$${n.toFixed(2)}/hr`;
-}
-
-function staffStartISO(v: unknown): string {
-  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-  if (typeof v === "object" && v !== null && "toDate" in v) {
-    try {
-      return (v as { toDate: () => Date }).toDate().toISOString().slice(0, 10);
-    } catch {
-      return "";
-    }
-  }
-  return "";
-}
-
-function staffNameOf(raw: Record<string, unknown>): string {
-  if (typeof raw.fullName === "string" && raw.fullName.trim()) return raw.fullName.trim();
-  const first = String(raw.firstName ?? "").trim();
-  const last = String(raw.lastName ?? "").trim();
-  return `${first}${last ? ` ${last}` : ""}`.trim() || "Unknown";
-}
-
 /** Reply from /api/payroll/payslips/publish, narrowed to what the card shows. */
 type PublicationState = {
   published: boolean;
@@ -287,8 +254,6 @@ export default function TimesheetsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
-  const [payrollStaff, setPayrollStaff] = useState<PayrollStaffRecord[]>([]);
-  const [attentionBusy, setAttentionBusy] = useState<string | null>(null);
 
   /**
    * Payslip release switch.
@@ -430,40 +395,6 @@ export default function TimesheetsPage() {
     }
   }, [startISO, endISO]);
 
-  const loadStaff = useCallback(async () => {
-    try {
-      const snap = await getDocs(collection(getDb(), "staff_onboarding"));
-      const rows: PayrollStaffRecord[] = snap.docs.map((d) => {
-        const raw = d.data() as Record<string, unknown>;
-        return {
-          uid: d.id,
-          name: staffNameOf(raw),
-          position: typeof raw.position === "string" ? raw.position : "Staff",
-          startDate: staffStartISO(raw.startDate),
-          trainingPeriod:
-            typeof raw.trainingPeriod === "string" ? raw.trainingPeriod : "First 2 Weeks",
-          trainingRate: typeof raw.trainingRate === "number" ? raw.trainingRate : null,
-          afterTrainingRate:
-            typeof raw.afterTrainingRate === "number" ? raw.afterTrainingRate : null,
-          payrollRateNotedFor:
-            typeof raw.payrollRateNotedFor === "string" ? raw.payrollRateNotedFor : "",
-          payrollRateReminderActive: raw.payrollRateReminderActive !== false,
-          accountCreated: !!raw.accountCreated,
-          status: typeof raw.status === "string" ? raw.status : "",
-        };
-      });
-      setPayrollStaff(rows);
-    } catch (err) {
-      console.error("[timesheets] staff_onboarding load failed:", err);
-      setPayrollStaff([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (authLoading || !allowed) return;
-    void loadStaff();
-  }, [authLoading, allowed, loadStaff]);
-
   useEffect(() => {
     if (authLoading || !allowed || !startISO || !endISO) return;
     const cached = readTimesheetsCache(startISO, endISO);
@@ -476,18 +407,6 @@ export default function TimesheetsPage() {
     }
     void load();
   }, [authLoading, allowed, startISO, endISO, load]);
-
-  /* Re-fetch staff when returning from onboarding approval so the alert
-     appears without a manual refresh. */
-  useEffect(() => {
-    if (authLoading || !allowed) return;
-    const onFocus = () => void loadStaff();
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") void loadStaff();
-    });
-    return () => window.removeEventListener("focus", onFocus);
-  }, [authLoading, allowed, loadStaff]);
 
   /**
    * Fold the loaded shifts into the totals the page shows. Everything on
@@ -627,35 +546,6 @@ export default function TimesheetsPage() {
     [applyLocalChange],
   );
 
-  const attentionItems = useMemo(() => buildPayrollAttentionItems(payrollStaff), [payrollStaff]);
-  const todayISO = useMemo(() => sydneyTodayISO(), []);
-
-  async function stopReminder(item: PayrollAttentionItem) {
-    setAttentionBusy(item.staffUid);
-    setPayrollStaff((prev) =>
-      prev.map((r) =>
-        r.uid === item.staffUid
-          ? {
-              ...r,
-              payrollRateNotedFor: item.trainingEndISO,
-              payrollRateReminderActive: false,
-            }
-          : r,
-      ),
-    );
-    try {
-      await updateDoc(doc(getDb(), "staff_onboarding", item.staffUid), {
-        payrollRateNotedFor: item.trainingEndISO,
-        payrollRateReminderActive: false,
-      });
-    } catch (err) {
-      console.error("[timesheets] stop reminder failed:", err);
-      void loadStaff();
-    } finally {
-      setAttentionBusy(null);
-    }
-  }
-
   if (authLoading) {
     return (
       <div className={styles.page}>
@@ -792,61 +682,6 @@ export default function TimesheetsPage() {
 
         {publishError && <p className={styles.publishError}>{publishError}</p>}
       </section>
-
-      {attentionItems.length > 0 && (
-        <section className={styles.attentionCard} aria-label="Payroll attention">
-          <div className={styles.attentionHead}>
-            <span className={styles.attentionIcon} aria-hidden="true">
-              <WarnIcon />
-            </span>
-            <div>
-              <p className={styles.attentionEyebrow}>PAYROLL ATTENTION</p>
-              <p className={styles.attentionTitle}>
-                {attentionItems.length === 1
-                  ? "1 employee may require wage increase"
-                  : `${attentionItems.length} employees may require wage increase`}
-              </p>
-            </div>
-          </div>
-
-          <ul className={styles.attentionList}>
-            {attentionItems.map((item) => (
-              <li key={item.staffUid} className={styles.attentionRow}>
-                <Link
-                  href={`/people/active/${item.staffUid}`}
-                  className={styles.attentionNameLink}
-                >
-                  {item.name}
-                </Link>
-                <div className={styles.attentionDetailRow}>
-                  <div className={styles.attentionDetailText}>
-                    <p className={styles.attentionMeta}>
-                      {trainingEndStatusLabel(item.trainingEndISO, todayISO)}
-                    </p>
-                    <p className={styles.attentionRateLine}>
-                      Current rate: {fmtRateHr(item.currentRate)} → New rate:{" "}
-                      <strong className={styles.attentionRateNew}>
-                        {fmtRateHr(item.newRate)}
-                      </strong>
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.attentionStopBtn}
-                    disabled={attentionBusy === item.staffUid}
-                    aria-label={`Stop payroll reminder for ${item.name}`}
-                    onClick={() => void stopReminder(item)}
-                  >
-                    {attentionBusy === item.staffUid
-                      ? "…"
-                      : "New rate applied. Stop the reminder."}
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <p className={styles.sectionLabel}>DATE RANGE</p>
       <section className={styles.filterCard}>
@@ -1285,15 +1120,6 @@ function RefreshIcon() {
       <polyline points="23 4 23 10 17 10" />
       <polyline points="1 20 1 14 7 14" />
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  );
-}
-function WarnIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }
