@@ -1545,3 +1545,31 @@
 }
 
 .confirmProceedBtn:hover { opacity: 0.9; }
+
+/* Repeat last week's roster: a secondary action under the header, outlined and
+   full width so it is not mistaken for Publish beside it. */
+.repeatBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.repeatBtn:hover:not(:disabled) { border-color: var(--color-warm); }
+.repeatBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* The same button inside a week's card, between its heading and its grid. */
+.repeatBtnInCard {
+  margin-bottom: var(--space-3);
+}

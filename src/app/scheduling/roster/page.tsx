@@ -22,6 +22,14 @@ import {
   isChef,
 } from "@/lib/permissions";
 import { emailToUsername } from "@/lib/username";
+import {
+  DINNER_STARTS,
+  LUNCH_STARTS,
+  planRepeatLastWeek,
+  startTimesFor,
+  type Meal,
+  type ShiftAssignments,
+} from "@/lib/roster-repeat";
 import styles from "./page.module.css";
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -66,9 +74,6 @@ type StaffDoc = {
   availabilityRequests?: StoredAvailabilityRequest[];
 };
 
-type Meal = "lunch" | "dinner";
-
-type ShiftAssignments = Record<string, string>; // staffUid → "HH:MM" start time
 type RosterViewWeekKey = "current" | "next" | "prev";
 
 /** A single note entry stored in rosters_published notes[iso][]. */
@@ -93,9 +98,6 @@ type RosterWeekDoc = {
   notesAuthor?: string;
   notesUpdatedAt?: Timestamp;
 };
-
-const LUNCH_STARTS = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00"];
-const DINNER_STARTS = ["16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"];
 
 const STAFF_COLORS = [
   "#e91e63", "#9c27b0", "#ff7043", "#26a69a", "#42a5f5",
@@ -167,6 +169,25 @@ function tsDate(v: unknown): Date | null {
     try { return (v as Timestamp).toDate(); } catch { return null; }
   }
   return null;
+}
+
+/**
+ * Does this employee have an approved holiday that covers `day`?
+ *
+ * The test the staff picker uses to mark somebody ON HOLIDAY, and the one
+ * repeating last week's roster uses to leave them off a week they are away.
+ */
+function hasApprovedHoliday(d: StaffDoc, day: Date): boolean {
+  for (const r of d.holidayRequests ?? []) {
+    if (r.status !== "approved") continue;
+    const s = tsDate(r.startDate);
+    const e = tsDate(r.endDate);
+    if (!s || !e) continue;
+    const from = new Date(s); from.setHours(0, 0, 0, 0);
+    const to = new Date(e); to.setHours(23, 59, 59, 999);
+    if (day >= from && day <= to) return true;
+  }
+  return false;
 }
 
 function isoDate(d: Date): string {
@@ -531,6 +552,7 @@ export default function ManagerRosterPage() {
   const [pendingStart, setPendingStart] = useState<string>("");
   const [savingShift, setSavingShift] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [repeating, setRepeating] = useState(false);
 
   const nextWeekStart = useMemo(() => addDays(weekStart, 7), [weekStart]);
   const nextWeekStartISO = useMemo(() => isoDate(nextWeekStart), [nextWeekStart]);
@@ -722,10 +744,15 @@ export default function ManagerRosterPage() {
         dinner: Object.keys(dayAssignments.dinner ?? {}).length,
       };
 
+      // mergeFields, not merge: true. A plain merge folds the map being written
+      // into the one already stored, so a person left out of it — taken off a
+      // shift — stayed in the document: the screen showed them gone, and they came
+      // back on the next load. Naming the fields replaces them whole and still
+      // leaves the notes and the rest of the document alone.
       await setDoc(
         doc(getDb(), "rosters_published", weekKey),
         { assignments: allAssignments, counts },
-        { merge: true },
+        { mergeFields: ["assignments", "counts"] },
       );
       setCurrentDoc((prev) => ({ ...prev, assignments: allAssignments, counts }));
     } catch (err) {
@@ -885,6 +912,84 @@ export default function ManagerRosterPage() {
     }
   }
 
+  /**
+   * Repeat last week's roster onto a week, so the rest can be edited rather than
+   * built from nothing. "Last week" is the week just before the one it fills: the
+   * Previous Week for this week, and this week for Next Week — which is where a
+   * roster is usually built, a week ahead.
+   *
+   * Each day of that week lands on the same weekday of the target, with the same
+   * people at the same start times. Two things do not come across as they were:
+   * somebody no longer on the team is left out, and so is anyone with an approved
+   * holiday that covers the day it would put them on — the message says who, so it
+   * is not a silent gap. Notes are not copied; they belong to a day.
+   *
+   * It replaces whatever the target week already holds, after asking.
+   */
+  async function repeatLastWeek(into: "current" | "next") {
+    if (repeating || publishing || savingShift) return;
+
+    const target =
+      into === "next"
+        ? { doc: nextWeekDoc, set: setNextWeekDoc, iso: nextWeekStartISO, days: nextWeekDays, start: nextWeekStart, end: nextWeekEnd }
+        : { doc: weekDoc, set: setWeekDoc, iso: weekStartISO, days: weekDays, start: weekStart, end: weekEnd };
+    const source = into === "next" ? { doc: weekDoc, days: weekDays } : { doc: prevWeekDoc, days: prevWeekDays };
+
+    const team = new Map(staffDocs.map((s) => [s.uid, s]));
+    const plan = planRepeatLastWeek({
+      lastWeek: source.doc.assignments,
+      lastDates: source.days.map(isoDate),
+      thisDates: target.days.map(isoDate),
+      isOnTeam: (uid) => team.has(uid),
+      isAway: (uid, dayIndex) => {
+        const person = team.get(uid);
+        return !!person && hasApprovedHoliday(person, target.days[dayIndex]);
+      },
+    });
+    const { assignments, counts, copied } = plan;
+    const away = plan.away.map(
+      ({ uid, dayIndex }) => `${displayName(team.get(uid)!)} (${DAY_LABELS[dayIndex]})`,
+    );
+
+    if (copied === 0 && away.length === 0) {
+      alert("Last week has no roster to repeat.");
+      return;
+    }
+
+    const hasRoster = target.days.some((d) =>
+      (["lunch", "dinner"] as Meal[]).some((m) => assignmentCount(target.doc, isoDate(d), m) > 0),
+    );
+    const lines = [
+      `Repeat last week's roster onto ${fmtRange(target.start, target.end)}?`,
+      "",
+      `${copied} shift${copied === 1 ? "" : "s"} will be copied.`,
+      ...(hasRoster ? ["That week already has a roster. It will be replaced (notes stay)."] : []),
+      ...(away.length > 0 ? ["", `Left off, on approved holiday: ${away.join(", ")}`] : []),
+    ];
+    if (!window.confirm(lines.join("\n"))) return;
+
+    setRepeating(true);
+    try {
+      // mergeFields, for the same reason as saveAssignments: the week's people
+      // are replaced, not folded into.
+      await setDoc(
+        doc(getDb(), "rosters_published", target.iso),
+        { assignments, counts },
+        { mergeFields: ["assignments", "counts"] },
+      );
+      target.set((prev) => ({ ...prev, assignments, counts }));
+      alert(
+        away.length > 0
+          ? `Last week's roster repeated: ${copied} shifts. Left off, on approved holiday: ${away.join(", ")}.`
+          : `Last week's roster repeated: ${copied} shifts.`,
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to repeat last week's roster.");
+    } finally {
+      setRepeating(false);
+    }
+  }
+
   async function publishWeek() {
     if (publishing) return;
     const rangeLabel = fmtRange(weekStart, weekEnd);
@@ -1001,6 +1106,17 @@ export default function ManagerRosterPage() {
         </button>
       </header>
 
+      {/* Fills this week from the Previous Week, to be edited from there. */}
+      <button
+        type="button"
+        className={styles.repeatBtn}
+        onClick={() => repeatLastWeek("current")}
+        disabled={repeating || publishing}
+      >
+        <RepeatIcon />
+        {repeating ? "Repeating…" : "Repeat last week’s roster"}
+      </button>
+
       {/* ── Current week strip ── */}
       <section className={styles.grid}>
         <div className={styles.gridHeadRow}>
@@ -1102,6 +1218,16 @@ export default function ManagerRosterPage() {
           <p className={styles.cardTitle}>Next Week</p>
           <p className={styles.cardSubtitle}>{fmtRange(nextWeekStart, nextWeekEnd)}</p>
         </div>
+        {/* Fills Next Week from this week — where a roster is usually built, a week ahead. */}
+        <button
+          type="button"
+          className={`${styles.repeatBtn} ${styles.repeatBtnInCard}`}
+          onClick={() => repeatLastWeek("next")}
+          disabled={repeating || publishing}
+        >
+          <RepeatIcon />
+          {repeating ? "Repeating…" : "Repeat last week’s roster"}
+        </button>
         <div className={styles.cardGrid}>
           <div className={styles.gridHeadRow}>
             <span />
@@ -1538,7 +1664,7 @@ export default function ManagerRosterPage() {
         const longDow = DAY_LABELS_FULL[dowIdx] ?? DAY_LABELS_LONG[dowIdx];
         const cur = assignedFor(modalCell.iso, modalCell.meal, modalCell.weekKey);
         const assignedCount = Object.keys(cur).length;
-        const starts = modalCell.meal === "lunch" ? LUNCH_STARTS : DINNER_STARTS;
+        const starts = startTimesFor(modalCell.meal, dowIdx);
         return (
           <div
             className={styles.modalBackdrop}
@@ -1610,18 +1736,8 @@ export default function ManagerRosterPage() {
                   type WarnInfo = { type: "holiday" | "unavailability" };
                   const warningMap = new Map<string, WarnInfo>();
                   for (const d of staffDocs) {
-                    for (const r of d.holidayRequests ?? []) {
-                      if (r.status !== "approved") continue;
-                      const s = tsDate(r.startDate);
-                      const e = tsDate(r.endDate);
-                      if (s && e) {
-                        const sDay = new Date(s); sDay.setHours(0, 0, 0, 0);
-                        const eDay = new Date(e); eDay.setHours(23, 59, 59, 999);
-                        if (cellDate >= sDay && cellDate <= eDay) {
-                          warningMap.set(d.uid, { type: "holiday" });
-                          break;
-                        }
-                      }
+                    if (hasApprovedHoliday(d, cellDate)) {
+                      warningMap.set(d.uid, { type: "holiday" });
                     }
                     if (warningMap.has(d.uid) || !cellDayKey) continue;
                     const approvedChanges = (d.availabilityRequests ?? [])
@@ -1928,6 +2044,17 @@ export default function ManagerRosterPage() {
 }
 
 /* ── Icons ── */
+
+function RepeatIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="17 1 21 5 17 9" />
+      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+      <polyline points="7 23 3 19 7 15" />
+      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    </svg>
+  );
+}
 
 function SunIcon() {
   return (
