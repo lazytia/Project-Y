@@ -31,10 +31,24 @@ service cloud.firestore {
     //  - Staff can write their OWN doc (onboarding form progress).
     //  - Owners can write ANY staff doc (seeding new staff accounts from the
     //    Staff + page, sending reminders, pruning invalid FCM tokens, etc.).
+    //  - Staff cannot change a start date once the record has one. It is the
+    //    date the owner entered, it sets when the pay rate steps up, and the
+    //    onboarding screen used to replace it with the moment of each sign-in
+    //    (Masahiro's and Yuki's, repeatedly) from whichever version of the app a
+    //    phone happened to be running. A rule holds for all of them.
+    //    Only an update has an existing record to compare with, so the check sits
+    //    on update alone; creating and deleting stay as they were.
+    function keepsStartDate() {
+      return !('startDate' in resource.data)
+        || request.resource.data.startDate == resource.data.startDate;
+    }
+
     match /staff_onboarding/{uid} {
       allow read: if request.auth != null;
-      allow write: if isOwner() || isChef()
+      allow create, delete: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid);
+      allow update: if isOwner() || isChef()
+        || (request.auth != null && request.auth.uid == uid && keepsStartDate());
     }
 
     // Published rosters: weekly docs keyed by Monday ISO date. Shift

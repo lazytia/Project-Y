@@ -156,7 +156,14 @@ export default function OnboardingPage() {
     if (!user) return;
     (async () => {
       try {
-        const snap = await getDoc(doc(getDb(), "staff_onboarding", user.uid));
+        const ref = doc(getDb(), "staff_onboarding", user.uid);
+        // The server's copy first. Straight after a sign-in the local copy is
+        // little more than what the app wrote a moment ago, and this screen is
+        // the one that decides whether an employee is shown the form — read from
+        // that copy, somebody whose onboarding was signed off days ago was told
+        // they were at the first step. The local copy is the fallback for being
+        // offline, which is all it is good for.
+        const snap = await getDocFromServer(ref).catch(() => getDoc(ref));
         const today = new Date();
         if (snap.exists()) {
           const data = snap.data();
