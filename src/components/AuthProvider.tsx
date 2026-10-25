@@ -330,6 +330,15 @@ export function AuthProvider({
           ref,
           (snap) => {
             const data = snap.data() ?? {};
+            // The first snapshot of every page load is the sign-in write above
+            // (uid, username, a timestamp) laid over an empty cache, so it
+            // reports a record with no `completedStep` — which read as step 0.
+            // Whenever the server took longer than the 800ms fallback below to
+            // answer, that sent a fully onboarded employee to the onboarding
+            // screens and back, and the page flickered through them. A cached
+            // record that does not say how far they got says nothing; wait for
+            // the server's.
+            if (snap.metadata.fromCache && typeof data.completedStep !== "number") return;
             const completed = typeof data.completedStep === "number" ? data.completedStep : 0;
             setStaffCompletedStep(completed);
 
