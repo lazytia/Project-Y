@@ -990,23 +990,43 @@ export default function ManagerRosterPage() {
     }
   }
 
+  /**
+   * Publish this week and next together.
+   *
+   * Staff need their shifts before the week starts, and next week is the one
+   * being built. Publish used to cover the current week only, so next week's
+   * roster sat unseen until the Monday it was already in force. A week with no
+   * shifts in it yet is left unpublished rather than shown to staff as an
+   * empty one — except this week, which has always been published as it is.
+   */
   async function publishWeek() {
     if (publishing) return;
-    const rangeLabel = fmtRange(weekStart, weekEnd);
 
-    const byStaff = new Map<string, PublishShift[]>();
-    for (const d of weekDays) {
-      const iso = isoDate(d);
-      for (const meal of ["lunch", "dinner"] as Meal[]) {
-        const assigned = weekDoc.assignments?.[iso]?.[meal] ?? {};
-        for (const [uid, start] of Object.entries(assigned)) {
-          if (uid.startsWith("tr_")) continue;
-          const list = byStaff.get(uid) ?? [];
-          list.push({ iso, meal, start });
-          byStaff.set(uid, list);
+    const shiftsByStaff = (days: Date[], week: RosterWeekDoc) => {
+      const byStaff = new Map<string, PublishShift[]>();
+      let total = 0;
+      for (const d of days) {
+        const iso = isoDate(d);
+        for (const meal of ["lunch", "dinner"] as Meal[]) {
+          const assigned = week.assignments?.[iso]?.[meal] ?? {};
+          for (const [uid, start] of Object.entries(assigned)) {
+            total += 1;
+            if (uid.startsWith("tr_")) continue;
+            const list = byStaff.get(uid) ?? [];
+            list.push({ iso, meal, start });
+            byStaff.set(uid, list);
+          }
         }
       }
-    }
+      return { byStaff, total };
+    };
+
+    const targets = [
+      { label: "This week", iso: weekStartISO, range: fmtRange(weekStart, weekEnd), days: weekDays, doc: weekDoc, skipIfEmpty: false },
+      { label: "Next week", iso: nextWeekStartISO, range: fmtRange(nextWeekStart, nextWeekEnd), days: nextWeekDays, doc: nextWeekDoc, skipIfEmpty: true },
+    ].map((t) => ({ ...t, ...shiftsByStaff(t.days, t.doc) }));
+    const weeks = targets.filter((t) => !(t.skipIfEmpty && t.total === 0));
+    const left = targets.filter((t) => !weeks.includes(t));
 
     // staffDocs is already the team, so every one of them is looked at. The old
     // role filter here was the one that mattered most: it decided who got the
@@ -1015,42 +1035,58 @@ export default function ManagerRosterPage() {
 
     setPublishing(true);
     try {
-      // Who this publish concerns: each person's week against what they were
+      // Who each publish concerns: each person's week against what they were
       // last shown. Only they are told; everyone else is left as they were.
-      const plan = await planRosterPublish(
-        weekStartISO,
-        new Map(recipients.map((s) => [s.uid, byStaff.get(s.uid) ?? []])),
+      const planned = await Promise.all(
+        weeks.map(async (w) => {
+          const plan = await planRosterPublish(
+            w.iso,
+            new Map(recipients.map((s) => [s.uid, w.byStaff.get(s.uid) ?? []])),
+          );
+          const changeOf = (uid: string): RosterChange => plan.get(uid) ?? "unchanged";
+          const count = (c: RosterChange) => recipients.filter((s) => changeOf(s.uid) === c).length;
+          const toTell = recipients.filter((s) => rosterChangeNotifies(changeOf(s.uid))).length;
+          const lines = [
+            count("new") > 0 && `${count("new")} with new shifts`,
+            count("updated") > 0 && `${count("updated")} with changed shifts`,
+            count("removed") > 0 && `${count("removed")} with shifts removed`,
+          ].filter(Boolean);
+          return { ...w, changeOf, toTell, lines };
+        }),
       );
-      const changeOf = (uid: string): RosterChange => plan.get(uid) ?? "unchanged";
-      const count = (c: RosterChange) => recipients.filter((s) => changeOf(s.uid) === c).length;
-      const toTell = recipients.filter((s) => rosterChangeNotifies(changeOf(s.uid))).length;
 
-      const lines = [
-        count("new") > 0 && `${count("new")} with new shifts`,
-        count("updated") > 0 && `${count("updated")} with changed shifts`,
-        count("removed") > 0 && `${count("removed")} with shifts removed`,
-      ].filter(Boolean);
-      const summary =
-        toTell === 0
+      const describe = (p: (typeof planned)[number]) =>
+        p.toTell === 0
           ? "No one's shifts have changed since the last publish, so no one will be notified."
-          : `${toTell} staff will be notified:\n${lines.map((l) => `• ${l}`).join("\n")}`;
+          : `${p.toTell} staff will be notified:\n${p.lines.map((l) => `\u2022 ${l}`).join("\n")}`;
+      const body = planned.map((p) => `${p.label} (${p.range})\n${describe(p)}`).join("\n\n");
+      const notes = left.map((t) => `${t.label} (${t.range}) has no shifts yet, so it is not published.`);
+      const message = `Publish the roster?\n\n${body}${notes.length > 0 ? `\n\n${notes.join("\n")}` : ""}`;
+      if (!window.confirm(message)) return;
 
-      if (!window.confirm(`Publish the roster for ${rangeLabel}?\n\n${summary}`)) return;
+      for (const p of planned) {
+        await Promise.all(
+          recipients.map((s) =>
+            publishStaffRoster(s.uid, p.iso, p.range, p.byStaff.get(s.uid) ?? [], p.changeOf(s.uid)),
+          ),
+        );
+        await setDoc(
+          doc(getDb(), "rosters_published", p.iso),
+          { publishedAt: new Date() },
+          { merge: true },
+        );
+      }
 
-      await Promise.all(
-        recipients.map((s) =>
-          publishStaffRoster(s.uid, weekStartISO, rangeLabel, byStaff.get(s.uid) ?? [], changeOf(s.uid)),
+      // People, not notices: someone told about both weeks is still one person.
+      const told = new Set(
+        planned.flatMap((p) =>
+          recipients.filter((s) => rosterChangeNotifies(p.changeOf(s.uid))).map((s) => s.uid),
         ),
-      );
-      await setDoc(
-        doc(getDb(), "rosters_published", weekStartISO),
-        { publishedAt: new Date() },
-        { merge: true },
-      );
+      ).size;
       alert(
-        toTell === 0
+        told === 0
           ? "Roster published. No one's shifts had changed, so no one was notified."
-          : `Roster published. ${toTell} staff notified.`,
+          : `Roster published. ${told} staff notified.`,
       );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to publish roster.");
