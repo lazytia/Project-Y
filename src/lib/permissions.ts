@@ -5,10 +5,12 @@ import { emailToUsername } from "./username";
  * Usernames with owner-level access (full admin/manager rights).
  * Add a username here to grant access to owner-only pages.
  *
- * "yurina" is a manager — for now she gets the same UI/permissions as the
- * real owners. Will be split into a separate "manager" tier later.
+ * There is no manager on the list at the moment. "yurina" was one until she
+ * left; her name was taken off so that whoever registers it next does not
+ * inherit her access. A manager goes here and stays out of
+ * STRICT_OWNER_USERNAMES below.
  */
-export const OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica", "yurina", "eddie"]);
+export const OWNER_USERNAMES: ReadonlySet<string> = new Set(["tia", "yurica", "eddie"]);
 
 /**
  * Strict-owner accounts (real business owners). Managers like yurina are
