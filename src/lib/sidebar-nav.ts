@@ -76,8 +76,8 @@ export const OWNER_NAV: NavGroup[] = [
     children: [
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering", href: "/operations/catering-orders" },
-      { label: "Item & Price Search", href: "/operations/item-search" },
       { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
+      { label: "Item & Price Search", href: "/operations/item-search" },
       {
         label: "Roster",
         href: "/scheduling/roster",
