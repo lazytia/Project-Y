@@ -1,0 +1,74 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--color-warm);
+}
+
+.grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.axisLabel {
+  font-size: var(--font-size-xs);
+  fill: var(--color-fg-subtle);
+}
+
+.line {
+  stroke: currentColor;
+}
+
+.dot {
+  fill: var(--color-bg);
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.dates {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-subtle);
+}
+
+.changes {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.change {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.changeDate {
+  color: var(--color-fg-muted);
+}
+
+/* A cost going up is the bad news, so it is the red one. */
+.up {
+  color: var(--color-negative);
+  font-weight: 600;
+}
+
+.down {
+  color: var(--color-positive);
+  font-weight: 600;
+}
+
+.first {
+  color: var(--color-fg-muted);
+}

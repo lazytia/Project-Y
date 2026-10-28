@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
+import { useBackToDashboard } from "@/hooks/useBackToDashboard";
+import { cartCount, cartKeyOf, readCart, writeCart, type Cart } from "@/lib/cart";
 import { isOwnerOrChef } from "@/lib/permissions";
-import type { PriceList } from "@/lib/price-list-parse";
+import type { PriceItem, PriceList } from "@/lib/price-list-parse";
 import {
   PRICE_SORT_LABELS,
   filterItems,
@@ -12,6 +15,7 @@ import {
   sortItems,
   type PriceSort,
 } from "@/lib/price-list-search";
+import PriceHistoryChart from "./PriceHistoryChart";
 import styles from "./page.module.css";
 
 /** Rows drawn at a time. The list is a few hundred long; a phone need not paint it all. */
@@ -20,7 +24,7 @@ const PAGE_SIZE = 50;
 /** Give up on the read rather than leave the page on its loading line. */
 const FETCH_TIMEOUT_MS = 20 * 1000;
 
-const SORT_ORDER: PriceSort[] = ["name", "updated", "price-asc", "price-desc"];
+const SORT_ORDER: PriceSort[] = ["updated", "name", "price-asc", "price-desc"];
 
 function SearchIcon() {
   return (
@@ -40,16 +44,6 @@ function CloseIcon() {
   );
 }
 
-function BoxIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 8l-9-5-9 5 9 5 9-5z" />
-      <path d="M3 8v8l9 5 9-5V8" />
-      <line x1="12" y1="13" x2="12" y2="21" />
-    </svg>
-  );
-}
-
 function ChevronIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -58,7 +52,35 @@ function ChevronIcon() {
   );
 }
 
+function BackIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function CartIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="20" r="1.5" />
+      <circle cx="18" cy="20" r="1.5" />
+      <path d="M2 3h3l2.6 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 export default function ItemSearchPage() {
+  const goBack = useBackToDashboard();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwnerOrChef(user);
 
@@ -68,8 +90,13 @@ export default function ItemSearchPage() {
 
   const [query, setQuery] = useState("");
   const [supplier, setSupplier] = useState("");
-  const [sort, setSort] = useState<PriceSort>("name");
+  // What the kitchen opens this for: which prices have moved.
+  const [sort, setSort] = useState<PriceSort>("updated");
   const [shown, setShown] = useState(PAGE_SIZE);
+  /** The card opened to show its price history. One at a time. */
+  const [openKey, setOpenKey] = useState<string | null>(null);
+
+  const [cart, setCart] = useState<Cart>({});
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -106,9 +133,15 @@ export default function ItemSearchPage() {
     void load();
   }, [authLoading, allowed, load]);
 
+  // The cart is kept on the device; pick it up again when the page opens.
+  useEffect(() => {
+    if (user) setCart(readCart(user.uid));
+  }, [user]);
+
   // A new search starts from the top of its results again.
   useEffect(() => {
     setShown(PAGE_SIZE);
+    setOpenKey(null);
   }, [query, supplier, sort]);
 
   const trimmed = query.trim();
@@ -116,6 +149,19 @@ export default function ItemSearchPage() {
     () => (list ? sortItems(filterItems(list.items, query, supplier), sort) : []),
     [list, query, supplier, sort],
   );
+
+  /**
+   * Put one of the item in the cart. The screen stays where it is, so the next
+   * item can be added straight away; the cart icon's count is what moves.
+   */
+  function addToCart(it: PriceItem) {
+    if (!user) return;
+    const key = cartKeyOf(it);
+    const qty = (cart[key]?.qty ?? 0) + 1;
+    const next = { ...cart, [key]: { supplier: it.supplier, name: it.name, unit: it.unit, price: it.price, qty } };
+    setCart(next);
+    writeCart(user.uid, next);
+  }
 
   if (authLoading || !allowed) return null;
 
@@ -126,12 +172,24 @@ export default function ItemSearchPage() {
     : supplier
       ? `${count} ${noun} from ${supplier}`
       : `${count} ${noun}`;
+  const inCart = cartCount(cart);
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
+        <button type="button" className={styles.backBtn} aria-label="Back" onClick={goBack}>
+          <BackIcon />
+        </button>
         <h1 className={styles.title}>Item Search</h1>
         <p className={styles.subtitle}>Check item prices by supplier.</p>
+        <Link
+          href="/operations/cart"
+          className={styles.cartLink}
+          aria-label={inCart > 0 ? `Cart, ${inCart} in cart` : "Cart"}
+        >
+          <CartIcon />
+          {inCart > 0 && <span className={styles.cartBadge}>{inCart}</span>}
+        </Link>
       </header>
 
       <div className={styles.searchBox}>
@@ -218,22 +276,53 @@ export default function ItemSearchPage() {
           ) : (
             <ul className={styles.list}>
               {results.slice(0, shown).map((it) => {
+                const key = cartKeyOf(it);
                 const updated = formatUpdated(it.updatedAt);
+                const open = openKey === key;
                 return (
-                  <li key={`${it.supplier}::${it.name}`} className={styles.card}>
-                    <span className={styles.thumb}>
-                      <BoxIcon />
-                    </span>
-                    <div className={styles.body}>
-                      <p className={styles.name}>{it.name}</p>
-                      <p className={styles.supplier}>{it.supplier}</p>
-                    </div>
-                    <div className={styles.priceCol}>
-                      <p className={styles.price}>
-                        <span className={styles.amount}>{formatPrice(it.price)}</span>
-                        <span className={styles.unit}> / {it.unit}</span>
-                      </p>
-                      {updated && <p className={styles.updated}>{updated}</p>}
+                  <li key={key} className={styles.card}>
+                    <button
+                      type="button"
+                      className={styles.head}
+                      aria-expanded={open}
+                      onClick={() => setOpenKey(open ? null : key)}
+                    >
+                      <div className={styles.body}>
+                        <p className={styles.name}>{it.name}</p>
+                        <p className={styles.supplier}>{it.supplier}</p>
+                      </div>
+                      <div className={styles.priceCol}>
+                        <p className={styles.price}>
+                          <span className={styles.amount}>{formatPrice(it.price)}</span>
+                          <span className={styles.unit}> / {it.unit}</span>
+                        </p>
+                        {updated && <p className={styles.updated}>{updated}</p>}
+                      </div>
+                      <span className={`${styles.rowChevron} ${open ? styles.rowChevronOpen : ""}`}>
+                        <ChevronIcon />
+                      </span>
+                    </button>
+
+                    {open && (
+                      <div className={styles.detail}>
+                        <p className={styles.detailTitle}>Price history</p>
+                        {it.history && it.history.length >= 2 ? (
+                          <PriceHistoryChart points={it.history} />
+                        ) : (
+                          <p className={styles.detailNote}>No price changes recorded.</p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className={styles.foot}>
+                      <button
+                        type="button"
+                        className={styles.addBtn}
+                        aria-label={`Add ${it.name} to the cart`}
+                        onClick={() => addToCart(it)}
+                      >
+                        <PlusIcon />
+                      </button>
                     </div>
                   </li>
                 );

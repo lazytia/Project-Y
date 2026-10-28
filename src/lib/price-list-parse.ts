@@ -24,9 +24,17 @@ export type PriceItem = {
   /** Pack or measure the price is for; "unit" when the sheet does not say. */
   unit: string;
   price: number;
-  /** Epoch ms the price was set. Null where nothing in the sheet dates it. */
+  /** Epoch ms the price last changed. Null where nothing dates it. */
   updatedAt: number | null;
+  /**
+   * The prices the item has had, oldest first, each from the moment it began.
+   * Only present, and only with two or more points, where there is a change to
+   * draw; filled in by lib/price-history, not by the sheet.
+   */
+  history?: PricePoint[];
 };
+
+export type PricePoint = { at: number; p: number };
 
 export type PriceList = {
   /** Suppliers that have at least one item, in sheet order. */
@@ -188,7 +196,8 @@ export function buildPriceList(tabs: SheetTab[]): PriceList {
       const key = keyOf(tab.title, p.name);
       // The tab's own date wins. Failing that, the log's, but only where the
       // log recorded this very price: a different price on the tab was set
-      // later, by hand, and the log cannot say when.
+      // later, by hand, and the log cannot say when. (lib/price-history dates
+      // those from the sheet's saved versions.)
       const rec = logged.get(key);
       const updatedAt =
         p.updatedAt ?? (rec && Math.abs(rec.price - p.price) < SAME_PRICE ? rec.at : null);

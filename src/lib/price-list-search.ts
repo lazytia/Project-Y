@@ -7,7 +7,7 @@ import type { PriceItem } from "@/lib/price-list-parse";
 export type PriceSort = "updated" | "name" | "price-asc" | "price-desc";
 
 export const PRICE_SORT_LABELS: Record<PriceSort, string> = {
-  updated: "Last updated",
+  updated: "Recently changed",
   name: "Name (A–Z)",
   "price-asc": "Price: low to high",
   "price-desc": "Price: high to low",
@@ -32,12 +32,11 @@ export function filterItems(items: PriceItem[], query: string, supplier: string)
 
 const byName = (a: PriceItem, b: PriceItem) =>
   a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true });
-
 export function sortItems(items: PriceItem[], sort: PriceSort): PriceItem[] {
   const out = [...items];
   switch (sort) {
     case "updated":
-      // Newest first; what the sheet never dated goes last, in name order.
+      // Newest change first; what nothing dates goes last, in name order.
       return out.sort((a, b) => (b.updatedAt ?? -Infinity) - (a.updatedAt ?? -Infinity) || byName(a, b));
     case "price-asc":
       return out.sort((a, b) => a.price - b.price || byName(a, b));

@@ -1,0 +1,311 @@
+.page {
+  padding: var(--page-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-gap);
+}
+
+.header {
+  padding: 0 0 var(--space-2);
+}
+
+.backBtn {
+  display: flex;
+  margin: 0 0 var(--space-2) calc(var(--space-2) * -1);
+  padding: var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+/* ── empty ── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-6) 0;
+}
+
+.emptyText {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.browseLink {
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-fg);
+  font-size: var(--font-size-md);
+  text-decoration: none;
+}
+
+.browseLink:hover {
+  border-color: var(--color-warm);
+}
+
+/* ── one supplier's order ── */
+
+.groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.group {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.check {
+  flex-shrink: 0;
+  width: var(--space-5);
+  height: var(--space-5);
+  margin: 0;
+  accent-color: var(--color-warm);
+  cursor: pointer;
+}
+
+.groupName {
+  flex: 1;
+  min-width: 0;
+}
+
+.supplier {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.count {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.groupTotal {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.fold {
+  display: flex;
+  padding: var(--space-1);
+  border: none;
+  background: transparent;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.foldShut {
+  transform: rotate(180deg);
+}
+
+/* ── lines ── */
+
+.lines {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-4);
+}
+
+/* Name and remove above; quantity, unit price and line total below. Three
+   figures and a name do not fit on one row of a phone. */
+.line {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    "name name remove"
+    "stepper unit total";
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.lineName {
+  grid-area: name;
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-fg);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.removeBtn {
+  grid-area: remove;
+  display: flex;
+  padding: var(--space-1);
+  border: none;
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+}
+
+.removeBtn:hover {
+  color: var(--color-negative);
+}
+
+.stepper {
+  grid-area: stepper;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.stepBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.stepBtn:disabled {
+  color: var(--color-fg-subtle);
+  cursor: default;
+}
+
+.qty {
+  min-width: var(--space-5);
+  text-align: center;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.unitPrice {
+  grid-area: unit;
+  margin: 0;
+  text-align: right;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-subtle);
+}
+
+.lineTotal {
+  grid-area: total;
+  margin: 0;
+  min-width: var(--space-7);
+  text-align: right;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.subtotal {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.subtotalLabel {
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.subtotalAmount {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+/* ── order bar: stays at the foot of the screen while the suppliers scroll ── */
+
+.bar {
+  position: sticky;
+  bottom: 0;
+  margin: 0 calc(var(--page-padding) * -1) calc(var(--page-padding) * -1);
+  padding: var(--space-3) var(--page-padding);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+}
+
+.notice {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+  text-align: center;
+}
+
+.barRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.barSummary {
+  min-width: 0;
+}
+
+.barCount {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.barTotal {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.placeBtn {
+  flex: 1;
+  max-width: 60%;
+  padding: var(--space-4) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-warm);
+  color: var(--color-accent-fg);
+  font: inherit;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.placeBtn:disabled {
+  background: var(--color-surface-hover);
+  color: var(--color-fg-subtle);
+  cursor: default;
+}
