@@ -45,7 +45,33 @@ type Entry = {
 
 type State = { prices: Record<string, Entry>; updatedAt: number };
 
+/** The stored prices, or null when no record has been started yet. */
+export type StoredPrices = Record<string, Entry> | null;
+
 const keyOf = (it: PriceItem) => `${it.supplier.toLowerCase()}::${it.name.toLowerCase()}`;
+
+/**
+ * Read the record. Throws when Firestore cannot be reached: "no record" and
+ * "could not look" must stay apart, or a failed read would be taken for an empty
+ * one and the record started over on top of the real thing.
+ *
+ * A function of its own so a caller can start it alongside the sheet read
+ * instead of after it.
+ */
+export async function loadPriceHistory(): Promise<StoredPrices> {
+  const snap = await adminDb().collection(COLLECTION).doc(DOC_ID).get();
+  return snap.exists ? ((snap.data() as State).prices ?? {}) : null;
+}
+
+/** Read the record, compare, update, and date the list by it. */
+export async function withPriceHistory(list: PriceList, changedAt: number): Promise<PriceList> {
+  try {
+    return applyPriceHistory(list, await loadPriceHistory(), changedAt);
+  } catch (err) {
+    console.error("[price-history] could not read the record:", err);
+    return list;
+  }
+}
 
 /**
  * Compare the list with the record, update the record, and date each item by it.
@@ -54,11 +80,13 @@ const keyOf = (it: PriceItem) => `${it.supplier.toLowerCase()}::${it.name.toLowe
  * reach Firestore leaves the list as it was: dates and graphs are an extra, and
  * a price list that cannot show them is still a price list.
  */
-export async function withPriceHistory(list: PriceList, changedAt: number): Promise<PriceList> {
+export async function applyPriceHistory(
+  list: PriceList,
+  stored: StoredPrices,
+  changedAt: number,
+): Promise<PriceList> {
   try {
     const ref = adminDb().collection(COLLECTION).doc(DOC_ID);
-    const snap = await ref.get();
-    const stored = snap.exists ? ((snap.data() as State).prices ?? {}) : null;
 
     const next: Record<string, Entry> = {};
     let dirty = stored === null;

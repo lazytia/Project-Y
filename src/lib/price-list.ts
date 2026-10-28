@@ -10,24 +10,41 @@
 import { existsSync } from "node:fs";
 import { google } from "googleapis";
 import { buildPriceList, type PriceList, type SheetTab } from "@/lib/price-list-parse";
-import { withPriceHistory } from "@/lib/price-history";
+import { applyPriceHistory, loadPriceHistory, type StoredPrices } from "@/lib/price-history";
 
 const DEFAULT_SHEET_ID = "1eiZsDQRp-P3BKkQ2MsJi-ZDGHompRbeZZUg3A7bcMHk";
 
 /**
- * How long one read of the sheet serves everyone.
+ * How long one read of the sheet is served as it is.
  *
  * Reading it takes a second or two and the page is opened by a handful of
  * people, so a minute of staleness costs nothing, while a read per search
- * would. The ERP's edits land in the sheet and show here within the minute.
+ * would.
  */
 const CACHE_TTL_MS = 60 * 1000;
+
+/**
+ * How old a read may be and still be handed over at once while a new one is
+ * fetched behind it. Past the minute, the next person to open the page gets the
+ * last list immediately instead of waiting for the sheet; the list after that is
+ * the fresh one. Past this, the read is too old to show and is waited for.
+ */
+const STALE_OK_MS = 10 * 60 * 1000;
+
+/**
+ * How long the tab names are remembered. They change when a supplier is added,
+ * which is rare, and asking for them is a round trip made before the one that
+ * fetches the prices; a new supplier shows up within this long.
+ */
+const TITLES_TTL_MS = 5 * 60 * 1000;
 
 /** The sheet itself, and — to date a price change — when the file was last edited. */
 const SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets.readonly",
   "https://www.googleapis.com/auth/drive.metadata.readonly",
 ];
+
+const spreadsheetId = () => process.env.PRICE_SHEET_ID ?? DEFAULT_SHEET_ID;
 
 function authClient() {
   // Same order as lib/payroll-sheet: an inline key first, then the machine's
@@ -50,58 +67,93 @@ function authClient() {
   });
 }
 
-async function readTabs(): Promise<{ tabs: SheetTab[]; modifiedAt: number }> {
-  const spreadsheetId = process.env.PRICE_SHEET_ID ?? DEFAULT_SHEET_ID;
-  const auth = authClient();
-  const sheets = google.sheets({ version: "v4", auth });
+// One client for every read: building one each time throws away its access token.
+let auth: ReturnType<typeof authClient> | null = null;
+const authed = () => (auth ??= authClient());
 
-  const meta = await sheets.spreadsheets.get({
-    spreadsheetId,
+let titlesCache: { at: number; titles: string[] } | null = null;
+
+async function readTitles(): Promise<string[]> {
+  const meta = await google.sheets({ version: "v4", auth: authed() }).spreadsheets.get({
+    spreadsheetId: spreadsheetId(),
     fields: "sheets.properties.title",
   });
   const titles = (meta.data.sheets ?? [])
     .map((s) => s.properties?.title)
     .filter((t): t is string => typeof t === "string" && t.length > 0);
+  titlesCache = { at: Date.now(), titles };
+  return titles;
+}
 
+async function batchGet(titles: string[]): Promise<SheetTab[]> {
   // One request for every tab, not one per supplier.
-  const res = await sheets.spreadsheets.values.batchGet({
-    spreadsheetId,
+  const res = await google.sheets({ version: "v4", auth: authed() }).spreadsheets.values.batchGet({
+    spreadsheetId: spreadsheetId(),
     ranges: titles.map((t) => `'${t.replace(/'/g, "''")}'`),
     valueRenderOption: "UNFORMATTED_VALUE",
     dateTimeRenderOption: "FORMATTED_STRING",
   });
-  const tabs = (res.data.valueRanges ?? []).map((range, i) => ({
+  return (res.data.valueRanges ?? []).map((range, i) => ({
     title: titles[i],
     rows: (range.values ?? []) as unknown[][],
   }));
+}
 
-  // When the sheet was last edited: the best date for a price found to have
-  // moved, since nobody opens this page the minute an edit is made. Failing
-  // to ask only costs that precision.
-  let modifiedAt = Date.now();
+async function readTabs(): Promise<SheetTab[]> {
+  if (titlesCache && Date.now() - titlesCache.at < TITLES_TTL_MS) {
+    try {
+      return await batchGet(titlesCache.titles);
+    } catch {
+      // A tab renamed or deleted since the names were remembered: ask again.
+    }
+  }
+  return batchGet(await readTitles());
+}
+
+/**
+ * When the sheet was last edited: the best date for a price found to have
+ * moved, since nobody opens this page the minute an edit is made. Failing to
+ * ask only costs that precision.
+ */
+async function readModifiedAt(): Promise<number> {
+  const now = Date.now();
   try {
-    const file = await google.drive({ version: "v3", auth }).files.get({
-      fileId: spreadsheetId,
+    const file = await google.drive({ version: "v3", auth: authed() }).files.get({
+      fileId: spreadsheetId(),
       fields: "modifiedTime",
     });
     const t = Date.parse(file.data.modifiedTime ?? "");
-    if (Number.isFinite(t)) modifiedAt = Math.min(t, modifiedAt);
+    return Number.isFinite(t) ? Math.min(t, now) : now;
   } catch (err) {
     console.warn("[price-list] could not read the sheet's modified time:", err);
+    return now;
   }
-  return { tabs, modifiedAt };
+}
+
+/** The price record, or "unreadable" — which must not be mistaken for "empty". */
+async function readHistory(): Promise<{ stored: StoredPrices } | null> {
+  try {
+    return { stored: await loadPriceHistory() };
+  } catch (err) {
+    console.error("[price-history] could not read the record:", err);
+    return null;
+  }
+}
+
+async function load(): Promise<PriceList> {
+  // Three independent reads, made together rather than one after another.
+  const [tabs, modifiedAt, history] = await Promise.all([readTabs(), readModifiedAt(), readHistory()]);
+  const list = buildPriceList(tabs);
+  return history ? applyPriceHistory(list, history.stored, modifiedAt) : list;
 }
 
 let cache: { at: number; list: PriceList } | null = null;
 let inflight: Promise<PriceList> | null = null;
 
-/** The merged price list, from the cache while it is fresh. */
-export async function fetchPriceList(): Promise<PriceList> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.list;
-  // Everyone who opens the page in the same moment waits on one read.
-  inflight ??= readTabs()
-    .then(async ({ tabs, modifiedAt }) => {
-      const list = await withPriceHistory(buildPriceList(tabs), modifiedAt);
+function refresh(): Promise<PriceList> {
+  // Everyone who asks in the same moment waits on one read.
+  inflight ??= load()
+    .then((list) => {
       cache = { at: Date.now(), list };
       return list;
     })
@@ -109,4 +161,20 @@ export async function fetchPriceList(): Promise<PriceList> {
       inflight = null;
     });
   return inflight;
+}
+
+/**
+ * The merged price list.
+ *
+ * Fresh from the cache within a minute; within ten, the last list at once and a
+ * new read started behind it; beyond that, a read that is waited for.
+ */
+export async function fetchPriceList(): Promise<PriceList> {
+  const age = cache ? Date.now() - cache.at : Infinity;
+  if (cache && age < CACHE_TTL_MS) return cache.list;
+  if (cache && age < STALE_OK_MS) {
+    refresh().catch((err) => console.error("[price-list] background refresh failed:", err));
+    return cache.list;
+  }
+  return refresh();
 }

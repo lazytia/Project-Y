@@ -26,6 +26,34 @@ const FETCH_TIMEOUT_MS = 20 * 1000;
 
 const SORT_ORDER: PriceSort[] = ["updated", "name", "price-asc", "price-desc"];
 
+/**
+ * The last list received, kept on the device.
+ *
+ * Reading the sheet takes a moment, so the page shows what it saw last time the
+ * instant it opens and swaps in the fresh list when that arrives. The list is
+ * the same for everyone who may open this page, so it is not kept per person;
+ * who may fetch a new one is still decided by the server.
+ */
+const LIST_CACHE_KEY = "y.priceList.v1";
+
+function readListCache(): PriceList | null {
+  try {
+    const raw = window.localStorage.getItem(LIST_CACHE_KEY);
+    const list = raw ? (JSON.parse(raw) as PriceList) : null;
+    return list && Array.isArray(list.items) && Array.isArray(list.suppliers) ? list : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeListCache(list: PriceList): void {
+  try {
+    window.localStorage.setItem(LIST_CACHE_KEY, JSON.stringify(list));
+  } catch {
+    // Storage full or switched off: the page works the same, a little slower to open.
+  }
+}
+
 function SearchIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -113,6 +141,7 @@ export default function ItemSearchPage() {
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload?.error ?? `Failed (${res.status}).`);
       setList(payload as PriceList);
+      writeListCache(payload as PriceList);
     } catch (err) {
       const timedOut = err instanceof DOMException && err.name === "AbortError";
       setError(
@@ -132,6 +161,15 @@ export default function ItemSearchPage() {
     if (authLoading || !allowed) return;
     void load();
   }, [authLoading, allowed, load]);
+
+  // Show the last list at once; the fetch above replaces it when it lands.
+  useEffect(() => {
+    const cached = readListCache();
+    if (cached) {
+      setList((current) => current ?? cached);
+      setLoading(false);
+    }
+  }, []);
 
   // The cart is kept on the device; pick it up again when the page opens.
   useEffect(() => {
