@@ -1,0 +1,299 @@
+.page {
+  padding: var(--page-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-gap);
+}
+
+.header {
+  text-align: center;
+  padding: var(--space-3) 0 var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+/* ── search box ── */
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.searchBox:focus-within {
+  border-color: var(--color-warm);
+}
+
+.searchIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-lg);
+  color: var(--color-fg);
+  caret-color: var(--color-warm);
+}
+
+.searchInput::placeholder {
+  color: var(--color-fg-subtle);
+}
+
+.clearBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+  border: none;
+  border-radius: 50%;
+  background: var(--color-fg-subtle);
+  color: var(--color-bg);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── supplier chips ── */
+
+.chips {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  /* Run to the screen's edge, so a scrolling row reads as scrolling. */
+  margin: 0 calc(var(--page-padding) * -1);
+  padding: 0 var(--page-padding);
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background: var(--color-surface-hover);
+}
+
+.chipActive,
+.chipActive:hover {
+  background: var(--color-warm-bg);
+  color: var(--color-warm);
+  font-weight: 600;
+}
+
+/* ── result bar ── */
+
+.resultBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.count {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.sort {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sortSelect {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: var(--space-1) var(--space-5) var(--space-1) var(--space-1);
+  font: inherit;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.sortChevron {
+  position: absolute;
+  right: var(--space-1);
+  display: flex;
+  color: var(--color-fg-muted);
+  pointer-events: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── list ── */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+/* The sheet has no photographs, so every row gets the same quiet tile. */
+.thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--item-thumb-size);
+  height: var(--item-thumb-size);
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-fg-subtle);
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-fg);
+  line-height: 1.3;
+  /* Names run long (pack sizes, codes); two lines, then an ellipsis. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.supplier {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.priceCol {
+  flex-shrink: 0;
+  max-width: 40%;
+  text-align: right;
+}
+
+.price {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.amount {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+  white-space: nowrap;
+}
+
+.unit {
+  overflow-wrap: anywhere;
+}
+
+.updated {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-subtle);
+}
+
+/* ── states ── */
+
+.note {
+  margin: var(--space-5) 0;
+  text-align: center;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.errorBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+}
+
+.errorText {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-negative);
+  text-align: center;
+}
+
+.retryBtn,
+.moreBtn {
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+.retryBtn:hover,
+.moreBtn:hover {
+  border-color: var(--color-warm);
+}
+
+.moreBtn {
+  align-self: center;
+}

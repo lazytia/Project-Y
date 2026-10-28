@@ -73,6 +73,9 @@
   --page-padding: var(--space-4);
   --page-gap: var(--space-3);
 
+  /* A list row's picture tile (Item Search) */
+  --item-thumb-size: 56px;
+
   /* Layout */
   --sidebar-width: 260px;
   --header-height: 56px;
