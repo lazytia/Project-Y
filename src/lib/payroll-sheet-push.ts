@@ -227,21 +227,8 @@ function pickPayHistoryBlocks(
   return { appendAfter, template };
 }
 
-export function matchSheetEmployee(displayName: string, sheetEmployees: string[]): string | null {
-  const norm = displayName.trim().toLowerCase();
-  if (!norm) return null;
-
-  for (const emp of sheetEmployees) {
-    const el = emp.toLowerCase();
-    if (el === norm) return emp;
-    const paren = /\(([^)]+)\)/.exec(emp);
-    if (paren && norm.includes(paren[1].trim().toLowerCase())) return emp;
-    const nick = emp.split(/[\s(]/)[0]?.trim().toLowerCase();
-    const first = norm.split(/\s+/)[0];
-    if (nick && (nick === first || norm.startsWith(nick))) return emp;
-  }
-  return null;
-}
+// Where the matching lives, so it can be run on its own; the push route still imports it from here.
+export { matchSheetEmployee } from "@/lib/payroll-name-match";
 
 export async function pushPayHistoryToSheet(
   startISO: string,
