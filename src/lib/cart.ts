@@ -61,3 +61,19 @@ export function writeCart(uid: string, cart: Cart): void {
 export function cartCount(cart: Cart): number {
   return Object.values(cart).reduce((sum, line) => sum + line.qty, 0);
 }
+
+/**
+ * One supplier's order as plain text, to paste or send to them.
+ *
+ *   Order – Alpha Fresh Chicken (28 Oct 2026)
+ *   FEET × 1
+ *   Cabbage Chinese Wombok × 2 (box)
+ *
+ * Names and quantities only: what the kitchen pays is the kitchen's business,
+ * and the supplier has their own price. The unit is named when the sheet gave
+ * one, since "× 2" of a keg and of a box are not the same order.
+ */
+export function orderListText(supplier: string, lines: CartLine[], dateLabel: string): string {
+  const rows = lines.map((l) => `${l.name} × ${l.qty}${l.unit && l.unit !== "unit" ? ` (${l.unit})` : ""}`);
+  return [`Order – ${supplier} (${dateLabel})`, ...rows].join("\n");
+}
