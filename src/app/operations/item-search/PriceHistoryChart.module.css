@@ -21,21 +21,47 @@
   fill: var(--color-fg-subtle);
 }
 
+.axisLabelStart {
+  text-anchor: start;
+}
+
+.axisLabelMid {
+  text-anchor: middle;
+}
+
+.axisLabelEnd {
+  text-anchor: end;
+}
+
 .line {
   stroke: currentColor;
 }
 
-.dot {
-  fill: var(--color-bg);
+/* The last price carried on to today: level, and quieter than the changes. */
+.carry {
   stroke: currentColor;
-  stroke-width: 2;
+  opacity: 0.5;
 }
 
-.dates {
-  display: flex;
-  justify-content: space-between;
+.dot {
+  fill: currentColor;
+  stroke: var(--color-bg);
+  stroke-width: 1.5;
+}
+
+.valueLabel {
   font-size: var(--font-size-xs);
-  color: var(--color-fg-subtle);
+  font-weight: 600;
+  fill: var(--color-fg);
+  text-anchor: middle;
+}
+
+.valueLabelStart {
+  text-anchor: start;
+}
+
+.valueLabelEnd {
+  text-anchor: end;
 }
 
 .changes {
