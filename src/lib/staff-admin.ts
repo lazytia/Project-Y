@@ -46,7 +46,7 @@ export async function createStaffAccount(
   const usernameError = validateUsername(input.username);
   if (usernameError) throw new Error(usernameError);
   if (input.password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    throw new Error(`Employee Number must be at least ${MIN_PASSWORD_LENGTH} characters.`);
   }
   if (!(input.startDate instanceof Date) || Number.isNaN(input.startDate.getTime())) {
     throw new Error("Pick a valid start date.");
@@ -84,7 +84,7 @@ export async function createStaffAccount(
           code === "auth/email-already-in-use"
             ? `Staff ID "${input.username}" is already taken. Pick a different one.`
             : code === "auth/weak-password"
-              ? "Password must be at least 6 characters."
+              ? "Employee Number must be at least 6 characters."
               : code === "auth/invalid-email"
                 ? "That Staff ID isn't valid. Use 3–30 lowercase letters / numbers / . _ -"
                 : code === "auth/operation-not-allowed"

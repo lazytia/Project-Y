@@ -47,7 +47,7 @@ export default function SetupSteps({ platform }: { platform: PlatformKey }) {
       {/* Said here as well as in step five: it is the one thing on the page a
           reader can get stuck on that no instruction of ours can fix. */}
       <p className={styles.note}>
-        Your username and password are in the same message as this link. If you
+        Your username and employee number are in the same message as this link. If you
         cannot find them, ask your manager.
       </p>
     </main>

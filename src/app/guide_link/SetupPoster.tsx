@@ -104,7 +104,7 @@ export default function SetupPoster({
           reader can get stuck on that no instruction of ours can fix — and the
           one line they may need to select, or have read aloud. */}
       <p className={styles.note}>
-        Your username and password are in the same message as this link. If you
+        Your username and employee number are in the same message as this link. If you
         cannot find them, ask your manager.
       </p>
     </main>

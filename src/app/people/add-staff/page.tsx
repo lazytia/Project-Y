@@ -85,7 +85,7 @@ export default function AddStaffPage() {
         <h1 className={styles.title}>Add Staff</h1>
         <p className={styles.subtitle}>
           Create a sign-in account and set their start date. The new staff member
-          can log in immediately with this Staff ID and password.
+          can log in immediately with this Staff ID and employee number.
         </p>
       </header>
 
@@ -110,7 +110,7 @@ export default function AddStaffPage() {
         </div>
 
         <div className={styles.field}>
-          <label htmlFor="password" className={styles.label}>Password</label>
+          <label htmlFor="password" className={styles.label}>Employee Number</label>
           <input
             id="password"
             type="text"

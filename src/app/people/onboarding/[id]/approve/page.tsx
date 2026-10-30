@@ -174,7 +174,7 @@ export default function CreateLoginDetailsPage() {
     const loginIdError = validateUsername(loginId);
     if (loginIdError) return loginIdError;
     if (password.length < 6) {
-      return "Password needs at least 6 characters. Entering the Square Staff ID above fills one in for you.";
+      return "Employee Number needs at least 6 characters. Entering the Square Staff ID above fills one in for you.";
     }
     if (mobileLocal.trim().length < 9) return "Enter the employee's mobile number.";
     return null;
@@ -282,7 +282,7 @@ export default function CreateLoginDetailsPage() {
           `Please set up ${APP_NAME} before your first shift so you can access your roster, payslips and important staff updates.`,
           "",
           `Username: ${finalUsername}`,
-          `Password: ${password}`,
+          `Employee Number: ${password}`,
           "",
           `Setup Guide: ${publicUrl(ROUTES.setupGuide)}`,
         ].join("\n");
@@ -423,12 +423,12 @@ export default function CreateLoginDetailsPage() {
           <p className={styles.fieldHint}>Prefilled from employee&apos;s first name</p>
         </div>
         <div>
-          <p className={styles.fieldLabel}>PASSWORD</p>
+          <p className={styles.fieldLabel}>EMPLOYEE NUMBER</p>
           <div className={styles.passwordWrap}>
             <input
               className={styles.input}
               type={showPassword ? "text" : "password"}
-              placeholder="Enter password"
+              placeholder="Enter employee number"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={busy}
@@ -438,7 +438,7 @@ export default function CreateLoginDetailsPage() {
               type="button"
               className={styles.eyeBtn}
               onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? "Hide employee number" : "Show employee number"}
             >
               <EyeIcon open={showPassword} />
             </button>

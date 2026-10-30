@@ -108,7 +108,7 @@ export const PLATFORMS: Record<PlatformKey, Platform> = {
       },
       {
         title: "Open it and log in",
-        body: "Use the username and password from your welcome message, and tap Allow when it asks about notifications — that is how you are told about shift changes.",
+        body: "Use the username and employee number from your welcome message, and tap Allow when it asks about notifications — that is how you are told about shift changes.",
       },
     ],
   },
@@ -137,7 +137,7 @@ export const PLATFORMS: Record<PlatformKey, Platform> = {
       },
       {
         title: "Open it and log in",
-        body: "Use the username and password from your welcome message, and tap Allow when it asks about notifications — that is how you are told about shift changes.",
+        body: "Use the username and employee number from your welcome message, and tap Allow when it asks about notifications — that is how you are told about shift changes.",
       },
     ],
   },

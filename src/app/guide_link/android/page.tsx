@@ -20,7 +20,7 @@ const ALT = `Installing ${HOME_SCREEN_NAME} on Android, in six steps. \
 3. Install and create shortcut: tap Install, then create shortcut. \
 4. Open from Home Screen: close Chrome, then open the new YURICA icon from your Home Screen. \
 5. Allow notifications: tap Allow to receive roster, payslip and important staff updates. \
-6. Log in and complete onboarding, using the username and password sent to you.`;
+6. Log in and complete onboarding, using the username and employee number sent to you.`;
 
 /* The address drawn in step 1. Measured on android.png (1024 x 1469): the text
    occupies x 184-431, y 332-354, so the centre is 307.5/1024 by 343/1469 and

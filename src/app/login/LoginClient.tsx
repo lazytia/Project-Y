@@ -93,7 +93,7 @@ export default function LoginClient({ initialHasSession }: LoginClientProps) {
       setClientDashboardHint(dashboardKindFromEmail(cred.user.email));
       await refreshAuthSession(cred.user);
     } catch {
-      setError("Invalid username or password");
+      setError("Invalid username or employee number");
       setBusy(false);
     }
   };
@@ -121,7 +121,7 @@ export default function LoginClient({ initialHasSession }: LoginClientProps) {
           />
         </label>
         <label className={styles.field}>
-          <span>Password</span>
+          <span>Employee Number</span>
           <input
             type="password"
             value={password}
