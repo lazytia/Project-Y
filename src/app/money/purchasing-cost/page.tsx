@@ -210,7 +210,8 @@ export default function PurchasingCostPage() {
     };
   }, [summary]);
 
-  const top5 = useMemo(() => current?.suppliers.slice(0, 5) ?? [], [current]);
+  // Every supplier paid that week, biggest first: the list used to stop at five.
+  const ranked = useMemo(() => current?.suppliers ?? [], [current]);
 
   if (authLoading || !user || !allowed) return <Splash />;
 
@@ -385,13 +386,13 @@ export default function PurchasingCostPage() {
             TOP SUPPLIERS <span className={styles.cardTitleSub}>(Last Week)</span>
           </p>
         </div>
-        {top5.length === 0 ? (
+        {ranked.length === 0 ? (
           <p className={styles.listEmpty}>
             {fetching ? "Loading…" : "No supplier purchases recorded for this week yet."}
           </p>
         ) : (
           <ol className={styles.rankList}>
-            {top5.map((s, idx) => (
+            {ranked.map((s, idx) => (
               <li key={s.name} className={styles.rankItem}>
                 <span className={idx === 0 ? styles.rankHot : styles.rank}>{idx + 1}</span>
                 <span className={styles.rankName}>{s.name}</span>
