@@ -14,7 +14,7 @@ import {
   type PublishShift,
 } from "@/lib/manager-actions";
 import { rosterChangeNotifies, type RosterChange } from "@/lib/roster-publish";
-import { isTeamMember } from "@/lib/staff-active";
+import { isPastOnboarding, isTeamMember, staffOnboardingFlags } from "@/lib/staff-active";
 import {
   CHEF_USERNAMES,
   OWNER_USERNAMES,
@@ -253,11 +253,17 @@ function sydneyTodayDate(): Date {
   return dt;
 }
 
-function assignmentCount(doc: RosterWeekDoc, iso: string, meal: Meal): number {
-  const assignments = doc.assignments?.[iso]?.[meal] ?? {};
-  const fromAssignments = Object.keys(assignments).length;
-  if (fromAssignments > 0) return fromAssignments;
-  return doc.counts?.[iso]?.[meal] ?? 0;
+/**
+ * Who may be put on the roster: the team, less anyone an owner has not signed
+ * off. A new hire is on New Employees until the owner presses Activate, and has
+ * no use of a shift before then — the chef rostered one the day she was
+ * requested, and the shift sat on a person the owner had never seen.
+ */
+function rosterTeam(docs: StaffDoc[]): StaffDoc[] {
+  return docs.filter(
+    (d) =>
+      isTeamMember(d) && isPastOnboarding(staffOnboardingFlags(d as unknown as Record<string, unknown>)),
+  );
 }
 
 function resolveShiftStaff(
@@ -511,9 +517,26 @@ export default function ManagerRosterPage() {
   const weekStartISO = useMemo(() => isoDate(weekStart), [weekStart]);
   const initialRosterCache = useMemo(() => readRosterCache(weekStartISO), [weekStartISO]);
 
-  const [staffDocs, setStaffDocs] = useState<StaffDoc[]>(
-    () => (initialRosterCache?.staffDocs as StaffDoc[] | undefined) ?? [],
+  const [staffDocs, setStaffDocs] = useState<StaffDoc[]>(() =>
+    rosterTeam((initialRosterCache?.staffDocs as StaffDoc[] | undefined) ?? []),
   );
+  /**
+   * Whether an assignment is one anybody can see: a temporary slot, or a person
+   * on the list above. An assignment under any other id belongs to nobody who
+   * can be named — a request whose record was replaced when it was approved, or
+   * someone not yet signed off — and counting it made a shift say six assigned
+   * with five names on it.
+   */
+  const isRostered = useCallback(
+    (uid: string) => uid.startsWith("tr_") || staffDocs.some((d) => d.uid === uid),
+    [staffDocs],
+  );
+  /** Head count for a shift, from the people who can be seen on it. */
+  function assignmentCount(doc: RosterWeekDoc, iso: string, meal: Meal): number {
+    const assignments = doc.assignments?.[iso]?.[meal] ?? {};
+    if (Object.keys(assignments).length > 0) return Object.keys(assignments).filter(isRostered).length;
+    return doc.counts?.[iso]?.[meal] ?? 0;
+  }
   const [weekDoc, setWeekDoc] = useState<RosterWeekDoc>(
     () => (initialRosterCache?.weekDoc as RosterWeekDoc | undefined) ?? {},
   );
@@ -613,7 +636,7 @@ export default function ManagerRosterPage() {
       // isTeamMember reads the username against the three real owners and
       // drops terminated staff, and deliberately keeps a hire who has not
       // finished onboarding: they work shifts before the paperwork is in.
-      const nextStaff = [...byUid.values()].filter(isTeamMember);
+      const nextStaff = rosterTeam([...byUid.values()]);
       setStaffDocs(nextStaff);
 
       const nextWeek = (weekSnap.exists() ? (weekSnap.data() as RosterWeekDoc) : {}) ?? {};
@@ -740,8 +763,8 @@ export default function ManagerRosterPage() {
       const counts = { ...(currentDoc.counts ?? {}) };
       counts[iso] = {
         ...(counts[iso] ?? {}),
-        lunch: Object.keys(dayAssignments.lunch ?? {}).length,
-        dinner: Object.keys(dayAssignments.dinner ?? {}).length,
+        lunch: Object.keys(dayAssignments.lunch ?? {}).filter(isRostered).length,
+        dinner: Object.keys(dayAssignments.dinner ?? {}).filter(isRostered).length,
       };
 
       // mergeFields, not merge: true. A plain merge folds the map being written
@@ -1702,7 +1725,7 @@ export default function ManagerRosterPage() {
         const dowIdx = (cellDate.getDay() + 6) % 7;
         const longDow = DAY_LABELS_FULL[dowIdx] ?? DAY_LABELS_LONG[dowIdx];
         const cur = assignedFor(modalCell.iso, modalCell.meal, modalCell.weekKey);
-        const assignedCount = Object.keys(cur).length;
+        const assignedCount = Object.keys(cur).filter(isRostered).length;
         const starts = startTimesFor(modalCell.meal, dowIdx);
         return (
           <div
@@ -1994,10 +2017,11 @@ export default function ManagerRosterPage() {
             </header>
 
             <div className={styles.chefStaffList}>
-              {Object.keys(assignedFor(chefStaffModal.iso, chefStaffModal.meal, chefStaffModal.weekKey)).length === 0 ? (
+              {Object.keys(assignedFor(chefStaffModal.iso, chefStaffModal.meal, chefStaffModal.weekKey)).filter(isRostered).length === 0 ? (
                 <p className={styles.chefStaffEmpty}>No staff assigned for this shift.</p>
               ) : (
                 Object.entries(assignedFor(chefStaffModal.iso, chefStaffModal.meal, chefStaffModal.weekKey))
+                  .filter(([uid]) => isRostered(uid))
                   .map(([uid, startTime]) => ({
                     uid,
                     ...resolveShiftStaff(uid, startTime, staffDocs),
