@@ -81,7 +81,14 @@ export const OWNER_NAV: NavGroup[] = [
       {
         label: "Roster",
         href: "/scheduling/roster",
-        children: [{ label: "Timesheets", href: "/payroll/timesheets" }],
+        // The two requests sit with the roster they change, each opening the
+        // Action Required queue on its own tab — the same queue People links
+        // to, which the owner otherwise only reached by going looking for it.
+        children: [
+          { label: "Timesheets", href: "/payroll/timesheets" },
+          { label: "Holiday Requests", href: "/attention-required?filter=holiday" },
+          { label: "Availability Requests", href: "/attention-required?filter=availability" },
+        ],
       },
       { label: "Cash Payments", href: "/people/cash-payments" },
     ],
@@ -331,4 +338,87 @@ export function navForSessionRole(
   if (dashboard === "manager") return MANAGER_NAV;
   if (role === "owner") return OWNER_NAV;
   return OWNER_NAV;
+}
+
+/* ── Which entry stands for the current page ── */
+
+export function isNavChildActive(pathname: string, href: string): boolean {
+  // usePathname() never carries a query string, so a nav href that opens a
+  // page on a particular tab — /attention-required?filter=availability — could
+  // never match the path it lands on. It highlighted nothing, and worse left
+  // groupOwningPath unable to find the group holding it, so the accordion
+  // collapsed the moment that row was used.
+  const path = href.split("?")[0];
+  if (pathname === path) return true;
+  if (path === "/onboarding" && pathname.startsWith("/onboarding")) return true;
+  return pathname.startsWith(`${path}/`);
+}
+
+/**
+ * How well a nav href describes the current page: 0 not at all, 1 by its path,
+ * 2 by its path and every query parameter it names, and 0.5 for a href whose
+ * path matches but whose tab is not the open one — still the right entry when
+ * a menu has no other way to that page, as the kitchen's has none but its
+ * Availability Requests row.
+ *
+ * The owner's menu reaches /attention-required three ways — Action Required
+ * under People, and Holiday / Availability Requests under Roster, each opening
+ * one tab. Matching on the path alone lit all three at once and opened
+ * whichever group came first, so a href that names the tab now has to agree
+ * with the tab that is open, and beats a plain link to the same page.
+ */
+export function navHrefScore(pathname: string, search: URLSearchParams, href: string): number {
+  if (!isNavChildActive(pathname, href)) return 0;
+  const query = href.split("?")[1];
+  if (!query) return 1;
+  for (const [key, value] of new URLSearchParams(query)) {
+    if (search.get(key) !== value) return 0.5;
+  }
+  return 2;
+}
+
+/**
+ * The one href in the rendered tree that stands for the current page, or null.
+ * The best score wins; among equals, the first in menu order.
+ */
+export function activeNavHref(nav: NavGroup[], pathname: string, search: URLSearchParams): string | null {
+  let best: string | null = null;
+  let bestScore = 0;
+  const consider = (href: string | undefined) => {
+    if (!href) return;
+    const score = navHrefScore(pathname, search, href);
+    if (score > bestScore) {
+      best = href;
+      bestScore = score;
+    }
+  };
+  const walk = (items: NavItem[]) =>
+    items.forEach((i) => {
+      consider(i.href);
+      if (i.children) walk(i.children);
+    });
+  nav.forEach((g) => {
+    consider(g.href);
+    if (g.children) walk(g.children);
+  });
+  return best;
+}
+
+/**
+ * Label of the group that holds the current page's entry, or null. Searched
+ * through the rendered tree — including grandchildren — so the answer is
+ * always whatever the menu actually looks like for this role.
+ *
+ * A group's own href counts as well as its children's: HR Records is a
+ * section with a page of its own, and landing on that page should leave the
+ * list under it open rather than collapsed. Groups with nothing under them
+ * are skipped — there is no accordion to open.
+ */
+export function groupOwningPath(nav: NavGroup[], activeHref: string | null): string | null {
+  if (!activeHref) return null;
+  const owns = (items: NavItem[]): boolean =>
+    items.some((i) => i.href === activeHref || (i.children ? owns(i.children) : false));
+  return (
+    nav.find((g) => !!g.children && (owns(g.children) || g.href === activeHref))?.label ?? null
+  );
 }

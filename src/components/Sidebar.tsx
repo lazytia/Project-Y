@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { User } from "firebase/auth";
 import { useAuth } from "./AuthProvider";
 import { useLang } from "./LanguageProvider";
@@ -14,8 +14,11 @@ import type { DashboardKind } from "@/lib/session-dashboard";
 import { prefetchOwnerMoneySummaries } from "@/lib/owner-money-prefetch";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import {
+  activeNavHref,
   buildStaffNav,
   CHEF_NAV,
+  groupOwningPath,
+  isNavChildActive,
   MANAGER_NAV,
   NAV_ICON_GLYPH,
   OWNER_NAV,
@@ -47,51 +50,16 @@ type Props = {
   initialDashboard?: DashboardKind | null;
 };
 
-function isNavChildActive(pathname: string, href: string): boolean {
-  // usePathname() never carries a query string, so a nav href that opens a
-  // page on a particular tab — /attention-required?filter=availability — could
-  // never match the path it lands on. It highlighted nothing, and worse left
-  // groupOwningPath unable to find the group holding it, so the accordion
-  // collapsed the moment that row was used.
-  const path = href.split("?")[0];
-  if (pathname === path) return true;
-  if (path === "/onboarding" && pathname.startsWith("/onboarding")) return true;
-  return pathname.startsWith(`${path}/`);
-}
-
-/**
- * Label of the group that contains the current page, or null. Searched
- * through the rendered tree — including grandchildren — so the answer is
- * always whatever the menu actually looks like for this role.
- *
- * A group's own href counts as well as its children's: HR Records is a
- * section with a page of its own, and landing on that page should leave the
- * list under it open rather than collapsed. Groups with nothing under them
- * are skipped — there is no accordion to open.
- */
-function groupOwningPath(nav: NavGroup[], pathname: string): string | null {
-  const owns = (items: NavItem[]): boolean =>
-    items.some(
-      (i) => isNavChildActive(pathname, i.href) || (i.children ? owns(i.children) : false),
-    );
-  return (
-    nav.find(
-      (g) =>
-        !!g.children &&
-        (owns(g.children) || (!!g.href && isNavChildActive(pathname, g.href))),
-    )?.label ?? null
-  );
-}
-
 function NavChildList({
   items,
-  pathname,
+  activeHref,
   onNavigate,
   badges,
   nested = false,
 }: {
   items: NavItem[];
-  pathname: string;
+  /** The entry standing for the current page (see activeNavHref). */
+  activeHref: string | null;
   onNavigate?: () => void;
   /** How many new rows each href has gained since the user last opened it. */
   badges?: NavCountMap;
@@ -106,7 +74,7 @@ function NavChildList({
           <Link
             href={item.href}
             className={`${styles.childLink} ${nested ? styles.grandChildLink : ""} ${
-              isNavChildActive(pathname, item.href) ? styles.active : ""
+              item.href === activeHref ? styles.active : ""
             }`}
             onClick={onNavigate}
           >
@@ -123,7 +91,7 @@ function NavChildList({
           {item.children && (
             <NavChildList
               items={item.children}
-              pathname={pathname}
+              activeHref={activeHref}
               onNavigate={onNavigate}
               badges={badges}
               nested
@@ -152,6 +120,7 @@ function NavChildList({
 function NavGroupBlock({
   group,
   pathname,
+  activeHref,
   expanded,
   onToggle,
   onNavigate,
@@ -159,6 +128,7 @@ function NavGroupBlock({
 }: {
   group: NavGroup;
   pathname: string;
+  activeHref: string | null;
   expanded: boolean;
   onToggle: () => void;
   onNavigate?: () => void;
@@ -210,7 +180,7 @@ function NavGroupBlock({
         <div className={`${styles.collapseWrap} ${expanded ? styles.collapseOpen : ""}`}>
           <NavChildList
             items={group.children}
-            pathname={pathname}
+            activeHref={activeHref}
             onNavigate={onNavigate}
             badges={badges}
           />
@@ -298,6 +268,7 @@ function useNavChangeBadges(user: User | null | undefined, enabled: boolean, pat
 
 export default function Sidebar({ open, onClose, initialDashboard = null }: Props) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user, signOut, staffAppLocked } = useAuth();
   const { t, canChooseLanguage } = useLang();
   // Firebase Auth hydrates a second or two after paint, and until it does
@@ -372,13 +343,21 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
    * all — so every Training link collapsed the accordion. Asking the tree
    * which group owns the path can't drift out of step with the menu.
    *
-   * Depends on the path and the tree, never on openGroup: a group the user
-   * expands by hand stays expanded until they navigate somewhere else.
+   * Depends on the current entry and the tree, never on openGroup: a group the
+   * user expands by hand stays expanded until they navigate somewhere else. The
+   * entry follows the query string too, so switching a tab on Action Required
+   * moves the highlight between the Roster rows and People.
    */
+  const search = searchParams.toString();
+  const activeHref = useMemo(
+    () => activeNavHref(activeNav, pathname, new URLSearchParams(search)),
+    [activeNav, pathname, search],
+  );
+
   useEffect(() => {
-    const owner = groupOwningPath(activeNav, pathname);
+    const owner = groupOwningPath(activeNav, activeHref);
     if (owner) setOpenGroup(owner);
-  }, [pathname, activeNav]);
+  }, [activeHref, activeNav]);
 
   // Staff who haven't completed onboarding — and staff who have but whom no
   // owner has activated yet — get a stripped sidebar: no nav links, just
@@ -434,6 +413,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
               key={group.label}
               group={group}
               pathname={pathname}
+              activeHref={activeHref}
               expanded={openGroup === group.label}
               onToggle={() => toggleGroup(group.label)}
               onNavigate={onClose}
@@ -465,6 +445,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
             key={group.label}
             group={group}
             pathname={pathname}
+            activeHref={activeHref}
             expanded={openGroup === group.label}
             onToggle={() => toggleGroup(group.label)}
             onNavigate={onClose}
