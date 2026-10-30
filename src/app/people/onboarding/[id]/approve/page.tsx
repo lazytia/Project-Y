@@ -16,6 +16,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { actorNameOf, isStrictOwner } from "@/lib/permissions";
 import { shouldActivatePayrollReminder } from "@/lib/payroll-attention";
 import { onboardingProgressPatch } from "@/lib/staff-active";
+import { moveRosterAssignments } from "@/lib/roster-move";
 import { ROUTES, publicUrl } from "@/lib/routes";
 import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import { createStaffAccount } from "@/lib/staff-admin";
@@ -248,6 +249,12 @@ export default function CreateLoginDetailsPage() {
       );
 
       if (requestId !== uid) {
+        // Shifts the chef put on the request go with the person to their new id.
+        // A failure here must not undo an account that now exists; the roster
+        // simply keeps counting them as a shift with no name until it is fixed.
+        await moveRosterAssignments(requestId, uid).catch((err) =>
+          console.error("[approve] moving roster shifts failed:", err),
+        );
         await deleteDoc(doc(getDb(), "staff_onboarding", requestId));
       }
 
