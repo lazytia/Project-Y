@@ -29,6 +29,9 @@ const STAFF_STEP_CACHE_KEY = "y.staffStep";
  */
 const SIGN_OUT_COOKIE_WAIT_MS = 2_500;
 
+/** How long signing out waits to take this phone off the person's record before going on without. */
+const FCM_UNREGISTER_WAIT_MS = 1_500;
+
 type StaffStepCache = { uid: string; step: number; activated?: boolean };
 
 /** `activated: null` for a record written before it was cached — unknown, not
@@ -384,6 +387,23 @@ export function AuthProvider({
     };
   }, [user, loading]);
 
+  // Keep this phone registered for notifications under whoever is signed in.
+  // Signing in is not the only way to arrive: the app is mostly opened with the
+  // session already there, and a phone whose registration was lost (or never
+  // finished) would otherwise stay off its owner's record for good. Only where
+  // permission has already been given, so this never asks; and late, so it
+  // takes nothing from the screen coming up.
+  const signedInUid = user?.uid ?? null;
+  useEffect(() => {
+    if (!signedInUid || typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    return runWhenIdle(() => {
+      void import("@/lib/fcm")
+        .then((m) => m.registerFcmToken(signedInUid))
+        .catch(() => {/* best effort */});
+    }, 6000);
+  }, [signedInUid]);
+
   const userIsOwner = isOwner(user);
   const userIsChef = isChef(user);
   const staffNeedsOnboarding =
@@ -596,6 +616,15 @@ export function AuthProvider({
         import("firebase/auth"),
         import("@/lib/firebase"),
       ]);
+      // Take this phone off their record while they are still signed in, so the
+      // next person to use it is not sent this one's notices. Time-boxed: signing
+      // out does not wait on the network for it.
+      if (user) {
+        await Promise.race([
+          import("@/lib/fcm").then((m) => m.unregisterFcmToken(user.uid)).catch(() => {/* best effort */}),
+          new Promise<void>((resolve) => setTimeout(resolve, FCM_UNREGISTER_WAIT_MS)),
+        ]);
+      }
       await fbSignOut(getAuth()).catch(() => {/* revoke the UI regardless */});
 
       clearStaffStepCache();

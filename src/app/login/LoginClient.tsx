@@ -22,6 +22,9 @@ type LoginClientProps = {
   initialHasSession: boolean;
 };
 
+/** The longest sign-in waits for this phone to be registered for notifications. */
+const REGISTER_WAIT_MS = 4_000;
+
 export default function LoginClient({ initialHasSession }: LoginClientProps) {
   const { user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
@@ -76,7 +79,14 @@ export default function LoginClient({ initialHasSession }: LoginClientProps) {
       }
 
       if (notifPermission === "granted") {
-        registerFcmToken(cred.user.uid).catch(() => {});
+        // Waited for, within limits. This used to be left running while the page
+        // moved on, and the move to the next screen is a full page load that
+        // cancels whatever is still in flight: for most people the registration
+        // never finished, so their own phone was never on their record.
+        await Promise.race([
+          registerFcmToken(cred.user.uid).catch(() => null),
+          new Promise<void>((resolve) => setTimeout(resolve, REGISTER_WAIT_MS)),
+        ]);
       }
 
       setClientSessionHint();
