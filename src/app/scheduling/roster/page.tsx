@@ -14,7 +14,7 @@ import {
   type PublishShift,
 } from "@/lib/manager-actions";
 import { rosterChangeNotifies, type RosterChange } from "@/lib/roster-publish";
-import { isTeamMember, onboardingProgressPatch, type StaffOnboardingFlags } from "@/lib/staff-active";
+import { isTeamMember } from "@/lib/staff-active";
 import {
   CHEF_USERNAMES,
   OWNER_USERNAMES,
@@ -782,9 +782,12 @@ export default function ManagerRosterPage() {
         const ref = doc(getDb(), "staff_onboarding", uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          const raw = snap.data() as StaffOnboardingFlags;
-          const progress = onboardingProgressPatch(raw, { addedToScheduling: true });
-          await updateDoc(ref, { ...progress, updatedAt: serverTimestamp() });
+          // Only the fact that they are on the roster. Their status is not the
+          // roster's to set: it used to be worked out here from whether they had
+          // a login, which turned a request nobody had approved into "approved"
+          // — and an approved person is listed under Active Employees. Putting
+          // someone on a shift does not approve them or text them a login.
+          await updateDoc(ref, { addedToScheduling: true, updatedAt: serverTimestamp() });
         }
       } catch (err) {
         // eslint-disable-next-line no-console
