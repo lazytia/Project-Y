@@ -83,7 +83,10 @@ export async function pushToUid(uid: string, message: PushMessage): Promise<Push
  * is always a side effect of something more important, and half a delivery
  * beats aborting the thing that triggered it.
  */
-export async function pushToOwners(message: PushMessage): Promise<PushResult> {
+export async function pushToOwners(
+  message: PushMessage,
+  options?: { excludeUid?: string },
+): Promise<PushResult> {
   const snap = await adminDb()
     .collection(STAFF_COLLECTION)
     .where("role", "==", "owner")
@@ -92,6 +95,8 @@ export async function pushToOwners(message: PushMessage): Promise<PushResult> {
   let delivered = 0;
   let failed = 0;
   for (const doc of snap.docs) {
+    // Whoever caused the alert does not need telling about their own action.
+    if (doc.id === options?.excludeUid) continue;
     const res = await pushToUid(doc.id, message).catch(() => null);
     if (!res) continue;
     delivered += res.delivered;

@@ -79,11 +79,17 @@ function nameOf(d: Record<string, unknown>, uid: string): string {
   return uid.slice(0, 6);
 }
 
+/** Written to an owner's record when a roster is published (lib/owner-announce). */
+const OWNER_ROSTER_KIND = "roster-published-owner";
+
+/** How long an owner's roster-published notice stays in the bell: news, not a task. */
+const OWNER_ROSTER_NOTICE_DAYS = 3;
+
 /** The notices announced to one employee, as stored on their own staff_onboarding doc. */
 function ownNotificationItems(me: Record<string, unknown>): BellItem[] {
   const notifs = (Array.isArray(me.notifications)
     ? me.notifications
-    : []) as { id?: string; title?: string; detail?: string; createdAt?: Timestamp }[];
+    : []) as { id?: string; kind?: string; title?: string; detail?: string; createdAt?: Timestamp }[];
   return notifs.map((n) => {
     const at = tsDate(n.createdAt);
     return {
@@ -91,10 +97,30 @@ function ownNotificationItems(me: Record<string, unknown>): BellItem[] {
       title: n.title ?? "Notification",
       detail: n.detail ?? "",
       ago: fmtRelative(at),
-      href: n.id ? `/staff/notifications/${n.id}` : undefined,
+      // An owner's notice leads to the roster; a staff member's opens its own page.
+      href:
+        n.kind === OWNER_ROSTER_KIND
+          ? "/scheduling/roster"
+          : n.id
+            ? `/staff/notifications/${n.id}`
+            : undefined,
       occurredAt: at,
     };
   });
+}
+
+/** An owner's own notices that are still worth showing: the recent roster ones. */
+function ownerRosterNoticeItems(me: Record<string, unknown>): BellItem[] {
+  const notifs = Array.isArray(me.notifications) ? (me.notifications as { kind?: string; id?: string }[]) : [];
+  const recent = new Set(
+    notifs
+      .filter((n) => n.kind === OWNER_ROSTER_KIND && n.id)
+      .map((n) => n.id as string),
+  );
+  const cutoff = Date.now() - OWNER_ROSTER_NOTICE_DAYS * 86400000;
+  return ownNotificationItems(me).filter(
+    (it) => recent.has(it.id) && (it.occurredAt?.getTime() ?? 0) >= cutoff,
+  );
 }
 
 /**
@@ -255,6 +281,8 @@ export function useBellInbox(options?: { enabled?: boolean }): {
           // The chef is staff as well: what has been announced to them still
           // lands in the same bell.
           if (chef) out.push(...ownNotificationItems(meData));
+          // Owners are told when a roster is published, which the chef does.
+          else out.push(...ownerRosterNoticeItems(meData));
           // Newest first.
           out.sort((a, b) => (b.occurredAt?.getTime() ?? 0) - (a.occurredAt?.getTime() ?? 0));
           if (!cancelled) setItems(out);

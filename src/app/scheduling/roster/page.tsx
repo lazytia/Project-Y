@@ -1109,6 +1109,21 @@ export default function ManagerRosterPage() {
           recipients.filter((s) => rosterChangeNotifies(p.changeOf(s.uid))).map((s) => s.uid),
         ),
       ).size;
+      // The owners hear about every publish, whoever pressed it. The server
+      // leaves out whoever did, and a failure here must not look like the
+      // publish failing: the staff have already been told.
+      try {
+        const idToken = await user?.getIdToken();
+        if (idToken) {
+          await fetch("/api/roster/notify-owners", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ ranges: planned.map((p) => p.range), told }),
+          });
+        }
+      } catch (err) {
+        console.error("[roster] telling the owners failed:", err);
+      }
       alert(
         told === 0
           ? "Roster published. No one's shifts had changed, so no one was notified."
