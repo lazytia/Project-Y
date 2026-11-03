@@ -58,6 +58,9 @@ export async function callBooking<T = Record<string, unknown>>(
       cache: "no-store",
       headers: {
         Origin: SPOOF_ORIGIN,
+        // Proves to the booking platform that this is Project-Y's server, so it
+        // returns guest details. Without it the list comes back stripped.
+        "x-booking-server-key": process.env.BOOKING_SERVER_KEY ?? "",
         ...(hasBody ? { "Content-Type": "application/json" } : {}),
       },
       ...(hasBody ? { body: JSON.stringify(init.body) } : {}),
