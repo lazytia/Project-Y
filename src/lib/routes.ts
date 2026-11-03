@@ -27,6 +27,7 @@ export const ROUTES = {
   staffFoodSafety: "/staff/food-safety",
   staffTrainingMaterials: "/staff/training-materials",
   reservations: "/operations/reservations",
+  bookingSources: "/operations/reservations/sources",
   cateringOrders: "/operations/catering-orders",
   setupGuide: "/guide_link",
 } as const;

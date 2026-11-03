@@ -1,0 +1,181 @@
+.page {
+  padding: var(--page-padding);
+  max-width: 640px;
+}
+
+.header {
+  margin-bottom: var(--space-4);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.badge {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-warm-bg);
+  color: var(--color-fg);
+  font-size: var(--font-size-sm);
+}
+
+.subtitle {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-fg-muted);
+}
+
+/* ── 7D / 30D / 90D ── */
+.periods {
+  display: inline-flex;
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.period {
+  min-width: 88px;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+
+.periodActive {
+  background: var(--color-warm);
+  color: var(--color-accent-fg);
+  border-radius: var(--radius-md);
+}
+
+/* ── Cards ── */
+.card {
+  margin-bottom: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+.totalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.cardSub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.totalNumber {
+  font-size: var(--font-size-3xl);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.breakdownTitle {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.rowHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.rowLabel {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.rowValue {
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+}
+
+/* A <progress> keeps the bar length in markup, so no inline width is needed. */
+.bar {
+  display: block;
+  width: 100%;
+  height: var(--space-2);
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+  overflow: hidden;
+}
+
+.bar::-webkit-progress-bar {
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
+}
+
+.bar::-webkit-progress-value {
+  background: var(--color-warm);
+  border-radius: var(--radius-sm);
+}
+
+.bar::-moz-progress-bar {
+  background: var(--color-warm);
+  border-radius: var(--radius-sm);
+}
+
+.footer {
+  padding-top: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.footer p {
+  margin: 0;
+}
+
+.footer .note {
+  margin-top: var(--space-1);
+  color: var(--color-fg-subtle);
+}
+
+.error {
+  color: var(--color-negative);
+  font-size: var(--font-size-md);
+}

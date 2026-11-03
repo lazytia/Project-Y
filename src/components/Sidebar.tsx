@@ -300,16 +300,17 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
 
   // Managers (yurina) get a curated nav — narrower than the owner nav and
   // explicit so the structure isn't accidentally widened later.
-  const ownerNav = useMemo(
-    () =>
-      OWNER_NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
-        .map((group) => ({
-          ...group,
-          children: group.children?.filter((c) => !c.ownerOnly || userIsStrictOwner),
-        }))
-        .filter((group) => group.href || (group.children && group.children.length > 0)),
-    [userIsStrictOwner],
-  );
+  const ownerNav = useMemo(() => {
+    // Owner-only items can sit a level down (Booking Sources under
+    // Reservations), so the filter walks every level, not just the first.
+    const visible = (items?: NavItem[]): NavItem[] | undefined =>
+      items
+        ?.filter((c) => !c.ownerOnly || userIsStrictOwner)
+        .map((c) => (c.children ? { ...c, children: visible(c.children) } : c));
+    return OWNER_NAV.filter((group) => !group.ownerOnly || userIsStrictOwner)
+      .map((group) => ({ ...group, children: visible(group.children) }))
+      .filter((group) => group.href || (group.children && group.children.length > 0));
+  }, [userIsStrictOwner]);
 
   // Staff sidebar. Built here rather than inside the staff branch below so the
   // open-group effect can see the same tree the staff member is looking at.

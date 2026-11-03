@@ -19,7 +19,7 @@ export const BOOKING_API =
 export const SPOOF_ORIGIN = "https://book.admin.yurica.com.au";
 
 export type AuthResult =
-  | { ok: true }
+  | { ok: true; email: string | null }
   | { ok: false; status: number; error: string };
 
 /** Reject anything without a valid Firebase ID token. */
@@ -27,8 +27,8 @@ export async function verifyAuth(req: NextRequest): Promise<AuthResult> {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!idToken) return { ok: false, status: 401, error: "Missing bearer token." };
   try {
-    await adminAuth().verifyIdToken(idToken);
-    return { ok: true };
+    const decoded = await adminAuth().verifyIdToken(idToken);
+    return { ok: true, email: decoded.email ?? null };
   } catch (err) {
     return {
       ok: false,

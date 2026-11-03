@@ -74,7 +74,11 @@ export const OWNER_NAV: NavGroup[] = [
     icon: "food",
     label: "Operations",
     children: [
-      { label: "Reservations", href: "/operations/reservations" },
+      {
+        label: "Reservations",
+        href: ROUTES.reservations,
+        children: [{ label: "Booking Sources", href: ROUTES.bookingSources, ownerOnly: true }],
+      },
       { label: "Catering", href: "/operations/catering-orders" },
       { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
       { label: "Item & Price Search", href: "/operations/item-search" },
@@ -355,8 +359,9 @@ export function isNavChildActive(pathname: string, href: string): boolean {
 }
 
 /**
- * How well a nav href describes the current page: 0 not at all, 1 by its path,
- * 2 by its path and every query parameter it names, and 0.5 for a href whose
+ * How well a nav href describes the current page: 0 not at all, 1 by a path
+ * prefix, 1.5 by its exact path, 2 by its path and every query parameter it
+ * names, and 0.5 for a href whose
  * path matches but whose tab is not the open one — still the right entry when
  * a menu has no other way to that page, as the kitchen's has none but its
  * Availability Requests row.
@@ -369,8 +374,10 @@ export function isNavChildActive(pathname: string, href: string): boolean {
  */
 export function navHrefScore(pathname: string, search: URLSearchParams, href: string): number {
   if (!isNavChildActive(pathname, href)) return 0;
-  const query = href.split("?")[1];
-  if (!query) return 1;
+  const [path, query] = href.split("?");
+  // A page nested under another entry's path (Booking Sources under
+  // Reservations) matches both by prefix; the entry naming it exactly wins.
+  if (!query) return pathname === path ? 1.5 : 1;
   for (const [key, value] of new URLSearchParams(query)) {
     if (search.get(key) !== value) return 0.5;
   }
