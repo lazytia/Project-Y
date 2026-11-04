@@ -1,22 +1,22 @@
 /**
- * How a day's sales divide between cash, card and everything else.
+ * What has been collected so far, by how it was paid: cash, card and everything else.
  *
- * Square records how each order was paid as `tenders` on the order, so the split
- * comes from the same orders the dashboard already fetches for its sales figure
- * — no second request.
+ * Square records how each order was paid as `tenders` on the order, so the figures
+ * come from the same orders the dashboard already fetches for its sales figure —
+ * no second request.
  *
- * What is split is the sales figure itself (gross, 9am-10pm, refunds taken off),
- * not the money in the till. Tenders carry tax, tips and surcharges that the
- * sales figure leaves out, so adding up the tenders would not give the number
- * printed above them. Instead each order's gross sales are shared out across
- * the tenders that paid for it, and the result is scaled to the day's total.
- * Cash plus card plus other therefore always equals Total Sales, to the cent.
+ * These are the amounts actually taken, the same ones Square's own Sales Report
+ * prints under "Sales by payment types". They are NOT a cut of Total Sales: a table
+ * that has eaten but not paid yet is in the sales figure and in no tender, so during
+ * service cash plus card is less than the total, and catches up as tables settle.
+ * Scaling them up to the total to hide that gap would show a cash figure the till
+ * never held.
  */
 
 export type PaymentSplitEntry = {
   /** Dollars. */
   amount: number;
-  /** Percent of the day's sales, to one decimal. */
+  /** Percent of what has been collected, to one decimal. */
   pct: number;
 };
 
@@ -31,9 +31,7 @@ type Money = { amount?: number | bigint | null } | null | undefined;
 
 /** The part of a Square order this needs; the SDK's Order satisfies it. */
 export type OrderForSplit = {
-  tenders?:
-    | { type?: string | null; amountMoney?: Money; tipMoney?: Money }[]
-    | null;
+  tenders?: { type?: string | null; amountMoney?: Money }[] | null;
 };
 
 type Bucket = "cash" | "card" | "other";
@@ -76,55 +74,30 @@ export function apportion(total: number, weights: number[]): number[] {
 }
 
 /**
- * @param orders      the orders whose gross sales make up `totalDollars`
- * @param grossCents  an order's gross sales, in cents
- * @param totalDollars the day's sales as shown on the dashboard (refunds off)
- * @returns null when there is nothing to split: no paid orders yet, or no sales.
+ * @param orders the orders whose payments to add up
+ * @returns null when nothing has been paid yet.
  */
-export function splitSalesByTender<O extends OrderForSplit>(
-  orders: O[],
-  grossCents: (order: O) => number,
-  totalDollars: number,
-): PaymentSplit | null {
-  const share: Record<Bucket, number> = { cash: 0, card: 0, other: 0 };
+export function collectedByTender(orders: OrderForSplit[]): PaymentSplit | null {
+  const collected: Record<Bucket, number> = { cash: 0, card: 0, other: 0 };
 
+  // A tender's amount includes any tip on it, as in Square's report. An open
+  // order has no tender yet and so counts for nothing here.
   for (const order of orders) {
-    const gross = grossCents(order);
-    if (!(gross > 0)) continue;
-
-    // What each tender paid toward the order, tip left out — a tip is the
-    // customer's to give and not part of the sale, and on a card it would tilt
-    // the split towards card.
-    const paid: Record<Bucket, number> = { cash: 0, card: 0, other: 0 };
-    let paidTotal = 0;
     for (const tender of order.tenders ?? []) {
-      const net = Math.max(0, cents(tender.amountMoney) - cents(tender.tipMoney));
-      if (net <= 0) continue;
-      paid[bucketOf(tender.type)] += net;
-      paidTotal += net;
-    }
-    // An open order has no tender yet: it is in the sales figure but has no
-    // payment method to count under, so it is left out of the proportions.
-    if (paidTotal <= 0) continue;
-
-    for (const bucket of ["cash", "card", "other"] as const) {
-      share[bucket] += (gross * paid[bucket]) / paidTotal;
+      const amount = cents(tender.amountMoney);
+      if (amount > 0) collected[bucketOf(tender.type)] += amount;
     }
   }
 
-  const weights = [share.cash, share.card, share.other];
+  const weights = [collected.cash, collected.card, collected.other];
   if (!(weights.reduce((s, w) => s + w, 0) > 0)) return null;
 
-  const totalCents = Math.round(totalDollars * 100);
-  if (!(totalCents > 0)) return null;
-
-  const amounts = apportion(totalCents, weights);
   // Tenths of a percent, so the three figures read as exactly 100.0.
   const pcts = apportion(1000, weights);
 
   return {
-    cash: { amount: amounts[0] / 100, pct: pcts[0] / 10 },
-    card: { amount: amounts[1] / 100, pct: pcts[1] / 10 },
-    other: { amount: amounts[2] / 100, pct: pcts[2] / 10 },
+    cash: { amount: collected.cash / 100, pct: pcts[0] / 10 },
+    card: { amount: collected.card / 100, pct: pcts[1] / 10 },
+    other: { amount: collected.other / 100, pct: pcts[2] / 10 },
   };
 }

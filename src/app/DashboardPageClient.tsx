@@ -963,8 +963,9 @@ function OwnerDashboard({
           </div>
         </div>
 
-        {/* PAYMENT METHOD - the same sales, cut by how they were paid. Hidden
-            once the numbers are in if nothing has been paid for yet. */}
+        {/* PAYMENT METHOD - what has been collected so far, by how it was paid
+            (Square's "Sales by payment types"). Hidden once the numbers are in
+            if nothing has been paid for yet. */}
         {(paymentSplitPending || shownPaymentSplit) && (
           <div className={styles.paymentBlock}>
             <p className={styles.miniLabel}>PAYMENT METHOD</p>
