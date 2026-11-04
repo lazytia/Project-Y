@@ -965,7 +965,7 @@ function OwnerDashboard({
 
         {/* PAYMENT METHOD - what has been collected so far, by how it was paid
             (Square's "Sales by payment types"). Hidden once the numbers are in
-            if nothing has been paid for yet. */}
+            if nothing has been paid and nothing is waiting to be. */}
         {(paymentSplitPending || shownPaymentSplit) && (
           <div className={styles.paymentBlock}>
             <p className={styles.miniLabel}>PAYMENT METHOD</p>
@@ -1000,6 +1000,13 @@ function OwnerDashboard({
               <p className={styles.paymentOther}>
                 Other <span className={styles.strong}>{fmtCurrency(shownPaymentSplit.other.amount)}</span>
                 {" · "}{shownPaymentSplit.other.pct.toFixed(1)}%
+              </p>
+            )}
+            {/* Tables that have eaten but not paid: in Total Sales, in no tender
+                yet. Says why cash plus card is short of the total. */}
+            {shownPaymentSplit && shownPaymentSplit.unpaid > 0 && (
+              <p className={styles.paymentOther}>
+                Not paid yet <span className={styles.strong}>{fmtCurrency(shownPaymentSplit.unpaid)}</span>
               </p>
             )}
           </div>

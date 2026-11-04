@@ -10,7 +10,8 @@
  * that has eaten but not paid yet is in the sales figure and in no tender, so during
  * service cash plus card is less than the total, and catches up as tables settle.
  * Scaling them up to the total to hide that gap would show a cash figure the till
- * never held.
+ * never held. The gap is reported as `unpaid` instead, so the three figures can be
+ * read side by side.
  */
 
 export type PaymentSplitEntry = {
@@ -25,12 +26,15 @@ export type PaymentSplit = {
   card: PaymentSplitEntry;
   /** Gift cards, wallets, bank transfers, "other" tenders — anything not cash or card. */
   other: PaymentSplitEntry;
+  /** Dollars of sales on open orders that have not been paid at all yet. */
+  unpaid: number;
 };
 
 type Money = { amount?: number | bigint | null } | null | undefined;
 
 /** The part of a Square order this needs; the SDK's Order satisfies it. */
 export type OrderForSplit = {
+  state?: string | null;
   tenders?: { type?: string | null; amountMoney?: Money }[] | null;
 };
 
@@ -74,23 +78,34 @@ export function apportion(total: number, weights: number[]): number[] {
 }
 
 /**
- * @param orders the orders whose payments to add up
- * @returns null when nothing has been paid yet.
+ * @param orders     the orders whose payments to add up
+ * @param grossCents an order's gross sales, in cents — what Total Sales is made of
+ * @returns null when nothing has been paid and nothing is waiting to be.
  */
-export function collectedByTender(orders: OrderForSplit[]): PaymentSplit | null {
+export function collectedByTender<O extends OrderForSplit>(
+  orders: O[],
+  grossCents: (order: O) => number,
+): PaymentSplit | null {
   const collected: Record<Bucket, number> = { cash: 0, card: 0, other: 0 };
+  let unpaid = 0;
 
-  // A tender's amount includes any tip on it, as in Square's report. An open
-  // order has no tender yet and so counts for nothing here.
   for (const order of orders) {
+    let tendered = 0;
+    // A tender's amount includes any tip on it, as in Square's report.
     for (const tender of order.tenders ?? []) {
       const amount = cents(tender.amountMoney);
-      if (amount > 0) collected[bucketOf(tender.type)] += amount;
+      if (amount <= 0) continue;
+      collected[bucketOf(tender.type)] += amount;
+      tendered += amount;
     }
+    // Waiting to be paid: open and no money taken yet. A completed order with
+    // no tender is a comp, not a table still to settle, and one that has a
+    // payment in progress is already counted above.
+    if (order.state === "OPEN" && tendered === 0) unpaid += Math.max(0, grossCents(order));
   }
 
   const weights = [collected.cash, collected.card, collected.other];
-  if (!(weights.reduce((s, w) => s + w, 0) > 0)) return null;
+  if (!(weights.reduce((s, w) => s + w, 0) > 0) && !(unpaid > 0)) return null;
 
   // Tenths of a percent, so the three figures read as exactly 100.0.
   const pcts = apportion(1000, weights);
@@ -99,5 +114,6 @@ export function collectedByTender(orders: OrderForSplit[]): PaymentSplit | null 
     cash: { amount: collected.cash / 100, pct: pcts[0] / 10 },
     card: { amount: collected.card / 100, pct: pcts[1] / 10 },
     other: { amount: collected.other / 100, pct: pcts[2] / 10 },
+    unpaid: unpaid / 100,
   };
 }

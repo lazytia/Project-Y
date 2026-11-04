@@ -116,8 +116,8 @@ export async function GET(req: NextRequest) {
     // What has been collected so far — cash, card, other. Read off the orders
     // already in hand (each carries its tenders), so it costs no extra Square
     // call. Open tables are in todaySales but not here until they pay, exactly
-    // as in Square's own Sales Report.
-    const paymentSplit = collectedByTender(todayOrdersWindow);
+    // as in Square's own Sales Report; what they come to is reported as unpaid.
+    const paymentSplit = collectedByTender(todayOrdersWindow, squareGrossSalesCents);
 
     // Avg net spend
     const restaurantNet = sumDollars(todayOrders, netAmountCents);
