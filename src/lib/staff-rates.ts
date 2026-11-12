@@ -5,14 +5,48 @@
  * rates on `staff_onboarding/{uid}` and applies them to every imported
  * shift. Saturday is paid at its own rate; Sun–Fri share the weekday one.
  * These are base rates — penalties and allowances are applied on top.
+ *
+ * A raise is scheduled rather than typed over the old rate: the owner sets
+ * the new pair and the day it starts, and it is kept in `rateChanges` next to
+ * the rates it replaces. A pay week can straddle that day, so a shift is paid
+ * at the rate of the day it was worked — never at whatever the rate happens
+ * to be on the day the timesheet is read.
  */
 
-export type StaffRates = {
+import { addDaysISO, sydneyTodayKey } from "./sydney-date";
+
+/** New rates from a given day on. */
+export type RateChange = {
+  /** First day worked at the new rates, YYYY-MM-DD (Sydney). */
+  effectiveFrom: string;
+  weekday: number;
+  saturday: number | null;
+};
+
+export type RateSet = {
   weekday: number | null;
   saturday: number | null;
 };
 
+export type StaffRates = RateSet & {
+  /** What was paid before the first change. */
+  base: RateSet;
+  /** Every change, past and upcoming, oldest first. */
+  changes: RateChange[];
+};
+
+/** Field on `staff_onboarding/{uid}` that holds the changes. */
+export const RATE_CHANGES_FIELD = "rateChanges";
+
+/**
+ * How many days before a change the employee's payslip page announces it.
+ * One week means it shows over exactly one weekly payday, so each change is
+ * announced once rather than on every payslip after it.
+ */
+export const RATE_NOTICE_DAYS = 7;
+
 const SATURDAY_DOW = 6;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function numberOrNull(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
@@ -22,7 +56,7 @@ function numberOrNull(v: unknown): number | null {
  * Employees onboarded before the rate card existed only have the legacy
  * training rates, so fall back to those rather than showing nothing.
  */
-export function readStaffRates(raw: Record<string, unknown>): StaffRates {
+function readBaseRates(raw: Record<string, unknown>): RateSet {
   return {
     weekday:
       numberOrNull(raw.weekdayRate) ??
@@ -30,6 +64,63 @@ export function readStaffRates(raw: Record<string, unknown>): StaffRates {
       numberOrNull(raw.trainingRate),
     saturday: numberOrNull(raw.saturdayRate),
   };
+}
+
+/** The stored changes, oldest first. One per day: a later entry for the same day wins. */
+export function readRateChanges(raw: Record<string, unknown>): RateChange[] {
+  const list = raw[RATE_CHANGES_FIELD];
+  if (!Array.isArray(list)) return [];
+  const byDay = new Map<string, RateChange>();
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const entry = item as Record<string, unknown>;
+    const effectiveFrom = typeof entry.effectiveFrom === "string" ? entry.effectiveFrom : "";
+    const weekday = numberOrNull(entry.weekdayRate);
+    if (!ISO_DATE.test(effectiveFrom) || weekday === null) continue;
+    byDay.set(effectiveFrom, {
+      effectiveFrom,
+      weekday,
+      saturday: numberOrNull(entry.saturdayRate),
+    });
+  }
+  return [...byDay.values()].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+}
+
+/** The rates that pay for work done on `dateISO`. */
+export function ratesOn(rates: Pick<StaffRates, "base" | "changes">, dateISO: string): RateSet {
+  let current = rates.base;
+  for (const change of rates.changes) {
+    if (change.effectiveFrom > dateISO) break;
+    current = { weekday: change.weekday, saturday: change.saturday };
+  }
+  return current;
+}
+
+/** Rates in force on `todayISO`, plus everything needed to pay any other day. */
+export function readStaffRates(
+  raw: Record<string, unknown>,
+  todayISO: string = sydneyTodayKey(),
+): StaffRates {
+  const base = readBaseRates(raw);
+  const changes = readRateChanges(raw);
+  return { ...ratesOn({ base, changes }, todayISO), base, changes };
+}
+
+/** Changes that have not started yet, soonest first. */
+export function upcomingRateChanges(rates: StaffRates, todayISO: string = sydneyTodayKey()): RateChange[] {
+  return rates.changes.filter((c) => c.effectiveFrom > todayISO);
+}
+
+/**
+ * The change the employee should be told about today: the first one starting
+ * within the next RATE_NOTICE_DAYS days, or null.
+ */
+export function rateChangeToAnnounce(
+  changes: RateChange[],
+  todayISO: string = sydneyTodayKey(),
+): RateChange | null {
+  const lastDay = addDaysISO(todayISO, RATE_NOTICE_DAYS);
+  return changes.find((c) => c.effectiveFrom > todayISO && c.effectiveFrom <= lastDay) ?? null;
 }
 
 export function isSaturdayISO(dateISO: string): boolean {
@@ -44,6 +135,7 @@ export function rateForDateISO(
   dateISO: string,
 ): number | null {
   if (!rates) return null;
-  if (isSaturdayISO(dateISO)) return rates.saturday ?? rates.weekday;
-  return rates.weekday;
+  const on = ratesOn(rates, dateISO);
+  if (isSaturdayISO(dateISO)) return on.saturday ?? on.weekday;
+  return on.weekday;
 }

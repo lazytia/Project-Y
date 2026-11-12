@@ -599,6 +599,9 @@ const EN: Dict = {
   "pay.paymentDate": "Payment Date",
   "pay.viewPayslip": "View Payslip",
   "pay.recentShownHere": "Recent payslips are shown here.",
+  // Shown in the week before a scheduled pay rise; {date} is its first day.
+  "pay.rateUpdate": "Rate Update",
+  "pay.rateUpdateBody": "New rate applies to hours worked from {date}.",
   "pay.loadingList": "Loading your payslips…",
   "pay.loadError": "Couldn't load payslips.",
   "pay.empty": "No payslips yet — as soon as payroll runs the first pay week for you, it will appear here.",
@@ -1069,6 +1072,8 @@ const JA: Dict = {
   "pay.paymentDate": "支給日",
   "pay.viewPayslip": "明細を見る",
   "pay.recentShownHere": "最近の給与明細がここに表示されます。",
+  "pay.rateUpdate": "時給の改定",
+  "pay.rateUpdateBody": "{date}以降の勤務から新しい時給が適用されます。",
   "pay.loadingList": "給与明細を読み込んでいます…",
   "pay.loadError": "給与明細を読み込めませんでした。",
   "pay.empty": "まだ給与明細はありません。最初の支給が処理されるとここに表示されます。",

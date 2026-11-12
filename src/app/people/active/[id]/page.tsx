@@ -22,12 +22,16 @@ import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
-import { readStaffRates } from "@/lib/staff-rates";
 import {
-  fmtTrainingEndLong,
-  readTrainingStatus,
-  type TrainingStatus,
-} from "@/lib/staff-training";
+  ratesOn,
+  readStaffRates,
+  upcomingRateChanges,
+  type RateChange,
+  type StaffRates,
+} from "@/lib/staff-rates";
+import { readRateHistory, type RateHistoryRow } from "@/lib/rate-history";
+import { removeRateChange, saveRateChange } from "@/lib/rate-change-store";
+import { addDaysISO, sydneyTodayKey } from "@/lib/sydney-date";
 import { todayIso } from "@/lib/staff-display";
 import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
@@ -43,6 +47,7 @@ import {
 } from "@/lib/onboarding-review";
 import CalendarPicker from "@/components/CalendarPicker";
 import { OnboardingSectionModal } from "@/components/OnboardingSectionModal";
+import PayDetails from "./PayDetails";
 import Splash from "@/components/Splash";
 import styles from "./page.module.css";
 
@@ -78,11 +83,14 @@ type Staff = {
   uid: string;
   name: string;
   positionLabel: string;
+  /** The rates in force today. */
   weekdayRate: number | null;
   saturdayRate: number | null;
-  /** Training rate, period and end date — the roster showed everyone on
-   *  their full rate from day one until this was surfaced. */
-  training: TrainingStatus;
+  /** Today's rates plus every scheduled change, so upcoming ones can be shown
+   *  next to what they replace. */
+  rates: StaffRates;
+  /** Training, then the standard rate, then each change that has started. */
+  rateHistory: RateHistoryRow[];
   startDate: Date | null;
   visaExpiry: Date | null;
   visaType: string;
@@ -111,17 +119,6 @@ type Staff = {
     terminatedAt: string;
   } | null;
 };
-
-/** Firestore field written for each cell of the rate card. */
-const RATE_FIELDS = {
-  weekday: "weekdayRate",
-  saturday: "saturdayRate",
-  training: "trainingRate",
-} as const;
-type RateKind = keyof typeof RATE_FIELDS;
-type RateDrafts = Record<RateKind, string>;
-
-const EMPTY_RATE_DRAFTS: RateDrafts = { weekday: "", saturday: "", training: "" };
 
 const EMPLOYMENT_POSITIONS = ["Hall Staff", "Kitchen Staff", "Hall Manager", "Chef"] as const;
 const EMPLOYMENT_VISA_TYPES = ["Student", "Resident", "Working Holiday"] as const;
@@ -171,6 +168,21 @@ function fmtDateWithDay(iso: string): string {
   const main = date.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
   const dow = date.toLocaleDateString("en-AU", { weekday: "short" });
   return `${main} (${dow})`;
+}
+
+function isoToDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** "14 Nov 2026". */
+function fmtIso(iso: string): string {
+  return fmtDate(isoToDate(iso));
+}
+
+/** Name recorded against a change the signed-in person makes. */
+function actorName(user: { displayName?: string | null; email?: string | null } | null): string {
+  return user?.displayName?.trim() || (user?.email ? user.email.split("@")[0] : "Owner");
 }
 
 function daysBetween(fromISO: string): number | null {
@@ -272,9 +284,8 @@ export default function EmployeeDetailPage() {
   const [editEmploymentType, setEditEmploymentType] = useState("");
   const [editRate, setEditRate] = useState("");
   const [editReportsTo, setEditReportsTo] = useState("");
-  const [ratesEditing, setRatesEditing] = useState(false);
-  const [rateDrafts, setRateDrafts] = useState<RateDrafts>(EMPTY_RATE_DRAFTS);
-  const [savingRate, setSavingRate] = useState(false);
+  /** Date of the scheduled change being cancelled, while it is. */
+  const [cancellingRate, setCancellingRate] = useState<string | null>(null);
   const [calRehireOpen, setCalRehireOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -336,7 +347,8 @@ export default function EmployeeDetailPage() {
           positionLabel: positionLabelOf(raw),
           weekdayRate: rates.weekday,
           saturdayRate: rates.saturday,
-          training: readTrainingStatus(raw),
+          rates,
+          rateHistory: readRateHistory(raw),
           startDate: tsToDate(raw.startDate),
           visaExpiry: tsToDate(documents.visaExpiry ?? raw.visaExpiry ?? null),
           visaType: visaTypeOf(raw),
@@ -521,77 +533,28 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  function startRatesEdit() {
-    if (!staff) return;
-    setRateDrafts({
-      weekday: staff.weekdayRate != null ? String(staff.weekdayRate) : "",
-      saturday: staff.saturdayRate != null ? String(staff.saturdayRate) : "",
-      training: staff.training.rate != null ? String(staff.training.rate) : "",
-    });
-    setRatesEditing(true);
-  }
-
-  function setRateDraft(kind: RateKind, value: string) {
-    setRateDrafts((prev) => ({ ...prev, [kind]: value }));
-  }
-
-  /**
-   * All three rates save together — they are read together, and one of them
-   * only makes sense next to the others (a training rate above the weekday
-   * rate is a typo, not a pay rise).
-   *
-   * A blank Saturday or training rate clears it rather than failing: not
-   * everyone is hired on one, and the card has to be able to say so.
-   */
-  async function handleSaveRates() {
-    if (!staff || savingRate) return;
-
-    const parsed: Record<RateKind, number | null> = {
-      weekday: null,
-      saturday: null,
-      training: null,
-    };
-    for (const kind of Object.keys(RATE_FIELDS) as RateKind[]) {
-      const draft = rateDrafts[kind].trim();
-      if (!draft) {
-        if (kind === "weekday") {
-          alert("A weekday rate is required — it is what timesheets are paid at.");
-          return;
-        }
-        continue;
-      }
-      const n = parseFloat(draft);
-      if (Number.isNaN(n) || n <= 0) {
-        alert("Please enter a valid hourly rate.");
-        return;
-      }
-      parsed[kind] = Math.round(n * 100) / 100;
-    }
-
-    setSavingRate(true);
+  /** Take an upcoming change off. The rates it would have replaced stay. */
+  async function handleCancelRateChange(change: RateChange) {
+    if (!staff || cancellingRate) return;
+    const ok = window.confirm(
+      `Cancel the rate change scheduled for ${fmtIso(change.effectiveFrom)}?`,
+    );
+    if (!ok) return;
+    setCancellingRate(change.effectiveFrom);
     try {
-      await setDoc(
-        doc(getDb(), "staff_onboarding", staff.uid),
-        {
-          [RATE_FIELDS.weekday]: parsed.weekday,
-          [RATE_FIELDS.saturday]: parsed.saturday,
-          [RATE_FIELDS.training]: parsed.training,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-      setStaff({
-        ...staff,
-        weekdayRate: parsed.weekday,
-        saturdayRate: parsed.saturday,
-        training: { ...staff.training, rate: parsed.training },
-      });
-      setRatesEditing(false);
+      await removeRateChange(staff.uid, change.effectiveFrom);
+      const changes = staff.rates.changes.filter((c) => c.effectiveFrom !== change.effectiveFrom);
+      const rates: StaffRates = {
+        ...ratesOn({ base: staff.rates.base, changes }, sydneyTodayKey()),
+        base: staff.rates.base,
+        changes,
+      };
+      setStaff({ ...staff, rates, weekdayRate: rates.weekday, saturdayRate: rates.saturday });
     } catch (err) {
-      console.error("[rate] save failed:", err);
-      alert("Failed to save the rates. Please try again.");
+      console.error("[rate-change] cancel failed:", err);
+      alert("Failed to cancel the rate change. Please try again.");
     } finally {
-      setSavingRate(false);
+      setCancellingRate(null);
     }
   }
 
@@ -632,6 +595,13 @@ export default function EmployeeDetailPage() {
     }
     setSavingEmployment(true);
     try {
+      // Once a scheduled change has started, it — not `weekdayRate` — is what
+      // pays today, so a new rate typed here has to become a change from
+      // today; written over `weekdayRate` it would never be paid.
+      const today = sydneyTodayKey();
+      const rateViaChange =
+        parsedRate !== staff.weekdayRate &&
+        staff.rates.changes.some((c) => c.effectiveFrom <= today);
       await setDoc(
         doc(getDb(), "staff_onboarding", staff.uid),
         {
@@ -640,19 +610,25 @@ export default function EmployeeDetailPage() {
           visaType: editVisaType,
           workLocation: editWorkLocation,
           employmentType: editEmploymentType,
-          // Same field the RATE card writes — otherwise editing here would
-          // leave the timesheets still paying the old rate. `trainingRate`
-          // is deliberately not written: this field is the ongoing rate, and
+          // Same field the timesheets read — otherwise editing here would
+          // leave them still paying the old rate. `trainingRate` is
+          // deliberately not written: this field is the ongoing rate, and
           // overwriting the training rate with it used to wipe out what the
           // person was actually hired on and silence the wage-increase
           // reminder that compares the two.
-          weekdayRate: parsedRate,
-          afterTrainingRate: parsedRate,
+          ...(rateViaChange ? {} : { weekdayRate: parsedRate, afterTrainingRate: parsedRate }),
           reportsTo: editReportsTo.trim(),
           updatedAt: serverTimestamp(),
         },
         { merge: true },
       );
+      if (rateViaChange) {
+        await saveRateChange(
+          staff.uid,
+          { effectiveFrom: today, weekday: parsedRate, saturday: staff.saturdayRate },
+          { scheduledBy: actorName(user) },
+        );
+      }
       setStaff({
         ...staff,
         rehireDate: editRehireDate,
@@ -720,94 +696,29 @@ export default function EmployeeDetailPage() {
     ? fmtDateWithDay(prevTerm.terminatedAt)
     : "—";
 
-  // The training half of the card is only drawn for people who were actually
-  // hired on a training rate. `trainingPeriod` defaults to "First 2 Weeks"
-  // when it was never set, so showing it unconditionally would put a training
-  // period — and an end date — on employees who never had one.
-  const showTraining = staff.training.rate != null || ratesEditing;
+  const upcomingChanges = upcomingRateChanges(staff.rates);
 
-  const rateActions = ratesEditing ? (
-    <div className={styles.rateEditActions}>
-      <button
-        type="button"
-        className={styles.rateSaveBtn}
-        onClick={() => void handleSaveRates()}
-        disabled={savingRate}
-      >
-        {savingRate ? "Saving…" : "Save"}
-      </button>
-      <button
-        type="button"
-        className={styles.rateCancelBtn}
-        onClick={() => setRatesEditing(false)}
-        disabled={savingRate}
-      >
-        Cancel
-      </button>
-    </div>
-  ) : (
-    <button type="button" className={styles.rateEditBtn} onClick={startRatesEdit}>
-      <EditIcon />
-      Edit Rates
-    </button>
-  );
-
-  // Drives the pay shown on /payroll/timesheets for this employee.
+  // Drives the pay shown on /payroll/timesheets for this employee. Rates are
+  // changed by scheduling, never typed over: a pay week can straddle the day
+  // a raise starts, and each shift is paid at the rate of the day it was worked.
   const rateCard = (
-    <>
-      <p className={styles.sectionLabel}>RATE</p>
-      <section className={styles.rateCard}>
-        <div className={styles.rateGrid}>
-          <RateCell
-            label="Weekdays Rate"
-            value={staff.weekdayRate}
-            editing={ratesEditing}
-            draft={rateDrafts.weekday}
-            onDraft={(v) => setRateDraft("weekday", v)}
-          />
-          <RateCell
-            label="Saturday Rate"
-            value={staff.saturdayRate}
-            editing={ratesEditing}
-            draft={rateDrafts.saturday}
-            onDraft={(v) => setRateDraft("saturday", v)}
-          />
-          {showTraining && (
-            <RateCell
-              label="Training Rate"
-              value={staff.training.rate}
-              editing={ratesEditing}
-              draft={rateDrafts.training}
-              onDraft={(v) => setRateDraft("training", v)}
-            />
-          )}
-        </div>
-
-        {showTraining ? (
-          <>
-            <div className={styles.rateDivider} aria-hidden="true" />
-            <div className={styles.rateMetaGrid}>
-              <RateMetaCell label="Training Period" value={staff.training.period} />
-              <RateMetaCell
-                label="Training Ends"
-                value={fmtTrainingEndLong(staff.training.endISO)}
-              />
-              {rateActions}
-            </div>
-            <p className={styles.rateHint}>
-              Training rate applies during the training period only.
-            </p>
-          </>
-        ) : (
-          <div className={styles.rateActionsRow}>{rateActions}</div>
-        )}
-
-        <p className={styles.rateFootnote}>
-          <InfoCircleIcon />
-          Rates are applied before penalties and allowances.
-        </p>
-      </section>
-    </>
+    <PayDetails
+      weekdayRate={staff.weekdayRate}
+      saturdayRate={staff.saturdayRate}
+      upcoming={upcomingChanges.map((change) => ({
+        change,
+        before: ratesOn(staff.rates, addDaysISO(change.effectiveFrom, -1)),
+      }))}
+      history={staff.rateHistory}
+      cancelling={cancellingRate}
+      onSchedule={() => router.push(`/people/active/${staff.uid}/rate-change`)}
+      onEdit={(change) =>
+        router.push(
+          `/people/active/${staff.uid}/rate-change?from=${encodeURIComponent(change.effectiveFrom)}`,
+        )
+      }
+      onCancel={(change) => void handleCancelRateChange(change)}
+    />
   );
 
   return (
@@ -1440,60 +1351,6 @@ function EmploymentEditRow({
     <div className={`${styles.employmentEditRow} ${last ? styles.employmentRowLast : ""}`}>
       <span className={styles.employmentLabel}>{label}</span>
       <div className={styles.employmentEditControl}>{children}</div>
-    </div>
-  );
-}
-
-/** One money cell of the rate card — a label over a dollar figure, or over
- *  an input while the card is being edited. */
-function RateCell({
-  label,
-  value,
-  editing,
-  draft,
-  onDraft,
-}: {
-  label: string;
-  value: number | null;
-  editing: boolean;
-  draft: string;
-  onDraft: (v: string) => void;
-}) {
-  return (
-    <div className={styles.rateCell}>
-      <p className={styles.rateCellLabel}>{label}</p>
-      {editing ? (
-        <div className={styles.rateInputRow}>
-          <span className={styles.rateValueUnit}>$</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            className={styles.rateInput}
-            value={draft}
-            onChange={(e) => onDraft(e.target.value)}
-            min="0"
-            step="0.01"
-            aria-label={`${label} per hour`}
-          />
-        </div>
-      ) : (
-        <p className={styles.rateCellValue}>
-          {value != null ? `$${value.toFixed(2)}` : "—"}
-          <span className={styles.rateValueUnit}>/hr</span>
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** The training period and its end date. Read-only: the period is chosen when
- *  the hire is requested, and it is the start date and that choice — not this
- *  card — that decide when training is over. */
-function RateMetaCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.rateCell}>
-      <p className={styles.rateCellLabel}>{label}</p>
-      <p className={styles.rateMetaValue}>{value}</p>
     </div>
   );
 }

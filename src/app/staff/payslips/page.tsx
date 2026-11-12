@@ -7,6 +7,7 @@ import { useLang } from "@/components/LanguageProvider";
 import {
   fmtCurrency,
   fmtDateLong,
+  fmtDateShort,
   fmtPeriod,
   type Payslip,
 } from "./_data";
@@ -17,13 +18,16 @@ type PayslipsResponse = {
   nextPayDateISO: string | null;
   payFrequency: string;
   payslips: Payslip[];
+  /** A raise starting within the week, announced once at the foot of the page. */
+  rateUpdate?: { effectiveFrom: string } | null;
 };
 
 /** SessionStorage key + version. Bump the version whenever the API's
  *  response shape or contents change so old cached blobs don't render
  *  weirdly. v3: only pay weeks the owner has published are returned, so a
- *  v2 blob would keep listing every week the sheet happens to hold. */
-const CACHE_KEY_PREFIX = "y.payslips.v3.";
+ *  v2 blob would keep listing every week the sheet happens to hold.
+ *  v4: carries `rateUpdate`. */
+const CACHE_KEY_PREFIX = "y.payslips.v4.";
 /** Serve the cached copy briefly before revalidating in the background.
  *  Kept short because publishing a pay week is a change staff are waiting
  *  on — a long TTL would leave the list looking empty after it went live. */
@@ -239,6 +243,15 @@ export default function PayslipsPage() {
         </span>
         <p className={styles.infoBody}>{t("pay.recentShownHere")}</p>
       </div>
+
+      {data?.rateUpdate && (
+        <div className={styles.rateUpdate}>
+          <p className={styles.rateUpdateTitle}>{t("pay.rateUpdate")}</p>
+          <p className={styles.rateUpdateBody}>
+            {t("pay.rateUpdateBody").replace("{date}", fmtDateShort(data.rateUpdate.effectiveFrom))}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

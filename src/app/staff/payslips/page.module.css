@@ -317,3 +317,20 @@
   color: var(--color-fg);
   line-height: 1.45;
 }
+
+/* A scheduled raise, announced in the week before it starts. Plain text at
+   the foot of the page: it is news, not something to act on. */
+.rateUpdate {
+  padding: 0 var(--space-1);
+}
+.rateUpdateTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-fg-muted);
+}
+.rateUpdateBody {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}

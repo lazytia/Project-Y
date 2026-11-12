@@ -8,6 +8,7 @@ import {
 } from "@/lib/payroll-sheet";
 import { fetchPublishedWeekStarts } from "@/lib/payslip-publication";
 import { shiftDateKey } from "@/lib/square";
+import { rateChangeToAnnounce, readRateChanges } from "@/lib/staff-rates";
 import { emailToUsername } from "@/lib/username";
 
 /**
@@ -40,7 +41,8 @@ import { emailToUsername } from "@/lib/username";
  *     netPay: number,
  *     weekdayHours: number | null,   // sheet "Weekday Banking", null when absent
  *     saturdayHours: number | null,  // sheet "Sat Banking", null when absent
- *   }, ...]
+ *   }, ...],
+ *   rateUpdate: { effectiveFrom: string } | null,  // a raise starting within the week
  * }
  */
 
@@ -133,6 +135,24 @@ async function resolveEmployeeName(
   return null;
 }
 
+/**
+ * A rate change the owner has scheduled that starts within the next week, so
+ * the payslip page can say so. Shown for that week only — once the new rate
+ * is being paid the notice has done its job. Never fails the request: a
+ * missing notice is better than a missing payslip list.
+ */
+async function upcomingRateUpdate(uid: string): Promise<{ effectiveFrom: string } | null> {
+  try {
+    const snap = await adminDb().collection("staff_onboarding").doc(uid).get();
+    if (!snap.exists) return null;
+    const change = rateChangeToAnnounce(readRateChanges(snap.data() as Record<string, unknown>));
+    return change ? { effectiveFrom: change.effectiveFrom } : null;
+  } catch (err) {
+    console.warn("[staff/payslips] rate update lookup failed:", err);
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const idToken = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!idToken) {
@@ -151,7 +171,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const nameInfo = await resolveEmployeeName(uid, callerEmail);
+  const [nameInfo, rateUpdate] = await Promise.all([
+    resolveEmployeeName(uid, callerEmail),
+    upcomingRateUpdate(uid),
+  ]);
   if (!nameInfo) {
     return NextResponse.json(
       {
@@ -159,6 +182,7 @@ export async function GET(req: NextRequest) {
         nextPayDateISO: null,
         payFrequency: "Paid weekly",
         payslips: [],
+        rateUpdate,
       },
       { headers: CACHE_HEADERS },
     );
@@ -278,6 +302,7 @@ export async function GET(req: NextRequest) {
       nextPayDateISO,
       payFrequency: "Paid weekly",
       payslips,
+      rateUpdate,
     },
     { headers: CACHE_HEADERS },
   );
