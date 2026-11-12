@@ -36,7 +36,7 @@ service cloud.firestore {
     //    (Masahiro's and Yuki's, repeatedly) from whichever version of the app a
     //    phone happened to be running. A rule holds for all of them.
     //    Only an update has an existing record to compare with, so the check sits
-    //    on update alone; creating and deleting stay as they were.
+    //    on update alone.
     function keepsStartDate() {
       return !('startDate' in resource.data)
         || request.resource.data.startDate == resource.data.startDate;
@@ -48,8 +48,11 @@ service cloud.firestore {
     //    who could change an id could have their shifts, or a colleague's, paid
     //    at someone else's rate. Only the owner's and head chef's screens write
     //    these fields; no screen of the employee's own does. A record the
-    //    employee creates themselves must not carry them either, or deleting
-    //    their record and writing it again would get round the update check.
+    //    employee creates themselves must not carry them either, or writing a
+    //    missing record afresh would get round the update check.
+    //  - Staff cannot delete their own record. It holds their pay, their
+    //    signed documents and their onboarding; only the owner's screens
+    //    delete one, and deleting it was also a way round every check above.
     function payFields() {
       return [
         'weekdayRate', 'saturdayRate', 'trainingRate', 'afterTrainingRate', 'rateChanges',
@@ -69,8 +72,7 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid && setsNoPayFields());
-      allow delete: if isOwner() || isChef()
-        || (request.auth != null && request.auth.uid == uid);
+      allow delete: if isOwner() || isChef();
       allow update: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid
             && keepsStartDate() && keepsPayFields());
