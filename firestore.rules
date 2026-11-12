@@ -42,12 +42,32 @@ service cloud.firestore {
         || request.resource.data.startDate == resource.data.startDate;
     }
 
+    //  - Staff cannot set their own pay. Timesheets pay every shift from these
+    //    fields (src/lib/staff-rates.ts), and only the owner's and head chef's
+    //    screens write them; no screen of the employee's own does. A record the
+    //    employee creates themselves must not carry them either, or deleting
+    //    their record and writing it again would get round the update check.
+    function payRateFields() {
+      return ['weekdayRate', 'saturdayRate', 'trainingRate', 'afterTrainingRate', 'rateChanges'];
+    }
+
+    function keepsPayRates() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(payRateFields());
+    }
+
+    function setsNoPayRates() {
+      return !request.resource.data.keys().hasAny(payRateFields());
+    }
+
     match /staff_onboarding/{uid} {
       allow read: if request.auth != null;
-      allow create, delete: if isOwner() || isChef()
+      allow create: if isOwner() || isChef()
+        || (request.auth != null && request.auth.uid == uid && setsNoPayRates());
+      allow delete: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid);
       allow update: if isOwner() || isChef()
-        || (request.auth != null && request.auth.uid == uid && keepsStartDate());
+        || (request.auth != null && request.auth.uid == uid
+            && keepsStartDate() && keepsPayRates());
     }
 
     // Published rosters: weekly docs keyed by Monday ISO date. Shift
