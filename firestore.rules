@@ -42,32 +42,38 @@ service cloud.firestore {
         || request.resource.data.startDate == resource.data.startDate;
     }
 
-    //  - Staff cannot set their own pay. Timesheets pay every shift from these
-    //    fields (src/lib/staff-rates.ts), and only the owner's and head chef's
-    //    screens write them; no screen of the employee's own does. A record the
+    //  - Staff cannot set their own pay. Timesheets pay every shift from the
+    //    rates (src/lib/staff-rates.ts), and find whose rates those are by the
+    //    two Square ids (src/lib/timesheet-shifts-server.ts) — so an employee
+    //    who could change an id could have their shifts, or a colleague's, paid
+    //    at someone else's rate. Only the owner's and head chef's screens write
+    //    these fields; no screen of the employee's own does. A record the
     //    employee creates themselves must not carry them either, or deleting
     //    their record and writing it again would get round the update check.
-    function payRateFields() {
-      return ['weekdayRate', 'saturdayRate', 'trainingRate', 'afterTrainingRate', 'rateChanges'];
+    function payFields() {
+      return [
+        'weekdayRate', 'saturdayRate', 'trainingRate', 'afterTrainingRate', 'rateChanges',
+        'squareTeamMemberId', 'squareStaffId'
+      ];
     }
 
-    function keepsPayRates() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(payRateFields());
+    function keepsPayFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(payFields());
     }
 
-    function setsNoPayRates() {
-      return !request.resource.data.keys().hasAny(payRateFields());
+    function setsNoPayFields() {
+      return !request.resource.data.keys().hasAny(payFields());
     }
 
     match /staff_onboarding/{uid} {
       allow read: if request.auth != null;
       allow create: if isOwner() || isChef()
-        || (request.auth != null && request.auth.uid == uid && setsNoPayRates());
+        || (request.auth != null && request.auth.uid == uid && setsNoPayFields());
       allow delete: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid);
       allow update: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid
-            && keepsStartDate() && keepsPayRates());
+            && keepsStartDate() && keepsPayFields());
     }
 
     // Published rosters: weekly docs keyed by Monday ISO date. Shift
