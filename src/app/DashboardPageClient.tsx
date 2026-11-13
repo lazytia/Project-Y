@@ -1002,6 +1002,14 @@ function OwnerDashboard({
                 {" · "}{shownPaymentSplit.other.pct.toFixed(1)}%
               </p>
             )}
+            {/* Tips are inside the card and cash figures but not in Total
+                Sales. Says why they can come to more than the total. Older
+                cached snapshots have no `tips`, hence the `?? 0`. */}
+            {shownPaymentSplit && (shownPaymentSplit.tips ?? 0) > 0 && (
+              <p className={styles.paymentOther}>
+                Tips <span className={styles.strong}>{fmtCurrency(shownPaymentSplit.tips)}</span>
+              </p>
+            )}
             {/* Tables that have eaten but not paid: in Total Sales, in no tender
                 yet. Says why cash plus card is short of the total. */}
             {shownPaymentSplit && shownPaymentSplit.unpaid > 0 && (

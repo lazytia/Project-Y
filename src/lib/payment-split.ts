@@ -12,6 +12,10 @@
  * Scaling them up to the total to hide that gap would show a cash figure the till
  * never held. The gap is reported as `unpaid` instead, so the three figures can be
  * read side by side.
+ *
+ * The other way round, a tender carries any tip on it and Total Sales does not, so
+ * once everyone has paid, card can sit a few dollars above the total. That is
+ * reported as `tips`, for the same reason.
  */
 
 export type PaymentSplitEntry = {
@@ -28,6 +32,8 @@ export type PaymentSplit = {
   other: PaymentSplitEntry;
   /** Dollars of sales on open orders that have not been paid at all yet. */
   unpaid: number;
+  /** Dollars of tips inside the amounts above — collected, but not sales. */
+  tips: number;
 };
 
 type Money = { amount?: number | bigint | null } | null | undefined;
@@ -35,7 +41,7 @@ type Money = { amount?: number | bigint | null } | null | undefined;
 /** The part of a Square order this needs; the SDK's Order satisfies it. */
 export type OrderForSplit = {
   state?: string | null;
-  tenders?: { type?: string | null; amountMoney?: Money }[] | null;
+  tenders?: { type?: string | null; amountMoney?: Money; tipMoney?: Money }[] | null;
 };
 
 type Bucket = "cash" | "card" | "other";
@@ -88,6 +94,7 @@ export function collectedByTender<O extends OrderForSplit>(
 ): PaymentSplit | null {
   const collected: Record<Bucket, number> = { cash: 0, card: 0, other: 0 };
   let unpaid = 0;
+  let tips = 0;
 
   for (const order of orders) {
     let tendered = 0;
@@ -97,6 +104,7 @@ export function collectedByTender<O extends OrderForSplit>(
       if (amount <= 0) continue;
       collected[bucketOf(tender.type)] += amount;
       tendered += amount;
+      tips += Math.min(amount, Math.max(0, cents(tender.tipMoney)));
     }
     // Waiting to be paid: open and no money taken yet. A completed order with
     // no tender is a comp, not a table still to settle, and one that has a
@@ -115,5 +123,6 @@ export function collectedByTender<O extends OrderForSplit>(
     card: { amount: collected.card / 100, pct: pcts[1] / 10 },
     other: { amount: collected.other / 100, pct: pcts[2] / 10 },
     unpaid: unpaid / 100,
+    tips: tips / 100,
   };
 }
