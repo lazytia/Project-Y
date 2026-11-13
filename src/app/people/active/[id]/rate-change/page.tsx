@@ -10,6 +10,7 @@ import { isChef, isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { RATE_NOTICE_DAYS, ratesOn, readStaffRates, type StaffRates } from "@/lib/staff-rates";
 import { saveRateChange } from "@/lib/rate-change-store";
+import { startDateISO } from "@/lib/staff-training";
 import { addDaysISO, sydneyTodayKey } from "@/lib/sydney-date";
 import CalendarPicker from "@/components/CalendarPicker";
 import Splash from "@/components/Splash";
@@ -21,6 +22,8 @@ const MAX_DAYS_AHEAD = 730;
 type Loaded = {
   name: string;
   rates: StaffRates;
+  /** First day they worked, or "" — no change can start before it. */
+  startISO: string;
 };
 
 function fullNameOf(raw: Record<string, unknown>): string {
@@ -104,7 +107,7 @@ function ScheduleRateChangeInner() {
         // today's rates, since a raise is usually a small step from them.
         const editing = rates.changes.find((c) => c.effectiveFrom === editingFrom);
         if (cancelled) return;
-        setLoaded({ name: fullNameOf(raw), rates });
+        setLoaded({ name: fullNameOf(raw), rates, startISO: startDateISO(raw) });
         setWeekday(draftOf(editing ? editing.weekday : rates.weekday));
         setSaturday(draftOf(editing ? editing.saturday : rates.saturday));
         if (editing) setEffectiveFrom(editing.effectiveFrom);
@@ -129,8 +132,10 @@ function ScheduleRateChangeInner() {
       alert("Please enter a valid Saturday rate, or leave it blank.");
       return;
     }
-    if (effectiveFrom < today) {
-      alert("The new rate can't start in the past.");
+    // A backdated change is allowed — a raise agreed late still pays from the
+    // day it was meant to — but not one from before they started.
+    if (loaded.startISO && effectiveFrom < loaded.startISO) {
+      alert("The new rate can't start before the employee's start date.");
       return;
     }
     // Compared with what is paid the day before, ignoring the change being
@@ -245,7 +250,7 @@ function ScheduleRateChangeInner() {
       {calOpen && (
         <CalendarPicker
           value={effectiveFrom}
-          minDate={today}
+          minDate={loaded.startISO || undefined}
           maxDate={addDaysISO(today, MAX_DAYS_AHEAD)}
           singleOnly
           onChange={(iso) => {

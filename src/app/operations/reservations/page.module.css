@@ -735,6 +735,22 @@
   }
 }
 
+/* Desktop: the sidebar is always on screen and sits above this layer, so
+   the form starts beside it — spanning the whole window put its left edge
+   (labels, inputs, the start of Save) underneath the sidebar. The fields
+   keep to a readable column instead of stretching across a wide monitor. */
+@media (min-width: 1025px) {
+  .fullSheet {
+    left: var(--sidebar-width);
+  }
+  .fullSheetBody {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+}
+
 .fullSheetHeader {
   position: sticky;
   top: 0;

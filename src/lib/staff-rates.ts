@@ -21,6 +21,8 @@ export type RateChange = {
   effectiveFrom: string;
   weekday: number;
   saturday: number | null;
+  /** Day it was scheduled, YYYY-MM-DD (Sydney), when known. */
+  scheduledOn?: string | null;
 };
 
 export type RateSet = {
@@ -39,9 +41,11 @@ export type StaffRates = RateSet & {
 export const RATE_CHANGES_FIELD = "rateChanges";
 
 /**
- * How many days before a change the employee's payslip page announces it.
- * One week means it shows over exactly one weekly payday, so each change is
- * announced once rather than on every payslip after it.
+ * How long the employee's payslip page announces a change: the week before
+ * it starts. One week means it shows over exactly one weekly payday, so each
+ * change is announced once rather than on every payslip after it. A change
+ * entered with less notice than that — or backdated — is announced for a
+ * week from the day it was entered instead, so it is never missed.
  */
 export const RATE_NOTICE_DAYS = 7;
 
@@ -66,6 +70,14 @@ function readBaseRates(raw: Record<string, unknown>): RateSet {
   };
 }
 
+/** The Sydney calendar day of a stored ISO timestamp, or null. */
+function sydneyDayOf(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const at = new Date(v);
+  if (Number.isNaN(at.getTime())) return null;
+  return at.toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
+}
+
 /** The stored changes, oldest first. One per day: a later entry for the same day wins. */
 export function readRateChanges(raw: Record<string, unknown>): RateChange[] {
   const list = raw[RATE_CHANGES_FIELD];
@@ -81,6 +93,7 @@ export function readRateChanges(raw: Record<string, unknown>): RateChange[] {
       effectiveFrom,
       weekday,
       saturday: numberOrNull(entry.saturdayRate),
+      scheduledOn: sydneyDayOf(entry.scheduledAt),
     });
   }
   return [...byDay.values()].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
@@ -112,15 +125,22 @@ export function upcomingRateChanges(rates: StaffRates, todayISO: string = sydney
 }
 
 /**
- * The change the employee should be told about today: the first one starting
- * within the next RATE_NOTICE_DAYS days, or null.
+ * The change the employee should be told about today, or null: shown from
+ * RATE_NOTICE_DAYS before it starts until it starts — or, when it was entered
+ * later than that, for RATE_NOTICE_DAYS from the day it was entered.
  */
 export function rateChangeToAnnounce(
   changes: RateChange[],
   todayISO: string = sydneyTodayKey(),
 ): RateChange | null {
-  const lastDay = addDaysISO(todayISO, RATE_NOTICE_DAYS);
-  return changes.find((c) => c.effectiveFrom > todayISO && c.effectiveFrom <= lastDay) ?? null;
+  const showing = changes.filter((c) => {
+    if (todayISO < addDaysISO(c.effectiveFrom, -RATE_NOTICE_DAYS)) return false;
+    const enteredLate = c.scheduledOn ? addDaysISO(c.scheduledOn, RATE_NOTICE_DAYS) : "";
+    const until = enteredLate > c.effectiveFrom ? enteredLate : c.effectiveFrom;
+    return todayISO < until;
+  });
+  // The newest one, if two overlap: it is the rate they are about to be paid.
+  return showing[showing.length - 1] ?? null;
 }
 
 export function isSaturdayISO(dateISO: string): boolean {
