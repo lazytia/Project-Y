@@ -216,7 +216,8 @@ export default function StaffDashboardPage() {
   const [staffId, setStaffId] = useState("");
   // The next catering job. "error" drops the card rather than saying there is
   // no catering when the truth is that we could not find out.
-  const [nextCatering, setNextCatering] = useState<NextCatering | null>(null);
+  // Every job on the next day with catering — usually one, sometimes two or three.
+  const [nextCatering, setNextCatering] = useState<NextCatering[]>([]);
   const [cateringState, setCateringState] = useState<"loading" | "ready" | "error">("loading");
 
   const [today, setTodayDate] = useState<Date>(() => {
@@ -339,8 +340,11 @@ export default function StaffDashboardPage() {
         headers: { Authorization: `Bearer ${await user.getIdToken()}` },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as { nextOrder?: NextCatering | null };
-      setNextCatering(data.nextOrder ?? null);
+      const data = (await res.json()) as {
+        nextOrder?: NextCatering | null;
+        nextOrders?: NextCatering[];
+      };
+      setNextCatering(data.nextOrders ?? (data.nextOrder ? [data.nextOrder] : []));
       setCateringState("ready");
     } catch {
       // Keep what is already on screen if there was something; otherwise show
@@ -510,8 +514,8 @@ export default function StaffDashboardPage() {
           page, where everything but the price is shown to every employee. With
           nothing booked it is plain text: the calendar is not theirs to open. */}
       {cateringState !== "error" && (
-        nextCatering ? (
-          <Link href={cateringOrderRoute(nextCatering.id)} className={styles.cateringCard}>
+        nextCatering.length > 0 ? (
+          <div className={styles.cateringCard}>
             <div className={styles.cateringTop}>
               <span className={styles.cateringIcon} aria-hidden="true">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -522,42 +526,49 @@ export default function StaffDashboardPage() {
               </span>
               <span className={styles.cateringLabel}>{t("staff.nextCatering")}</span>
             </div>
-            <div className={styles.cateringMain}>
-              <div className={styles.cateringText}>
-                <p className={styles.cateringWhen}>
-                  {fmtShiftDate(dateFromISO(nextCatering.deliveryDateISO))} · {nextCatering.deliveryTime}
-                </p>
-                <p className={styles.cateringMeta}>
-                  {nextCatering.guestsCount} {t("staff.catering.pax")} ·{" "}
-                  {t(nextCatering.fulfillmentType === "DELIVERY" ? "staff.catering.delivery" : "staff.catering.pickup")}
-                </p>
-              </div>
-              <span className={styles.cateringChev} aria-hidden="true">›</span>
-            </div>
-            {nextCatering.firstItem && (
-              <>
-                <div className={styles.cateringRule} />
-                <p className={styles.cateringItem}>
-                  <span className={styles.cateringItemIcon} aria-hidden="true">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="8" y1="13" x2="16" y2="13" />
-                      <line x1="8" y1="17" x2="13" y2="17" />
-                    </svg>
-                  </span>
-                  <span className={styles.cateringItemName}>
-                    {nextCatering.firstItem.name} ×{nextCatering.firstItem.qty}
-                  </span>
-                  {nextCatering.moreItems > 0 && (
-                    <span className={styles.cateringMore}>
-                      {t("staff.catering.more").replace("{n}", String(nextCatering.moreItems))}
-                    </span>
+            {nextCatering.map((job, i) => (
+              <div key={job.id} className={styles.cateringJobWrap}>
+                {i > 0 && <div className={styles.cateringRule} />}
+                <Link href={cateringOrderRoute(job.id)} className={styles.cateringJob}>
+                  <div className={styles.cateringMain}>
+                    <div className={styles.cateringText}>
+                      <p className={styles.cateringWhen}>
+                        {fmtShiftDate(dateFromISO(job.deliveryDateISO))} · {job.deliveryTime}
+                      </p>
+                      <p className={styles.cateringMeta}>
+                        {job.guestsCount} {t("staff.catering.pax")} ·{" "}
+                        {t(job.fulfillmentType === "DELIVERY" ? "staff.catering.delivery" : "staff.catering.pickup")}
+                      </p>
+                    </div>
+                    <span className={styles.cateringChev} aria-hidden="true">›</span>
+                  </div>
+                  {job.firstItem && (
+                    <>
+                      <div className={styles.cateringRule} />
+                      <p className={styles.cateringItem}>
+                        <span className={styles.cateringItemIcon} aria-hidden="true">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="8" y1="13" x2="16" y2="13" />
+                            <line x1="8" y1="17" x2="13" y2="17" />
+                          </svg>
+                        </span>
+                        <span className={styles.cateringItemName}>
+                          {job.firstItem.name} ×{job.firstItem.qty}
+                        </span>
+                        {job.moreItems > 0 && (
+                          <span className={styles.cateringMore}>
+                            {t("staff.catering.more").replace("{n}", String(job.moreItems))}
+                          </span>
+                        )}
+                      </p>
+                    </>
                   )}
-                </p>
-              </>
-            )}
-          </Link>
+                </Link>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className={styles.cateringCard}>
             <div className={styles.cateringTop}>

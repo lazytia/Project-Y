@@ -107,6 +107,22 @@
 
 a.cateringCard:hover { border-color: var(--color-warm); }
 
+/* One job in the card. Each opens its own order page; a day with two or
+   three jobs lists them all, divided by a rule. */
+.cateringJobWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.cateringJob {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: inherit;
+}
+.cateringJob:hover .cateringWhen { color: var(--color-warm); }
+
 .cateringTop {
   display: flex;
   align-items: center;

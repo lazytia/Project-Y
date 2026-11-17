@@ -76,10 +76,19 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const requested = req.nextUrl.searchParams.get("date");
-  const todayKey =
-    requested && DATE_KEY_RE.test(requested)
-      ? requested
-      : new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
+  const realTodayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
+  const todayKey = requested && DATE_KEY_RE.test(requested) ? requested : realTodayKey;
+  // Minutes past midnight in Sydney now — only meaningful when the day asked
+  // about is today; any other day is taken whole, as before.
+  const nowParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Australia/Sydney",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const nowMinutes =
+    Number(nowParts.find((p) => p.type === "hour")?.value ?? 0) * 60 +
+    Number(nowParts.find((p) => p.type === "minute")?.value ?? 0);
 
   const mondayKey = isoDateToMonday(todayKey);
   const [my, mm, md] = mondayKey.split("-").map(Number);
@@ -115,27 +124,39 @@ export async function GET(req: NextRequest) {
       a.deliveryDateISO.localeCompare(b.deliveryDateISO) ||
       minutesOfDay(a.deliveryTime) - minutesOfDay(b.deliveryTime);
 
+    // Still to come: a later day, or today with its time not yet passed. Once
+    // the 11:45 AM job has gone out, "next" is whatever follows it — staff
+    // were being shown a job that was already delivered. A job with no
+    // readable time stays for the whole day rather than vanishing early.
+    const stillToCome = (o: (typeof orders)[number]) => {
+      if (o.deliveryDateISO > todayKey) return true;
+      if (o.deliveryDateISO < todayKey) return false;
+      return todayKey !== realTodayKey || minutesOfDay(o.deliveryTime) >= nowMinutes;
+    };
+
     const upcoming = orders
-      .filter(
-        (o) =>
-          (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey,
-      )
+      .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && stillToCome(o))
       .sort(byDateThenTime);
 
-    const next = upcoming[0];
-    const nextOrder: SummaryOrder | null = next
-      ? {
-          id: next.id,
-          clientName: next.clientName,
-          status: next.status,
-          deliveryDateISO: next.deliveryDateISO,
-          deliveryTime: next.deliveryTime,
-          guestsCount: next.guestsCount,
-          fulfillmentType: next.fulfillmentType ?? null,
-          firstItem: next.menu[0] ? { name: next.menu[0].name, qty: next.menu[0].qty } : null,
-          moreItems: Math.max(0, next.menu.length - 1),
-        }
-      : null;
+    const toSummary = (o: (typeof orders)[number]): SummaryOrder => ({
+      id: o.id,
+      clientName: o.clientName,
+      status: o.status,
+      deliveryDateISO: o.deliveryDateISO,
+      deliveryTime: o.deliveryTime,
+      guestsCount: o.guestsCount,
+      fulfillmentType: o.fulfillmentType ?? null,
+      firstItem: o.menu[0] ? { name: o.menu[0].name, qty: o.menu[0].qty } : null,
+      moreItems: Math.max(0, o.menu.length - 1),
+    });
+
+    // Every job on the next day that has one, earliest first: two or three
+    // platters on the same day are all shown, not just the first.
+    const nextDay = upcoming[0]?.deliveryDateISO;
+    const nextOrders = nextDay
+      ? upcoming.filter((o) => o.deliveryDateISO === nextDay).map(toSummary)
+      : [];
+    const nextOrder: SummaryOrder | null = nextOrders[0] ?? null;
 
     const weekOrders = orders.filter(
       (o) =>
@@ -150,12 +171,11 @@ export async function GET(req: NextRequest) {
     // the next one inside it. Same orders, different question, so it is answered
     // here rather than making the kitchen screen re-fetch and re-filter the whole
     // Square list itself.
-    const weekNextOrder = weekOrders
-      .filter((o) => o.deliveryDateISO >= todayKey)
-      .sort(byDateThenTime)[0];
+    const weekNextOrder = weekOrders.filter(stillToCome).sort(byDateThenTime)[0];
 
     return NextResponse.json({
       nextOrder,
+      nextOrders,
       weekCount,
       weekNext: weekNextOrder
         ? { dateISO: weekNextOrder.deliveryDateISO, time: weekNextOrder.deliveryTime }
@@ -165,6 +185,7 @@ export async function GET(req: NextRequest) {
     console.error("[catering-orders/summary]", err);
     return NextResponse.json({
       nextOrder: null,
+      nextOrders: [],
       weekCount: 0,
       weekNext: null,
     });
