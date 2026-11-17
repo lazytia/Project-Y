@@ -342,6 +342,70 @@ export function toTimeLabel(value: string | undefined): string {
   });
 }
 
+/**
+ * "11:30 AM" → 690, for ordering and for "has it gone out yet". Unparseable
+ * labels (Square prints "—" when an order has no slot) count as the end of the
+ * day: a job with no time is never taken as already done, nor sorted first.
+ */
+export function cateringMinutesOfDay(label: string): number {
+  const value = toTimeInputValue(label);
+  if (!value) return 24 * 60;
+  const [h, m] = value.split(":").map(Number);
+  return h * 60 + m;
+}
+
+const SYDNEY_TZ = "Australia/Sydney";
+
+/** Sydney's date and minutes past midnight at `now`. */
+function sydneyClock(now: Date): { dateKey: string; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: SYDNEY_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  return {
+    dateKey: `${get("year")}-${get("month")}-${get("day")}`,
+    minutes: Number(get("hour")) * 60 + Number(get("minute")),
+  };
+}
+
+/**
+ * Whether a job is still to come as seen from `todayKey`: not cancelled, and
+ * on a later day — or today with its time not yet passed. Square's own state
+ * is no guide here: an order paid at the counter is COMPLETED the moment it is
+ * paid, days before it is cooked, so COMPLETED does not mean delivered. When
+ * `todayKey` is not today (a dashboard looking at another date) the whole day
+ * counts.
+ */
+export function isCateringStillToCome(
+  order: Pick<CateringOrder, "status" | "deliveryDateISO" | "deliveryTime">,
+  todayKey: string,
+  now: Date = new Date(),
+): boolean {
+  if (order.status === "CANCELLED") return false;
+  if (order.deliveryDateISO > todayKey) return true;
+  if (order.deliveryDateISO < todayKey) return false;
+  const clock = sydneyClock(now);
+  if (todayKey !== clock.dateKey) return true;
+  return cateringMinutesOfDay(order.deliveryTime) >= clock.minutes;
+}
+
+/** Earliest first: by day, then by time within the day. */
+export function byCateringSchedule(
+  a: Pick<CateringOrder, "deliveryDateISO" | "deliveryTime">,
+  b: Pick<CateringOrder, "deliveryDateISO" | "deliveryTime">,
+): number {
+  return (
+    a.deliveryDateISO.localeCompare(b.deliveryDateISO) ||
+    cateringMinutesOfDay(a.deliveryTime) - cateringMinutesOfDay(b.deliveryTime)
+  );
+}
+
 /** YYYY-MM-DD in local timezone. */
 export function todayISO(): string {
   return new Date().toLocaleDateString("en-CA");

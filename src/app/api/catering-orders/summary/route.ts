@@ -8,7 +8,11 @@ import {
   fetchScheduleOverrides,
   syncOrdersToFirestore,
 } from "@/lib/catering-firestore";
-import { applyDetailsOverride } from "@/lib/catering-orders";
+import {
+  applyDetailsOverride,
+  byCateringSchedule,
+  isCateringStillToCome,
+} from "@/lib/catering-orders";
 
 export const dynamic = "force-dynamic";
 
@@ -20,23 +24,6 @@ function isoDateToMonday(dateKey: string): string {
   const dow = (dt.getUTCDay() + 6) % 7;
   dt.setUTCDate(dt.getUTCDate() - dow);
   return dt.toISOString().slice(0, 10);
-}
-
-/**
- * "11:30 AM" → 690, for ordering. Sorting the labels as text puts 11:30 AM
- * before 9:00 AM, which would name the wrong job as the first of the day.
- * Unparseable labels (Square prints "—" when an order has no slot) sort last
- * rather than first, so a missing time never masquerades as midnight.
- */
-function minutesOfDay(label: string): number {
-  const m = /^(\d{1,2}):(\d{2})\s*([AaPp])\.?[Mm]?\.?$/.exec(label.trim());
-  if (m) {
-    const hour = (parseInt(m[1], 10) % 12) + (m[3].toLowerCase() === "p" ? 12 : 0);
-    return hour * 60 + parseInt(m[2], 10);
-  }
-  const h24 = /^(\d{1,2}):(\d{2})$/.exec(label.trim());
-  if (h24) return parseInt(h24[1], 10) * 60 + parseInt(h24[2], 10);
-  return Number.MAX_SAFE_INTEGER;
 }
 
 async function verifyAuth(req: NextRequest) {
@@ -76,19 +63,10 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const requested = req.nextUrl.searchParams.get("date");
-  const realTodayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
-  const todayKey = requested && DATE_KEY_RE.test(requested) ? requested : realTodayKey;
-  // Minutes past midnight in Sydney now — only meaningful when the day asked
-  // about is today; any other day is taken whole, as before.
-  const nowParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Australia/Sydney",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date());
-  const nowMinutes =
-    Number(nowParts.find((p) => p.type === "hour")?.value ?? 0) * 60 +
-    Number(nowParts.find((p) => p.type === "minute")?.value ?? 0);
+  const todayKey =
+    requested && DATE_KEY_RE.test(requested)
+      ? requested
+      : new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
 
   const mondayKey = isoDateToMonday(todayKey);
   const [my, mm, md] = mondayKey.split("-").map(Number);
@@ -117,26 +95,13 @@ export async function GET(req: NextRequest) {
         : withSchedule;
     syncOrdersToFirestore(orders);
 
-    // Earliest first within a day too: two jobs on one date used to come back
-    // in whatever order Square listed them, so the "next" one could be the
-    // later pickup.
-    const byDateThenTime = (a: (typeof orders)[number], b: (typeof orders)[number]) =>
-      a.deliveryDateISO.localeCompare(b.deliveryDateISO) ||
-      minutesOfDay(a.deliveryTime) - minutesOfDay(b.deliveryTime);
+    // Still to come: a later day, or today with its time not yet passed — so
+    // once the 11:45 AM job has gone out, "next" is whatever follows it. Any
+    // status but cancelled: Square marks a counter-paid order COMPLETED the
+    // moment it is paid, which hid a job booked for tomorrow.
+    const stillToCome = (o: (typeof orders)[number]) => isCateringStillToCome(o, todayKey);
 
-    // Still to come: a later day, or today with its time not yet passed. Once
-    // the 11:45 AM job has gone out, "next" is whatever follows it — staff
-    // were being shown a job that was already delivered. A job with no
-    // readable time stays for the whole day rather than vanishing early.
-    const stillToCome = (o: (typeof orders)[number]) => {
-      if (o.deliveryDateISO > todayKey) return true;
-      if (o.deliveryDateISO < todayKey) return false;
-      return todayKey !== realTodayKey || minutesOfDay(o.deliveryTime) >= nowMinutes;
-    };
-
-    const upcoming = orders
-      .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && stillToCome(o))
-      .sort(byDateThenTime);
+    const upcoming = orders.filter(stillToCome).sort(byCateringSchedule);
 
     const toSummary = (o: (typeof orders)[number]): SummaryOrder => ({
       id: o.id,
@@ -171,7 +136,7 @@ export async function GET(req: NextRequest) {
     // the next one inside it. Same orders, different question, so it is answered
     // here rather than making the kitchen screen re-fetch and re-filter the whole
     // Square list itself.
-    const weekNextOrder = weekOrders.filter(stillToCome).sort(byDateThenTime)[0];
+    const weekNextOrder = weekOrders.filter(stillToCome).sort(byCateringSchedule)[0];
 
     return NextResponse.json({
       nextOrder,

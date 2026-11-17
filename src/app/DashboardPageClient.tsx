@@ -39,8 +39,10 @@ import {
 } from "@/lib/reservations";
 import {
   type CateringOrder,
+  byCateringSchedule,
   fetchCateringOrders,
   dCountdownLabel,
+  isCateringStillToCome,
 } from "@/lib/catering-orders";
 
 const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
@@ -493,8 +495,8 @@ function OwnerDashboard({
           (o) => o.deliveryDateISO >= weekMondayISO && o.deliveryDateISO <= end && o.status !== "CANCELLED",
         ).length;
         const upcoming = orders
-          .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey)
-          .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
+          .filter((o) => isCateringStillToCome(o, todayKey))
+          .sort(byCateringSchedule);
         writeDashCache(selectedDate, {
           weekCateringCount: weekCount,
           nextCateringISO: upcoming[0]?.deliveryDateISO,
@@ -714,9 +716,10 @@ function OwnerDashboard({
 
   const nextCatering = useMemo((): { deliveryDateISO: string } | null => {
     if (cateringOrders && todayKey) {
+      // Same rule as the staff card: not cancelled, and not already gone out.
       const upcoming = cateringOrders
-        .filter((o) => (o.status === "CONFIRMED" || o.status === "PENDING") && o.deliveryDateISO >= todayKey)
-        .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO));
+        .filter((o) => isCateringStillToCome(o, todayKey))
+        .sort(byCateringSchedule);
       return upcoming[0] ? { deliveryDateISO: upcoming[0].deliveryDateISO } : null;
     }
     if (cachedCatering?.nextCateringISO) {

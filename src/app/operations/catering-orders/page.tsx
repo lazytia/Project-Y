@@ -6,9 +6,11 @@ import { useAuth } from "@/components/AuthProvider";
 import { isStrictOwner } from "@/lib/permissions";
 import {
   type CateringOrder,
+  byCateringSchedule,
   dCountdownLabel,
   daysUntil,
   fetchCateringOrders,
+  isCateringStillToCome,
   todayISO,
 } from "@/lib/catering-orders";
 import styles from "./page.module.css";
@@ -112,9 +114,12 @@ export default function CateringOrdersPage() {
     return orders.filter((o) => o.deliveryDateISO >= startISO && o.deliveryDateISO < endISO).length;
   }, [orders, cursor]);
 
+  // The first job not yet gone out — today's 11:45 AM delivery stops being
+  // "next" once 11:45 has passed — and never a cancelled one.
   const nextOrder = useMemo(() => {
-    return orders.find((o) => daysUntil(o.deliveryDateISO) >= 0) ?? null;
-  }, [orders]);
+    if (!today) return null;
+    return [...orders].filter((o) => isCateringStillToCome(o, today)).sort(byCateringSchedule)[0] ?? null;
+  }, [orders, today]);
 
   const monthGrid = useMemo(() => {
     if (!cursor) return [];
