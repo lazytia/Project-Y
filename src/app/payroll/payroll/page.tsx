@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/components/AuthProvider";
-import { useBackToDashboard } from "@/hooks/useBackToDashboard";
-import { isOwner } from "@/lib/permissions";
+import { useBackTo } from "@/hooks/useBackTo";
+import { isChef, isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { PAYROLL_TARGET_PCT } from "@/lib/cost-targets";
 import {
   isoLastCompletedPayWeek,
   sydneyTodayKey,
@@ -21,29 +22,20 @@ const CalendarPicker = dynamic(() => import("@/components/CalendarPicker"), {
 });
 
 /**
- * Owner Payroll overview — reads from /api/payroll/summary which pulls
- * the selected week's detail (per-employee breakdown + weekly totals)
- * from the Google Pay History sheet plus the week before it, and looks
- * up the matching Sydney-week Gross Sales from Firestore so the
- * "Payroll % of sales" gauge is meaningful.
+ * Payroll Cost — one week's payroll and what share of that week's sales it
+ * took, against the house target. Reads /api/payroll/summary, which pulls the
+ * week and the one before it from the Google Pay History sheet and the
+ * matching Sydney-week Gross Sales.
+ *
+ * Kept to those few figures on purpose: it sits under Weekly Cost Control,
+ * next to Supplier Cost, and answers "is labour where it should be this
+ * week", not "who was paid what".
  *
  * The week shown defaults to the last finished pay week and follows the
- * Sydney date until the owner picks one from the calendar. Every week
- * heading and chip caption is named from that week's distance to today,
- * so the words and the numbers cannot drift apart.
+ * Sydney date until a week is picked from the calendar.
  */
 
-
 type PayrollTotals = {
-  netPay: number;
-  tax: number;
-  superAnn: number;
-  cashPay: number;
-  totalIncSuper: number;
-};
-
-type EmployeePayRow = {
-  name: string;
   netPay: number;
   tax: number;
   superAnn: number;
@@ -54,7 +46,6 @@ type EmployeePayRow = {
 type WeekDetail = {
   weekStartISO: string;
   weekEndISO: string;
-  employees: EmployeePayRow[];
   totals: PayrollTotals;
 };
 
@@ -93,30 +84,10 @@ function fmtWeekRange(mondayISO: string): string {
   const mon = new Date(Date.UTC(my, mm - 1, md, 12));
   const sun = new Date(Date.UTC(sy, sm - 1, sd, 12));
   // en-GB, not en-AU: both are day-first, but en-AU spells out "June"/"July"
-  // for `month: "short"`, which made the two comparison headings different
-  // widths and wrapped one of them onto a second line.
+  // for `month: "short"`.
   const monPart = `${md} ${mon.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" })}`;
   const sunPart = sun.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   return `${monPart} – ${sunPart}`;
-}
-
-/** Whole weeks between `mondayISO` and the Monday of the Sydney week we are
- *  in now. 0 = this week, 1 = last week. Both ends are date-only UTC
- *  midnights, so no DST transition can make the division come out ragged. */
-function weeksAgo(mondayISO: string, todayKey: string): number {
-  const [ty, tm, td] = isoMondayOf(todayKey).split("-").map(Number);
-  const [my, mm, md] = mondayISO.split("-").map(Number);
-  const diff = Date.UTC(ty, tm - 1, td) - Date.UTC(my, mm - 1, md);
-  return Math.round(diff / (7 * 24 * 60 * 60 * 1000));
-}
-
-/** "This Week" / "Last Week" / "3 Weeks Ago". Every week heading and chip
- *  caption on this page is written by this one function, so a heading can
- *  never name a different week than the number printed under it. */
-function weekOffsetLabel(n: number): string {
-  if (n <= 0) return "This Week";
-  if (n === 1) return "Last Week";
-  return `${n} Weeks Ago`;
 }
 
 function fmtCurrency(n: number): string {
@@ -128,20 +99,11 @@ function safePct(current: number, baseline: number): number | null {
   return ((current - baseline) / baseline) * 100;
 }
 
-function initials(name: string): string {
-  const parts = name.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 /* ── Session cache ── */
 
 const SESSION_TTL_MS = 5 * 60 * 1000;
 
-/** How often an open page re-checks the Sydney date. Only has to be finer
- *  than a person's patience on the one night a week the date rolls into a
- *  new pay week. */
+/** How often an open page re-checks the Sydney date. */
 const DATE_ROLL_POLL_MS = 60 * 1000;
 
 function readSession<T>(key: string): T | null {
@@ -167,21 +129,20 @@ function writeSession<T>(key: string, data: T) {
 
 /* ── Page ── */
 
-export default function PayrollOverviewPage() {
+export default function PayrollCostPage() {
   const router = useRouter();
-  const goBack = useBackToDashboard();
+  const goBack = useBackTo(ROUTES.weeklyCostControl);
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  // The head chef manages what the kitchen costs, so he reads this too.
+  const allowed = isOwner(user) || isChef(user);
 
   const [weekMondayISO, setWeekMondayISO] = useState(isoLastCompletedPayWeek);
   const [todayKey, setTodayKey] = useState(sydneyTodayKey);
-  /** Set once the owner picks a week from the calendar. From then on the
-   *  page stops following the date — rolling a hand-picked week forward
-   *  underneath them would be the more surprising behaviour. */
+  /** Set once a week is picked from the calendar; from then on the page
+   *  stops following the date. */
   const [weekPinned, setWeekPinned] = useState(false);
   const [summary, setSummary] = useState<SummaryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [fetching, setFetching] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
@@ -190,12 +151,9 @@ export default function PayrollOverviewPage() {
     if (!allowed) router.replace(ROUTES.home);
   }, [allowed, authLoading, user, router]);
 
-  // Both the shown week and the calendar's max date are derived from today,
-  // and both were read once at mount. Installed as a PWA the page is not
-  // reloaded between openings, so a phone carried over a Monday would keep
-  // showing the week before last until it was force-quit. Re-derive when the
-  // page comes back to the front, and on a slow timer for a screen that is
-  // simply left open across midnight.
+  // Installed as a PWA the page is not reloaded between openings, so re-derive
+  // today (and the default week) when it comes back to the front, and on a
+  // slow timer for a screen left open across midnight.
   useEffect(() => {
     const sync = () => {
       const key = sydneyTodayKey();
@@ -220,22 +178,11 @@ export default function PayrollOverviewPage() {
   useEffect(() => {
     if (!allowed || !weekMondayISO) return;
     let cancelled = false;
-    // v10: the chips compare against summary.previous, and payrollPctPrev is
-    // that week's own ratio. A v9 entry still parses — twoWeeksAgo simply goes
-    // unread — so without the bump the old percentages would be replayed from
-    // session storage for five minutes after the deploy: right numbers on the
-    // tiles, wrong numbers on the chips underneath them.
     const cacheKey = `y.payroll.summary.v10.${weekMondayISO}`;
     const cached = readSession<SummaryPayload>(cacheKey);
-    const cachedHasPayroll =
-      cached && (cached.current?.totals?.totalIncSuper ?? 0) > 0;
-    if (cachedHasPayroll) {
-      setSummary(cached);
-    } else {
-      setSummary(null);
-    }
+    const cachedHasPayroll = cached && (cached.current?.totals?.totalIncSuper ?? 0) > 0;
+    setSummary(cachedHasPayroll ? cached : null);
     setError(null);
-    setFetching(!cachedHasPayroll);
     (async () => {
       try {
         const res = await fetch(`/api/payroll/summary?weekStart=${weekMondayISO}`);
@@ -246,8 +193,6 @@ export default function PayrollOverviewPage() {
         writeSession(cacheKey, data);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load payroll");
-      } finally {
-        if (!cancelled) setFetching(false);
       }
     })();
     return () => {
@@ -255,85 +200,48 @@ export default function PayrollOverviewPage() {
     };
   }, [allowed, weekMondayISO]);
 
-  // Every chip reads against summary.previous — the week immediately before
-  // the one on the tiles, which is exactly the WEEKLY COMPARISON card's
-  // right-hand column further down the page. The tiles show the last finished
-  // week, so from today that baseline is two weeks ago, which is what the
-  // chip labels say. The bucket a week further back is not fetched at all:
-  // having two candidate baselines in the payload is how a chip ended up
-  // reporting a rise off a week nothing on this page ever printed.
-  const chips = useMemo(() => {
+  /** Payroll in dollars against the week before, as a percentage change. */
+  const costChange = useMemo(() => {
     if (!summary) return null;
-    const a = summary.current.totals;
-    const b = summary.previous.totals;
-    return {
-      netPay: safePct(a.netPay, b.netPay),
-      tax: safePct(a.tax, b.tax),
-      superAnn: safePct(a.superAnn, b.superAnn),
-      cashPay: safePct(a.cashPay, b.cashPay),
-      totalIncSuper: safePct(a.totalIncSuper, b.totalIncSuper),
-    };
+    return safePct(summary.current.totals.totalIncSuper, summary.previous.totals.totalIncSuper);
   }, [summary]);
 
-  const payrollPctChip = useMemo(() => {
-    if (!summary) return null;
-    if (summary.payrollPctSales == null || summary.payrollPctPrev == null) return null;
-    return safePct(summary.payrollPctSales, summary.payrollPctPrev);
-  }, [summary]);
-
-  // Ranked by the same number the table prints — total including super, the
-  // sheet's own "Total Inc Super" column. Super is a per-employee figure from
-  // the sheet (not one shared rate), so ordering by a pay-out-only total
-  // could put the list in a different order than the amounts shown.
-  const topPaid = useMemo(() => {
-    if (!summary) return [];
-    return [...summary.current.employees]
-      .sort((a, b) => b.totalIncSuper - a.totalIncSuper)
-      .slice(0, 5);
+  /** Share of sales against the week before, in percentage points. */
+  const pctChangePp = useMemo(() => {
+    if (summary?.payrollPctSales == null || summary.payrollPctPrev == null) return null;
+    return summary.payrollPctSales - summary.payrollPctPrev;
   }, [summary]);
 
   if (authLoading || !user || !allowed) return <Splash />;
 
   const totals = summary?.current.totals;
-  const prevTotals = summary?.previous.totals;
-  const previousLabel = summary ? fmtWeekRange(summary.previous.weekStartISO) : "—";
-
-  // Named from where the shown week sits relative to today, not written into
-  // the markup: on the default view that is still "Last Week" comparing
-  // against "2 weeks ago", but pick July from the calendar and the captions
-  // follow instead of insisting it is last week.
-  const shownWeeksAgo = weeksAgo(weekMondayISO, todayKey);
-  const shownWeekLabel = weekOffsetLabel(shownWeeksAgo);
-  const baselineLabel = weekOffsetLabel(shownWeeksAgo + 1).toLowerCase();
+  const pct = summary?.payrollPctSales ?? null;
+  const overBy = pct === null ? null : pct - PAYROLL_TARGET_PCT;
 
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
-        <button
-          type="button"
-          className={styles.backBtn}
-          onClick={goBack}
-          aria-label="Back"
-        >
+        <button type="button" className={styles.backBtn} onClick={goBack} aria-label="Back">
           <ChevronLeft />
         </button>
         <div className={styles.headerTitles}>
-          <h1 className={styles.pageTitle}>Payroll</h1>
-          <p className={styles.pageSubtitle}>Weekly payroll overview and summary.</p>
+          <h1 className={styles.pageTitle}>Payroll Cost</h1>
+          <p className={styles.pageSubtitle}>Total weekly payroll and sales percentage.</p>
         </div>
-        <button
-          type="button"
-          className={styles.datePill}
-          onClick={() => setCalendarOpen(true)}
-          aria-label="Pick a pay week"
-        >
-          <CalendarIcon />
-          <span className={styles.datePillLabel}>
-            {weekMondayISO ? fmtWeekRange(weekMondayISO) : "—"}
-          </span>
-          <span className={styles.datePillChevron} aria-hidden="true">▾</span>
-        </button>
       </header>
+
+      <button
+        type="button"
+        className={styles.datePill}
+        onClick={() => setCalendarOpen(true)}
+        aria-label="Pick a pay week"
+      >
+        <CalendarIcon />
+        <span className={styles.datePillLabel}>
+          {weekMondayISO ? fmtWeekRange(weekMondayISO) : "—"}
+        </span>
+        <span className={styles.datePillChevron} aria-hidden="true">▾</span>
+      </button>
 
       {calendarOpen && (
         <CalendarPicker
@@ -341,8 +249,7 @@ export default function PayrollOverviewPage() {
           maxDate={todayKey}
           singleOnly
           onChange={(pickedISO) => {
-            // Snap whichever day the owner picked to that week's Monday
-            // so the summary always fetches a full Mon–Sun window.
+            // Snap the picked day to its Monday so a full Mon–Sun week is read.
             setWeekMondayISO(isoMondayOf(pickedISO));
             setWeekPinned(true);
             setCalendarOpen(false);
@@ -354,17 +261,15 @@ export default function PayrollOverviewPage() {
         />
       )}
 
-      {/* ── Headline cost + ratio ── */}
+      {/* ── Payroll cost + its share of sales ── */}
       <div className={styles.heroGrid}>
         <section className={styles.heroCard}>
           <div className={styles.heroHead}>
             <p className={styles.heroLabel}>PAYROLL COST</p>
             <span className={styles.heroBadge} aria-hidden="true"><WalletIcon /></span>
           </div>
-          <p className={styles.heroValue}>
-            {totals ? fmtCurrency(totals.totalIncSuper) : "—"}
-          </p>
-          <HeroDelta pct={chips?.totalIncSuper ?? null} baseline={baselineLabel} />
+          <p className={styles.heroValue}>{totals ? fmtCurrency(totals.totalIncSuper) : "—"}</p>
+          <HeroDelta value={costChange} unit="%" />
         </section>
 
         <section className={styles.heroCard}>
@@ -374,250 +279,77 @@ export default function PayrollOverviewPage() {
           </div>
           <div className={styles.heroPctRow}>
             <p className={styles.heroValue}>
-              {summary?.payrollPctSales !== null && summary?.payrollPctSales !== undefined
-                ? summary.payrollPctSales.toFixed(1)
-                : "—"}
+              {pct !== null ? pct.toFixed(1) : "—"}
               <span className={styles.heroUnit}>%</span>
             </p>
-            <GaugeChart pct={summary?.payrollPctSales ?? null} />
+            <GaugeChart pct={pct} />
           </div>
-          <HeroDelta pct={payrollPctChip} baseline={baselineLabel} />
+          <HeroDelta value={pctChangePp} unit=" pp" />
         </section>
       </div>
 
       {error && <p className={styles.errorMsg}>{error}</p>}
 
-      {/* ── Payroll summary ── */}
-      <section className={styles.card}>
-        <div className={styles.cardHead}>
-          <p className={styles.cardTitle}>
-            PAYROLL SUMMARY <span className={styles.cardTitleSub}>({shownWeekLabel})</span>
+      {/* ── Sales the ratio is taken against, and the target ── */}
+      <section className={styles.factsCard}>
+        <div className={styles.factCol}>
+          <p className={styles.factLabel}>
+            <BarsIcon />
+            WEEKLY SALES
           </p>
-          <p className={styles.cardTitleRange}>
-            {summary ? fmtWeekRange(summary.current.weekStartISO) : ""}
-          </p>
+          <p className={styles.factValue}>{summary ? fmtCurrency(summary.sales.current) : "—"}</p>
         </div>
-
-        <div className={styles.summaryGrid}>
-          <SummaryTile
-            icon={<WalletIcon />}
-            label="Net Pay"
-            value={totals ? fmtCurrency(totals.netPay) : "—"}
-            deltaPct={chips?.netPay ?? null}
-            baseline={baselineLabel}
-            loading={fetching && !summary}
-          />
-          <SummaryTile
-            icon={<TaxIcon />}
-            label="Tax"
-            value={totals ? fmtCurrency(totals.tax) : "—"}
-            deltaPct={chips?.tax ?? null}
-            baseline={baselineLabel}
-            loading={fetching && !summary}
-          />
-          <SummaryTile
-            icon={<PersonBadgeIcon />}
-            label="Superannuation"
-            value={totals ? fmtCurrency(totals.superAnn) : "—"}
-            deltaPct={chips?.superAnn ?? null}
-            baseline={baselineLabel}
-            loading={fetching && !summary}
-          />
-          <SummaryTile
-            icon={<CashIcon />}
-            label="Cash Pay"
-            value={totals ? fmtCurrency(totals.cashPay) : "—"}
-            deltaPct={chips?.cashPay ?? null}
-            baseline={baselineLabel}
-            loading={fetching && !summary}
-          />
+        <span className={styles.factDivider} aria-hidden="true" />
+        <div className={styles.factCol}>
+          <p className={styles.factLabel}>PAYROLL TARGET</p>
+          <p className={styles.factValue}>≤ {PAYROLL_TARGET_PCT.toFixed(1)}%</p>
         </div>
-
       </section>
 
-      {/* ── Weekly comparison ── */}
-      <section className={styles.card}>
-        <div className={styles.cardHead}>
-          <p className={styles.cardTitle}>WEEKLY COMPARISON</p>
-          <div className={styles.legendRow}>
-            <span className={styles.legendItem}>
-              <span className={`${styles.legendDot} ${styles.legendDotWarm}`} /> Recent Week
-            </span>
-            <span className={styles.legendItem}>
-              <span className={`${styles.legendDot} ${styles.legendDotMuted}`} /> Previous Week
-            </span>
+      {overBy !== null && pct !== null && (
+        <section className={overBy > 0 ? styles.targetAlert : styles.targetOk}>
+          <span className={styles.targetIcon} aria-hidden="true">
+            {overBy > 0 ? <AlertIcon /> : <CheckIcon />}
+          </span>
+          <div>
+            <p className={styles.targetTitle}>
+              {overBy > 0
+                ? `Above target by ${overBy.toFixed(1)} pp`
+                : `Within target by ${Math.abs(overBy).toFixed(1)} pp`}
+            </p>
+            <p className={styles.targetSub}>
+              Target ≤ {PAYROLL_TARGET_PCT.toFixed(1)}%
+              <span className={styles.targetSep} aria-hidden="true">|</span>
+              Current {pct.toFixed(1)}%
+            </p>
           </div>
-        </div>
-        <div className={styles.comparisonGrid}>
-          <ComparisonColumn
-            label={summary ? fmtWeekRange(summary.current.weekStartISO) : "—"}
-            totals={totals ?? null}
-            highlight
-          />
-          <ComparisonColumn label={previousLabel} totals={prevTotals ?? null} />
-        </div>
-      </section>
-
-      {/* ── Top paid employees ── */}
-      <section className={styles.card}>
-        <div className={styles.cardHead}>
-          <p className={styles.cardTitle}>
-            TOP PAID EMPLOYEES <span className={styles.cardTitleSub}>({shownWeekLabel.toLowerCase()})</span>
-          </p>
-        </div>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.thLeft}>Employee</th>
-                <th className={styles.thRight}>Total Inc Super</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topPaid.length === 0 ? (
-                <tr>
-                  <td colSpan={2} className={styles.tableEmpty}>
-                    {fetching ? "Loading…" : "No pay records for this week yet."}
-                  </td>
-                </tr>
-              ) : (
-                topPaid.map((emp) => (
-                  <tr key={emp.name}>
-                    <td>
-                      <span className={styles.empRow}>
-                        <span className={styles.empAvatar}>{initials(emp.name)}</span>
-                        <span className={styles.empName}>{emp.name}</span>
-                      </span>
-                    </td>
-                    <td className={styles.tdRight}>{fmtCurrency(emp.totalIncSuper)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }
 
 /* ── Sub-components ── */
 
-/** Rising payroll is the bad direction, so up reads warm and down reads positive. */
-function HeroDelta({ pct, baseline }: { pct: number | null; baseline: string }) {
+/** Rising cost is the bad direction, so up reads warm and down reads positive. */
+function HeroDelta({ value, unit }: { value: number | null; unit: string }) {
   return (
     <div className={styles.heroFoot}>
       <div className={styles.heroDivider} />
-      {pct !== null ? (
-        <p className={pct >= 0 ? styles.heroDeltaUp : styles.heroDeltaDown}>
-          {pct >= 0 ? "↑" : "↓"} {Math.abs(pct).toFixed(1)}%
+      {value !== null ? (
+        <p className={value >= 0 ? styles.heroDeltaUp : styles.heroDeltaDown}>
+          {value >= 0 ? "↑" : "↓"} {Math.abs(value).toFixed(1)}
+          {unit}
         </p>
       ) : (
         <p className={styles.heroDeltaMuted}>—</p>
       )}
-      <p className={styles.heroDeltaSub}>vs {baseline}</p>
+      <p className={styles.heroDeltaSub}>vs previous week</p>
     </div>
   );
 }
 
-function SummaryTile({
-  icon,
-  label,
-  value,
-  deltaPct,
-  baseline,
-  loading,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  deltaPct: number | null;
-  baseline: string;
-  loading: boolean;
-}) {
-  return (
-    <div className={styles.tile}>
-      <span className={styles.tileIcon} aria-hidden="true">{icon}</span>
-      <p className={styles.tileLabel}>{label}</p>
-      <p className={styles.tileValue}>{loading ? "…" : value}</p>
-      {deltaPct !== null ? (
-        <p
-          className={
-            deltaPct >= 0 ? styles.tileDeltaUp : styles.tileDeltaDown
-          }
-        >
-          {deltaPct >= 0 ? "↑" : "↓"} {Math.abs(deltaPct).toFixed(1)}%
-        </p>
-      ) : (
-        <p className={styles.tileDeltaMuted}>—</p>
-      )}
-      <p className={styles.tileDeltaSub}>vs {baseline}</p>
-    </div>
-  );
-}
-
-function ComparisonColumn({
-  label,
-  totals,
-  highlight = false,
-}: {
-  label: string;
-  totals: PayrollTotals | null;
-  highlight?: boolean;
-}) {
-  return (
-    <div className={styles.comparisonCol}>
-      <p className={highlight ? styles.comparisonLabelHot : styles.comparisonLabel}>{label}</p>
-      <ComparisonRow name="Net" value={totals?.netPay} highlight={highlight} />
-      <ComparisonRow name="Tax" value={totals?.tax} highlight={highlight} />
-      <ComparisonRow name="Super" value={totals?.superAnn} highlight={highlight} />
-      <ComparisonRow name="Cash" value={totals?.cashPay} highlight={highlight} />
-      <div className={styles.comparisonDivider} />
-      <ComparisonRow
-        name="Total"
-        value={totals?.totalIncSuper}
-        highlight={highlight}
-        bold
-      />
-    </div>
-  );
-}
-
-function ComparisonRow({
-  name,
-  value,
-  highlight,
-  bold = false,
-}: {
-  name: string;
-  value: number | undefined;
-  highlight?: boolean;
-  bold?: boolean;
-}) {
-  return (
-    <div className={styles.comparisonRow}>
-      <span className={bold ? styles.comparisonNameBold : styles.comparisonName}>{name}</span>
-      <span
-        className={
-          bold
-            ? highlight
-              ? styles.comparisonValueBoldHot
-              : styles.comparisonValueBold
-            : highlight
-              ? styles.comparisonValueHot
-              : styles.comparisonValue
-        }
-      >
-        {typeof value === "number" ? fmtCurrency(value) : "—"}
-      </span>
-    </div>
-  );
-}
-
-/**
- * Ring only — the percentage itself is already printed beside it as the
- * hero value, so repeating it inside the ring just duplicated the number.
- */
+/** Ring only — the percentage is printed beside it. */
 function GaugeChart({ pct }: { pct: number | null }) {
   const radius = 44;
   const stroke = 12;
@@ -627,21 +359,14 @@ function GaugeChart({ pct }: { pct: number | null }) {
   return (
     <div className={styles.gauge}>
       <svg viewBox="0 0 120 120" className={styles.gaugeSvg} aria-hidden="true">
-        <circle
-          cx={60}
-          cy={60}
-          r={radius}
-          fill="none"
-          stroke="rgba(255,255,255,0.15)"
-          strokeWidth={stroke}
-        />
+        <circle cx={60} cy={60} r={radius} fill="none" className={styles.gaugeTrack} strokeWidth={stroke} />
         {pct !== null && (
           <circle
             cx={60}
             cy={60}
             r={radius}
             fill="none"
-            stroke="#FF6A13"
+            className={styles.gaugeFill}
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={`${fillLen} ${circumference - fillLen}`}
@@ -676,7 +401,7 @@ function CalendarIcon() {
 
 function InfoIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: -2 }}>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
       <line x1="12" y1="16" x2="12" y2="12" />
       <line x1="12" y1="8" x2="12.01" y2="8" />
@@ -694,34 +419,31 @@ function WalletIcon() {
   );
 }
 
-function TaxIcon() {
+function BarsIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <text x="12" y="16" textAnchor="middle" fontSize="8" fontWeight="800" fill="currentColor" stroke="none">TAX</text>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <rect x="3" y="13" width="4.5" height="8" rx="1" />
+      <rect x="9.75" y="9" width="4.5" height="12" rx="1" />
+      <rect x="16.5" y="4" width="4.5" height="17" rx="1" />
     </svg>
   );
 }
 
-function PersonBadgeIcon() {
+function AlertIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="9" r="3.5" />
-      <path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5" />
-      <path d="M15 9a3.5 3.5 0 0 0-3.5-3.5" />
-      <path d="M15 12l1 1 2-2" />
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="7" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }
 
-function CashIcon() {
+function CheckIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="6" width="20" height="12" rx="2" />
-      <circle cx="12" cy="12" r="2.5" />
-      <line x1="5" y1="10" x2="5" y2="14" />
-      <line x1="19" y1="10" x2="19" y2="14" />
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="8 12.5 11 15.5 16.5 9.5" />
     </svg>
   );
 }
-

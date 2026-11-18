@@ -11,6 +11,7 @@ export type NavItem = {
   children?: NavItem[];
 };
 
+
 /**
  * Which picture a menu group shows, named after the picture rather than after
  * the group that happens to use it: labels get re-worded, but the payslip row
@@ -24,6 +25,7 @@ export type NavIcon =
   | "home"
   | "food"
   | "money"
+  | "coins"
   | "people"
   | "calendar"
   | "book"
@@ -35,6 +37,7 @@ export const NAV_ICON_GLYPH: Record<NavIcon, string> = {
   home: "🏠",
   food: "🍽",
   money: "💰",
+  coins: "🪙",
   people: "👥",
   calendar: "📅",
   book: "📚",
@@ -62,6 +65,22 @@ export type NavGroup = {
  * unsigned beer guide as their own alert — that signature is chased
  * separately, from SIGNABLE_DOCUMENTS in lib/document-signatures.
  */
+/**
+ * Weekly Cost Control, with the two costs it is made of underneath it.
+ *
+ * Shared by the owner's and the kitchen's Finance group, which differ only in
+ * whether Sales Overview sits above it: the chef manages what the kitchen
+ * costs, not the takings.
+ */
+const WEEKLY_COST_CONTROL: NavItem = {
+  label: "Weekly Cost Control",
+  href: ROUTES.weeklyCostControl,
+  children: [
+    { label: "Payroll Cost", href: "/payroll/payroll" },
+    { label: "Supplier Cost", href: "/money/purchasing-cost" },
+  ],
+};
+
 const TRAINING_MANUAL: NavItem = {
   label: "Training Manual",
   href: "/staff/training-manual",
@@ -98,12 +117,11 @@ export const OWNER_NAV: NavGroup[] = [
     ],
   },
   {
-    icon: "money",
-    label: "Money",
+    icon: "coins",
+    label: "Finance",
     children: [
       { label: "Sales Overview", href: "/money/sales" },
-      { label: "Payroll", href: "/payroll/payroll" },
-      { label: "Supplier Cost", href: "/money/purchasing-cost" },
+      WEEKLY_COST_CONTROL,
     ],
   },
   {
@@ -213,7 +231,7 @@ export const MANAGER_NAV: NavGroup[] = [
 ];
 
 /**
- * The kitchen menu. Six groups, owner-specced, and deliberately not the
+ * The kitchen menu. Seven groups, owner-specced, and deliberately not the
  * manager's with rows removed.
  *
  * Dashboard leads, as it does for the owner and the manager: the wordmark in
@@ -242,6 +260,8 @@ export const CHEF_NAV: NavGroup[] = [
       { label: "Item & Price Search", href: "/operations/item-search" },
     ],
   },
+  // What the kitchen costs a week. No Sales Overview: that is the owners'.
+  { icon: "coins", label: "Finance", children: [WEEKLY_COST_CONTROL] },
   {
     icon: "calendar",
     label: "Scheduling",

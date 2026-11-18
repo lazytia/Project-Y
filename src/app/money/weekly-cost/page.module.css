@@ -1,0 +1,378 @@
+.page {
+  font-family: var(--font-sans);
+  max-width: 720px;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Header ── */
+.pageHeader {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.backBtn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-fg);
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.backBtn:hover {
+  background: var(--color-surface);
+}
+
+.headerTitles {
+  min-width: 0;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  color: var(--color-fg);
+  letter-spacing: -0.02em;
+}
+
+.pageSubtitle {
+  margin: 2px 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.datePill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.datePillLabel {
+  white-space: nowrap;
+}
+
+.datePillChevron {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+/* ── Weekly sales ── */
+.salesCard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-fg);
+}
+
+.salesIcon {
+  display: inline-flex;
+  padding-top: 2px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.salesLabel {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.salesValue {
+  margin: 2px 0 0;
+  font-size: clamp(26px, 8vw, 34px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--color-bg);
+}
+
+/* ── Payroll | Supplier ── */
+.costGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.costCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-fg);
+  color: var(--color-bg);
+  text-decoration: none;
+}
+
+.costLabel {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.costIcon {
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.costMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.costText {
+  min-width: 0;
+}
+
+/* Two cards share a phone width, so the figure scales with the viewport. */
+.costValue {
+  margin: 0;
+  font-size: clamp(17px, 5vw, 26px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.costPct {
+  margin: 2px 0 0;
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.costChev {
+  flex: none;
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.costFoot {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* Rising cost is the bad direction, so up reads warm and down positive. */
+.deltaUp,
+.deltaDown,
+.deltaMuted {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+}
+
+.deltaUp { color: var(--color-warm); }
+.deltaDown { color: var(--color-positive); }
+.deltaMuted { color: rgba(255, 255, 255, 0.5); }
+
+.deltaSub {
+  margin: 1px 0 0;
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Combined against the target ── */
+.combinedAlert,
+.combinedOk {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+}
+
+.combinedAlert { background: var(--color-warm-bg); }
+.combinedOk { background: var(--color-surface); }
+
+.combinedIcon {
+  flex: none;
+  display: inline-flex;
+}
+
+.combinedAlert .combinedIcon { color: var(--color-warm); }
+.combinedOk .combinedIcon { color: var(--color-positive); }
+
+.combinedTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.combinedSub {
+  margin: 2px 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.combinedSep {
+  margin: 0 var(--space-2);
+}
+
+/* ── Cost trend ── */
+.trendCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+.trendHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.trendTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.trendTitleSub {
+  font-weight: 500;
+  color: var(--color-fg-muted);
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legendPayroll { background: var(--color-warm); }
+.legendSupplier { background: color-mix(in srgb, var(--color-warm) 30%, var(--color-bg)); }
+
+.bars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.barCol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The total sits on top of its own bar, so the column stacks from the floor
+   up: payroll, supplier, then the total label. Segment heights are a share
+   of this area less the label's line. */
+.barArea {
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.barTotal {
+  margin: 0 0 var(--space-1);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.barSupplier,
+.barPayroll {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.barSupplier {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: color-mix(in srgb, var(--color-warm) 30%, var(--color-bg));
+  color: var(--color-fg);
+}
+
+.barPayroll {
+  background: var(--color-warm);
+  color: var(--color-bg);
+}
+
+.barSupplier + .barPayroll {
+  border-radius: 0;
+}
+
+.barTotal + .barPayroll {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.barWeek,
+.barWeekOn {
+  margin: var(--space-2) 0 0;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.barWeek { color: var(--color-fg-muted); }
+.barWeekOn { color: var(--color-fg); font-weight: 800; }
+
+.errorMsg {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--color-negative);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 380px) {
+  .bars { gap: var(--space-1); }
+  .barArea { padding: 0 var(--space-1); }
+}

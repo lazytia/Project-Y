@@ -295,7 +295,7 @@ export default function Sidebar({ open, onClose, initialDashboard = null }: Prop
   const toggleGroup = (label: string) => {
     setOpenGroup((prev) => (prev === label ? null : label));
     if (!userIsStrictOwner) return;
-    if (label === "Money") runWhenIdle(() => prefetchOwnerMoneySummaries(), 0);
+    if (label === "Finance") runWhenIdle(() => prefetchOwnerMoneySummaries(), 0);
   };
 
   // Managers (yurina) get a curated nav — narrower than the owner nav and

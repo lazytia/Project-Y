@@ -197,6 +197,15 @@ const NAV_ICONS: Record<NavIcon, ReactNode> = {
       <circle cx="12" cy="15" r="1.5" />
     </>
   ),
+  coins: (
+    <>
+      <ellipse cx="9" cy="6.5" rx="6" ry="2.5" />
+      <path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4" />
+      <path d="M9 17.5c-3.3 0-6-1.1-6-2.5v-4" />
+      <ellipse cx="15" cy="13.5" rx="6" ry="2.5" />
+      <path d="M9 13.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4" />
+    </>
+  ),
   book: (
     <>
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />

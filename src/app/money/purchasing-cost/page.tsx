@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/components/AuthProvider";
-import { useBackToDashboard } from "@/hooks/useBackToDashboard";
-import { isOwner } from "@/lib/permissions";
+import { useBackTo } from "@/hooks/useBackTo";
+import { isChef, isOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isoLastCompletedPayWeek, sydneyTodayKey } from "@/lib/owner-money-prefetch";
 import Splash from "@/components/Splash";
@@ -142,9 +142,11 @@ function writeSession<T>(key: string, data: T) {
 
 export default function PurchasingCostPage() {
   const router = useRouter();
-  const goBack = useBackToDashboard();
+  // Sits under Weekly Cost Control, so Back returns there.
+  const goBack = useBackTo(ROUTES.weeklyCostControl);
   const { user, loading: authLoading } = useAuth();
-  const allowed = isOwner(user);
+  // The head chef manages what the kitchen buys, so he reads this too.
+  const allowed = isOwner(user) || isChef(user);
 
   const [weekMondayISO, setWeekMondayISO] = useState(isoLastCompletedPayWeek);
   const [todayKey] = useState(sydneyTodayKey);

@@ -4,6 +4,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { fetchSupplierWeeks, type WeeklySuppliers } from "@/lib/suppliers-sheet";
 import { loadWeekSalesResolved } from "@/lib/week-sales";
 import { shiftDateKey } from "@/lib/square";
+import { SUPPLIER_TARGET_PCT } from "@/lib/cost-targets";
 
 /**
  * GET /api/money/purchasing-cost/summary?weekStart=YYYY-MM-DD
@@ -20,9 +21,6 @@ export const dynamic = "force-dynamic";
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIMEZONE = "Australia/Sydney";
-
-/** House goal for supplier spend as a share of sales. */
-const TARGET_PCT_OF_SALES = 25;
 
 /** Bump when the weekly sheet parse changes so stale cache is ignored. */
 const PARSE_VERSION = 1;
@@ -154,7 +152,7 @@ export async function GET(req: NextRequest) {
         sales: { current: sales[0], previous: sales[1] },
         costPctSales: pctOfSales(current.total, sales[0]),
         costPctSalesPrev: pctOfSales(previous.total, sales[1]),
-        target: TARGET_PCT_OF_SALES,
+        target: SUPPLIER_TARGET_PCT,
       },
       { headers: CACHE_HEADERS },
     );

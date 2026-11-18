@@ -30,6 +30,7 @@ export const ROUTES = {
   bookingSources: "/operations/reservations/sources",
   cateringOrders: "/operations/catering-orders",
   setupGuide: "/guide_link",
+  weeklyCostControl: "/money/weekly-cost",
 } as const;
 
 /** One catering job's page. */
