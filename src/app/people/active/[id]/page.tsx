@@ -33,6 +33,7 @@ import { readRateHistory, type RateHistoryRow } from "@/lib/rate-history";
 import { removeRateChange, saveRateChange } from "@/lib/rate-change-store";
 import { addDaysISO, sydneyTodayKey } from "@/lib/sydney-date";
 import { todayIso } from "@/lib/staff-display";
+import { personalEmailOf } from "@/lib/username";
 import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
 import {
@@ -360,7 +361,7 @@ export default function EmployeeDetailPage() {
             preferredName: strField(raw, "preferredName"),
             dateOfBirth: strField(raw, "dateOfBirth"),
             gender: strField(raw, "gender"),
-            email: strField(raw, "email"),
+            email: personalEmailOf(raw),
           },
           tfn,
           taxFileNumber: tfn.taxFileNumber,

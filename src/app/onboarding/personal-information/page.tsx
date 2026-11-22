@@ -7,7 +7,11 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import Toast from "@/components/Toast";
 import { useLang } from "@/components/LanguageProvider";
+import { isLoginEmail, personalEmailOf } from "@/lib/username";
 import styles from "./page.module.css";
+
+/** Something@something.something — enough to catch a typo or a blank. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * The seven steps, as the row of circles across the top. Kept identical to
@@ -62,7 +66,10 @@ export default function PersonalInformationPage() {
         if (typeof data.preferredName === "string") setPreferredName(data.preferredName);
         if (typeof data.gender === "string") setGender(data.gender);
         if (typeof data.mobileNumber === "string") setMobileNumber(data.mobileNumber);
-        if (typeof data.email === "string") setEmail(data.email);
+        // Their own address only. `email` on this record is the login address
+        // (username@projecty.local); prefilling it is how everyone used to
+        // skip this field without typing anything.
+        setEmail(personalEmailOf(data));
       } catch {
         // Silent — user can still fill the form from scratch.
       }
@@ -85,7 +92,7 @@ export default function PersonalInformationPage() {
         lastName,
         gender,
         mobileNumber,
-        email,
+        personalEmail: email.trim(),
         step: CURRENT_STEP,
         status: markComplete ? "step_complete" : "in_progress",
         updatedAt: serverTimestamp(),
@@ -116,6 +123,12 @@ export default function PersonalInformationPage() {
     if (missing.length > 0) {
       setErrorTitle("Required Fields Missing");
       setError(`Please fill in the required fields:\n${missing.join("\n")}`);
+      setShowErrorModal(true);
+      return;
+    }
+    if (!EMAIL_PATTERN.test(email.trim()) || isLoginEmail(email)) {
+      setErrorTitle(t("onb.personal.emailInvalidTitle"));
+      setError(t("onb.personal.emailInvalid"));
       setShowErrorModal(true);
       return;
     }

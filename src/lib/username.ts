@@ -14,6 +14,27 @@ export function usernameToEmail(username: string): string {
   return `${username.trim().toLowerCase()}@${INTERNAL_DOMAIN}`;
 }
 
+/** True for the made-up address an account signs in with, not a mailbox. */
+export function isLoginEmail(email: string | null | undefined): boolean {
+  return !!email && email.trim().toLowerCase().endsWith(`@${INTERNAL_DOMAIN}`);
+}
+
+/**
+ * The employee's own email address, as they gave it in onboarding.
+ *
+ * Kept in `personalEmail`, apart from `email`: that field on a staff record is
+ * the login address the approve flow writes (username@projecty.local), and
+ * the personal information form used to prefill itself from it — so nobody
+ * ever typed a real address and the owners were shown the login one. Older
+ * records that only have `email` still count when it is a real address.
+ */
+export function personalEmailOf(raw: Record<string, unknown>): string {
+  const own = typeof raw.personalEmail === "string" ? raw.personalEmail.trim() : "";
+  if (own) return own;
+  const legacy = typeof raw.email === "string" ? raw.email.trim() : "";
+  return legacy && !isLoginEmail(legacy) ? legacy : "";
+}
+
 export function emailToUsername(email: string | null | undefined): string {
   if (!email) return "";
   const at = email.indexOf("@");

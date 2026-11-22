@@ -12,6 +12,7 @@
  */
 
 import { deleteField, serverTimestamp } from "firebase/firestore";
+import { personalEmailOf } from "./username";
 import { type OnboardingStepNumber } from "./onboarding-steps";
 import { tsToDate } from "./staff-display";
 
@@ -353,7 +354,8 @@ export function readOnboardingSubmission(
       preferredName: strField(raw, "preferredName"),
       dateOfBirth: strField(raw, "dateOfBirth"),
       gender: strField(raw, "gender"),
-      email: strField(raw, "email"),
+      // The address they typed, never the login address on the same record.
+      email: personalEmailOf(raw),
     },
     tfn,
     // Kept alongside the block it came from: the section table's hasData and
