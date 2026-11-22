@@ -5,6 +5,7 @@ import Link from "next/link";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
+import HolidayClosuresBanner from "@/components/HolidayClosuresBanner";
 import { useLang } from "@/components/LanguageProvider";
 import {
   fetchDocumentSignatures,
@@ -441,6 +442,9 @@ export default function StaffDashboardPage() {
         </h1>
         <p className={styles.greetSub}>{t("staff.greeting.sub")}</p>
       </header>
+
+      {/* Christmas / New Year closures, for the weeks set in lib/holiday-closures. */}
+      <HolidayClosuresBanner label={t("staff.holidayClosures")} />
 
       {/* Getting Started — the POS time clock, for the first fortnight only.
           Above the roster on purpose: a shift you forgot to clock into is a

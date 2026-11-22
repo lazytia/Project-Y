@@ -120,6 +120,8 @@ const EN: Dict = {
   "onb.personal.mobilePlaceholder": "e.g. 0412 345 678",
   "onb.personal.email": "Email Address",
   "onb.personal.emailPlaceholder": "e.g. alex.smith@email.com",
+  "onb.personal.emailInvalidTitle": "Check Your Email",
+  "onb.personal.emailInvalid": "Please enter your own email address, e.g. alex.smith@email.com.",
 
   // Onboarding — progress bar
   "onb.percentComplete": "% Complete",
@@ -588,6 +590,8 @@ const EN: Dict = {
   "req.submitted.done": "Done",
 
   // Payslips
+  "staff.holidayClosures": "HOLIDAY CLOSURES",
+
   "pay.title": "Payslips",
   "pay.nextPay": "Next Pay Date",
   "pay.frequency": "Paid weekly",
@@ -707,6 +711,8 @@ const JA: Dict = {
   "onb.personal.mobilePlaceholder": "例：0412 345 678",
   "onb.personal.email": "メールアドレス",
   "onb.personal.emailPlaceholder": "例：alex.smith@email.com",
+  "onb.personal.emailInvalidTitle": "メールアドレスを確認してください",
+  "onb.personal.emailInvalid": "ご自身のメールアドレスを入力してください（例：alex.smith@email.com）。",
 
   // Onboarding — progress bar
   "onb.percentComplete": "% 完了",
@@ -1061,6 +1067,8 @@ const JA: Dict = {
   "req.submitted.done": "完了",
 
   // Payslips
+  "staff.holidayClosures": "年末年始の休業日",
+
   "pay.title": "給与明細",
   "pay.nextPay": "次回支給日",
   "pay.frequency": "毎週支給",

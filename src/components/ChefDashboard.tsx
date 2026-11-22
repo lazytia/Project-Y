@@ -19,6 +19,7 @@ import { isoMondayOf, sydneyTodayKey } from "@/lib/sydney-date";
 import { dailySalesTarget, targetPct, WEEKLY_SALES_TARGET } from "@/lib/sales-targets";
 import { fetchDocumentSignatures, SIGNABLE_DOCUMENT_KEYS } from "@/lib/document-signatures";
 import { CHEF_NAV, navShortcuts, type NavIcon } from "@/lib/sidebar-nav";
+import HolidayClosuresBanner from "./HolidayClosuresBanner";
 import { ROUTES } from "@/lib/routes";
 import styles from "./ChefDashboard.module.css";
 
@@ -552,6 +553,8 @@ export default function ChefDashboard({
           </h1>
           <p className={styles.greetingRole}>Head Chef</p>
         </header>
+
+        <HolidayClosuresBanner />
 
         <section className={styles.todayWeek}>
           <p className={`${styles.sectionLabel} ${styles.todayHeading}`}>TODAY</p>

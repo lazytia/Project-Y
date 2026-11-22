@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import HolidayClosuresBanner from "./HolidayClosuresBanner";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import type { User } from "firebase/auth";
 import { collection, doc, getDocs, getDoc, type Timestamp } from "firebase/firestore";
@@ -430,6 +431,8 @@ export default function ManagerDashboard({
         </h1>
         <p className={styles.greetingRole}>{roleLabel}</p>
       </header>
+
+      <HolidayClosuresBanner />
 
       {/* Documents this account still has to sign. Each row links straight
           into the document and disappears once the signature is stored. */}

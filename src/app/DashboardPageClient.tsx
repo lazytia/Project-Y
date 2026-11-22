@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import HolidayClosuresBanner from "@/components/HolidayClosuresBanner";
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { getDb } from "@/lib/firebase";
 import styles from "./page.module.css";
@@ -894,6 +895,8 @@ function OwnerDashboard({
           <span className={styles.datePillChevron} aria-hidden="true">▾</span>
         </button>
       </header>
+
+      <HolidayClosuresBanner />
 
       {calendarOpen && (
         <CalendarPicker

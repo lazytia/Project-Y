@@ -1,0 +1,54 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-warm);
+}
+
+.divider {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  background: var(--color-border);
+}
+
+.text {
+  min-width: 0;
+}
+
+.label {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-fg-muted);
+}
+
+.dates {
+  margin: var(--space-1) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-fg);
+}
+
+.period {
+  white-space: nowrap;
+}
+
+.sep {
+  margin: 0 var(--space-3);
+  font-weight: 400;
+  color: var(--color-fg-muted);
+}
