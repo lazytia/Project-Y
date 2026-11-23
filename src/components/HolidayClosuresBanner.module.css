@@ -36,7 +36,7 @@
 .dates {
   margin: var(--space-1) 0 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   font-size: var(--font-size-xl);
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -51,4 +51,38 @@
   margin: 0 var(--space-3);
   font-weight: 400;
   color: var(--color-fg-muted);
+}
+
+/*
+ * The dates stay on one line on every phone, so the banner never breaks into a
+ * second line with a stray "|" leading it.
+ *
+ * `nowrap` above is what guarantees the one line; the steps below are what
+ * stop it overflowing instead. The staff dashboard is the tightest of the four
+ * screens — its own page padding sits inside the shell's — and leaves the
+ * dates (viewport − 175px). "25 – 28 Dec | 1 – 3 Jan" measures 221px at
+ * --font-size-xl, so it ran out at 396px: an iPhone reports 390px in Display
+ * Zoom, and that is the wrap. Each step gives the dates room measured on the
+ * staff screen, down to a 320px phone (figures are space left over):
+ *
+ *   >400px  xl, as drawn    428 → 32px   414 → 18px
+ *   ≤400px  tighter banner  390 → 18px   386 → 14px
+ *   ≤385px  lg             375 → 42px   346 → 13px
+ *   ≤345px  md             320 → 15px
+ */
+@media (max-width: 400px) {
+  .banner {
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+  .sep { margin: 0 var(--space-2); }
+}
+
+@media (max-width: 385px) {
+  .dates { font-size: var(--font-size-lg); }
+}
+
+@media (max-width: 345px) {
+  .banner { gap: var(--space-2); }
+  .dates { font-size: var(--font-size-md); }
 }
