@@ -71,8 +71,30 @@ function money(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Day 0 of a spreadsheet's dates. A date it holds is this plus so many days. */
+const SHEET_EPOCH_MS = Date.UTC(1899, 11, 30);
+const serialOf = (ms: number) => (ms - SHEET_EPOCH_MS) / DAY_MS;
+
 /**
- * A date cell as epoch ms: "2026-05-23" or a full ISO timestamp.
+ * Smallest number in a date cell to read as a spreadsheet date, and the point
+ * past which a date is not a price date at all.
+ *
+ * A cell that has lost its date format comes back as the plain number the
+ * sheet keeps the date as — 46322 for 27 Oct 2026 — and `Date.parse` reads a
+ * number that size as a *year*. That is how one unformatted cell on the
+ * Pyrmont tab came out as 1 Jan 46322 and sat at the top of "Recently
+ * changed" for good. Below the floor the number is not a date the sheet
+ * wrote, and guessing at it is what caused this — a bare "2026" is a year
+ * with no day in it and "5" is nothing at all, so both go down as undated.
+ */
+const SERIAL_MIN = serialOf(Date.UTC(2000, 0, 1));
+const TOO_FAR_MS = Date.UTC(2050, 0, 1);
+
+/**
+ * A date cell as epoch ms: "2026-05-23", a full ISO timestamp, or the plain
+ * number a spreadsheet date turns into when the cell loses its format.
  *
  * A bare date is put at midday UTC so it reads as the same calendar day in
  * Sydney, whichever side of midnight the offset would otherwise throw it.
@@ -80,8 +102,21 @@ function money(v: unknown): number {
 function dateMs(v: unknown): number | null {
   const s = text(v);
   if (!s) return null;
+  const ms = readDate(s);
+  // A date that far out dates nothing — all it does is pin the item to the top
+  // of the list — so the item is better counted as undated.
+  return ms !== null && ms < TOO_FAR_MS ? ms : null;
+}
+
+function readDate(s: string): number | null {
   const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (day) return Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]), 12);
+  // A bare number is the sheet's own date or it is no date at all. Left to
+  // Date.parse, "46322" comes out as a year and "5" as a day in 2001.
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const serial = Number(s);
+    return serial >= SERIAL_MIN ? SHEET_EPOCH_MS + Math.floor(serial) * DAY_MS + DAY_MS / 2 : null;
+  }
   const t = Date.parse(s);
   return Number.isFinite(t) ? t : null;
 }
