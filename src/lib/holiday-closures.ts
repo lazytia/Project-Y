@@ -24,7 +24,7 @@ export type HolidayClosures = {
 
 /** Christmas and New Year 2026–27. */
 export const HOLIDAY_CLOSURES: HolidayClosures = {
-  showFrom: "2026-11-30",
+  showFrom: "2026-11-23",
   showUntil: "2027-01-03",
   periods: [
     { from: "2026-12-25", to: "2026-12-28" },
