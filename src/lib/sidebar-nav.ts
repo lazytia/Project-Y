@@ -81,6 +81,18 @@ const WEEKLY_COST_CONTROL: NavItem = {
   ],
 };
 
+/**
+ * How many of each dish went out this week.
+ *
+ * One entry shared by the owner's menu and the kitchen's, both of which sit it
+ * under Item & Price Search: the two pages are the same question asked from
+ * either end — what a dish costs to buy, and how many of it were sold.
+ */
+const MENU_PERFORMANCE: NavItem = {
+  label: "Menu Performance",
+  href: "/operations/menu-performance",
+};
+
 const TRAINING_MANUAL: NavItem = {
   label: "Training Manual",
   href: "/staff/training-manual",
@@ -101,6 +113,7 @@ export const OWNER_NAV: NavGroup[] = [
       { label: "Catering", href: "/operations/catering-orders" },
       { label: "Daily Sold Out", href: "/operations/daily-sold-out" },
       { label: "Item & Price Search", href: "/operations/item-search" },
+      MENU_PERFORMANCE,
       {
         label: "Roster",
         href: "/scheduling/roster",
@@ -258,6 +271,7 @@ export const CHEF_NAV: NavGroup[] = [
       { label: "Reservations", href: "/operations/reservations" },
       { label: "Catering Orders", href: "/operations/catering-orders" },
       { label: "Item & Price Search", href: "/operations/item-search" },
+      MENU_PERFORMANCE,
     ],
   },
   // What the kitchen costs a week. No Sales Overview: that is the owners'.

@@ -1,0 +1,328 @@
+.page {
+  padding: var(--page-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-gap);
+}
+
+/* ── header ── */
+
+/*
+ * Back arrow then title, as a row. Not the absolute-positioned header the
+ * price list uses: that one centres its title, and a title left-aligned
+ * behind an absolute arrow has to guess how wide the arrow is.
+ */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) 0 var(--space-2);
+}
+
+.backBtn {
+  display: flex;
+  /* Pulls the icon's own padding back so the arrow lines up with the page. */
+  margin-left: calc(var(--space-2) * -1);
+  padding: var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+/* ── week picker ── */
+
+.weekBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+.weekArrow {
+  flex: none;
+  display: flex;
+  padding: var(--space-2);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.weekArrow:disabled {
+  color: var(--color-fg-subtle);
+  cursor: default;
+}
+
+.weekLabel {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.weekName {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+.weekIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+}
+
+.weekDates {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+/* ── the three figures ── */
+
+/*
+ * Label, figure, unit — three rows the cards share, so the figures line up
+ * across all three however their labels fall. A third of a phone is 83px and
+ * "vs. Last Week" wants 86, so that one label wraps on the narrower handsets;
+ * without the shared rows its "+12%" then sat a line below the other two.
+ */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto auto auto;
+  gap: var(--space-2);
+}
+
+.statCard {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  text-align: center;
+}
+
+.statLabel {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.statValue {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.statSub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+/* ── Food / Drinks ── */
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.tab {
+  padding: var(--space-3) var(--space-2);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabActive {
+  background: var(--color-warm-bg);
+  color: var(--color-fg);
+  font-weight: 700;
+}
+
+/* ── search ── */
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.searchBox:focus-within {
+  border-color: var(--color-warm);
+}
+
+.searchIcon {
+  display: flex;
+  color: var(--color-fg-muted);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-lg);
+  color: var(--color-fg);
+  caret-color: var(--color-warm);
+}
+
+.searchInput::placeholder {
+  color: var(--color-fg-subtle);
+}
+
+/* ── the list ── */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-fg-muted);
+}
+
+.thRank {
+  width: var(--space-6);
+  text-align: left;
+}
+
+.thDish {
+  text-align: left;
+}
+
+.thQty {
+  width: 22%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.thDelta {
+  width: 28%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-4) var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-lg);
+  color: var(--color-fg);
+}
+
+.tdRank {
+  color: var(--color-fg-muted);
+}
+
+.tdDish {
+  font-weight: 500;
+}
+
+.tdQty {
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tdDelta {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.deltaUp {
+  color: var(--color-positive);
+  font-weight: 700;
+}
+
+.deltaDown {
+  color: var(--color-negative);
+  font-weight: 700;
+}
+
+.deltaFlat {
+  color: var(--color-fg-muted);
+  font-weight: 700;
+}
+
+.viewAllBtn {
+  width: 100%;
+  padding: var(--space-4);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── loading, empty, failed ── */
+
+.state {
+  margin: 0;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  font-size: var(--font-size-lg);
+  color: var(--color-fg-muted);
+}
+
+.stateText {
+  margin: 0 0 var(--space-4);
+}
+
+.retryBtn {
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refreshing {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-subtle);
+}
