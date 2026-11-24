@@ -13,6 +13,7 @@ import {
   type Decision,
   type PublishShift,
 } from "@/lib/manager-actions";
+import { HOLIDAY_CLOSURES, fmtClosurePeriod, isClosedDate } from "@/lib/holiday-closures";
 import { rosterChangeNotifies, type RosterChange } from "@/lib/roster-publish";
 import { isPastOnboarding, isTeamMember, staffOnboardingFlags } from "@/lib/staff-active";
 import {
@@ -509,6 +510,22 @@ function DotCount({ n }: { n: number }) {
   );
 }
 
+/**
+ * A day the restaurant is shut over a holiday closure.
+ *
+ * Not a button: there is nobody to roster, and saying so is the whole of the
+ * answer the tap would have got. A head count is still drawn if one is
+ * somehow stored for the day, so a shift made before the closure was set is
+ * visible rather than quietly hidden behind the label.
+ */
+function ClosedCell({ n }: { n: number }) {
+  return (
+    <div className={styles.gridCellClosed} role="img" aria-label="Closed">
+      {n > 0 ? <DotCount n={n} /> : <span className={styles.closedMark} aria-hidden="true">✕</span>}
+    </div>
+  );
+}
+
 export default function ManagerRosterPage() {
   const { user } = useAuth();
   const isChefUser = isChef(user);
@@ -589,6 +606,19 @@ export default function ManagerRosterPage() {
   const weekDays = useMemo(
     () => Array.from({ length: DAYS_IN_WEEK }, (_, i) => addDays(weekStart, i)),
     [weekStart],
+  );
+
+  /**
+   * Whether either week on screen runs into a holiday closure.
+   *
+   * The ✕ on those days says a day is shut but not why, and the dates are
+   * worth spelling out where the roster is built — so the line below the
+   * strip appears for the weeks it bears on and stays off the page the rest
+   * of the year.
+   */
+  const closedInView = useMemo(
+    () => [...weekDays, ...nextWeekDays].some((d) => isClosedDate(isoDate(d))),
+    [weekDays, nextWeekDays],
   );
 
   const prevWeekStart = useMemo(() => addDays(weekStart, -7), [weekStart]);
@@ -971,13 +1001,14 @@ export default function ManagerRosterPage() {
         const person = team.get(uid);
         return !!person && hasApprovedHoliday(person, target.days[dayIndex]);
       },
+      isClosed: isClosedDate,
     });
-    const { assignments, counts, copied } = plan;
+    const { assignments, counts, copied, skippedClosed } = plan;
     const away = plan.away.map(
       ({ uid, dayIndex }) => `${displayName(team.get(uid)!)} (${DAY_LABELS[dayIndex]})`,
     );
 
-    if (copied === 0 && away.length === 0) {
+    if (copied === 0 && away.length === 0 && skippedClosed === 0) {
       alert("Last week has no roster to repeat.");
       return;
     }
@@ -990,6 +1021,9 @@ export default function ManagerRosterPage() {
       "",
       `${copied} shift${copied === 1 ? "" : "s"} will be copied.`,
       ...(hasRoster ? ["That week already has a roster. It will be replaced (notes stay)."] : []),
+      ...(skippedClosed > 0
+        ? [`${skippedClosed} left off: the restaurant is closed those days.`]
+        : []),
       ...(away.length > 0 ? ["", `Left off, on approved holiday: ${away.join(", ")}`] : []),
     ];
     if (!window.confirm(lines.join("\n"))) return;
@@ -1194,6 +1228,13 @@ export default function ManagerRosterPage() {
         {repeating ? "Repeating…" : "Repeat last week’s roster"}
       </button>
 
+      {closedInView && (
+        <p className={styles.closedNote}>
+          Closed {HOLIDAY_CLOSURES.periods.map(fmtClosurePeriod).join(" · ")} — no shifts can be
+          set on those days.
+        </p>
+      )}
+
       {/* ── Current week strip ── */}
       <section className={styles.grid}>
         <div className={styles.gridHeadRow}>
@@ -1217,6 +1258,7 @@ export default function ManagerRosterPage() {
           {weekDays.map((d, i) => {
             const iso = isoDate(d);
             const n = assignmentCount(weekDoc, iso, "lunch");
+            if (isClosedDate(iso)) return <ClosedCell key={i} n={n} />;
             return (
               <button
                 key={i}
@@ -1239,6 +1281,7 @@ export default function ManagerRosterPage() {
           {weekDays.map((d, i) => {
             const iso = isoDate(d);
             const n = assignmentCount(weekDoc, iso, "dinner");
+            if (isClosedDate(iso)) return <ClosedCell key={i} n={n} />;
             return (
               <button
                 key={i}
@@ -1320,6 +1363,7 @@ export default function ManagerRosterPage() {
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
               const n = assignmentCount(nextWeekDoc, iso, "lunch");
+              if (isClosedDate(iso)) return <ClosedCell key={i} n={n} />;
               return (
                 <button
                   key={i}
@@ -1340,6 +1384,7 @@ export default function ManagerRosterPage() {
             {nextWeekDays.map((d, i) => {
               const iso = isoDate(d);
               const n = assignmentCount(nextWeekDoc, iso, "dinner");
+              if (isClosedDate(iso)) return <ClosedCell key={i} n={n} />;
               return (
                 <button
                   key={i}

@@ -32,6 +32,21 @@ export const HOLIDAY_CLOSURES: HolidayClosures = {
   ],
 };
 
+/**
+ * Is the restaurant shut on this day (YYYY-MM-DD, Sydney)?
+ *
+ * Asked by the roster, which will not put anybody on a day the doors do not
+ * open. Deliberately independent of `showFrom` / `showUntil`: those say when
+ * the dashboards announce the closure, while a day inside one of the periods
+ * is closed whether or not the banner is up yet.
+ */
+export function isClosedDate(
+  dateISO: string,
+  closures: HolidayClosures = HOLIDAY_CLOSURES,
+): boolean {
+  return closures.periods.some((p) => dateISO >= p.from && dateISO <= p.to);
+}
+
 /** The closures to announce today, or null outside the announcement window. */
 export function activeHolidayClosures(
   todayISO: string = sydneyTodayKey(),

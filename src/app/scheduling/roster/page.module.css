@@ -8,7 +8,7 @@
   gap: var(--space-4);
 }
 
-/* ?€?€ Header ?€?€ */
+/* ?ï¿½?ï¿½ Header ?ï¿½?ï¿½ */
 .header {
   display: flex;
   align-items: center;
@@ -55,7 +55,7 @@
   color: var(--color-fg-muted);
 }
 
-/* ?€?€ Week strip grid ?€?€ */
+/* ?ï¿½?ï¿½ Week strip grid ?ï¿½?ï¿½ */
 .grid {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -180,6 +180,36 @@
   font-weight: 600;
 }
 
+/*
+ * A day the restaurant is shut over a holiday closure. Deliberately reads as
+ * filled-in rather than empty: an empty cell is a day nobody has rostered
+ * yet, and this is a day nobody can.
+ *
+ * The padding matches .gridCell so swapping one for the other leaves the row
+ * the same height.
+ */
+.gridCellClosed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.closedMark {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-fg-subtle);
+}
+
+/* What the âœ• on those days means, shown only in a week that has one. */
+.closedNote {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
 /* Notes-row cell content: faint pencil (no note) vs warm pencil (note) */
 .notePencilFaint {
   display: inline-flex;
@@ -196,7 +226,7 @@
   color: var(--color-warm);
 }
 
-/* ?€?€ Cards (shared shell) ?€?€ */
+/* ?ï¿½?ï¿½ Cards (shared shell) ?ï¿½?ï¿½ */
 .card {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -309,7 +339,7 @@
 .chev { transition: transform 0.15s; }
 .chevOpen { transform: rotate(180deg); }
 
-/* ?€?€ Notes list ?€?€ */
+/* ?ï¿½?ï¿½ Notes list ?ï¿½?ï¿½ */
 .notesList {
   list-style: none;
   margin: 0;
@@ -376,7 +406,7 @@
   outline: none;
 }
 
-/* ?€?€ Request rows ?€?€ */
+/* ?ï¿½?ï¿½ Request rows ?ï¿½?ï¿½ */
 .reqList {
   list-style: none;
   margin: 0;
@@ -470,7 +500,7 @@
   text-align: center;
 }
 
-/* ?€?€ Availability overview ?€?€ */
+/* ?ï¿½?ï¿½ Availability overview ?ï¿½?ï¿½ */
 .availList {
   list-style: none;
   margin: 0;
@@ -540,7 +570,7 @@
   color: #b8870a;
 }
 
-/* ?€?€ Modal ?€?€ */
+/* ?ï¿½?ï¿½ Modal ?ï¿½?ï¿½ */
 .modalBackdrop {
   position: fixed;
   inset: 0;
@@ -901,21 +931,21 @@
 
 .modalDoneBtn:hover { opacity: 0.85; }
 
-/* ?€?€ Card subtitle (date range) ?€?€ */
+/* ?ï¿½?ï¿½ Card subtitle (date range) ?ï¿½?ï¿½ */
 .cardSubtitle {
   margin: 0;
   font-size: 12px;
   color: var(--color-fg-muted);
 }
 
-/* ?€?€ Grid nested inside a card (no own border/radius) ?€?€ */
+/* ?ï¿½?ï¿½ Grid nested inside a card (no own border/radius) ?ï¿½?ï¿½ */
 .cardGrid {
   border-top: 1px solid var(--color-border);
   background: var(--color-bg);
   overflow: hidden;
 }
 
-/* ?€?€ Sub-section header inside a card (Notes within Next/Prev week) ?€?€ */
+/* ?ï¿½?ï¿½ Sub-section header inside a card (Notes within Next/Prev week) ?ï¿½?ï¿½ */
 .cardSubHead {
   display: flex;
   align-items: center;
@@ -928,7 +958,7 @@
   border-top: none;
 }
 
-/* ?€?€ Wrapper that makes prev-week Notes look like a standalone card ?€?€ */
+/* ?ï¿½?ï¿½ Wrapper that makes prev-week Notes look like a standalone card ?ï¿½?ï¿½ */
 .prevNotesWrap {
   margin: var(--space-3) var(--space-3) var(--space-3);
   background: var(--color-bg);
@@ -938,7 +968,7 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
-/* ?€?€ Read-only grid cell (no hover, no cursor pointer) ?€?€ */
+/* ?ï¿½?ï¿½ Read-only grid cell (no hover, no cursor pointer) ?ï¿½?ï¿½ */
 .gridCellReadOnly {
   display: flex;
   align-items: center;
@@ -946,13 +976,13 @@
   padding: 6px 0;
 }
 
-/* ?€?€ Read-only note text ?€?€ */
+/* ?ï¿½?ï¿½ Read-only note text ?ï¿½?ï¿½ */
 .noteReadOnly {
   font-size: 13px;
   color: var(--color-fg);
 }
 
-/* ?€?€ Notes modal ??centered dialog ?€?€ */
+/* ?ï¿½?ï¿½ Notes modal ??centered dialog ?ï¿½?ï¿½ */
 
 .noteModalBackdrop {
   position: fixed;
@@ -1383,7 +1413,7 @@
   line-height: 1.35;
 }
 
-/* ?€?€ Chef Staff Details Modal ?€?€ */
+/* ?ï¿½?ï¿½ Chef Staff Details Modal ?ï¿½?ï¿½ */
 
 .chefStaffModalBox {
   width: 100%;
@@ -1447,7 +1477,7 @@
   text-align: center;
 }
 
-/* ?€?€ Phone ?€?€ */
+/* ?ï¿½?ï¿½ Phone ?ï¿½?ï¿½ */
 @media (max-width: 520px) {
   .gridHeadRow,
   .gridRow {
@@ -1460,7 +1490,7 @@
   .availPill { font-size: 9px; padding: 2px 4px; }
 }
 
-/* ?€?€ Confirm-assign overlay ?€?€ */
+/* ?ï¿½?ï¿½ Confirm-assign overlay ?ï¿½?ï¿½ */
 .confirmOverlay {
   position: absolute;
   inset: 0;

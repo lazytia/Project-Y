@@ -42,6 +42,8 @@ export type RepeatPlan = {
   copied: number;
   /** Shifts that were left off because the person is away that day. */
   away: { uid: string; dayIndex: number }[];
+  /** Shifts that were left off because the restaurant is shut that day. */
+  skippedClosed: number;
 };
 
 /**
@@ -56,6 +58,11 @@ export type RepeatPlan = {
  * - somebody who is away on the day it would put them on, reported in `away` so
  *   the gap is explained rather than silent.
  *
+ * A day the restaurant is shut comes across empty, however the week before it
+ * ran — a holiday closure falls on an ordinary trading weekday, and repeating
+ * last week onto it is exactly how somebody would be rostered for Christmas.
+ * Those shifts are counted in `skippedClosed` rather than dropped quietly.
+ *
  * A temporary-staff slot (`tr_…`) is a placeholder and carries over as it is.
  * The plan always covers the whole target week, so applying it replaces the week
  * and a day that was empty last week leaves the same day empty this week.
@@ -66,17 +73,25 @@ export function planRepeatLastWeek(input: {
   thisDates: readonly string[];
   isOnTeam: (uid: string) => boolean;
   isAway: (uid: string, dayIndex: number) => boolean;
+  /** Days the doors do not open. Left out, nothing is treated as closed. */
+  isClosed?: (iso: string) => boolean;
 }): RepeatPlan {
-  const { lastWeek, lastDates, thisDates, isOnTeam, isAway } = input;
+  const { lastWeek, lastDates, thisDates, isOnTeam, isAway, isClosed } = input;
   const assignments: WeekAssignments = {};
   const counts: RepeatPlan["counts"] = {};
   const away: RepeatPlan["away"] = [];
   let copied = 0;
+  let skippedClosed = 0;
 
   thisDates.forEach((iso, dayIndex) => {
     const rostered: Record<Meal, ShiftAssignments> = { lunch: {}, dinner: {} };
+    const closed = isClosed?.(iso) ?? false;
     for (const meal of ["lunch", "dinner"] as Meal[]) {
       const from = lastWeek?.[lastDates[dayIndex]]?.[meal] ?? {};
+      if (closed) {
+        skippedClosed += Object.keys(from).length;
+        continue;
+      }
       for (const [uid, start] of Object.entries(from)) {
         if (!uid.startsWith("tr_")) {
           if (!isOnTeam(uid)) continue;
@@ -96,5 +111,5 @@ export function planRepeatLastWeek(input: {
     };
   });
 
-  return { assignments, counts, copied, away };
+  return { assignments, counts, copied, away, skippedClosed };
 }
