@@ -127,7 +127,6 @@ export default function ManagerEditForm() {
 
   /** The cancellation already asked for on this record, if there is one. */
   const [cancelRequest, setCancelRequest] = useState<StaffCancelRequest | null>(null);
-  const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [requestingCancel, setRequestingCancel] = useState(false);
 
@@ -225,7 +224,6 @@ export default function ManagerEditForm() {
         reason: cancelReason,
         actor: user,
       });
-      setCancelOpen(false);
       setCancelRequest({
         status: "pending",
         requestedAt: new Date(),
@@ -511,15 +509,13 @@ export default function ManagerEditForm() {
           </p>
           <p className={styles.cancelPendingText}>Waiting on an owner.</p>
         </div>
-      ) : !cancelOpen ? (
-        <button
-          type="button"
-          className={styles.deleteBtn}
-          onClick={() => setCancelOpen(true)}
-        >
-          Request Cancel
-        </button>
       ) : (
+        /*
+          One step, not two. The reason box and what the button does are on
+          screen from the start, and the button that asks is the only button
+          here — a first press that only revealed a second was a tap spent
+          saying nothing.
+        */
         <div className={styles.confirmWrap}>
           <p className={styles.confirmText}>
             Ask an owner to cancel this employee? Nothing is deleted now — an owner is notified
@@ -537,24 +533,14 @@ export default function ManagerEditForm() {
             onChange={(e) => setCancelReason(e.target.value)}
             disabled={requestingCancel}
           />
-          <div className={styles.confirmRow}>
-            <button
-              type="button"
-              className={styles.cancelBtn}
-              onClick={() => setCancelOpen(false)}
-              disabled={requestingCancel}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              className={styles.confirmDeleteBtn}
-              disabled={requestingCancel}
-              onClick={handleRequestCancel}
-            >
-              {requestingCancel ? "Sending…" : "Send Request"}
-            </button>
-          </div>
+          <button
+            type="button"
+            className={styles.confirmDeleteBtn}
+            disabled={requestingCancel}
+            onClick={handleRequestCancel}
+          >
+            {requestingCancel ? "Sending…" : "Request Cancel"}
+          </button>
         </div>
       )}
 
