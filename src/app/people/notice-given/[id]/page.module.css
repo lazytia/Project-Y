@@ -519,6 +519,20 @@
   line-height: 1.45;
 }
 
+/*
+ * Edit and Terminate share the header's last column. They wrap rather than
+ * squeeze the title: "Notice Details" and its line of explanation have the
+ * middle column, and on a narrow phone Terminate drops under Edit instead of
+ * taking it from them.
+ */
+.detailHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .detailEditBtn {
   padding: 6px 12px;
   border: 1px solid var(--color-border);
@@ -529,6 +543,25 @@
   font-weight: 700;
   color: var(--color-fg);
   cursor: pointer;
+}
+
+/* The one button on this screen that ends something — coloured like the
+   READY TO TERMINATE pill it sits above. */
+.detailTerminateBtn {
+  padding: 6px 12px;
+  border: 1px solid var(--color-negative);
+  border-radius: var(--radius-sm);
+  background: var(--color-negative);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-accent-fg);
+  cursor: pointer;
+}
+
+.detailTerminateBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .detailProfileCard {

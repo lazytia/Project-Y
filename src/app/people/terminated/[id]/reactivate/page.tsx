@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwner, isChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { setStaffLoginEnabled } from "@/lib/terminate-staff";
 import {
   fmtDateWithDay,
   fmtDateWithDayFromTs,
@@ -202,10 +203,14 @@ export default function ReactivateEmployeePage() {
         { merge: true },
       );
 
+      // Their login was switched off when they were terminated. Coming back
+      // to an account that will not open is not coming back.
+      await setStaffLoginEnabled(user, staff.uid, true);
+
       router.push("/people/active");
     } catch (err) {
       console.error("[reactivate] failed:", err);
-      alert("Failed to reactivate. Please try again.");
+      alert(err instanceof Error ? err.message : "Failed to reactivate. Please try again.");
       setSaving(false);
     }
   }

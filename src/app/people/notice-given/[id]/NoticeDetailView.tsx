@@ -1,11 +1,14 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
+import { getDb } from "@/lib/firebase";
 import {
   isReadyToTerminate,
   noticeDaysFromToday,
 } from "@/lib/notice-last-day";
+import { terminateStaff } from "@/lib/terminate-staff";
 import styles from "./page.module.css";
 
 export type NoticeDetailData = {
@@ -55,8 +58,47 @@ function submittedByLine(name: string): string {
 
 export default function NoticeDetailView({ notice }: { notice: NoticeDetailData }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const [terminating, setTerminating] = useState(false);
   const readyToTerminate = isReadyToTerminate(notice.lastWorkingDay);
   const daysLeft = noticeDaysFromToday(notice.lastWorkingDay);
+
+  /**
+   * Terminate from the notice itself.
+   *
+   * The notice is where the last working day was agreed and where the owner
+   * is standing when it passes, so the act belongs here as well as on the
+   * employee's own page. Both go through lib/terminate-staff, so a
+   * termination means the same three things either way.
+   */
+  async function handleTerminate() {
+    if (terminating) return;
+    const warning = readyToTerminate
+      ? ""
+      : "\n\nTheir last working day has not passed yet.";
+    const ok = window.confirm(
+      `Terminate ${notice.employeeName}?\n\n` +
+        `Last working day: ${fmtWithDay(notice.lastWorkingDay)}.${warning}\n\n` +
+        "Their record moves to Terminated and their login stops working at once — " +
+        "anyone signed in on a phone is signed out. Reactivating them later gives the login back.",
+    );
+    if (!ok) return;
+    setTerminating(true);
+    try {
+      await terminateStaff({
+        db: getDb(),
+        uid: notice.employeeUid,
+        lastWorkingDayISO: notice.lastWorkingDay,
+        notice,
+        actor: user,
+      });
+      router.push("/people/terminated");
+    } catch (err) {
+      console.error("[terminate] failed:", err);
+      alert(err instanceof Error ? err.message : "Failed to terminate. Please try again.");
+      setTerminating(false);
+    }
+  }
 
   return (
     <div className={styles.detailPage}>
@@ -76,13 +118,23 @@ export default function NoticeDetailView({ notice }: { notice: NoticeDetailData 
           <h1 className={styles.detailTitle}>Notice Details</h1>
           <p className={styles.detailSubtitle}>This notice was submitted by the manager.</p>
         </div>
-        <button
-          type="button"
-          className={styles.detailEditBtn}
-          onClick={() => router.push(`/people/notice-given/${notice.id}?edit=1`)}
-        >
-          Edit
-        </button>
+        <div className={styles.detailHeaderActions}>
+          <button
+            type="button"
+            className={styles.detailEditBtn}
+            onClick={() => router.push(`/people/notice-given/${notice.id}?edit=1`)}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className={styles.detailTerminateBtn}
+            disabled={terminating}
+            onClick={() => void handleTerminate()}
+          >
+            {terminating ? "Terminating…" : "Terminate"}
+          </button>
+        </div>
       </header>
 
       <section className={styles.detailProfileCard}>

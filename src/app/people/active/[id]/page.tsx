@@ -34,6 +34,7 @@ import { removeRateChange, saveRateChange } from "@/lib/rate-change-store";
 import { addDaysISO, sydneyTodayKey } from "@/lib/sydney-date";
 import { todayIso } from "@/lib/staff-display";
 import { archiveStaffRecord } from "@/lib/staff-archive";
+import { terminateStaff } from "@/lib/terminate-staff";
 import { personalEmailOf } from "@/lib/username";
 import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
@@ -455,51 +456,21 @@ export default function EmployeeDetailPage() {
     if (!staff || terminating) return;
     setTerminating(true);
     try {
-      // 1) Flip the staff doc into a terminated state so it drops off
-      //    the active roster and lands on /people/terminated.
-      const reasonBase = notice?.reasonForLeaving ?? "";
-      const reasonOther = notice?.reasonForLeavingOther ?? "";
-      const reasonDisplay =
-        reasonBase === "Other" && reasonOther.trim()
-          ? `Other — ${reasonOther.trim()}`
-          : reasonBase;
-      const terminatedByName =
-        user?.displayName?.trim() ||
-        (user?.email ? user.email.split("@")[0] : "Owner");
-
-      await setDoc(
-        doc(getDb(), "staff_onboarding", staff.uid),
-        {
-          status: "terminated",
-          terminatedAt: serverTimestamp(),
-          lastWorkingDate: lastDayISO,
-          reasonForLeaving: reasonBase,
-          reasonForLeavingOther: reasonBase === "Other" ? reasonOther.trim() : "",
-          terminationReason: reasonDisplay,
-          noticeGivenDate: notice?.noticeGivenDate ?? "",
-          rehireEligible: notice?.rehireEligible ?? "",
-          terminationManagerNotes: notice?.managerNotes ?? "",
-          terminatedByName,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-      // 2) Any open notice_given rows belong to the pre-termination
-      //    flow — sweep them so the terminated list isn't cluttered
-      //    with countdowns that no longer apply.
-      const noticeSnap = await getDocs(
-        query(collection(getDb(), "notice_given"), where("employeeUid", "==", staff.uid)),
-      );
-      if (!noticeSnap.empty) {
-        const batch = writeBatch(getDb());
-        noticeSnap.docs.forEach((d) => batch.delete(d.ref));
-        await batch.commit();
-      }
+      // The record moves to Terminated, the notice counting down to today is
+      // cleared, and the login stops working — all three in lib/terminate-staff,
+      // which the notice screen terminates through as well.
+      await terminateStaff({
+        db: getDb(),
+        uid: staff.uid,
+        lastWorkingDayISO: lastDayISO,
+        notice,
+        actor: user,
+      });
       setTerminateOpen(false);
       router.push("/people/active");
     } catch (err) {
       console.error("[terminate] failed:", err);
-      alert("Failed to terminate. Please try again.");
+      alert(err instanceof Error ? err.message : "Failed to terminate. Please try again.");
       setTerminating(false);
     }
   }

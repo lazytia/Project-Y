@@ -146,6 +146,8 @@ export function AuthProvider({
   // seen (and accepted) the enable-notifications prompt, `false` if they
   // still owe us that step. Owners and chefs skip this entirely.
   const [notificationsPromptSeen, setNotificationsPromptSeen] = useState<boolean | null>(null);
+  /** Their record says they have left. The session goes with it — see below. */
+  const [staffTerminated, setStaffTerminated] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const loginRedirectStarted = useRef(false);
@@ -357,6 +359,13 @@ export function AuthProvider({
             // it primes both fields on the next load, so it must never carry
             // an activation a cached snapshot only appeared to deny.
             if (!snap.metadata.fromCache) {
+              // Terminated while the app was open in their hand. The login is
+              // disabled on the server in the same breath (see
+              // lib/terminate-staff), but a phone already signed in holds a
+              // token good for up to an hour, and the roster and payslips
+              // would stay readable on it for that hour. The record saying
+              // they have left is enough to end the session now.
+              setStaffTerminated(String(data.status ?? "").toLowerCase() === "terminated");
               const activated = !!data.activatedAt;
               writeStaffStepCache(user.uid, completed, activated);
               setStaffActivated(activated);
@@ -386,6 +395,19 @@ export function AuthProvider({
       unsub?.();
     };
   }, [user, loading]);
+
+  /**
+   * Sign a terminated employee out, the moment their record says so.
+   *
+   * `signOut` is deliberately not a dependency: it is rebuilt on every render
+   * and latches on its own ref, so listing it would only re-run this effect
+   * for a call that returns at its first line.
+   */
+  useEffect(() => {
+    if (!staffTerminated) return;
+    void signOut();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffTerminated]);
 
   // Keep this phone registered for notifications under whoever is signed in.
   // Signing in is not the only way to arrive: the app is mostly opened with the
