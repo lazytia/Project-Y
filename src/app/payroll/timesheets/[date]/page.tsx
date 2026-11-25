@@ -34,7 +34,7 @@ type ShiftFromApi = {
   hourlyRateCents: number | null;
 };
 
-type TeamMemberFromApi = { firstName?: string; lastName?: string };
+type TeamMemberFromApi = { firstName?: string; lastName?: string; inactive?: boolean };
 
 /**
  * A per-shift override document stored in Firestore. Square is read-only;
@@ -607,6 +607,9 @@ export default function DayDetailsPage() {
             >
               <option value="">Select a staff member…</option>
               {Object.entries(teamMembers)
+                // Someone who has left still has their name on past shifts,
+                // but cannot be given a new one.
+                .filter(([, tm]) => !tm.inactive)
                 .map(([id, tm]) => ({ id, name: nameOfTeamMember(id, tm) }))
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map(({ id, name }) => (

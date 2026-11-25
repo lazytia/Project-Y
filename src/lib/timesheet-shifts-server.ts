@@ -29,6 +29,13 @@ export type TimesheetShift = {
 export type TimesheetTeamMember = {
   firstName?: string;
   lastName?: string;
+  /**
+   * Somebody Square no longer lists as active, whose name was filled in from
+   * their own staff record. Their past shifts still have to read as theirs;
+   * what they must not do is turn up in the add-shift picker as though they
+   * could work another one.
+   */
+  inactive?: boolean;
 };
 
 function round2(n: number): number {
@@ -244,7 +251,23 @@ async function fetchExtraShifts(startDate: string, endDate: string): Promise<Tim
 type StaffRateIndex = {
   byTeamMemberId: Record<string, StaffRates>;
   byStaffId: Record<string, StaffRates>;
+  /** Names off the same records, for shifts Square can no longer name. */
+  nameByTeamMemberId: Record<string, TimesheetTeamMember>;
+  nameByStaffId: Record<string, TimesheetTeamMember>;
 };
+
+/** The employee's name as their own record holds it, or null if it has none. */
+function nameFromStaffDoc(raw: Record<string, unknown>): TimesheetTeamMember | null {
+  const first = typeof raw.firstName === "string" ? raw.firstName.trim() : "";
+  const last = typeof raw.lastName === "string" ? raw.lastName.trim() : "";
+  if (first || last) {
+    return { firstName: first || undefined, lastName: last || undefined, inactive: true };
+  }
+  const full = typeof raw.fullName === "string" ? raw.fullName.trim() : "";
+  if (!full) return null;
+  const [firstWord, ...rest] = full.split(/\s+/);
+  return { firstName: firstWord, lastName: rest.join(" ") || undefined, inactive: true };
+}
 
 /**
  * Rates are owned by the app, but shifts arrive keyed by Square team member,
@@ -255,28 +278,38 @@ type StaffRateIndex = {
 async function fetchStaffRates(): Promise<StaffRateIndex> {
   const byTeamMemberId: Record<string, StaffRates> = {};
   const byStaffId: Record<string, StaffRates> = {};
+  const nameByTeamMemberId: Record<string, TimesheetTeamMember> = {};
+  const nameByStaffId: Record<string, TimesheetTeamMember> = {};
   const sharedStaffIds = new Set<string>();
   try {
     const snap = await adminDb().collection("staff_onboarding").get();
     for (const d of snap.docs) {
       const raw = d.data() as Record<string, unknown>;
       const rates = readStaffRates(raw);
+      const name = nameFromStaffDoc(raw);
       const teamMemberId =
         typeof raw.squareTeamMemberId === "string" ? raw.squareTeamMemberId.trim() : "";
-      if (teamMemberId) byTeamMemberId[teamMemberId] = rates;
+      if (teamMemberId) {
+        byTeamMemberId[teamMemberId] = rates;
+        if (name) nameByTeamMemberId[teamMemberId] = name;
+      }
 
       const staffId = typeof raw.squareStaffId === "string" ? raw.squareStaffId.trim() : "";
       if (!staffId) continue;
       if (staffId in byStaffId) sharedStaffIds.add(staffId);
       byStaffId[staffId] = rates;
+      if (name) nameByStaffId[staffId] = name;
     }
   } catch (err) {
     console.warn("[timesheet-shifts] staff rates lookup failed:", err);
   }
   // Two employees on one code means a shift can't be attributed to either.
   // Paying the wrong rate is worse than falling back to the Square wage.
-  for (const staffId of sharedStaffIds) delete byStaffId[staffId];
-  return { byTeamMemberId, byStaffId };
+  for (const staffId of sharedStaffIds) {
+    delete byStaffId[staffId];
+    delete nameByStaffId[staffId];
+  }
+  return { byTeamMemberId, byStaffId, nameByTeamMemberId, nameByStaffId };
 }
 
 function resolveRatesByTeamMember(
@@ -344,6 +377,24 @@ export async function fetchMergedTimesheetShifts(
   const merged = [...squareShifts.map((s) => applyEdit(s, edits[s.id])), ...extras]
     .filter((s) => !dismissedIds.has(s.id) && !excludedTeamMemberIds.has(s.teamMemberId))
     .map((s) => applyConfiguredRate(s, staffRates[s.teamMemberId]));
+
+  // Name whoever Square no longer lists, from their own staff record.
+  //
+  // The team-member lookup above asks Square for active staff only, so the
+  // day somebody is deactivated there — which is what happens when they
+  // leave — every shift they ever worked lost its name and the timesheet
+  // started calling them by the first eight characters of an id. The work
+  // was still theirs and the pay still had to go somewhere, so the hours had
+  // to stay; it was only the name that went. Their record here still has it.
+  for (const shift of merged) {
+    const id = shift.teamMemberId;
+    if (!id || teamMembers[id]) continue;
+    const name =
+      rateIndex.nameByTeamMemberId[id] ??
+      rateIndex.nameByStaffId[staffIdByTeamMember[id] ?? ""];
+    if (name) teamMembers[id] = name;
+  }
+
   return { shifts: merged, teamMembers };
 }
 
