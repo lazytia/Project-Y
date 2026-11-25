@@ -2,9 +2,28 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Each authenticated user can read/write their own onboarding documents
+    // The owners, by the same synthetic emails the Firestore rules use. Keep
+    // in sync with OWNER_USERNAMES in src/lib/permissions.ts.
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email in [
+          "tia@projecty.local",
+          "yurica@projecty.local",
+          "eddie@projecty.local"
+        ];
+    }
+
+    // An employee's own onboarding documents — passport, visa, RSA.
+    //
+    // They upload them and may re-shoot one over the top (a blurred photo the
+    // owner sent back), but they cannot remove one: these are the evidence the
+    // restaurant is required to hold, and an employee who could delete them
+    // could empty their own file after the fact. Deleting is the owners',
+    // the same as deleting the record itself.
     match /staff_onboarding/{uid}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && (request.auth.uid == uid || isOwner());
+      allow create, update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if isOwner();
     }
 
     // Cash payment attachments (ID photos, signatures). Any signed-in

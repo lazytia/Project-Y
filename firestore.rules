@@ -68,6 +68,22 @@ service cloud.firestore {
       return !request.resource.data.keys().hasAny(payFields());
     }
 
+    //  - What a staff member has entered, they may correct but not take away.
+    //    Every field already on the record has to still be there afterwards,
+    //    so a write cannot drop one. Their own screens save with merge, which
+    //    never removes a key, so an honest save is unaffected; what this stops
+    //    is a crafted write that empties the record a field at a time — the
+    //    same end as deleting it, reached under the update rule.
+    //
+    //    It deliberately does not require the values to stay filled in. The
+    //    documents step writes `rsaUrl: null` for anyone who needs no RSA and
+    //    the tax step writes "" for the optional answers, so a rule against
+    //    empty values would block the forms themselves. Changing a value is
+    //    editing, which is allowed; losing the field is not.
+    function keepsEveryField() {
+      return request.resource.data.keys().hasAll(resource.data.keys());
+    }
+
     match /staff_onboarding/{uid} {
       allow read: if request.auth != null;
       allow create: if isOwner() || isChef()
@@ -80,7 +96,7 @@ service cloud.firestore {
       allow delete: if isOwner();
       allow update: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid
-            && keepsStartDate() && keepsPayFields());
+            && keepsStartDate() && keepsPayFields() && keepsEveryField());
     }
 
     // The copy of a staff record taken when one is deleted, written by
@@ -225,8 +241,13 @@ service cloud.firestore {
     // Guide), one doc per signer. Kept out of staff_onboarding because that
     // collection is enumerated to build the People lists — a manager signing
     // the handbook must not become an employee record.
+    // A signature is evidence that somebody read and accepted a document, so
+    // the signer may add one and sign a newer version over it, but cannot
+    // take one back. Nobody deletes these from a screen; the admin SDK can
+    // where it ever has to.
     match /document_signatures/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid;
     }
 
     // Default: deny all other access
