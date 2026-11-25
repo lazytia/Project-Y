@@ -33,6 +33,7 @@ import { readRateHistory, type RateHistoryRow } from "@/lib/rate-history";
 import { removeRateChange, saveRateChange } from "@/lib/rate-change-store";
 import { addDaysISO, sydneyTodayKey } from "@/lib/sydney-date";
 import { todayIso } from "@/lib/staff-display";
+import { archiveStaffRecord } from "@/lib/staff-archive";
 import { personalEmailOf } from "@/lib/username";
 import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
 import { ONBOARDING_STEP_ICONS } from "@/lib/onboarding-steps";
@@ -507,12 +508,15 @@ export default function EmployeeDetailPage() {
     if (!staff || deleting) return;
     setMenuOpen(false);
     const ok = window.confirm(
-      `Delete ${staff.name}'s record?\n\nThis is a hard delete — the employee's onboarding data, HR notes and any open notice will be permanently removed. Use this only for mistakes; use "Terminate" for real departures.`,
+      `Delete ${staff.name}'s record?\n\nThe record comes off every list and the employee's HR notes and any open notice go with it. A copy is filed where an owner can get it back. Use this only for mistakes; use "Terminate" for real departures.`,
     );
     if (!ok) return;
     setDeleting(true);
     try {
       const db = getDb();
+      // The copy goes first: a record that cannot be archived is one that
+      // must not be deleted. See lib/staff-archive.
+      await archiveStaffRecord(db, staff.uid, user, "active-employee");
       // Sweep any related rows keyed on the employee's uid so we don't
       // leave dangling notice_given / hr_notes docs behind.
       const [noticeSnap, hrSnap] = await Promise.all([

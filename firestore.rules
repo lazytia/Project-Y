@@ -78,6 +78,17 @@ service cloud.firestore {
             && keepsStartDate() && keepsPayFields());
     }
 
+    // The copy of a staff record taken when one is deleted, written by
+    // lib/staff-archive just before the original goes.
+    //
+    // Create and read only — on purpose. An entry here is the last thing
+    // standing between a mistaken delete and a record nobody can get back,
+    // so whoever can delete a staff member can file and read these, and
+    // nobody at all can edit or remove one.
+    match /staff_deleted/{entryId} {
+      allow read, create: if isOwner() || isChef();
+    }
+
     // Published rosters: weekly docs keyed by Monday ISO date. Shift
     // assignments, per-day counts, notes and the publish stamp live here.
     // Staff need read access so the staff roster page can display the same

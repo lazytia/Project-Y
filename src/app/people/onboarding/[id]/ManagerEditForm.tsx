@@ -15,6 +15,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { archiveStaffRecord } from "@/lib/staff-archive";
 import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import {
   DEFAULT_TRAINING_PERIOD,
@@ -201,6 +202,9 @@ export default function ManagerEditForm() {
     if (deleting) return;
     setDeleting(true);
     try {
+      // The copy goes first: a record that cannot be archived is one that
+      // must not be deleted. See lib/staff-archive.
+      await archiveStaffRecord(getDb(), id, user, "new-employees-edit");
       await deleteDoc(doc(getDb(), "staff_onboarding", id));
       setConfirmDelete(false);
       setToast({ title: "Employee removed", message: "The onboarding record has been deleted." });

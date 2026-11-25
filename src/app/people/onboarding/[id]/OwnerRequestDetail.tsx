@@ -15,6 +15,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
+import { archiveStaffRecord } from "@/lib/staff-archive";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
@@ -237,6 +238,9 @@ export default function OwnerRequestDetail() {
     if (busy) return;
     setBusy(true);
     try {
+      // The copy goes first: a record that cannot be archived is one that
+      // must not be deleted. See lib/staff-archive.
+      await archiveStaffRecord(getDb(), id, user, "staff-request-decline");
       await deleteDoc(doc(getDb(), "staff_onboarding", id));
       setToast({ title: "Request declined", message: "The staff request has been removed." });
       window.setTimeout(() => router.push("/people/onboarding"), 900);
