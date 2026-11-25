@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
-import { isOwnerOrChefEmail } from "@/lib/permissions";
+import { isOwnerOrChefEmail, isStrictOwnerEmail } from "@/lib/permissions";
 
 /**
  * POST /api/staff/login-access
@@ -35,8 +35,11 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Could not verify the sign-in." }, { status: 401 });
   }
-  if (!isOwnerOrChefEmail(callerEmail)) {
-    return NextResponse.json({ error: "Owners and the head chef only." }, { status: 403 });
+  // Owners only. Switching a login off is half of ending an employment, and
+  // from 2026-11-25 ending one is theirs — the kitchen asks for it instead
+  // (see lib/staff-owner-requests), so nothing of the chef's calls this.
+  if (!isStrictOwnerEmail(callerEmail)) {
+    return NextResponse.json({ error: "Owners only." }, { status: 403 });
   }
 
   let body: { uid?: unknown; disabled?: unknown };

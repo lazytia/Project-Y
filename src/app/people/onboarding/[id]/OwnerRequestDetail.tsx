@@ -18,10 +18,11 @@ import { actorNameOf } from "@/lib/permissions";
 import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import { archiveStaffRecord } from "@/lib/staff-archive";
 import {
-  declineStaffCancel,
-  readCancelRequest,
-  type StaffCancelRequest,
-} from "@/lib/staff-cancel-request";
+  CANCEL_REQUEST_FIELD,
+  declineOwnerRequest,
+  readOwnerRequest,
+  type OwnerRequest,
+} from "@/lib/staff-owner-requests";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
@@ -151,7 +152,7 @@ export default function OwnerRequestDetail() {
   const [confirmDecline, setConfirmDecline] = useState(false);
   const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
   /** A cancellation the kitchen or the floor has asked an owner to make. */
-  const [cancelRequest, setCancelRequest] = useState<StaffCancelRequest | null>(null);
+  const [cancelRequest, setCancelRequest] = useState<OwnerRequest | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -191,7 +192,7 @@ export default function OwnerRequestDetail() {
           addedToScheduling: !!raw.addedToScheduling,
           accountCreated: !!raw.accountCreated,
         });
-        setCancelRequest(readCancelRequest(raw));
+        setCancelRequest(readOwnerRequest(raw, CANCEL_REQUEST_FIELD));
         setLoading(false);
       } catch {
         if (!cancelled) setLoading(false);
@@ -264,7 +265,12 @@ export default function OwnerRequestDetail() {
     if (busy) return;
     setBusy(true);
     try {
-      await declineStaffCancel({ db: getDb(), uid: id, actor: user });
+      await declineOwnerRequest({
+        db: getDb(),
+        uid: id,
+        field: CANCEL_REQUEST_FIELD,
+        actor: user,
+      });
       setCancelRequest((prev) =>
         prev
           ? { ...prev, status: "declined", decidedAt: new Date(), decidedByName: actorNameOf(user) }

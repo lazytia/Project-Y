@@ -26,7 +26,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef, isStrictOwner, canViewStaffRequest } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
-import { hasPendingCancelRequest } from "@/lib/staff-cancel-request";
+import { hasPendingCancelRequest } from "@/lib/staff-owner-requests";
 import {
   isOnboardingListEmployee,
   onboardingListStatus,

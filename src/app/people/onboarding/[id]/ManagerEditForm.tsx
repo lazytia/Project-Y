@@ -16,10 +16,11 @@ import { actorNameOf, isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import {
-  readCancelRequest,
+  CANCEL_REQUEST_FIELD,
+  readOwnerRequest,
   requestStaffCancel,
-  type StaffCancelRequest,
-} from "@/lib/staff-cancel-request";
+  type OwnerRequest,
+} from "@/lib/staff-owner-requests";
 import { fmtDate } from "@/lib/staff-display";
 import {
   DEFAULT_TRAINING_PERIOD,
@@ -126,7 +127,7 @@ export default function ManagerEditForm() {
   const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
 
   /** The cancellation already asked for on this record, if there is one. */
-  const [cancelRequest, setCancelRequest] = useState<StaffCancelRequest | null>(null);
+  const [cancelRequest, setCancelRequest] = useState<OwnerRequest | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [requestingCancel, setRequestingCancel] = useState(false);
 
@@ -163,7 +164,7 @@ export default function ManagerEditForm() {
             : "",
         );
         setNotes((raw.notes as string | undefined) ?? "");
-        setCancelRequest(readCancelRequest(raw));
+        setCancelRequest(readOwnerRequest(raw, CANCEL_REQUEST_FIELD));
         setLoadingDoc(false);
       } catch {
         if (!cancelled) setLoadingDoc(false);
@@ -229,6 +230,7 @@ export default function ManagerEditForm() {
         requestedAt: new Date(),
         requestedByName: actorNameOf(user),
         reason: cancelReason.trim(),
+        lastWorkingDay: "",
         decidedAt: null,
         decidedByName: "",
       });

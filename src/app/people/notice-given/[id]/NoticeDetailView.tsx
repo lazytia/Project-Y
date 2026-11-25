@@ -8,6 +8,8 @@ import {
   isReadyToTerminate,
   noticeDaysFromToday,
 } from "@/lib/notice-last-day";
+import { isStrictOwner } from "@/lib/permissions";
+import { requestStaffTerminate } from "@/lib/staff-owner-requests";
 import { terminateStaff } from "@/lib/terminate-staff";
 import styles from "./page.module.css";
 
@@ -59,7 +61,10 @@ function submittedByLine(name: string): string {
 export default function NoticeDetailView({ notice }: { notice: NoticeDetailData }) {
   const router = useRouter();
   const { user } = useAuth();
+  const canTerminate = isStrictOwner(user);
   const [terminating, setTerminating] = useState(false);
+  /** Set once the kitchen's request has gone, so it cannot be sent twice. */
+  const [requested, setRequested] = useState(false);
   const readyToTerminate = isReadyToTerminate(notice.lastWorkingDay);
   const daysLeft = noticeDaysFromToday(notice.lastWorkingDay);
 
@@ -76,6 +81,36 @@ export default function NoticeDetailView({ notice }: { notice: NoticeDetailData 
     const warning = readyToTerminate
       ? ""
       : "\n\nTheir last working day has not passed yet.";
+
+    // Ending the employment is the owners'. Anyone else here — the head chef,
+    // who is usually the one watching the last day go by — asks for it.
+    if (!canTerminate) {
+      const ask = window.confirm(
+        `Ask an owner to terminate ${notice.employeeName}?\n\n` +
+          `Last working day: ${fmtWithDay(notice.lastWorkingDay)}.${warning}\n\n` +
+          "Nothing happens to the record now. An owner is notified and decides.",
+      );
+      if (!ask) return;
+      setTerminating(true);
+      try {
+        await requestStaffTerminate({
+          db: getDb(),
+          uid: notice.employeeUid,
+          staffName: notice.employeeName,
+          reason: reasonDisplay(notice),
+          lastWorkingDay: notice.lastWorkingDay,
+          actor: user,
+        });
+        setRequested(true);
+      } catch (err) {
+        console.error("[terminate-request] failed:", err);
+        alert("Could not send the request. Please try again.");
+      } finally {
+        setTerminating(false);
+      }
+      return;
+    }
+
     const ok = window.confirm(
       `Terminate ${notice.employeeName}?\n\n` +
         `Last working day: ${fmtWithDay(notice.lastWorkingDay)}.${warning}\n\n` +
@@ -129,10 +164,18 @@ export default function NoticeDetailView({ notice }: { notice: NoticeDetailData 
           <button
             type="button"
             className={styles.detailTerminateBtn}
-            disabled={terminating}
+            disabled={terminating || requested}
             onClick={() => void handleTerminate()}
           >
-            {terminating ? "Terminating…" : "Terminate"}
+            {requested
+              ? "Requested"
+              : terminating
+                ? canTerminate
+                  ? "Terminating…"
+                  : "Sending…"
+                : canTerminate
+                  ? "Terminate"
+                  : "Request Terminate"}
           </button>
         </div>
       </header>

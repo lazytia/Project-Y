@@ -34,6 +34,14 @@ import { removeRateChange, saveRateChange } from "@/lib/rate-change-store";
 import { addDaysISO, sydneyTodayKey } from "@/lib/sydney-date";
 import { todayIso } from "@/lib/staff-display";
 import { archiveStaffRecord } from "@/lib/staff-archive";
+import {
+  TERMINATE_REQUEST_FIELD,
+  declineOwnerRequest,
+  readOwnerRequest,
+  requestStaffTerminate,
+  type OwnerRequest,
+} from "@/lib/staff-owner-requests";
+import { actorNameOf } from "@/lib/permissions";
 import { terminateStaff } from "@/lib/terminate-staff";
 import { personalEmailOf } from "@/lib/username";
 import { VISA_WINDOW_DAYS } from "@/lib/hr-windows";
@@ -269,6 +277,14 @@ export default function EmployeeDetailPage() {
   const params = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
   const allowed = isOwner(user) || isChef(user);
+  /**
+   * Ending an employment is the owners'. The head chef reaches this page and
+   * knows before anyone when somebody is finishing, so the button is still
+   * his — it asks an owner instead of doing it.
+   */
+  const canTerminate = isStrictOwner(user);
+  const terminateLabel = canTerminate ? "Terminate Employee" : "Request Terminate";
+  const terminateShort = canTerminate ? "Terminated" : "Request Terminate";
 
   const [staff, setStaff] = useState<Staff | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -277,6 +293,8 @@ export default function EmployeeDetailPage() {
   const [openDoc, setOpenDoc] = useState<SectionKey | null>(null);
   const [terminateOpen, setTerminateOpen] = useState(false);
   const [terminating, setTerminating] = useState(false);
+  /** A termination the kitchen has asked an owner to carry out. */
+  const [terminateRequest, setTerminateRequest] = useState<OwnerRequest | null>(null);
   const [termDetailsOpen, setTermDetailsOpen] = useState(false);
   const [employmentEditing, setEmploymentEditing] = useState(false);
   const [savingEmployment, setSavingEmployment] = useState(false);
@@ -316,6 +334,8 @@ export default function EmployeeDetailPage() {
           router.replace(`/people/terminated/${id}`);
           return;
         }
+
+        if (!cancelled) setTerminateRequest(readOwnerRequest(raw, TERMINATE_REQUEST_FIELD));
 
         const prevRaw = (raw.previousTermination ?? null) as Record<string, unknown> | null;
         const previousTermination = prevRaw
@@ -452,10 +472,82 @@ export default function EmployeeDetailPage() {
     [notice],
   );
 
+  /**
+   * The same modal, two outcomes.
+   *
+   * An owner ends the employment. Anyone else — the head chef is the one who
+   * has it — is asking an owner to, and the last day they picked travels with
+   * the request so the owner is answering a specific proposal rather than a
+   * vague one.
+   */
+  /**
+   * The owner's two answers to a termination the kitchen has asked for.
+   *
+   * Agreeing goes through the same termination the modal does, on the last
+   * day that was proposed — the owner is answering that proposal, so there is
+   * nothing left to pick. Keeping closes the request on the record rather
+   * than erasing it: that it was raised, and refused, is worth having.
+   */
+  async function handleApproveTerminateRequest() {
+    if (!staff || !terminateRequest || terminating) return;
+    const lastDay = terminateRequest.lastWorkingDay;
+    const ok = window.confirm(
+      `Terminate ${staff.name}?\n\n` +
+        `Last working day: ${lastDay || "not given"}.\n\n` +
+        "Their record moves to Terminated and their login stops working at once.",
+    );
+    if (!ok) return;
+    await handleConfirmTermination(lastDay || todayIso());
+  }
+
+  async function handleKeepAfterRequest() {
+    if (!staff || terminating) return;
+    setTerminating(true);
+    try {
+      await declineOwnerRequest({
+        db: getDb(),
+        uid: staff.uid,
+        field: TERMINATE_REQUEST_FIELD,
+        actor: user,
+      });
+      setTerminateRequest((prev) =>
+        prev
+          ? { ...prev, status: "declined", decidedAt: new Date(), decidedByName: actorNameOf(user) }
+          : prev,
+      );
+    } catch {
+      alert("Could not close the request. Please try again.");
+    } finally {
+      setTerminating(false);
+    }
+  }
+
   async function handleConfirmTermination(lastDayISO: string) {
     if (!staff || terminating) return;
     setTerminating(true);
     try {
+      if (!canTerminate) {
+        await requestStaffTerminate({
+          db: getDb(),
+          uid: staff.uid,
+          staffName: staff.name,
+          reason: notice?.reasonForLeaving ?? "",
+          lastWorkingDay: lastDayISO,
+          actor: user,
+        });
+        setTerminateRequest({
+          status: "pending",
+          requestedAt: new Date(),
+          requestedByName: actorNameOf(user),
+          reason: notice?.reasonForLeaving ?? "",
+          lastWorkingDay: lastDayISO,
+          decidedAt: null,
+          decidedByName: "",
+        });
+        setTerminateOpen(false);
+        setTerminating(false);
+        return;
+      }
       // The record moves to Terminated, the notice counting down to today is
       // cleared, and the login stops working — all three in lib/terminate-staff,
       // which the notice screen terminates through as well.
@@ -1086,9 +1178,43 @@ export default function EmployeeDetailPage() {
             onClick={() => setTerminateOpen(true)}
           >
             <StopIcon />
-            <span className={styles.statusLabel}>Terminated</span>
+            <span className={styles.statusLabel}>{terminateShort}</span>
           </button>
         </div>
+      ) : terminateRequest?.status === "pending" ? (
+        <section className={styles.termAsk}>
+          <p className={styles.termAskTitle}>Termination requested</p>
+          <p className={styles.termAskText}>
+            {terminateRequest.requestedByName || "Someone"} asked for {staff.name} to be
+            terminated
+            {terminateRequest.lastWorkingDay
+              ? `, last working day ${fmtDateWithDay(terminateRequest.lastWorkingDay)}`
+              : ""}
+            .{terminateRequest.reason ? ` Reason: ${terminateRequest.reason}` : ""}
+          </p>
+          {canTerminate ? (
+            <div className={styles.termAskRow}>
+              <button
+                type="button"
+                className={styles.termAskKeep}
+                disabled={terminating}
+                onClick={() => void handleKeepAfterRequest()}
+              >
+                Keep employee
+              </button>
+              <button
+                type="button"
+                className={styles.termAskGo}
+                disabled={terminating}
+                onClick={() => void handleApproveTerminateRequest()}
+              >
+                {terminating ? "Working…" : "Terminate"}
+              </button>
+            </div>
+          ) : (
+            <p className={styles.termAskText}>Waiting on an owner.</p>
+          )}
+        </section>
       ) : (
       <div className={hasNotice ? styles.statusGrid : styles.statusGridSingle}>
         {hasNotice ? (
@@ -1110,7 +1236,7 @@ export default function EmployeeDetailPage() {
               onClick={() => setTerminateOpen(true)}
             >
               <StopIcon />
-              <span className={styles.statusLabel}>Terminate Employee</span>
+              <span className={styles.statusLabel}>{terminateLabel}</span>
             </button>
           </>
         ) : (
@@ -1120,7 +1246,7 @@ export default function EmployeeDetailPage() {
             onClick={() => setTerminateOpen(true)}
           >
             <StopIcon />
-            <span className={styles.statusLabel}>Terminated</span>
+            <span className={styles.statusLabel}>{terminateShort}</span>
           </button>
         )}
       </div>

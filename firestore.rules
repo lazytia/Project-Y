@@ -89,6 +89,17 @@ service cloud.firestore {
     //    writing one on their own record — about themselves it would only be
     //    noise on the owner's list, and about the field itself it is the one
     //    thing on the record that asks for the record to go.
+    //  - Ending an employment is the owners'. The head chef may edit a record
+    //    and may raise a termination request on it — his screens do exactly
+    //    that — but he may not be the one who writes the status that ends it.
+    //    Terminating also switches the login off and moves the record off
+    //    every active list, which is not something to reach by editing.
+    function setsNoTermination() {
+      return !('status' in request.resource.data)
+        || request.resource.data.status != 'terminated'
+        || (('status' in resource.data) && resource.data.status == 'terminated');
+    }
+
     function setsNoCancelRequest() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cancelRequest']);
     }
@@ -103,7 +114,8 @@ service cloud.firestore {
       // five accounts that were allowed to. Five is too many for something
       // this hard to undo, and the kitchen never needed it.
       allow delete: if isOwner();
-      allow update: if isOwner() || isChef()
+      allow update: if isOwner()
+        || (isChef() && setsNoTermination())
         || (request.auth != null && request.auth.uid == uid
             && keepsStartDate() && keepsPayFields() && keepsEveryField()
             && setsNoCancelRequest());

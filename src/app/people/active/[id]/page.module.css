@@ -743,6 +743,72 @@
 }
 
 /* ── Change status grid ── */
+/*
+ * A termination the kitchen has asked for, standing where the Terminate
+ * button would be. The owner answers it here; anyone else is told it is
+ * with an owner, which is also why the button they pressed is gone — there
+ * is nothing to press twice.
+ */
+.termAsk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-warm-bg);
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-lg);
+}
+
+.termAskTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.termAskText {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+.termAskRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.termAskKeep {
+  height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.termAskGo {
+  height: 48px;
+  border: 1px solid var(--color-negative);
+  border-radius: var(--radius-md);
+  background: var(--color-negative);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-accent-fg);
+  cursor: pointer;
+}
+
+.termAskKeep:disabled,
+.termAskGo:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .statusGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;

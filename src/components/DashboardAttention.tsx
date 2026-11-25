@@ -18,7 +18,10 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { canViewStaffRequest } from "@/lib/permissions";
 import { isOnboardingListEmployee, staffOnboardingFlags } from "@/lib/staff-active";
-import { hasPendingCancelRequest } from "@/lib/staff-cancel-request";
+import {
+  hasPendingCancelRequest,
+  hasPendingTerminateRequest,
+} from "@/lib/staff-owner-requests";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { isNoticeGivenActive, isReadyToTerminate, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import styles from "./DashboardAttention.module.css";
@@ -41,6 +44,7 @@ type AttentionKind =
   | "soldOut"
   | "newEmployee"
   | "cancelRequest"
+  | "terminateRequest"
   | "noticeGiven"
   | "readyToTerminate"
   | "hrNotes"
@@ -252,6 +256,15 @@ async function loadCancelRequestCount(): Promise<number> {
   );
 }
 
+/** Employees the kitchen has asked an owner to finish up. */
+async function loadTerminateRequestCount(): Promise<number> {
+  const snap = await getDocs(collection(getDb(), "staff_onboarding"));
+  return snap.docs.reduce(
+    (acc, d) => (hasPendingTerminateRequest(d.data() as Record<string, unknown>) ? acc + 1 : acc),
+    0,
+  );
+}
+
 async function loadNoticeGivenCount(): Promise<number> {
   const snap = await getDocs(
     query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
@@ -445,11 +458,12 @@ export default function DashboardAttention() {
     let cancelled = false;
     (async () => {
       const sinceUtc = startOfSydneyToday();
-      const [catering, soldOut, newEmp, cancelReq, notice, ready, hr, cash] = await Promise.all([
+      const [catering, soldOut, newEmp, cancelReq, termReq, notice, ready, hr, cash] = await Promise.all([
         loadCateringCount(sinceUtc, todayKey).catch(() => 0),
         loadSoldOutCount(todayKey).catch(() => 0),
         loadNewEmployeeCount(user).catch(() => 0),
         loadCancelRequestCount().catch(() => 0),
+        loadTerminateRequestCount().catch(() => 0),
         loadNoticeGivenCount().catch(() => 0),
         loadReadyToTerminateCount().catch(() => 0),
         loadHrNotesCount(sinceUtc).catch(() => 0),
@@ -461,6 +475,7 @@ export default function DashboardAttention() {
         soldOut,
         newEmployee: newEmp,
         cancelRequest: cancelReq,
+        terminateRequest: termReq,
         noticeGiven: notice,
         readyToTerminate: ready,
         hrNotes: hr,
@@ -533,6 +548,14 @@ export default function DashboardAttention() {
         subtitle: `${counts.cancelRequest ?? 0} new employee${counts.cancelRequest === 1 ? "" : "s"} waiting on your decision`,
         href: "/people/onboarding",
         icon: <UserMinusIcon />,
+      },
+      {
+        kind: "terminateRequest",
+        count: counts.terminateRequest ?? 0,
+        title: "Termination Requested",
+        subtitle: `${counts.terminateRequest ?? 0} employee${counts.terminateRequest === 1 ? "" : "s"} waiting on your decision`,
+        href: "/people/active",
+        icon: <StopCircleIcon />,
       },
       {
         kind: "noticeGiven",
