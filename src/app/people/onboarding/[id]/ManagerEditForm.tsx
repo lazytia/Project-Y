@@ -533,14 +533,27 @@ export default function ManagerEditForm() {
             onChange={(e) => setCancelReason(e.target.value)}
             disabled={requestingCancel}
           />
-          <button
-            type="button"
-            className={styles.confirmDeleteBtn}
-            disabled={requestingCancel}
-            onClick={handleRequestCancel}
-          >
-            {requestingCancel ? "Sending…" : "Request Cancel"}
-          </button>
+          <div className={styles.confirmRow}>
+            {/* Back leaves the screen, the same way the arrow in the header
+                does. There is nothing to collapse any more — the panel is
+                the panel — so the way out is out. */}
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={goBack}
+              disabled={requestingCancel}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              className={styles.confirmDeleteBtn}
+              disabled={requestingCancel}
+              onClick={handleRequestCancel}
+            >
+              {requestingCancel ? "Sending…" : "Request Cancel"}
+            </button>
+          </div>
         </div>
       )}
 
