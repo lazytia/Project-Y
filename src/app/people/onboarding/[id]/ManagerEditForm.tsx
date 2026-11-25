@@ -12,9 +12,15 @@ import {
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
-import { isOwnerOrChef } from "@/lib/permissions";
+import { actorNameOf, isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
+import {
+  readCancelRequest,
+  requestStaffCancel,
+  type StaffCancelRequest,
+} from "@/lib/staff-cancel-request";
+import { fmtDate } from "@/lib/staff-display";
 import {
   DEFAULT_TRAINING_PERIOD,
   TRAINING_PERIODS,
@@ -119,6 +125,12 @@ export default function ManagerEditForm() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
 
+  /** The cancellation already asked for on this record, if there is one. */
+  const [cancelRequest, setCancelRequest] = useState<StaffCancelRequest | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [requestingCancel, setRequestingCancel] = useState(false);
+
   // Load existing document
   useEffect(() => {
     if (!allowed || !id) return;
@@ -152,6 +164,7 @@ export default function ManagerEditForm() {
             : "",
         );
         setNotes((raw.notes as string | undefined) ?? "");
+        setCancelRequest(readCancelRequest(raw));
         setLoadingDoc(false);
       } catch {
         if (!cancelled) setLoadingDoc(false);
@@ -191,6 +204,44 @@ export default function ManagerEditForm() {
     } catch {
       setSaving(false);
       alert("Failed to save changes. Please try again.");
+    }
+  }
+
+  /**
+   * Ask an owner to cancel this hire.
+   *
+   * The screen stays where it is afterwards: the request belongs to this
+   * record, and the person who raised it should see it sitting there rather
+   * than be returned to a list as though something had been done.
+   */
+  async function handleRequestCancel() {
+    if (requestingCancel) return;
+    setRequestingCancel(true);
+    try {
+      await requestStaffCancel({
+        db: getDb(),
+        uid: id,
+        staffName: fullName.trim(),
+        reason: cancelReason,
+        actor: user,
+      });
+      setCancelOpen(false);
+      setCancelRequest({
+        status: "pending",
+        requestedAt: new Date(),
+        requestedByName: actorNameOf(user),
+        reason: cancelReason.trim(),
+        decidedAt: null,
+        decidedByName: "",
+      });
+      setToast({
+        title: "Request sent",
+        message: "An owner has been asked to cancel this record.",
+      });
+    } catch {
+      alert("Could not send the request. Please try again.");
+    } finally {
+      setRequestingCancel(false);
     }
   }
 
@@ -445,11 +496,67 @@ export default function ManagerEditForm() {
       </button>
 
       {/*
-        No Delete here any more. This form is the manager's and the chef's —
-        the owners get the request screen — and from 2026-11-25 deleting a
-        staff record is the owners' alone. Anything wrong with a record is
-        edited above; anything worse goes to an owner.
+        No Delete here. This form is the manager's and the chef's — the owners
+        get the request screen — and deleting a staff record is the owners'.
+        What the kitchen can do is say the hire is not happening; the owner
+        decides what becomes of the record.
       */}
+      {cancelRequest?.status === "pending" ? (
+        <div className={styles.cancelPendingCard}>
+          <p className={styles.cancelPendingTitle}>Cancellation requested</p>
+          <p className={styles.cancelPendingText}>
+            {cancelRequest.requestedByName || "Someone"} asked an owner to cancel this record
+            {cancelRequest.requestedAt ? ` on ${fmtDate(cancelRequest.requestedAt)}` : ""}.
+            {cancelRequest.reason ? ` Reason: ${cancelRequest.reason}` : ""}
+          </p>
+          <p className={styles.cancelPendingText}>Waiting on an owner.</p>
+        </div>
+      ) : !cancelOpen ? (
+        <button
+          type="button"
+          className={styles.deleteBtn}
+          onClick={() => setCancelOpen(true)}
+        >
+          Request Cancel
+        </button>
+      ) : (
+        <div className={styles.confirmWrap}>
+          <p className={styles.confirmText}>
+            Ask an owner to cancel this employee? Nothing is deleted now — an owner is notified
+            and decides.
+          </p>
+          <label className={styles.fieldLabel} htmlFor="cancel-reason">
+            REASON (OPTIONAL)
+          </label>
+          <input
+            id="cancel-reason"
+            className={styles.input}
+            type="text"
+            value={cancelReason}
+            placeholder="e.g. not starting after all"
+            onChange={(e) => setCancelReason(e.target.value)}
+            disabled={requestingCancel}
+          />
+          <div className={styles.confirmRow}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={() => setCancelOpen(false)}
+              disabled={requestingCancel}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              className={styles.confirmDeleteBtn}
+              disabled={requestingCancel}
+              onClick={handleRequestCancel}
+            >
+              {requestingCancel ? "Sending…" : "Send Request"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Calendar bottom sheet */}
       {calOpen && (

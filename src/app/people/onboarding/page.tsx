@@ -26,6 +26,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { isOwner, isChef, isStrictOwner, canViewStaffRequest } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
+import { hasPendingCancelRequest } from "@/lib/staff-cancel-request";
 import {
   isOnboardingListEmployee,
   onboardingListStatus,
@@ -64,6 +65,8 @@ type StaffOnboarding = {
   requestedByName?: string;
   /** Which half of the list this row sits in, and which pill it wears. */
   listStatus: OnboardingListStatus;
+  /** Somebody has asked an owner to cancel this hire. */
+  cancelPending?: boolean;
 };
 
 /**
@@ -284,6 +287,7 @@ export default function ManagerOnboardingPage() {
             requestedByRole: raw.requestedByRole as string | undefined,
             requestedByName: raw.requestedByName as string | undefined,
             listStatus: onboardingListStatus(flags),
+            cancelPending: hasPendingCancelRequest(raw),
             listed: isOnboardingListEmployee(flags),
           };
         });
@@ -428,6 +432,13 @@ export default function ManagerOnboardingPage() {
                         <span className={styles.position}>{positionLabel(row)}</span>
                       </span>
                       <span className={styles.cardRight}>
+                        {/* Somebody has asked an owner to cancel this hire.
+                            It outranks the onboarding stage: how far through
+                            the form they are stops mattering once the question
+                            is whether they are coming at all. */}
+                        {row.cancelPending && (
+                          <span className={styles.pillCancel}>CANCEL REQUESTED</span>
+                        )}
                         {pill && (
                           <span className={`${styles.pill} ${styles.pillWarm}`}>
                             <StatusIcon status={row.listStatus} />

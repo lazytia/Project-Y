@@ -115,6 +115,72 @@
   color: var(--color-fg-muted);
 }
 
+/*
+ * Somebody has asked for this record to go, and the owner is the only one
+ * who can agree. It sits above the record itself — the question comes first,
+ * the details it is about are underneath — and carries the two answers, so
+ * neither is a button the owner has to go looking for.
+ */
+.cancelAsk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-warm-bg);
+  border: 1px solid var(--color-warm);
+  border-radius: var(--radius-lg);
+}
+
+.cancelAskTitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  color: var(--color-fg);
+}
+
+.cancelAskText {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-fg);
+}
+
+.cancelAskRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.cancelAskKeep {
+  height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+
+.cancelAskGo {
+  height: 48px;
+  border: 1px solid var(--color-negative);
+  border-radius: var(--radius-md);
+  background: var(--color-negative);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-accent-fg);
+  cursor: pointer;
+}
+
+.cancelAskKeep:disabled,
+.cancelAskGo:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .grid2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -291,6 +291,24 @@
   color: var(--color-warm);
 }
 
+/*
+ * A cancellation waiting on an owner. Filled rather than outlined, because it
+ * is the one pill on this list that is a question for the reader rather than
+ * a description of where the hire has got to.
+ */
+.pillCancel {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--color-negative);
+  color: var(--color-accent-fg);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .dateSmall {
   font-size: 11px;
   color: var(--color-fg-muted);

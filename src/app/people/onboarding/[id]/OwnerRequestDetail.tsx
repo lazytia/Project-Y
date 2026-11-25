@@ -14,8 +14,14 @@ import {
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
+import { actorNameOf } from "@/lib/permissions";
 import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import { archiveStaffRecord } from "@/lib/staff-archive";
+import {
+  declineStaffCancel,
+  readCancelRequest,
+  type StaffCancelRequest,
+} from "@/lib/staff-cancel-request";
 import { emailToUsername } from "@/lib/username";
 import Splash from "@/components/Splash";
 import Toast from "@/components/Toast";
@@ -144,6 +150,8 @@ export default function OwnerRequestDetail() {
   const [busy, setBusy] = useState(false);
   const [confirmDecline, setConfirmDecline] = useState(false);
   const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
+  /** A cancellation the kitchen or the floor has asked an owner to make. */
+  const [cancelRequest, setCancelRequest] = useState<StaffCancelRequest | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -183,6 +191,7 @@ export default function OwnerRequestDetail() {
           addedToScheduling: !!raw.addedToScheduling,
           accountCreated: !!raw.accountCreated,
         });
+        setCancelRequest(readCancelRequest(raw));
         setLoading(false);
       } catch {
         if (!cancelled) setLoading(false);
@@ -229,6 +238,41 @@ export default function OwnerRequestDetail() {
       setToast({ title: "Reverted to pending", message: "The request can be approved again." });
     } catch {
       alert("Failed to revert. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * The owner's two answers to a cancellation request.
+   *
+   * Agreeing goes through the same delete the Decline button uses, archive
+   * and all. Keeping closes the request on the record rather than erasing it:
+   * who asked, and that an owner said no, is worth having later.
+   */
+  async function handleApproveCancel() {
+    if (busy) return;
+    const ok = window.confirm(
+      `Cancel ${docData?.fullName ?? "this employee"}?\n\n` +
+        "The record comes off New Employees. A copy is filed where an owner can get it back.",
+    );
+    if (!ok) return;
+    await handleDecline();
+  }
+
+  async function handleKeepEmployee() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await declineStaffCancel({ db: getDb(), uid: id, actor: user });
+      setCancelRequest((prev) =>
+        prev
+          ? { ...prev, status: "declined", decidedAt: new Date(), decidedByName: actorNameOf(user) }
+          : prev,
+      );
+      setToast({ title: "Kept", message: "The record stays. The request is closed." });
+    } catch {
+      alert("Could not close the request. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -304,6 +348,35 @@ export default function OwnerRequestDetail() {
           {fmtDateTime(docData.createdAt)}
         </p>
       </div>
+
+      {cancelRequest?.status === "pending" && (
+        <section className={styles.cancelAsk}>
+          <p className={styles.cancelAskTitle}>Cancellation requested</p>
+          <p className={styles.cancelAskText}>
+            {cancelRequest.requestedByName || "Someone"} asked for this record to be cancelled
+            {cancelRequest.requestedAt ? ` on ${fmtDateTime(cancelRequest.requestedAt)}` : ""}.
+            {cancelRequest.reason ? ` Reason: ${cancelRequest.reason}` : ""}
+          </p>
+          <div className={styles.cancelAskRow}>
+            <button
+              type="button"
+              className={styles.cancelAskKeep}
+              disabled={busy}
+              onClick={() => void handleKeepEmployee()}
+            >
+              Keep employee
+            </button>
+            <button
+              type="button"
+              className={styles.cancelAskGo}
+              disabled={busy}
+              onClick={() => void handleApproveCancel()}
+            >
+              {busy ? "Working…" : "Cancel employee"}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className={styles.card}>
         <h2 className={styles.cardTitle}>START &amp; POSITION</h2>

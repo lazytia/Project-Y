@@ -18,6 +18,7 @@ import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { canViewStaffRequest } from "@/lib/permissions";
 import { isOnboardingListEmployee, staffOnboardingFlags } from "@/lib/staff-active";
+import { hasPendingCancelRequest } from "@/lib/staff-cancel-request";
 import { runWhenIdle } from "@/lib/run-when-idle";
 import { isNoticeGivenActive, isReadyToTerminate, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import styles from "./DashboardAttention.module.css";
@@ -39,6 +40,7 @@ type AttentionKind =
   | "catering"
   | "soldOut"
   | "newEmployee"
+  | "cancelRequest"
   | "noticeGiven"
   | "readyToTerminate"
   | "hrNotes"
@@ -236,6 +238,20 @@ async function loadNewEmployeeCount(viewer: User | null): Promise<number> {
   }, 0);
 }
 
+/**
+ * New hires somebody has asked an owner to cancel.
+ *
+ * Unscoped by who raised it, unlike the new-employee count above: a request
+ * is addressed to the owners, and all of them should see it waiting.
+ */
+async function loadCancelRequestCount(): Promise<number> {
+  const snap = await getDocs(collection(getDb(), "staff_onboarding"));
+  return snap.docs.reduce(
+    (acc, d) => (hasPendingCancelRequest(d.data() as Record<string, unknown>) ? acc + 1 : acc),
+    0,
+  );
+}
+
 async function loadNoticeGivenCount(): Promise<number> {
   const snap = await getDocs(
     query(collection(getDb(), "notice_given"), orderBy("createdAt", "desc")),
@@ -306,6 +322,17 @@ function UserPlusIcon() {
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <line x1="19" y1="8" x2="19" y2="14" />
+      <line x1="22" y1="11" x2="16" y2="11" />
+    </svg>
+  );
+}
+
+/** The same figure as UserPlusIcon, with the plus struck down to a minus. */
+function UserMinusIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
       <line x1="22" y1="11" x2="16" y2="11" />
     </svg>
   );
@@ -418,10 +445,11 @@ export default function DashboardAttention() {
     let cancelled = false;
     (async () => {
       const sinceUtc = startOfSydneyToday();
-      const [catering, soldOut, newEmp, notice, ready, hr, cash] = await Promise.all([
+      const [catering, soldOut, newEmp, cancelReq, notice, ready, hr, cash] = await Promise.all([
         loadCateringCount(sinceUtc, todayKey).catch(() => 0),
         loadSoldOutCount(todayKey).catch(() => 0),
         loadNewEmployeeCount(user).catch(() => 0),
+        loadCancelRequestCount().catch(() => 0),
         loadNoticeGivenCount().catch(() => 0),
         loadReadyToTerminateCount().catch(() => 0),
         loadHrNotesCount(sinceUtc).catch(() => 0),
@@ -432,6 +460,7 @@ export default function DashboardAttention() {
         catering,
         soldOut,
         newEmployee: newEmp,
+        cancelRequest: cancelReq,
         noticeGiven: notice,
         readyToTerminate: ready,
         hrNotes: hr,
@@ -496,6 +525,14 @@ export default function DashboardAttention() {
         subtitle: `${counts.newEmployee ?? 0} request${counts.newEmployee === 1 ? "" : "s"} pending approval`,
         href: "/people/onboarding",
         icon: <UserPlusIcon />,
+      },
+      {
+        kind: "cancelRequest",
+        count: counts.cancelRequest ?? 0,
+        title: "Cancellation Requested",
+        subtitle: `${counts.cancelRequest ?? 0} new employee${counts.cancelRequest === 1 ? "" : "s"} waiting on your decision`,
+        href: "/people/onboarding",
+        icon: <UserMinusIcon />,
       },
       {
         kind: "noticeGiven",

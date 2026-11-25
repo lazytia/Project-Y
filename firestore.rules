@@ -84,6 +84,15 @@ service cloud.firestore {
       return request.resource.data.keys().hasAll(resource.data.keys());
     }
 
+    //  - A cancellation request is the kitchen's or the floor's to raise about
+    //    a new hire, and an owner's to answer. An employee has no business
+    //    writing one on their own record — about themselves it would only be
+    //    noise on the owner's list, and about the field itself it is the one
+    //    thing on the record that asks for the record to go.
+    function setsNoCancelRequest() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cancelRequest']);
+    }
+
     match /staff_onboarding/{uid} {
       allow read: if request.auth != null;
       allow create: if isOwner() || isChef()
@@ -96,7 +105,8 @@ service cloud.firestore {
       allow delete: if isOwner();
       allow update: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid
-            && keepsStartDate() && keepsPayFields() && keepsEveryField());
+            && keepsStartDate() && keepsPayFields() && keepsEveryField()
+            && setsNoCancelRequest());
     }
 
     // The copy of a staff record taken when one is deleted, written by
