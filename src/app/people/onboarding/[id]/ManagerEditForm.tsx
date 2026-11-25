@@ -6,7 +6,6 @@ import {
   doc,
   getDoc,
   updateDoc,
-  deleteDoc,
   serverTimestamp,
   type Timestamp,
 } from "firebase/firestore";
@@ -15,7 +14,6 @@ import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
 import { isOwnerOrChef } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
-import { archiveStaffRecord } from "@/lib/staff-archive";
 import { SMS_INVITES_ENABLED } from "@/lib/sms-invites";
 import {
   DEFAULT_TRAINING_PERIOD,
@@ -119,8 +117,6 @@ export default function ManagerEditForm() {
   const [periodDraft, setPeriodDraft] = useState<TrainingPeriod>(DEFAULT_TRAINING_PERIOD);
 
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
 
   // Load existing document
@@ -195,23 +191,6 @@ export default function ManagerEditForm() {
     } catch {
       setSaving(false);
       alert("Failed to save changes. Please try again.");
-    }
-  }
-
-  async function handleDelete() {
-    if (deleting) return;
-    setDeleting(true);
-    try {
-      // The copy goes first: a record that cannot be archived is one that
-      // must not be deleted. See lib/staff-archive.
-      await archiveStaffRecord(getDb(), id, user, "new-employees-edit");
-      await deleteDoc(doc(getDb(), "staff_onboarding", id));
-      setConfirmDelete(false);
-      setToast({ title: "Employee removed", message: "The onboarding record has been deleted." });
-      window.setTimeout(() => router.push("/people/onboarding"), 900);
-    } catch {
-      setDeleting(false);
-      alert("Failed to delete employee. Please try again.");
     }
   }
 
@@ -465,39 +444,12 @@ export default function ManagerEditForm() {
         {saving ? "Saving…" : "Save Changes"}
       </button>
 
-      {/* Delete */}
-      {!confirmDelete ? (
-        <button
-          type="button"
-          className={styles.deleteBtn}
-          onClick={() => setConfirmDelete(true)}
-        >
-          Delete Employee
-        </button>
-      ) : (
-        <div className={styles.confirmWrap}>
-          <p className={styles.confirmText}>
-            Are you sure? This will permanently remove the onboarding record.
-          </p>
-          <div className={styles.confirmRow}>
-            <button
-              type="button"
-              className={styles.cancelBtn}
-              onClick={() => setConfirmDelete(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={styles.confirmDeleteBtn}
-              disabled={deleting}
-              onClick={handleDelete}
-            >
-              {deleting ? "Deleting…" : "Yes, Delete"}
-            </button>
-          </div>
-        </div>
-      )}
+      {/*
+        No Delete here any more. This form is the manager's and the chef's —
+        the owners get the request screen — and from 2026-11-25 deleting a
+        staff record is the owners' alone. Anything wrong with a record is
+        edited above; anything worse goes to an owner.
+      */}
 
       {/* Calendar bottom sheet */}
       {calOpen && (

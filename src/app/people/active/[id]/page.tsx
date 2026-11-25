@@ -19,7 +19,7 @@ import {
 import { getDb } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useBackToDashboard } from "@/hooks/useBackToDashboard";
-import { isOwner, isChef } from "@/lib/permissions";
+import { isOwner, isChef, isStrictOwner } from "@/lib/permissions";
 import { ROUTES } from "@/lib/routes";
 import { isReadyToTerminate, noticeDaysFromToday, noticeLastWorkingDay } from "@/lib/notice-last-day";
 import {
@@ -732,7 +732,12 @@ export default function EmployeeDetailPage() {
         onBack={goBack}
         menuOpen={menuOpen}
         onToggleMenu={() => setMenuOpen((v) => !v)}
-        onDelete={handleDeleteEmployee}
+        onDelete={
+          // Owners only: a deleted record takes its HR notes and notice with
+          // it, and the head chef had this until two were lost on 2026-11-25.
+          // Passing nothing takes the whole menu away.
+          isStrictOwner(user) ? handleDeleteEmployee : undefined
+        }
         deleting={deleting}
       />
 

@@ -72,7 +72,12 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid && setsNoPayFields());
-      allow delete: if isOwner() || isChef();
+      // Deleting a staff record is the owners' alone. The head chef had it
+      // too until 2026-11-25, when two new hires were deleted and the only
+      // thing anybody could say for certain was that it came from one of the
+      // five accounts that were allowed to. Five is too many for something
+      // this hard to undo, and the kitchen never needed it.
+      allow delete: if isOwner();
       allow update: if isOwner() || isChef()
         || (request.auth != null && request.auth.uid == uid
             && keepsStartDate() && keepsPayFields());
@@ -86,7 +91,8 @@ service cloud.firestore {
     // so whoever can delete a staff member can file and read these, and
     // nobody at all can edit or remove one.
     match /staff_deleted/{entryId} {
-      allow read, create: if isOwner() || isChef();
+      allow read: if isOwner() || isChef();
+      allow create: if isOwner();
     }
 
     // Published rosters: weekly docs keyed by Monday ISO date. Shift
