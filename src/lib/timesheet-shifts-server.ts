@@ -100,8 +100,15 @@ async function fetchSquareShifts(
   try {
     let tCursor: string | undefined;
     do {
+      // Everyone the location has ever had, not only who works here now.
+      //
+      // This asked for ACTIVE only, and the day somebody is deactivated in
+      // Square — which is what leaving means there — every shift they had
+      // ever worked lost its name and the timesheet called them by the first
+      // characters of an id. Square still has the name against the inactive
+      // record; it was only ever the question that excluded them.
       const res = await squareClient.teamMembers.search({
-        query: { filter: { locationIds: [locationId], status: "ACTIVE" as never } },
+        query: { filter: { locationIds: [locationId] } },
         cursor: tCursor,
         limit: 200,
       });
@@ -116,8 +123,15 @@ async function fetchSquareShifts(
         cursor?: string;
       };
       for (const m of page.teamMembers ?? []) {
-        if (!m.id || (m.status && m.status !== "ACTIVE")) continue;
-        teamMembers[m.id] = { firstName: m.givenName, lastName: m.familyName };
+        if (!m.id) continue;
+        // Marked, not dropped: their name belongs on the shifts they worked,
+        // and `inactive` is what keeps them out of the add-shift picker.
+        const inactive = !!m.status && m.status !== "ACTIVE";
+        teamMembers[m.id] = {
+          firstName: m.givenName,
+          lastName: m.familyName,
+          ...(inactive ? { inactive: true } : {}),
+        };
         const staffId = (m.referenceId ?? "").trim();
         if (staffId) staffIdByTeamMember[m.id] = staffId;
       }
@@ -378,7 +392,16 @@ export async function fetchMergedTimesheetShifts(
     .filter((s) => !dismissedIds.has(s.id) && !excludedTeamMemberIds.has(s.teamMemberId))
     .map((s) => applyConfiguredRate(s, staffRates[s.teamMemberId]));
 
-  // Name whoever Square no longer lists, from their own staff record.
+  // The location has had a hundred-odd team members over the years and all of
+  // them come back from the search above. Someone who no longer works here is
+  // only here to put a name on a shift, so the ones with no shift in this
+  // window are dropped rather than sent to the browser.
+  const worked = new Set(merged.map((s) => s.teamMemberId));
+  for (const [id, member] of Object.entries(teamMembers)) {
+    if (member.inactive && !worked.has(id)) delete teamMembers[id];
+  }
+
+  // Name whoever Square no longer lists at all, from their own staff record.
   //
   // The team-member lookup above asks Square for active staff only, so the
   // day somebody is deactivated there — which is what happens when they
